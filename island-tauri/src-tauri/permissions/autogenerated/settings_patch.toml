@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-settings-patch"
+description = "Enables the settings_patch command without any pre-configured scope."
+commands.allow = ["settings_patch"]
+
+[[permission]]
+identifier = "deny-settings-patch"
+description = "Denies the settings_patch command without any pre-configured scope."
+commands.deny = ["settings_patch"]

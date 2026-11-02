@@ -1,0 +1,15 @@
+[package]
+name = "bluetooth-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure BlueZ device/adapter core for the Hermes Island 'Bluetooth' row and quick toggles (SPEC §3.5): no IO, no network, no threads, no clock, never panics."
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

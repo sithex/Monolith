@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-layout-command"
+description = "Enables the layout_command command without any pre-configured scope."
+commands.allow = ["layout_command"]
+
+[[permission]]
+identifier = "deny-layout-command"
+description = "Denies the layout_command command without any pre-configured scope."
+commands.deny = ["layout_command"]

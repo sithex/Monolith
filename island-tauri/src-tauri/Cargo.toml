@@ -1,0 +1,91 @@
+[package]
+name = "hermes-island"
+version = "5.0.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Hermes Island on Tauri v2"
+license = "MIT"
+
+[lib]
+name = "hermes_island_lib"
+crate-type = ["rlib"]
+
+[features]
+# Phase 1 deviation from SPEC §1.2 (see VERIFICATION.md): without `custom-protocol` a plain
+# `cargo build/test` binary loads `devUrl` instead of the embedded `dist/`, which would make
+# the Xvfb integration test exercise a blank page. `cargo tauri dev` turns it off itself.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+# Phase 1 subset of the SPEC §1.2 table. Every version/pin is copied verbatim; the remaining
+# rows (reqwest, keyring, zbus, portable-pty, ...) are added in the phase that first uses them.
+# The full table was resolved and checked in a scratch crate (see VERIFICATION.md).
+[dependencies]
+tauri = { version = "2.12", features = ["tray-icon", "image-png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+specta = { version = "=2.0.0-rc.26", features = ["derive", "serde_json"] }
+specta-typescript = "=0.0.13"
+tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
+tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread", "net", "io-util", "fs", "signal", "process"] }
+thiserror = "2"
+portable-pty = "0.9"
+shell-words = "1"
+notify = "8"
+libc = "0.2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+regex = "1.13.1"
+xxhash-rust = { version = "=0.8.15", features = ["xxh3"] }
+base64 = "=0.23.1"
+# Phase 6a weather (SPEC §3.5): Open-Meteo over HTTPS. Verified on crates.io/docs.rs: 0.13.5
+# (MSRV 1.85); `rustls` = rustls + aws-lc-rs + platform verifier, no native-tls/OpenSSL.
+# Bodies are parsed by weather-core (256 KiB cap), so the `json` feature is not enabled.
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls"] }
+# Phase 6b2 calendar time zones (SPEC §8 6b carried bug): verified on crates.io/docs.rs, jiff 0.2.38
+# (MSRV 1.70, Unlicense OR MIT). Only std + system TZ + zoneinfo dirs; no bundled tzdb, no serde.
+jiff = { version = "=0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+gdk = "0.18"
+glib = "0.18"
+cairo-rs = "0.18"
+zbus = { version = "6", default-features = false, features = ["tokio"] }
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+x11rb = { version = "0.14", features = ["shape", "xfixes"] }
+# Deviation (VERIFICATION.md): tauri does not re-export it; already in the tree at 0.6.2.
+raw-window-handle = "0.6"
+# `system`: libwayland-backed client, so the native-Wayland window path can share GDK's own
+# wl_display (input region + KDE blur on the island surface). The clipboard's private
+# connection works the same on either backend.
+wayland-client = { version = "=0.31.15", features = ["system"] }
+wayland-protocols = { version = "=0.32.12", features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "=0.3.12", features = ["client"] }
+# Native Wayland (Nov 2c, `displayBackend: wayland`): wlr-layer-shell overlay surface for the
+# island (exact placement over the panel), KDE blur-behind protocol, GDK Wayland handles.
+gtk-layer-shell = { version = "=0.8.2", features = ["v0_6"] }
+wayland-protocols-plasma = { version = "=0.3.12", features = ["client"] }
+gdkwayland-sys = "0.18"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+wl-clipboard-rs = "=0.9.5"
+# xtest: synthetic key events for the Xvfb test. image: PNG evidence screenshots.
+x11rb = { version = "0.14", features = ["shape", "xfixes", "xtest"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+todo = "deny"
+unimplemented = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+panic = "abort"

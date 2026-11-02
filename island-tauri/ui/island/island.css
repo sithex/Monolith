@@ -1,0 +1,62 @@
+@import './workshop.css';
+@import './workshop-apps.css';
+@import './vorssaint.css';
+html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+main { height: 100%; display: flex; flex-direction: column; align-items: center; padding-top: 8px; }
+.island { flex: none; display: flex; flex-direction: column; position: relative; overflow: hidden; user-select: none; -webkit-user-select: none; background: var(--ui-background); color: var(--ui-text); border: 1px solid var(--island-border, var(--ui-border)); box-shadow: var(--ui-shadow); transform: translate(var(--popup-x, 0px), var(--popup-y, 0px)); }
+html[data-panel-anchor='true'] .island[data-state='still']:not([data-morphing='true']) { visibility: hidden; }
+html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] { visibility: hidden; }
+/* Under the panel notch the island's clock is an exact replica of the native notch clock
+   (PanelPill.qml: 12 px bold time over 10 px demibold date, spacing -1, centred in the
+   notch box), drawn in that same box. It stays put and visible through every open/close,
+   so the shell's final fade hands over to an identical clock: nothing jumps or blinks. */
+.island { --bw: 1px; }
+.island[data-notching='true'] { --bw: 0px; }
+.island[data-state='still'] .topline { justify-content: center; padding: 0; }
+.topline { position: relative; display: flex; align-items: center; height: 42px; min-height: 42px; gap: 14px; padding: 0 18px; font-size: 12px; }
+.clock { padding: 2px 0; display: flex; flex-direction: column; align-items: center; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.clock small { color: var(--ui-dim); font-size: 10px; }
+.topline[data-notch-clock='false'] .clock { order: -1; }
+.topline[data-notch-clock='true'] .clock { position: absolute; top: calc(-1 * var(--bw) - 2px); left: 50%; width: var(--native-pill-width); height: var(--native-pill-height);
+  margin-left: calc(var(--native-pill-width) / -2); padding: 0 !important; justify-content: center; gap: 0; border-radius: 0 0 10px 10px;
+  font-family: system-ui, 'Noto Sans', sans-serif; font-variant-numeric: normal; color: var(--ui-text); transition: color .25s ease, background-color .18s ease; }
+.topline[data-notch-clock='true'] .clock span { display: block; position: relative; top: 1px; height: 14px; font-size: 12px; font-weight: 700; line-height: 14px; }
+.topline[data-notch-clock='true'] .clock small { display: block; height: 12px; margin-top: 0; font-size: 10px; font-weight: 600; line-height: 12px; letter-spacing: -.25px; color: inherit; }
+.topline[data-notch-clock='true'] .clock[data-date='false'] span { height: 18px; font-size: 14px; line-height: 18px; }
+.island .topline[data-notch-clock='true'] .clock:active:not(:disabled) { transform: none; opacity: 1; }
+/* Closing: the native notch's own text colour (the Hermes skin), so the hand-off is exact. */
+.island[data-state='still'] .topline[data-notch-clock='true'] .clock { color: var(--notch-text, var(--ui-text)); }
+.collapse { margin-left: auto; font-size: 24px; width: 32px; padding: 0; }
+.preview { padding: 20px 24px; flex: 1; }
+.preview h2 { font-size: 21px; font-weight: 500; }
+.preview button { margin-top: 20px; width: 100%; }
+.terminal-wrap { display: flex; flex: 1; min-height: 0; padding: 0 16px 18px; }
+
+.island[data-morphing='true'] > .terminal-wrap { will-change: transform, opacity, filter; }
+.island[data-state='large'][data-morphing='true'] > .terminal-wrap { position: absolute; top: 42px; left: 50%; margin-left: calc(var(--open-content-width) / -2); width: var(--open-content-width); height: var(--open-content-height); flex: none; }
+.view-stage { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; }
+.view-tabs { display: flex; min-height: 36px; align-items: center; gap: 5px; border-bottom: 1px solid var(--ui-border); font-size: 12px; }
+.view-tabs button[aria-current='page'] { color: var(--ui-accent); background: var(--ui-surface); }
+.island-shell { border: 0; box-shadow: none; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.shell-content { flex: 1; min-height: 0; padding: 0; display: flex; }
+.view-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* WebKitGTK overlay scrollbars have a wider hit area than their painted thumb.
+   Keep right-edge controls outside that area; xterm retains its separate padding. */
+.app-pane { flex: 1; min-width: 0; min-height: 0; overflow: auto; scrollbar-width: thin; padding: 4px 20px 12px 4px; }
+.card { overflow-wrap: anywhere; }
+.terminal-pane { display: flex; padding: 0; }
+.terminal { flex: 1; min-width: 0; min-height: 0; user-select: text; -webkit-user-select: text; }
+.terminal *, .terminal textarea { font-family: 'DejaVu Sans Mono', monospace; user-select: text; -webkit-user-select: text; }
+.xterm { height: 100%; }
+.terminal .xterm-viewport, .terminal .xterm-screen, .terminal canvas { background: transparent !important; }
+.island input, .island textarea { user-select: text; -webkit-user-select: text; }
+[hidden] { display: none !important; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 40px; }
+.setting-row input[type='range'] { width: 180px; margin-left: auto; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+legend { margin: 8px 0; font-weight: 600; }
+.gauge h3 strong { margin-left: auto; font-size: 21px; font-variant-numeric: tabular-nums; }
+.gauge progress { --tone: var(--ui-accent); }
+.dashboard .card p, .monitor .card p { font-size: 12px; }
+main > [role='alert'] { color: var(--ui-error); }
+.live-side-button { z-index: 5; box-shadow: var(--ui-shadow); color: var(--ui-text); background: var(--ui-background); border: 1px solid var(--island-border, var(--ui-border)); }

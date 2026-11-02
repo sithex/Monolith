@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-downloads-get"
+description = "Enables the downloads_get command without any pre-configured scope."
+commands.allow = ["downloads_get"]
+
+[[permission]]
+identifier = "deny-downloads-get"
+description = "Denies the downloads_get command without any pre-configured scope."
+commands.deny = ["downloads_get"]

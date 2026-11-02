@@ -1,0 +1,15 @@
+[package]
+name = "weather-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure Open-Meteo URLs, response parsing, weather conditions and refresh policy"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

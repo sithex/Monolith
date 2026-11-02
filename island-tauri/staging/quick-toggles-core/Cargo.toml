@@ -1,0 +1,15 @@
+[package]
+name = "quick-toggles-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure core for the Hermes Island Phase 6b Controls quick toggles (SPEC §0.5, bullet \"Quick toggles\"): power profile (power-profiles-daemon), mic mute (PipeWire pulse via pactl) and Do Not Disturb. The Tauri actor runs D-Bus/pactl; this crate builds argv and parses text. No IO, no network, no threads, no clock, never panics."
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

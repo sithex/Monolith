@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notch-scheme-set"
+description = "Enables the notch_scheme_set command without any pre-configured scope."
+commands.allow = ["notch_scheme_set"]
+
+[[permission]]
+identifier = "deny-notch-scheme-set"
+description = "Denies the notch_scheme_set command without any pre-configured scope."
+commands.deny = ["notch_scheme_set"]

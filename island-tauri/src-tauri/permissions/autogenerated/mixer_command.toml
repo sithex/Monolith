@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mixer-command"
+description = "Enables the mixer_command command without any pre-configured scope."
+commands.allow = ["mixer_command"]
+
+[[permission]]
+identifier = "deny-mixer-command"
+description = "Denies the mixer_command command without any pre-configured scope."
+commands.deny = ["mixer_command"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tiles-get"
+description = "Enables the tiles_get command without any pre-configured scope."
+commands.allow = ["tiles_get"]
+
+[[permission]]
+identifier = "deny-tiles-get"
+description = "Denies the tiles_get command without any pre-configured scope."
+commands.deny = ["tiles_get"]

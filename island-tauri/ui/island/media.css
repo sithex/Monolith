@@ -1,0 +1,52 @@
+.now-playing { gap: 14px; }
+.now-playing .track-header { display: flex; align-items: center; gap: 18px; }
+.now-playing .artwork { width: 108px; height: 108px; flex: 0 0 108px; border-radius: 12px; overflow: hidden; position: relative; background: rgb(255 255 255 / .065); display: grid; place-items: center; }
+.now-playing .artwork .bounded-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+.now-playing .track-description { min-width: 0; flex: 1; }
+.now-playing .track-description h2 { font-size: 20px; line-height: 1.2; margin: 7px 0; overflow-wrap: anywhere; }
+.now-playing .track-description p { margin: 0 0 5px; }
+.now-playing .track-source { display: flex; align-items: center; gap: 12px; }
+.music-indicator { display: inline-flex; align-items: center; justify-content: center; gap: 2px; height: 18px; width: 23px; color: var(--ui-accent); }
+/* Clip the retained oscillator rather than removing its animation on pause.
+   The centred 3px clip is always filled (minimum waveform height is 3.2px),
+   so every paused bar settles to the same dot without a transform jump. */
+.music-indicator i { width: 3px; height: 16px; max-height: 3px; border-radius: 2px; overflow: hidden; display: flex; align-items: center; transition: max-height 240ms ease-out; }
+.music-indicator i b { width: 3px; height: 16px; flex: 0 0 auto; border-radius: 2px; background: currentColor; animation: music-indicator-bounce 850ms ease-in-out infinite alternate; animation-play-state: paused; }
+.music-indicator i:nth-child(2) b { animation-duration: 670ms; animation-delay: -420ms; }
+.music-indicator i:nth-child(3) b { animation-duration: 1010ms; animation-delay: -720ms; }
+.music-indicator i:nth-child(4) b { animation-duration: 730ms; animation-delay: -180ms; }
+.music-indicator i:nth-child(5) b { animation-duration: 930ms; animation-delay: -570ms; }
+.music-indicator[data-playing="true"] i { max-height: 16px; }
+.music-indicator[data-playing="true"]:not([data-static="true"]) i b { animation-play-state: running; }
+.music-indicator[data-static="true"] i { transition: none; }
+.music-indicator[data-static="true"] i b { animation: none; transform: scaleY(.45); }
+.now-playing .transport { display: flex; justify-content: center; align-items: center; gap: 26px; padding: 2px 0; }
+.island .now-playing .transport button { display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; color: var(--ui-text); background: transparent;
+  transition: background-color .18s ease, transform .28s var(--v-ease), opacity .18s ease, color .18s ease; }
+.island .now-playing .transport .transport-skip { width: 46px; height: 46px; }
+.island .now-playing .transport .transport-skip svg { width: 25px; height: 25px; }
+.island .now-playing .transport .transport-skip:hover:not(:disabled) { background: var(--v-hover); }
+.island .now-playing .transport .transport-main { position: relative; width: 58px; height: 58px; background: var(--ui-text); color: var(--ui-background);
+  box-shadow: 0 6px 18px rgb(0 0 0 / .35); }
+.island .now-playing .transport .transport-main:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-text) 88%, var(--ui-accent)); transform: scale(1.04); }
+.island .now-playing .transport button:active:not(:disabled) { transform: scale(.9); opacity: .85; }
+.now-playing .transport-main svg { grid-area: 1 / 1; width: 28px; height: 28px; transition: opacity .2s ease, transform .32s var(--v-ease); }
+.now-playing .transport-main .glyph-play { transform: translateX(1px); }
+.now-playing .transport-main[data-playing='true'] .glyph-play, .now-playing .transport-main[data-playing='false'] .glyph-pause { opacity: 0; transform: scale(.55); }
+.island .now-playing .transport button:disabled { opacity: .35; }
+.now-playing .track-progress progress { width: 100%; height: 4px; border: 0; border-radius: 2px; overflow: hidden; accent-color: var(--ui-accent); }
+.now-playing .track-progress progress::-webkit-progress-bar { background: rgb(255 255 255 / .12); }
+.now-playing .track-progress progress::-webkit-progress-value { background: var(--ui-accent); }
+.now-playing .player-volume { display: flex; gap: 12px; align-items: center; font-size: 12px; }
+.now-playing .player-volume input { flex: 1; min-width: 0; }
+.now-playing .player-volume small { min-width: 34px; text-align: right; }
+.now-playing .lyrics { border-radius: 16px; padding: 16px; background: rgb(255 255 255 / .065); }
+.now-playing .lyrics-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.now-playing .lyrics-heading h3 { margin: 0; }
+.now-playing .lyrics-switch { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.now-playing .synced-lyrics { position: relative; max-height: 180px; overflow-y: auto; list-style: none; margin: 0; padding: 48px 4px; scroll-padding: 48px 0; }
+.now-playing .synced-lyrics li { padding: 8px 0; font-size: 15px; line-height: 1.5; color: var(--ui-dim); transition: color 200ms ease; }
+.now-playing .synced-lyrics li[aria-current="true"] { color: var(--ui-accent); font-weight: 700; }
+.now-playing .plain-lyrics { white-space: pre-wrap; max-height: 200px; overflow-y: auto; line-height: 1.65; margin: 0; }
+@keyframes music-indicator-bounce { 0% { transform: scaleY(.2); } 35% { transform: scaleY(.85); } 65% { transform: scaleY(.4); } 100% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .music-indicator i { transition: none; } .music-indicator i b { animation: none !important; transform: scaleY(.45); } .now-playing .synced-lyrics li { transition: none; } }

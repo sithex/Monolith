@@ -1,0 +1,15 @@
+[package]
+name = "ai-dashboard-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure aggregation core for the Hermes Island Phase 7 AI-stats dashboard (SPEC §0.5 Apps bullet): receives already-decoded usage rows and limit windows and computes the stat cards (per-provider session/week limits with reset countdowns, spending today, the now active session, hourly trend, per-model/per-project cost, activity heatmap). No IO, no SQLite, no network, no threads, no clock, no chrono, never panics."
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

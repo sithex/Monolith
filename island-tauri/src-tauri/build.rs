@@ -1,0 +1,75 @@
+// Declaring the app manifest makes every app command require an explicit `allow-<command>`
+// permission, so `capabilities/island.json` is a real allow-list (SPEC §1.3).
+// Keep this list literal and in sync with `collect_commands!` in `src/lib.rs`; the
+// `command_lists_match` test in lib.rs fails if they drift.
+const COMMANDS: &[&str] = &[
+    "launcher_get",
+    "launcher_command",
+    "layout_get",
+    "layout_command",
+    "layout_geometry",
+    "visual_get",
+    "appearance_set",
+    "island_bootstrap",
+    "island_dispatch",
+    "island_report_geometry",
+    "settings_get",
+    "settings_patch",
+    "palette_get",
+    "hermes_theme_sync",
+    "notch_scheme_set",
+    "terminal_attach",
+    "terminal_input",
+    "terminal_resize",
+    "terminal_restart",
+    "terminal_ack",
+    "system_stats",
+    "ai_usage",
+    "ai_connect",
+    "voice_command",
+    "notifications_list",
+    "notifications_dismiss",
+    "notifications_clear",
+    "clipboard_list",
+    "clipboard_get",
+    "clipboard_copy",
+    "clipboard_pin",
+    "clipboard_delete",
+    "clipboard_clear",
+    "clipboard_set_paused",
+    "weather_refresh",
+    "weather_geocode",
+    "media_control",
+    "media_set_visible",
+    "timer_get",
+    "timer_command",
+    "scratchpad_get",
+    "scratchpad_command",
+    "downloads_get",
+    "downloads_open",
+    "calendar_get",
+    "calendar_command",
+    "calendar_refresh",
+    "calendar_set_subscription",
+    "brightness_get",
+    "brightness_command",
+    "agents_get",
+    "mixer_get",
+    "mixer_command",
+    "toggles_get",
+    "toggles_command",
+    "updates_get",
+    "updates_refresh",
+    "tiles_get",
+    "tiles_command",
+    "test_probe_reply",
+];
+
+fn main() {
+    let attributes = tauri_build::Attributes::new()
+        .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS));
+    if let Err(error) = tauri_build::try_build(attributes) {
+        eprintln!("tauri build failed: {error:#}");
+        std::process::exit(1);
+    }
+}

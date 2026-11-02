@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-media-set-visible"
+description = "Enables the media_set_visible command without any pre-configured scope."
+commands.allow = ["media_set_visible"]
+
+[[permission]]
+identifier = "deny-media-set-visible"
+description = "Denies the media_set_visible command without any pre-configured scope."
+commands.deny = ["media_set_visible"]

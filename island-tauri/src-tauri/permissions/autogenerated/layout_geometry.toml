@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-layout-geometry"
+description = "Enables the layout_geometry command without any pre-configured scope."
+commands.allow = ["layout_geometry"]
+
+[[permission]]
+identifier = "deny-layout-geometry"
+description = "Denies the layout_geometry command without any pre-configured scope."
+commands.deny = ["layout_geometry"]

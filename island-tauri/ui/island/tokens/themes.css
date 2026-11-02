@@ -1,0 +1,52 @@
+@font-face { font-family: 'OpenRunde'; src: url('../../src/assets/fonts/OpenRunde-Regular.woff') format('woff'); font-weight: 400; font-display: block; }
+@font-face { font-family: 'OpenRunde'; src: url('../../src/assets/fonts/OpenRunde-Medium.woff') format('woff'); font-weight: 500; font-display: block; }
+@font-face { font-family: 'OpenRunde'; src: url('../../src/assets/fonts/OpenRunde-Semibold.woff') format('woff'); font-weight: 600; font-display: block; }
+@font-face { font-family: 'OpenRunde'; src: url('../../src/assets/fonts/OpenRunde-Bold.woff') format('woff'); font-weight: 700; font-display: block; }
+/* Same upstream skin roles as ui/legacy/style.css. Host sets --skin-* once,
+   then pushes palette updates. These fallbacks are the legacy default skin. */
+:root, [data-theme='skin'] {
+  color-scheme: dark;
+  --ui-background: var(--skin-background, #111111);
+  --ui-text: var(--skin-text, #dddddd);
+  --ui-primary: var(--skin-primary, #eeeeee);
+  --ui-accent: var(--skin-accent, #dddddd);
+  --ui-dim: var(--skin-dim, #999999);
+  --ui-border: var(--skin-border, #444444);
+  --ui-surface: var(--skin-surface, #222222);
+  --ui-error: var(--skin-error, #ff8888);
+  --ui-blue: var(--skin-primary, #eeeeee);
+  --ui-amber: var(--skin-accent, #dddddd);
+  --ui-green: var(--skin-accent, #dddddd);
+  --ui-pink: var(--skin-primary, #eeeeee);
+  --ui-violet: var(--skin-primary, #eeeeee);
+  --ui-shadow: 0 24px 70px #0005;
+  --ui-page: color-mix(in srgb, var(--ui-background) 88%, var(--ui-border));
+  --ui-raised: color-mix(in srgb, var(--ui-surface) 82%, var(--ui-text) 4%);
+  --ui-on-accent: var(--ui-background);
+  --ui-font: 'OpenRunde', 'Noto Sans', system-ui, sans-serif;
+  --ui-mono: 'DejaVu Sans Mono', monospace;
+  --ui-radius: 24px;
+  --ui-card-radius: 18px;
+  --ui-tile-radius: 17px;
+  --ui-focus: var(--ui-accent);
+}
+[data-theme='neutral'] {
+  --ui-background: #000000;
+  --ui-surface: #111111;
+  --ui-raised: #1c1c1e;
+  --ui-text: #eeeeef;
+  --ui-primary: #ffffff;
+  --ui-dim: #a0a0a5;
+  --ui-border: #303034;
+  --ui-accent: #479dff;
+  --ui-error: #ff8b8b;
+  --ui-blue: #8198f3;
+  --ui-amber: #ffb000;
+  --ui-green: #80c99a;
+  --ui-pink: #ff3d81;
+  --ui-violet: #c0a1ff;
+  --ui-page: #202023;
+  --ui-on-accent: #000000;
+  --ui-shadow: 0 24px 70px #0005;
+}
+

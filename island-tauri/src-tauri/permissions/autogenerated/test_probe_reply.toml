@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-test-probe-reply"
+description = "Enables the test_probe_reply command without any pre-configured scope."
+commands.allow = ["test_probe_reply"]
+
+[[permission]]
+identifier = "deny-test-probe-reply"
+description = "Denies the test_probe_reply command without any pre-configured scope."
+commands.deny = ["test_probe_reply"]

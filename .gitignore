@@ -1,0 +1,44 @@
+# The Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+native/mac-notch/build/
+native/mac-notch/prebuilds/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Isolated Hermes Island runtime state and local evidence
+.island-data/
+.island-data-overlay/
+.island-data-overlay-test/
+island/backups/
+island/__pycache__/
+island/evidence/
+test-results/
+playwright-report/
+island-rust/target/
+island-rust/evidence/
+island-rust/tests/__pycache__/
+island-native/target/
+island-native/evidence/
+island-native/tests/__pycache__/
+.island-data-native-test/
+__pycache__/

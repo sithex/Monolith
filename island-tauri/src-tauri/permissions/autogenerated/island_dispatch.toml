@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-island-dispatch"
+description = "Enables the island_dispatch command without any pre-configured scope."
+commands.allow = ["island_dispatch"]
+
+[[permission]]
+identifier = "deny-island-dispatch"
+description = "Denies the island_dispatch command without any pre-configured scope."
+commands.deny = ["island_dispatch"]

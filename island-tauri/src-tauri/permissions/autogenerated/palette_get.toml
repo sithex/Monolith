@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-palette-get"
+description = "Enables the palette_get command without any pre-configured scope."
+commands.allow = ["palette_get"]
+
+[[permission]]
+identifier = "deny-palette-get"
+description = "Denies the palette_get command without any pre-configured scope."
+commands.deny = ["palette_get"]

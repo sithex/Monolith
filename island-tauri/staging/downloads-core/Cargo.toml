@@ -1,0 +1,15 @@
+[package]
+name = "downloads-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure core for the Hermes Island Phase 6b Downloads app (SPEC §0.5, §8): recent files in the XDG download dir via directory notifications; open/reveal. Turns scan results + change events into the list the UI shows; the Tauri actor does the inotify watching, stat calls and opening. No IO, no network, no threads, no clock, never panics."
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

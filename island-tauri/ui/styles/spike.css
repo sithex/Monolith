@@ -1,0 +1,18 @@
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+/* Phase 2.5 spike: a flat, distinct colour so the compositor captures can classify pixels
+   without guessing. The alpha is driven from the test (opaque for stacking/morph, translucent
+   for the blur check). */
+.spike-island {
+  position: absolute;
+  box-sizing: border-box;
+  background: rgba(255, 200, 0, var(--spike-alpha, 1));
+}

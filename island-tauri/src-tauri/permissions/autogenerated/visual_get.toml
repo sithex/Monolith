@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-visual-get"
+description = "Enables the visual_get command without any pre-configured scope."
+commands.allow = ["visual_get"]
+
+[[permission]]
+identifier = "deny-visual-get"
+description = "Denies the visual_get command without any pre-configured scope."
+commands.deny = ["visual_get"]

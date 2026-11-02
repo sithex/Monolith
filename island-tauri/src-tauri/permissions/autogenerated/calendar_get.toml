@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-calendar-get"
+description = "Enables the calendar_get command without any pre-configured scope."
+commands.allow = ["calendar_get"]
+
+[[permission]]
+identifier = "deny-calendar-get"
+description = "Denies the calendar_get command without any pre-configured scope."
+commands.deny = ["calendar_get"]

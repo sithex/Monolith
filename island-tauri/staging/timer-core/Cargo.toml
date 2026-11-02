@@ -1,0 +1,15 @@
+[package]
+name = "timer-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure Timer core (countdown, pomodoro, stopwatch) for the Hermes Island Phase 6b Timer app (SPEC §0.5, §8): no IO, no network, no threads, no clock, never panics."
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

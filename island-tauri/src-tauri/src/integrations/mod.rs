@@ -1,0 +1,27 @@
+//! Independent native integrations; lifecycle wiring belongs to the application host.
+pub mod agents;
+pub mod apps;
+pub mod bluetooth;
+pub mod brightness;
+pub mod calendar;
+pub mod clipboard;
+pub mod control_actor;
+pub mod control_dbus;
+pub mod control_process;
+#[cfg(target_os = "linux")]
+pub mod dbus_util;
+pub mod downloads;
+pub mod media;
+pub mod mixer;
+pub mod notifications;
+pub mod plasma;
+pub mod power;
+pub mod private_file;
+pub mod scratchpad;
+pub mod service_status;
+pub mod system_services;
+pub mod tiles;
+pub mod timer;
+pub mod toggles;
+pub mod updates;
+pub mod weather;

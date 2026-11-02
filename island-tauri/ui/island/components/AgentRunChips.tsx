@@ -1,0 +1,5 @@
+import type { AgentUpdate, AppViewIntents } from '../app-presentations';
+import { duration } from './TimerApp';
+export function AgentRunChips({ update, intents }: { update: AgentUpdate; intents: Pick<AppViewIntents, 'agent'> }) {
+  return <div className="agent-chips" aria-label="Agent runs">{update.chips.map(chip => <button className="agent-chip" key={chip.id} onClick={() => intents.agent(chip.id)}><span className="status-dot online"/><span><strong>{chip.label}</strong><small>{chip.model ?? 'Unknown model'} · {duration(Math.max(0, chip.elapsedSecs) * 1000)}{chip.isDelegated && ' · delegated'}</small></span><span className="child-count" aria-label={`${chip.children} children`}>{chip.children} ↳</span></button>)}{update.overflow > 0 && <button className="overflow-chip" aria-label={`Show ${update.overflow} more agent runs`} onClick={() => intents.agent(null)}>+{update.overflow}</button>}{!update.chips.length && update.overflow === 0 && <span className="muted">No active runs reported</span>}</div>;
+}

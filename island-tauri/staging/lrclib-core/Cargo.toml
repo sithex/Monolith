@@ -1,0 +1,16 @@
+[package]
+name = "lrclib-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure LRCLIB lyrics-lookup core for the Hermes Island Phase 6 'Music extras' (SPEC §8): query building, response parsing, cache keys; no IO, no network, no threads, no clock, never panics."
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

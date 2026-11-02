@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "island-main",
+  "description": "Permissions of the single island window. Core permissions are added only when a concrete call fails.",
+  "windows": ["island"],
+  "permissions": ["core:event:default", "island-commands"]
+}

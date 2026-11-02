@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hermes-theme-sync"
+description = "Enables the hermes_theme_sync command without any pre-configured scope."
+commands.allow = ["hermes_theme_sync"]
+
+[[permission]]
+identifier = "deny-hermes-theme-sync"
+description = "Denies the hermes_theme_sync command without any pre-configured scope."
+commands.deny = ["hermes_theme_sync"]

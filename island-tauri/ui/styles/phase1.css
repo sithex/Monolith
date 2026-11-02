@@ -1,0 +1,21 @@
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+.island {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1b1b1b; /* fully opaque: the screenshot test reads alpha from these pixels */
+  color: #f5efe0;
+  border: 1px solid #ffd84a;
+  font: 600 14px system-ui, sans-serif;
+}

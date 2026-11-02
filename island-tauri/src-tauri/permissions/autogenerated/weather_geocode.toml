@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-weather-geocode"
+description = "Enables the weather_geocode command without any pre-configured scope."
+commands.allow = ["weather_geocode"]
+
+[[permission]]
+identifier = "deny-weather-geocode"
+description = "Denies the weather_geocode command without any pre-configured scope."
+commands.deny = ["weather_geocode"]

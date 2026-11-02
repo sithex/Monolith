@@ -1,0 +1,13 @@
+[package]
+name = "lrc-lyrics"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure LRC synced-lyrics parser for the Hermes Island music widget (SPEC §8 Phase 6 Music extras): no IO, no network, never panics."
+license = "MIT"
+
+[dependencies]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

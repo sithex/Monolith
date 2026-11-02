@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-toggles-get"
+description = "Enables the toggles_get command without any pre-configured scope."
+commands.allow = ["toggles_get"]
+
+[[permission]]
+identifier = "deny-toggles-get"
+description = "Denies the toggles_get command without any pre-configured scope."
+commands.deny = ["toggles_get"]

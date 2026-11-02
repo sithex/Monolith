@@ -1,0 +1,156 @@
+--- island/renderer.jsx
++++ island-tauri/ui/legacy/renderer.jsx
+@@ -1,9 +1,10 @@
+-import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
++import React, { useEffect, useMemo, useRef, useState } from "react";
+ import { createRoot } from "react-dom/client";
+ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+ import { Terminal } from "@xterm/xterm/lib/xterm.js";
+ import { FitAddon } from "@xterm/addon-fit";
+-import stateMachine from "./state.cjs";
++import { dispatch as dispatchIntent, subscribeCue, useIslandState } from "../ipc/island-state";
++import { toLegacyMode } from "../ipc/legacy-mode";
+ import paletteTools from "./palette.cjs";
+ import clickSoundTools from "./click-sound.cjs";
+ import AIStats from "./ai-stats.jsx";
+@@ -301,10 +302,13 @@
+     if (border) root.style.setProperty("--island-border", border);
+     else root.style.removeProperty("--island-border");
+   }, [effectivePalette, cfg.borderEnabled, cfg.borderColor, cfg.uiFont]);
+-  const [mode, dispatch] = useReducer(stateMachine.transition, "idle");
+-  const modeRef = useRef(mode);
+-  modeRef.current = mode;
+-  const [view, setView] = useState("terminal");
++  // Phase 3 ownership seam: mode, view and `started` are the Rust actor's, never local.
++  const island = useIslandState();
++  const mode = toLegacyMode(island.mode);
++  const view = island.view;
++  const started = island.terminalStarted;
++  const stateRev = useRef(island.rev);
++  stateRev.current = island.rev;
+   const [direction, setDirection] = useState(1);
+   const viewIds = VIEWS.map((v) => v.id).filter((id) => id !== "monitor" || cfg.hardwareMonitor);
+   const navigate = (dir) => {
+@@ -312,7 +316,7 @@
+     const next = idx + dir;
+     if (next < 0 || next >= viewIds.length) return;
+     setDirection(dir);
+-    setView(viewIds[next]);
++    dispatchIntent({ type: "selectView", view: viewIds[next] }).catch(fail);
+   };
+   useEffect(() => {
+     let frame = null;
+@@ -334,10 +338,10 @@
+         }
+         const rect = {x:Math.max(0, b.x), y:Math.max(0, b.y), width:b.width, height:b.height};
+         rect.radius = parseFloat(getComputedStyle(el).borderRadius) || 0;
+-        const key = JSON.stringify([mode, devicePixelRatio, rect]);
++        const key = JSON.stringify([mode, devicePixelRatio, rect, stateRev.current]);
+         if (api.overlay && key !== previousLayout.current) {
+           previousLayout.current = key;
+-          api.layout(rect, mode, devicePixelRatio).catch((e) => console.error(e));
++          api.layout(rect, mode, devicePixelRatio, stateRev.current).catch((e) => console.error(e));
+         }
+       }
+     };
+@@ -362,7 +366,7 @@
+       window.removeEventListener("resize", schedule);
+       if (frame !== null) cancelAnimationFrame(frame);
+     };
+-  }, [mode, view, cfg.offsetX, cfg.offsetY, cfg.uiFont, cfg.showDate]);
++  }, [mode, view, island.rev, cfg.offsetX, cfg.offsetY, cfg.uiFont, cfg.showDate]);
+   const [viewport, setViewport] = useState({ width: innerWidth, height: innerHeight });
+   // Dynamic-island scaling: each view sizes the island to its own content,
+   // mirroring upstream Ripple's per-tab widths/heights.
+@@ -377,7 +381,6 @@
+   const [time, setTime] = useState(new Date());
+   const [voice, setVoice] = useState("checking");
+   const [error, setError] = useState("");
+-  const [started, setStarted] = useState(false);
+   const [session, setSession] = useState({});
+   const [busy, setBusy] = useState(false);
+   const [stats, setStats] = useState(null);
+@@ -424,22 +427,12 @@
+     const timer = setInterval(poll, 1500);
+     return () => { live = false; clearTimeout(warm); clearInterval(timer); };
+   }, [mode, view]);
+-  const hoverTimer = useRef(null), leaveTimer = useRef(null);
+-  const cancelHoverTimers = () => {
+-    clearTimeout(hoverTimer.current);
+-    clearTimeout(leaveTimer.current);
+-  };
+-  const enter = () => {
+-    cancelHoverTimers();
+-    if (cfg.hoverDelay > 0) hoverTimer.current = setTimeout(() => dispatch("enter"), cfg.hoverDelay);
+-  };
+-  const leave = () => {
+-    cancelHoverTimers();
+-    leaveTimer.current = setTimeout(() => dispatch("leave"), 300);
+-  };
++  const enter = () => { dispatchIntent({ type: "pointerEnter" }).catch(fail); };
++  const leave = () => { dispatchIntent({ type: "pointerLeave" }).catch(fail); };
++  const collapse = () => { dispatchIntent({ type: "collapse" }).catch(fail); };
+   useEffect(() => {
+     const escape = (e) => {
+-      if (e.key === "Escape" && !e.defaultPrevented && !e.target.closest(".terminal")) dispatch("collapse");
++      if (e.key === "Escape" && !e.defaultPrevented && !e.target.closest(".terminal")) collapse();
+     };
+     window.addEventListener("keydown", escape);
+     return () => window.removeEventListener("keydown", escape);
+@@ -454,24 +447,10 @@
+     return () => window.removeEventListener("keydown", keys);
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [mode, view, cfg.hardwareMonitor]);
+-  const pin = () => {
+-    cancelHoverTimers();
+-    api.pin().catch(fail);
+-    setStarted(true);
+-    dispatch("pin");
+-  };
+-  useEffect(() => {
+-    const off = api.onAnchor?.((event) => {
+-      if (event === "enter") enter();
+-      else if (event === "leave") leave();
+-      else if (event === "pin") {
+-        playClick(cfg.clickSounds);
+-        if (modeRef.current === "pinned") { cancelHoverTimers(); dispatch("collapse"); }
+-        else pin();
+-      }
+-    });
+-    return () => { off?.(); cancelHoverTimers(); };
+-  }, [cfg.hoverDelay, cfg.clickSounds]);
++  const pin = () => { dispatchIntent({ type: "pin" }).catch(fail); };
++  useEffect(() => subscribeCue((cue) => {
++    if (cue.kind === "click") playClick(cfg.clickSounds);
++  }), [cfg.clickSounds]);
+   const toggle = async () => {
+     setBusy(true);
+     try {
+@@ -545,8 +524,7 @@
+           onClick={(event) => {
+             if (suppressClick.current || event.target.closest("button, .terminal")) return;
+             if (mode === "pinned" && event.target.closest(".topline")) {
+-              cancelHoverTimers();
+-              dispatch("collapse");
++              collapse();
+             } else if (mode !== "pinned") pin();
+           }}
+           onMouseEnter={enter}
+@@ -574,7 +552,7 @@
+             </Control>
+             {mode !== "idle" && <span className="session-label">{mode === "pinned" ? "HERMES · LIVE TERMINAL" : "HERMES"}</span>}
+             {mode === "pinned" && (
+-              <Control data-testid="collapse" className="collapse" aria-label="Minimize island" onClick={() => { cancelHoverTimers(); dispatch("collapse"); }} title="Minimize into island (session keeps running)">−</Control>
++              <Control data-testid="collapse" className="collapse" aria-label="Minimize island" onClick={collapse} title="Minimize into island (session keeps running)">−</Control>
+             )}
+           </div>
+           <AnimatePresence initial={false}>
+@@ -609,7 +587,7 @@
+                 {viewIds.map((id) => {
+                   const v = VIEWS.find((x) => x.id === id);
+                   return (
+-                    <Control key={id} data-testid={`view-${id}`} className={`view-tab ${view === id ? "active" : ""}`} onClick={() => { setDirection(viewIds.indexOf(id) > viewIds.indexOf(view) ? 1 : -1); setView(id); }}>
++                    <Control key={id} data-testid={`view-${id}`} className={`view-tab ${view === id ? "active" : ""}`} onClick={() => { setDirection(viewIds.indexOf(id) > viewIds.indexOf(view) ? 1 : -1); dispatchIntent({ type: "selectView", view: id }).catch(fail); }}>
+                       {v.label}
+                     </Control>
+                   );

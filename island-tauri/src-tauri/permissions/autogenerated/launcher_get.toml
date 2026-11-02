@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-launcher-get"
+description = "Enables the launcher_get command without any pre-configured scope."
+commands.allow = ["launcher_get"]
+
+[[permission]]
+identifier = "deny-launcher-get"
+description = "Denies the launcher_get command without any pre-configured scope."
+commands.deny = ["launcher_get"]

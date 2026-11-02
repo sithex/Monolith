@@ -1,0 +1,15 @@
+[package]
+name = "ics-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Pure iCalendar (RFC 5545 subset) core for the Phase 6b read-only Calendar app (SPEC §8): parses .ics TEXT supplied by the Tauri side and expands an agenda over a time window. No IO, no network, no threads, no clock, no chrono, never panics."
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

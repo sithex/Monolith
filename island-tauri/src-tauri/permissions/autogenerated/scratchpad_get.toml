@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-scratchpad-get"
+description = "Enables the scratchpad_get command without any pre-configured scope."
+commands.allow = ["scratchpad_get"]
+
+[[permission]]
+identifier = "deny-scratchpad-get"
+description = "Denies the scratchpad_get command without any pre-configured scope."
+commands.deny = ["scratchpad_get"]

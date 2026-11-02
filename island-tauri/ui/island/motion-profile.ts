@@ -56,18 +56,6 @@ export function sideDropPath(side: string, diameter: number, gap: number, progre
   return `M${point(r * .6, r * .5)} Q${point(middle, neck)} ${point(edge + 1, neck)} L${point(edge + 1, -neck)} Q${point(middle, -neck)} ${point(r * .6, -r * .5)} Z`;
 }
 
-/**
- * Glass lip openness during a resize. Ported from Vorssaint's `NotchGlassFade`
- * (vorssaint-utils, Sources/Vorssaint/Services/Notch/NotchSupport.swift,
- * `NotchGlassFade.plan(from:to:endsInGlass:current:)` and `openness(atHeight:)`),
- * Copyright (C) 2026 Vorssaint, GPL-3.0-or-later; used here under that licence.
- *
- * Glass closing into the notch shuts at once (the page leaves as soon as it starts
- * closing, so an open lip only shows the windows beneath through the collapse).
- * Glass growing out of the solid notch stays shut until the last `GLASS_STRETCH`
- * pixels of height, then opens over that stretch. An opening that interrupts a
- * close starts from the openness already on screen.
- */
 export const GLASS_STRETCH = 48;
 export type GlassFade = { solidHeight: number; range: number };
 export const GLASS_OPEN: GlassFade = { solidHeight: 0, range: 1 };
@@ -88,14 +76,6 @@ export function glassFadePlan(start: number, end: number, endsInGlass: boolean, 
   return { solidHeight: Math.max(start, end), range: 1 };
 }
 
-/**
- * The island's corner radius at a drawn height, every frame of a resize, so a closing
- * shell keeps true rounded corners all the way into the notch instead of a separately
- * sprung radius that reached 0 early (a square box mid-close). Ported from Vorssaint's
- * `NotchLayout.surfaceRadius(height:)` (vorssaint-utils,
- * Sources/Vorssaint/Services/Notch/NotchSupport.swift), Copyright (C) 2026 Vorssaint,
- * GPL-3.0-or-later; used here under that licence.
- */
 export function surfaceRadius(height: number): number {
   return Number.isFinite(height) ? Math.min(28, Math.max(0, height) * .34) : 0;
 }

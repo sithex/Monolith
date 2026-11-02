@@ -4,7 +4,7 @@ version = "5.0.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Hermes Island on Tauri v2"
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [lib]
 name = "hermes_island_lib"

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Pure clipboard history store for Hermes Island (SPEC §3.3): platform-free, unit-tested."
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

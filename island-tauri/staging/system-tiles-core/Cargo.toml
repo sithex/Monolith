@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Pure core for the Hermes Island Controls system tiles (SPEC §0.5): Keep awake (ScreenSaver inhibit state machine), Audio output switch (pactl sinks + default-sink argv), Network / Tailscale (NetworkManager + tailscale status), colour picker (KWin ARGB -> hex/CSS), Hermes voice switcher (hermes-fish). The Tauri actor runs the commands / D-Bus calls; this crate never runs anything. No IO, no network, no threads, no clock, never panics."
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

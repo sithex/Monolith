@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 test('withdrawal delay never intercepts the JS-driven shell size spring at zero offset', () => {
-  const css = readFileSync(new URL('../ui/island/vorssaint.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../ui/island/surface.css', import.meta.url), 'utf8');
   // Without data-glide (the normal zero-offset path), a delay on the default
   // transition-property: all restarts on EVERY spring frame and freezes the box.
   const base = [...css.matchAll(/(?:^|\n)\.island\s*\{([^}]+)\}/g)].map(m => m[1]).join(';');
@@ -13,7 +13,7 @@ test('withdrawal delay never intercepts the JS-driven shell size spring at zero 
 import { load } from './phase7b-loader.mjs';
 const { axisSpring, springProgress, arrivalTime, sidePose, sideDropPath, WITHDRAW_SECONDS, glassFadePlan, glassOpenness, GLASS_STRETCH, surfaceRadius } = load('ui/island/motion-profile.ts');
 
-test('glass lip (Vorssaint NotchGlassFade): solid out of the notch, opens over the last 48 px, shuts at once on close', () => {
+test('glass lip: solid out of the notch, opens over the last 48 px, shuts at once on close', () => {
   const open = glassFadePlan(26, 640, true, 0);
   assert.equal(glassOpenness(open, 26), 0); assert.equal(glassOpenness(open, 640 - GLASS_STRETCH), 0);
   assert.ok(glassOpenness(open, 616) > .4 && glassOpenness(open, 616) < .6); assert.equal(glassOpenness(open, 640), 1);

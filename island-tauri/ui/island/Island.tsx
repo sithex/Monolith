@@ -44,7 +44,7 @@ export function Island() {
     root.dataset.theme = appearance;
     root.dataset.font = settings.uiFont;
     root.dataset.glass = String(settings.translucent !== false);
-    // 0..100 → the body's see-through fraction (55 = the original Vorssaint look).
+    // 0..100 → the body's see-through fraction (55 = the default look).
     root.style.setProperty('--glass-strength', String(Math.max(0, Math.min(100, settings.glassStrength ?? 55)) / 100));
     // The native notch draws its clock in the Hermes skin text colour (PanelPill.qml).
     root.style.setProperty('--notch-text', (scheme ?? palette).text);
@@ -71,7 +71,7 @@ export function Island() {
     goingBack.current = true; navigate(target);
   };
   const reduced = useReducedMotion();
-  // Vorssaint reveal: content holds while the shell grows, then blurs/scales in from the top.
+  // Reveal: content holds while the shell grows, then blurs/scales in from the top.
   const shown = { opacity: [0, 0, 1], scale: [0.86, 0.86, 1], filter: ['blur(12px)', 'blur(6px)', 'blur(0px)'] };
   const showTransition = { duration: 0.45, times: [0, 0.35, 1], ease: [0.22, 1, 0.36, 1] as const };
   const reveal = reduced ? { initial: false as const } : { initial: { opacity: 0, scale: 0.86, filter: 'blur(12px)' }, animate: shown, transition: showTransition };

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Pure core for the Hermes Island Phase 6b Controls app (SPEC §0.5 Apps bullet, §8 Phase 6b): display model for KDE PowerDevil ScreenBrightness, percent <-> raw conversion, slider-drag coalescing, and D-Bus method-call request builders. The Tauri actor talks to PowerDevil over zbus and passes decoded values here; this crate never does IO, never runs anything."
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

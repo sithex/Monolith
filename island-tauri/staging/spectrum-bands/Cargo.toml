@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Pure Rust FFT spectrum analyzer for the Hermes Island equalizer visual (SPEC §8 Phase 6 Music extras): smoothed, log-spaced bands from PCM audio; no IO, no network, no unsafe."
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 

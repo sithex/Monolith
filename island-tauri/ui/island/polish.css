@@ -1,5 +1,5 @@
 /* Nov 2 changes: colour schemes, layout/size editor, quick-action side buttons, fluidity polish.
-   Loaded after island.css (which pulls in the workshop + Vorssaint layers) so it wins. */
+   Loaded after island.css (which pulls in the workshop + surface layers) so it wins. */
 
 /* ---- Colour scheme list (concept.png) ---------------------------------- */
 .scheme-list { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 8px; }

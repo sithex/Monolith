@@ -53,7 +53,7 @@ The user's names are canonical in Rust, on the IPC wire and in new TS. **Revised
 
 ### 0.5 Product target (added after Phase 2 review)
 
-Long-term target: animation quality and customizability close to Vorssaint's Dynamic Island (github.com/vorssaint/vorssaint-utils, Swift/macOS, GPL-3.0 — a design reference only; copy no code). Decisions so far (Nick, 2026-10-29):
+Long-term target: smooth Dynamic Island animations and deep customizability. Decisions so far (Nick, 2026-10-29):
 - **Panel relationship:** keep the native Plasma pill for hover/click input, but *test first* whether the Tauri window can draw over the panel at the pill's position so the island visibly grows out of the pill (Phase 2.5 spike). If the spike fails, report the evidence before choosing an alternative.
 - **Features in scope:** music with lyrics and a live equalizer (Phase 6). **Revised after Nick's concept review (Oct 30):** also Timer, Calendar, Scratchpad + Downloads, Controls + Volume mixer (Phase 6b). Camera mirror, file shelf, recent captures, "Watch" and agent-activity tracking stay out of scope unless Nick adds them.
 - **Design direction (revised after Nick's concept review, Oct 30; references: `/home/nick/Hermes/Ripple/concept-pics/*.png`, Nick's own screenshots; do not move or edit them).** Not 1:1, but the Phase 7 UI adopts the concept's structure:
@@ -317,7 +317,7 @@ Fallback if tauri-specta RC breaks: replace the generator with `ts-rs 12` on the
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.icns", "icons/icon.ico"],
     "category": "Utility",
     "shortDescription": "Hermes Dynamic Island",
-    "license": "MIT"
+    "license": "GPL-3.0-or-later"
   }
 }
 ```

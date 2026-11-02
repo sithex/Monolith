@@ -87,7 +87,7 @@ test('the island clock replicates the native notch clock in the notch box and ne
 });
 
 test('glass strength drives the body and side-button transparency', () => {
-  const css = src('ui/island/vorssaint.css');
+  const css = src('ui/island/surface.css');
   assert.match(css, /--glass-cut: calc\(var\(--glass-open, 1\) \* var\(--glass-strength\) \* 100%\)/);
   assert.match(css, /\.live-side-button \{ background: color-mix\(in srgb, var\(--ui-background\) calc\(100% - var\(--glass-strength\) \* 100%\), transparent\); \}/);
   assert.match(src('ui/island/Island.tsx'), /setProperty\('--glass-strength'/);
@@ -101,7 +101,7 @@ test('the native notch follows the scheme (hover tint = scheme accent) and the r
 });
 
 test('side-button hover is explicit state cleared by the real X11 leave, not a sticky :hover', () => {
-  const side = src('ui/island/SideControls.tsx'), css = src('ui/island/vorssaint.css');
+  const side = src('ui/island/SideControls.tsx'), css = src('ui/island/surface.css');
   assert.doesNotMatch(side, /whileHover=/);
   assert.match(side, /addEventListener\('island-pointer-left', clear\)/);
   assert.doesNotMatch(css, /\.live-side-button:hover/);
@@ -118,7 +118,7 @@ test('Now Playing transport uses drawn glyphs with a solid play/pause disc', () 
 });
 
 test('the solid top strip eases into the glass instead of a hard 42 px edge', () => {
-  const css = src('ui/island/vorssaint.css');
+  const css = src('ui/island/surface.css');
   assert.doesNotMatch(css, /var\(--ui-background\) 42px,/);
   assert.ok((css.match(/var\(--glass-cut\) \* \.\d+\), transparent\) \d+px/g) ?? []).length >= 8, 'multi-stop eased ramp');
 });

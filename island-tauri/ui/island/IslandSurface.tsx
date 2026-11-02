@@ -99,13 +99,13 @@ export function IslandSurface({ children, fail }: { children: ReactNode; fail(er
     const drawn = root.getBoundingClientRect();
     if (Math.abs(drawn.width - pill.width) < .5 && Math.abs(drawn.height - pill.height) < .5) arrive(root);
   }, [state.mode, pill !== null]);
-  // Under the notch the corner radius is a function of the drawn height (Vorssaint's
-  // surfaceRadius), written with the size each frame; it is not a third spring.
+  // Under the notch the corner radius is a function of the drawn height
+  // (surfaceRadius), written with the size each frame; it is not a third spring.
   useLayoutEffect(() => {
     const root = outer.current;
     if (root && pill) root.style.borderRadius = `${surfaceRadius(root.getBoundingClientRect().height)}px`;
   }, [pill !== null]);
-  // Vorssaint's glass lip (motion-profile.ts glassFadePlan): solid while growing out of the
+  // The glass lip (motion-profile.ts glassFadePlan): solid while growing out of the
   // notch, opening over the last 48 px; shut at once on close.
   const glassFade = useRef(GLASS_OPEN), glassNow = useRef(1);
   const setGlass = (root: HTMLElement, value: number) => {

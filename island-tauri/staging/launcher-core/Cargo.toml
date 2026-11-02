@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Pure core for the Hermes Island Phase 7 app-grid launcher (SPEC §0.5): parses .desktop file text into launcher entries and turns an entry's Exec line into an argv. Decides what an entry is and how to launch it; the Tauri side reads files and spawns processes. No IO, no network, no threads, no clock, never panics."
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

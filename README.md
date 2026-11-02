@@ -62,4 +62,7 @@ that, plus autostart, updating and the problems you're likely to hit.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). The original Ripple copyright notice stays, as the license requires.
+GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+Monolith began as a fork of Ripple, which is MIT licensed. Its original notice is kept in
+[LICENSE-RIPPLE](LICENSE-RIPPLE) and still covers any code left over from Ripple.

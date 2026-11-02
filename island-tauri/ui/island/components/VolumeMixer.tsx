@@ -5,7 +5,7 @@ import { DraftRange, Dropdown, Empty, ServiceCard } from './AppPrimitives';
 import { Icon } from './Icon';
 
 /**
- * Vertical capsule fader (Vorssaint mixer): 28 px track, no knob, filled from the bottom.
+ * Vertical capsule fader: 28 px track, no knob, filled from the bottom.
  * Dragging follows the pointer directly with a local draft and throttled commits;
  * external changes ease over 0.22 s.
  */

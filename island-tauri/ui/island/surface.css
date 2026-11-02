@@ -1,5 +1,5 @@
-/* Vorssaint-style surface language (design values from vorssaint-utils' Notch UI,
-   re-implemented; no code copied). Loaded after the workshop styles so it wins. */
+/* Island surface language: fills, glass body, launcher tiles and round controls.
+   Loaded after the workshop styles so it wins. */
 :root {
   --v-fill: rgb(255 255 255 / .065);
   --v-fill-hi: rgb(255 255 255 / .12);
@@ -27,7 +27,7 @@ html[data-glass='true'] { --v-fill: var(--v-fill-soft); }
 /* Translucent: opaque across the top strip (matches the panel pill), then eases to the
    chosen glass strength (`--glass-strength`, Settings → Glass strength, default .55) over
    36 px so KWin's blur-behind shows through the body. `--glass-open` (IslandSurface,
-   Vorssaint's glass lip) keeps the body solid while it grows out of the notch and opens
+   the glass lip) keeps the body solid while it grows out of the notch and opens
    it over the last 48 px of height; closing shuts it at once. */
 html { --glass-strength: .55; }
 html[data-glass='true'] .island {
@@ -98,7 +98,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .live-side-button { background: var(--ui-background); border: .75px solid var(--v-stroke-hi); color: rgb(255 255 255 / .9); box-shadow: 0 0 12px rgb(0 0 0 / .25), 0 5px 16px rgb(0 0 0 / .35); }
 .live-side-button svg, .round-button svg { width: 46%; height: 46%; max-width: 20px; max-height: 20px; display: block; }
 
-/* ---- Launcher (Vorssaint sections gallery tiles) ------------------------ */
+/* ---- Launcher tiles ------------------------------------------------------ */
 .launcher { display: flex; flex-direction: column; gap: 10px; }
 .launcher-toolbar { margin: 0; min-height: 28px; font-size: 11px; gap: 6px; }
 .launcher-toolbar .pill-button { border-radius: 14px; padding: 4px 12px; font-size: 12px; font-weight: 600; background: var(--v-fill); }

@@ -9,7 +9,7 @@ export function duration(ms: number): string {
   return `${hours ? `${hours}:` : ''}${String(Math.floor(seconds / 60) % (hours ? 60 : 100000)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-/** Digits roll vertically when they change (Vorssaint numeric-text transition, 0.3 s). */
+/** Digits roll vertically when they change (0.3 s). */
 function RollingText({ text, reduced }: { text: string; reduced: boolean }) {
   const chars = text.split('');
   return <span aria-hidden="true" style={{ display: 'inline-flex', overflow: 'hidden' }}>{chars.map((c, i) => {
@@ -24,7 +24,7 @@ function RollingText({ text, reduced }: { text: string; reduced: boolean }) {
 
 const TICK = 14, MIN = 1, MAX = 180;
 /**
- * Horizontal scroll ruler (Vorssaint timer picker): drag with momentum, scroll wheel and
+ * Horizontal scroll ruler: drag with momentum, scroll wheel and
  * arrow keys move it; it always settles on a whole minute.
  */
 function MinuteWheel({ value, onChange, disabled, reduced }: { value: number; onChange(v: number): void; disabled: boolean; reduced: boolean }) {

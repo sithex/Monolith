@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Pure core for the Hermes Island Phase 7 side-button Layout editor (SPEC §0.5 \"Design direction\" Side buttons bullet): persisted layout model and geometry math for the shape/input-region owner. Renders nothing. No IO, no network, no threads, no clock, never panics."
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

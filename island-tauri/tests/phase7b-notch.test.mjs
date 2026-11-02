@@ -4,7 +4,7 @@ import { load } from './phase7b-loader.mjs';
 import { readFileSync } from 'node:fs';
 test('island shadow includes an ambient halo, not just a bottom-heavy bar', () => {
   const root=process.env.ISLAND_UI_ROOT ?? new URL('../ui',import.meta.url).pathname;
-  const css=readFileSync(`${root}/island/vorssaint.css`,'utf8');
+  const css=readFileSync(`${root}/island/surface.css`,'utf8');
   assert.match(css, /\.island\[data-state\]\s*\{\s*box-shadow:\s*0 0 24px/);
 });
 const { notchMorphPath } = load(`${process.env.ISLAND_UI_ROOT ?? new URL('../ui', import.meta.url).pathname}/island/notch-profile.ts`);

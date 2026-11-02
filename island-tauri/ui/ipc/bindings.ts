@@ -990,7 +990,7 @@ export type Settings = {
 	equalizerBands?: number,
 	/**  Additive (post-9b): horizontal swipe / trackpad gesture switches between views. */
 	swipeNavigation?: boolean,
-	/**  Additive (post-9b): Vorssaint-style translucent island body over KWin blur-behind. */
+	/**  Additive (post-9b): Translucent island body over KWin blur-behind. */
 	translucent?: boolean,
 	/**  Additive (Nov 2): how see-through the translucent body is, 0 (opaque) ..= 100. */
 	glassStrength?: number,

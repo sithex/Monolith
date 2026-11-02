@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Pure core for the Hermes Island Phase 6b Controls + Volume mixer app (SPEC §0.5, §8): parses pactl TEXT output into a mixer model and builds argv for volume/mute commands. The Tauri actor runs pactl; this crate never runs anything. No IO, no network, no threads, no clock, never panics."
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

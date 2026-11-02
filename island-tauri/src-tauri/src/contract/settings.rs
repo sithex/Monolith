@@ -135,7 +135,7 @@ pub struct Settings {
     /// Additive (post-9b): horizontal swipe / trackpad gesture switches between views.
     #[serde(default = "default_true")]
     pub swipe_navigation: bool,
-    /// Additive (post-9b): Vorssaint-style translucent island body over KWin blur-behind.
+    /// Additive (post-9b): Translucent island body over KWin blur-behind.
     #[serde(default = "default_true")]
     pub translucent: bool,
     /// Additive (Nov 2): how see-through the translucent body is, 0 (opaque) ..= 100.

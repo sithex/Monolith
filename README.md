@@ -1,168 +1,65 @@
-# Ripple
+# Monolith
 
-**Dynamic Island, but for everyone**
+A Dynamic Island for KDE Plasma, built around a Hermes Agent terminal.
 
-Ripple is a cross-platform desktop application that recreates Apple's Dynamic Island experience on Windows, Linux, and macOS. It's a notification hub, widget system, and smart assistant that stays out of your way until you need it.
+Monolith lives in a small notch on the Plasma panel and shows the clock and date. Hover it and it shows you
+what's playing. Click it and it grows into a panel with a full Hermes chat on the home page and an app grid
+behind it. Click the notch again and it shrinks back. The terminal keeps running while it's collapsed, so a
+long agent task survives being put away.
 
-<div align="center">
+It started as a fork of [Ripple](https://github.com/TopMyster/Ripple), an Electron Dynamic Island. Almost
+none of that code is left. The current version runs on Tauri 2 (a Rust core with a React UI in the system
+WebKitGTK), and the notch is a native Plasma widget.
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2)](https://discord.gg/a2xzVkxFVg)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.3.0-blue)](package.json)
+## What's in it
 
-https://github.com/user-attachments/assets/a7b9ed8a-97b5-4603-bad7-6f4c4bef1f5d
+- **Hermes terminal.** A real PTY running Hermes (xterm.js on the front end). It picks up your Hermes skin
+  colours, and you can set the exact launch command in Settings.
+- **Apps.** Now Playing (any MPRIS player, with synced lyrics and a live equalizer), timer, calendar from an ICS
+  link, scratchpad, recent downloads, clipboard history, notifications, a volume mixer, brightness, package
+  updates, AI usage stats and a small system monitor.
+- **Side buttons.** Round buttons along the island's edges that run quick actions: play/pause, Do Not Disturb,
+  mic mute, power profile, keep-awake, screenshot, colour picker, or jump straight to an app. A layout editor
+  sets where they go.
+- **Customisation.** Colour schemes, including a custom one and one that follows your Hermes skin, plus size
+  presets, glass/blur strength and notch colours. You can rearrange the launcher iPhone-style: hold a tile and
+  drag.
 
-</div>
+Clipboard history, lyrics and the equalizer are off until you turn them on.
 
----
+## Platform
 
-## Features
+Linux only, and really KDE Plasma 6 on Wayland only. Monolith leans on KWin for blur and window placement and on
+Plasma for the notch widget, and it reads the desktop through D-Bus, PipeWire and `/proc`. Some parts work on
+X11, but nobody tests that. Windows and macOS would each need a port.
 
-### Core Functionality
-- **Multi-Monitor & Desktop Support** — Island syncs seamlessly across all desktops and monitors
-- **Media Controls** — Now playing preview with playback controls for your music
-- **Customizable Themes** — Multiple themes including Win95, SleekBlack, and more
-- **Quick Apps** — One-click access to 4 apps of your choice
-- **Keyboard Shortcuts** — Quick navigation with Ctrl + number shortcuts
+## Getting it running
 
-### Information & Alerts
-- **Weather Display** — Real-time weather information
-- **Battery Alerts** — Charging status and low battery notifications
-- **Bluetooth Alerts** — Get notified when devices connect/disconnect
+Short version, after installing the dependencies listed in [instructions.md](instructions.md):
 
-### Smart Features
-- **AI Ask Feature** — Integrated AI assistant powered by Groq
-- **Browser Search** — Quick search integration
-- **Clipboard Manager** — Access your clipboard history
-- **Tasks List** — Built-in task management
-
----
-
-## Quick Start
-
-### Installation
-
-Download the latest release for your platform:
-- **Windows**: `.exe` installer
-- **macOS**: `.dmg` package (Intel & Apple Silicon supported)
-- **Linux**: `.deb` or `.rpm` packages
-
-[Download Latest Release](https://github.com/TopMyster/Ripple/releases)
-
-### First Run
-1. Install and launch Ripple
-2. The Island will appear on your screen
-3. **Click** the Island to open Large Mode
-4. **Hover** over it to see Quick Mode
-5. Visit **Settings** (last tab) to customize everything
-
----
-
-## How to Use
-
-### The Three Modes
-
-**Still Mode** — The default idle state
-- Compact display
-- Minimal visual footprint
-- Ready to expand on interaction
-
-**Quick Mode** — Hover over the Island
-- See current time, weather, and battery status
-- If music is playing, view now-playing info
-- Hover playback controls for music
-
-**Large Mode** — Click the Island
-- Full interface with all tabs
-- Switch tabs with arrow keys or mouse scroll
-- Access all features and settings
-- Default view for focused work
-
-### Using Tabs
-- **Arrow Keys** — Navigate between tabs
-- **Mouse Wheel** — Scroll horizontally between tabs
-- **Ctrl + Number** — Jump to a specific tab
-
-
----
-
-## Build & Development
-
-### Prerequisites
-- **Node.js** 16+ and npm
-- Platform-specific build tools:
-  - **Windows**: Visual Studio Build Tools
-  - **macOS**: Xcode Command Line Tools
-  - **Linux**: Build essentials (`build-essential` on Ubuntu/Debian)
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/TopMyster/Ripple.git
-cd Ripple
-
-# Install dependencies
-npm install
-
-# Start development server
-npm start
+```sh
+git clone https://github.com/sithex/Monolith.git ~/Hermes/Ripple
+cd ~/Hermes/Ripple/island-tauri
+npm ci
+./build.sh
+./run.sh --overlay
 ```
 
-The development server will launch Ripple with hot reload enabled. Press `Ctrl+R` (or `Cmd+R` on macOS) to refresh the app.
+Then install the notch widget and add it to your panel. [instructions.md](instructions.md) walks through
+that, plus autostart, updating and the problems you're likely to hit.
 
-#### Build for Current OS
-```bash
-npm run make
-```
+## Layout
 
-#### Build for Specific Platforms
-
-**Windows (x64)**
-```bash
-npm run make -- --platform=win32 --arch=x64
-```
-
-**Linux (x64)**
-```bash
-npm run make -- --platform=linux --arch=x64
-```
-
-**macOS (Apple Silicon)**
-```bash
-npm run make -- --platform=darwin --arch=arm64
-```
-
-**macOS (Intel)**
-```bash
-npm run make -- --platform=darwin --arch=x64
-```
-
-> **Linux Note**: Building Linux packages requires `dpkg`, `fakeroot`, and `rpm`:
-> ```bash
-> sudo apt-get install dpkg fakeroot rpm
-> ```
-
-**Output**: Compiled binaries are found in `out/make/`
-
----
-
-## Contributing
-
-We welcome contributions!:
-- Bug reports and fixes
-- New features and improvements
-- Documentation updates
-- Theme designs
-- Ideas and suggestions
-
-Please check [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
----
+| Path | What's there |
+|---|---|
+| `island-tauri/src-tauri/` | Rust core: window, input region, PTY, settings, and every integration |
+| `island-tauri/ui/` | React + Framer Motion front end |
+| `island-tauri/staging/` | Small standalone Rust crates (parsers and models) that the core pulls in |
+| `island-tauri/native/vblank-fix/` | An `LD_PRELOAD` shim so WebKitGTK animates at your monitor's real refresh rate |
+| `island/plasma-anchor/` | The Plasma notch widget (QML) |
+| `island/*.py` | Helpers the notch and the theme sync call |
+| `island-tauri/SPEC.md` | The design spec the Tauri rewrite was built from |
 
 ## License
 
-Ripple is open source and available under the [MIT License](LICENSE).
-
----
-
+MIT. See [LICENSE](LICENSE). The original Ripple copyright notice stays, as the license requires.

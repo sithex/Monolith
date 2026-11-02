@@ -1,67 +1,184 @@
-## 👋 Welcome to Ripple
+# Setting up Monolith
 
-### Island
+This covers a fresh install on KDE Plasma 6 (Wayland), day-to-day use, updating, and the problems you're likely
+to hit. The package names are for Arch/CachyOS. Other distros have the same libraries under different names.
 
-##### *The part of the interface you interact with is called the Island.*
+## 1. Dependencies
 
-<img width="183" height="61" alt="Screenshot 2025-12-27 at 5 06 29 PM" src="https://github.com/user-attachments/assets/ab03012c-6ac1-42ed-a85a-b0b31fd6ff58" />
+```sh
+sudo pacman -S --needed rust nodejs npm webkit2gtk-4.1 gtk3 gtk-layer-shell base-devel python
+```
 
-## There are 3 main modes in the interface
+You also need [Hermes Agent](https://hermes-agent.nousresearch.com) installed and working in a normal
+terminal, since that's what the island runs.
 
-### Large Mode
+Optional extras, each needed by one feature:
 
-##### *When you click on the Island this mode will be active. It's the mode you will use the most, and it contains all Tabs you use.*
+| Package | Feature |
+|---|---|
+| `pipewire` / `pipewire-pulse` (`pactl`, `pw-record`) | Volume mixer, mic mute, equalizer |
+| `power-profiles-daemon` | Power profile button |
+| `pacman-contrib` (`checkupdates`), `paru` | Updates app |
+| `bluez` | Bluetooth status |
 
-<img width="430" height="227" alt="Screenshot 2025-12-27 at 4 59 29 PM" src="https://github.com/user-attachments/assets/df53bba4-c779-4cae-95c8-3959aaac108c" />
+## 2. Where to put it
 
-### Quick Mode
+Clone it to `~/Hermes/Ripple`:
 
-##### *When you hover over the Island you'll see this. Information like time, weather, and battery alerts will show here. If music is playing, it will also show "Now Playing" info with a smooth expansion and hover-activated playback controls.*
+```sh
+git clone https://github.com/sithex/Monolith.git ~/Hermes/Ripple
+```
 
-<img width="364" height="124" alt="Screenshot 2025-12-27 at 5 00 12 PM" src="https://github.com/user-attachments/assets/e17da264-4306-4d77-b071-0d9e5388d074" />
+The folder is still called Ripple because that's the path the Plasma widget expects. If you clone somewhere
+else, open `island/plasma-anchor/contents/ui/main.qml` and change the path on the `property string command`
+line (near the top) to point at your copy of `island/anchor-client.py`.
 
-### Still Mode
+## 3. Build
 
-##### *This is the idle mode you see when the Island is inactive. It's now more subtle and smaller (170px) to stay out of your way until needed.*
+```sh
+cd ~/Hermes/Ripple/island-tauri
+npm ci
+./build.sh
+```
 
-<img width="268" height="103" alt="Screenshot 2025-12-27 at 4 59 51 PM" src="https://github.com/user-attachments/assets/244077b5-f63b-4492-a0d0-743dbaf5526a" />
+`build.sh` builds the UI first, then the Rust release binary. The first build takes a while (several minutes, a
+few GB of disk). After that, rebuilds only touch what changed.
 
-## These are 2 optional modes
+The vblank shim ships prebuilt as `native/vblank-fix/libvblank_fix.so`. If it doesn't load on your system,
+rebuild it with `native/vblank-fix/build.sh`. Without it the island still works, but WebKitGTK caps its
+animations at 60 fps.
 
-### Stealth Mode 
+## 4. Install the notch
 
-##### *A mode that hides the Island when it's inactive (completely transparent).*
+The notch is a Plasma widget. Install it, then add it to the panel where you want the island to grow from:
 
-https://github.com/user-attachments/assets/44316ba5-34a7-4eca-9fe0-6ce6bad3c257
+```sh
+kpackagetool6 -t Plasma/Applet -i ~/Hermes/Ripple/island/plasma-anchor
+```
 
-### Standby Mode 
+Right-click the panel, choose **Add or Manage Widgets**, find **Hermes Island Notch** and drag it into place.
+Most people put it in the middle of a top panel, in place of the clock. It only works on a horizontal panel.
 
-##### *A mode that keeps the Quick View (time/weather/battery) always visible, replacing the idle Still mode.*
+If you change the QML later, upgrade the installed copy with `-u` instead of `-i`. Plasma sometimes keeps
+using the old compiled version until you remove the widget from the panel and add it back.
 
-https://github.com/user-attachments/assets/95317766-8599-4da4-9078-6b2a48af64f8
+## 5. First run
 
-## These are the parts of the Island
+```sh
+~/Hermes/Ripple/island-tauri/run.sh --overlay
+```
 
-### Tabs
+Click the notch. The island opens on the Hermes terminal.
 
-##### *The Tabs are tiles that you switch through in the interface using the arrow keys or by scrolling horizontally with your mouse/trackpad.*
+The built-in launch command points at the author's own wrapper script, which you won't have. Go to
+**Settings → General → Terminal** and enter `hermes`, then restart the terminal. A few other values work:
 
-https://github.com/user-attachments/assets/048ef089-c975-4a08-81e6-1f62f1795d12
+- `hermes --tui` forces the newer interface; `hermes --cli` forces the classic one.
+- Any executable path with arguments works too. The field isn't a shell, so `~`, `$HOME`, pipes and aliases
+  are passed through literally. Use absolute paths.
 
-### Quick Apps
+Saving the setting doesn't touch a terminal that's already running. It applies the next time one starts.
 
-##### *A Tab with 4 apps of your choosing, so you can quickly access them.*
+## 6. Start it on login
 
-<img width="443" height="217" alt="Screenshot 2025-12-27 at 5 02 41 PM" src="https://github.com/user-attachments/assets/e2569751-f892-472c-8df6-ae2a3effd4ce" />
+Create `~/.config/autostart/hermes-island.desktop`:
 
-### Settings
+```ini
+[Desktop Entry]
+Type=Application
+Name=Hermes Island
+Exec="/home/YOU/Hermes/Ripple/island-tauri/run.sh" --overlay
+Path=/home/YOU/Hermes/Ripple
+Terminal=false
+X-KDE-autostart-phase=2
+```
 
-##### *It's the last Tab and it allows you to adjust everything from colors and positioning to features like **Auto Launch on Boot** (available for Windows and Linux).*
+Replace `YOU` with your username. Desktop files don't expand `~`.
 
-https://github.com/user-attachments/assets/303dbcd0-37c8-457c-9372-73f756dbd472
+## Using it
 
-### Shortcuts
+- **Click the notch** to open or collapse the island. Collapsing keeps the terminal and whatever Hermes was
+  doing. Quitting the island ends that terminal session.
+- **Hover the notch** to tint it; the island doesn't open on hover.
+- **The app grid** sits behind the terminal. Hold a tile (or use the `⋯` menu) to enter edit mode, then drag
+  tiles to reorder or hide them. The Hermes home and Settings tiles stay put.
+- **Side buttons** are set up in Settings → Layout. A slot only shows up if it fits on the island at its
+  current size, so you get more slots on a bigger island.
+- **Size** (Compact, Spacious, Bigger or Custom) is in Settings → Layout too. Colours, glass strength and the
+  notch look are in Settings → Appearance.
 
-##### *Just press Control + the number of the Tab to jump to it.*
+Your settings live in `.island-data-overlay/` inside the repo. That folder is in `.gitignore`, so it never
+gets committed. It holds your calendar link and clipboard history, among other things.
 
-https://github.com/user-attachments/assets/e13465af-ea02-4986-9283-e8a0ff23f5dd
+## Updating
+
+```sh
+cd ~/Hermes/Ripple
+git pull
+cd island-tauri && npm ci && ./build.sh
+```
+
+The build replaces the binary while the old one is still running, so restart the island afterwards. Quit it
+from the tray icon (or `kill` the PID in `.island-data-overlay/status.json`), wait for it to exit, then run
+`run.sh --overlay` again. Starting a second copy while the first is still running does nothing, because only
+one instance is allowed.
+
+## Troubleshooting
+
+**Clicking the notch does nothing.** Check that the island is running (`pgrep -a hermes-island`) and that
+the path in `main.qml` matches where you cloned the repo. You can test the bridge on its own:
+`python3 island/anchor-client.py pin` should open the island.
+
+**"Cannot bind ingest socket" after a crash or power cut.** A dead socket file was left behind. Make sure no
+island is running first, then delete `.island-data-overlay/ingest.sock` and start it again. Don't delete it
+while an island is running.
+
+**The terminal shows an error instead of Hermes.** The launch command is wrong or not on `PATH`. Fix it in
+Settings → General → Terminal; Settings stays reachable even when the terminal fails. `which hermes` gives
+you the absolute path.
+
+**Animations stutter or feel capped at 60 fps.** Check that `run.sh` found the shim: the process should
+have `LD_PRELOAD` pointing at `libvblank_fix.so`. Rebuild the shim if it's missing.
+
+**The island ignores blur or sits in the wrong place.** It needs KWin. Check Settings → General → Display
+server: Wayland is the default and gets exact placement; X11 runs through XWayland and is the fallback.
+
+## Development
+
+Front-end checks, run from `island-tauri`:
+
+```sh
+npm run typecheck
+npm run test:ui
+```
+
+For live UI editing, build a debug binary with `--no-default-features`. That drops Tauri's
+`custom-protocol` feature, so the binary loads the page from Vite at `http://localhost:5173` instead of the
+copy embedded at build time. Then run `npm run dev:ui` and start that binary with `--overlay --ui island`.
+CSS and TSX edits then show up as soon as you save. Vite's hot reload is blocked by the release
+content-security policy, so pass this override at build time (dev builds only):
+
+```sh
+TAURI_CONFIG='{"app":{"security":{"csp":null,"freezePrototype":false}}}' \
+  cargo build --manifest-path src-tauri/Cargo.toml --locked --no-default-features
+```
+
+Rust checks, run from `island-tauri/src-tauri`:
+
+```sh
+cargo fmt --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+```
+
+If you change anything under `src-tauri/src/contract/` or the commands, regenerate the TypeScript bindings:
+
+```sh
+cargo test export_bindings -- --ignored
+```
+
+Tauri embeds the built UI into the binary at compile time. After a UI change, a release build needs
+`npm run build:ui` before cargo. `build.sh` does that for you.
+
+`cargo test` and the phase gate scripts in `island-tauri/scripts/` build a large debug tree in
+`src-tauri/target/debug` (it reached 60 GB here). It's safe to delete; it all rebuilds.

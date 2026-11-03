@@ -132,6 +132,32 @@ pub fn normalize_rows(rows: &[ShapeRow]) -> Vec<ShapeRow> {
     out
 }
 
+/// Same coverage as `normalize_rows`, with vertically consecutive identical spans merged into
+/// one taller rectangle (the pixman/X band form). A rounded pill is ~1 row per pixel of height
+/// at the corners but its straight middle collapses to a single rect, so compositor requests,
+/// blur properties and the status heartbeat carry ~5x fewer rectangles. Sorted by y, then x.
+pub fn band_rows(rows: &[ShapeRow]) -> Vec<ShapeRow> {
+    let mut out: Vec<ShapeRow> = Vec::new();
+    // Index into `out` of the band each (x, width) span last extended, keyed by its bottom.
+    let mut open: BTreeMap<(i16, u16), usize> = BTreeMap::new();
+    for row in normalize_rows(rows) {
+        let key = (row.x, row.width);
+        if let Some(&i) = open.get(&key) {
+            let band = &mut out[i];
+            if i32::from(band.y) + i32::from(band.height) == i32::from(row.y)
+                && band.height < u16::MAX
+            {
+                band.height += 1;
+                continue;
+            }
+        }
+        open.insert(key, out.len());
+        out.push(row);
+    }
+    out.sort_by_key(|r| (r.y, r.x));
+    out
+}
+
 pub fn union_rows(a: &[ShapeRow], b: &[ShapeRow]) -> Vec<ShapeRow> {
     let mut all = a.to_vec();
     all.extend_from_slice(b);
@@ -366,5 +392,20 @@ mod tests {
             false
         )
         .is_err());
+    }
+
+    #[test]
+    fn band_rows_preserves_coverage_and_collapses_straight_runs() {
+        let pill = RoundedRect { x: 10., y: 4., width: 220., height: 120., radius: 24. };
+        let rows = region_rows(&[pill], IslandMode::Large, 1.0, false).unwrap();
+        let bands = band_rows(&rows);
+        assert_eq!(normalize_rows(&bands), normalize_rows(&rows));
+        assert!(bands.len() * 2 < rows.len(), "{} vs {}", bands.len(), rows.len());
+        // Two separate shapes side by side keep their own bands.
+        let a = ShapeRow { x: 0, y: 0, width: 5, height: 3 };
+        let b = ShapeRow { x: 10, y: 1, width: 5, height: 3 };
+        let got = band_rows(&[a, b]);
+        assert_eq!(got, vec![a, b]);
+        assert!(band_rows(&[]).is_empty());
     }
 }

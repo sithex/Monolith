@@ -1,3 +1,0 @@
-# unwrap_used / expect_used are denied (Cargo.toml [lints.clippy]) for
-# non-test code. Allow them inside test code only.
-allow-unwrap-in-tests = true

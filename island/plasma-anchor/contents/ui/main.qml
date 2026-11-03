@@ -20,7 +20,9 @@ PlasmoidItem {
     property var requests: Requests.create(function(operation) {backend.connectSource(root.command + " " + operation);})
     property string clockText: Qt.formatTime(now, "hh:mm AP")
     property string dateText: Qt.formatDate(now, "ddd, MMM d")
-    property string command: "/usr/bin/python3 /home/nick/Hermes/Monolith/island/anchor-client.py"
+    // Stable per-user link to the checkout's client (kept current by the island; created
+    // once by the install step). No machine-specific repository path lives in the widget.
+    property string command: "/usr/bin/python3 -I -S \"${XDG_STATE_HOME:-$HOME/.local/state}/monolith/anchor-client.py\""
     preferredRepresentation: compactRepresentation
     Plasmoid.icon: "utilities-terminal"
     Plasmoid.constraintHints: PlasmaCore.Types.CanFillArea
@@ -48,6 +50,9 @@ PlasmoidItem {
     Timer { interval: Math.max(100, 60000 - Date.now() % 60000); running: true; onTriggered: { root.now = new Date(); interval = Math.max(100, 60000 - Date.now() % 60000); restart(); } }
     // Settings → Notch → Width (pushed as notchWidth; 144 = the original slot).
     readonly property real notchWidth: Math.max(110, Math.min(320, Number(root.appearance.notchWidth) || 144))
+    // Live states pushed with the appearance; ignored once the island is gone so a stale
+    // KConfig value can never leave the notch pulsing.
+    readonly property var live: root.online ? (root.appearance.live || {}) : ({})
     compactRepresentation: PanelPill {
         Layout.minimumWidth: root.notchWidth
         Layout.maximumWidth: root.notchWidth
@@ -65,8 +70,12 @@ PlasmoidItem {
         borderColor: (root.appearance.notchBorder || {}).color || accent
         borderOpacity: (root.appearance.notchBorder || {}).opacity ?? 0.1
         borderWidth: (root.appearance.notchBorder || {}).width ?? 0.8
+        working: root.live.working === true
+        micMuted: root.live.micMuted === true
+        timerEndsAt: (root.live.timer && !root.live.timer.paused) ? Number(root.live.timer.endsAt) || 0 : 0
+        timerPausedMs: (root.live.timer && root.live.timer.paused) ? Number(root.live.timer.remainingMs) || 0 : -1
         // Pointer enter/leave animate the native notch only; click remains authoritative.
-        onActivated: root.requests.enqueue(root.online ? "pin" : "launch")
+        onActivated: root.requests.enqueue((root.online ? "pin" : "launch") + " " + Plasmoid.id)
     }
     fullRepresentation: compactRepresentation
 }

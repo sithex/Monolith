@@ -172,6 +172,15 @@ fn run_app(cli: cli::Cli) -> anyhow::Result<()> {
     let paths = paths::resolve(&cli, &repo_root)?;
     // Ownership precedes GTK, services, test sockets and status publication.
     let instance = singleton::acquire(&paths.data_dir)?;
+    if cli.overlay && !cli.test_instance {
+        if let Some(home) = std::env::var_os("HOME").map(std::path::PathBuf::from) {
+            let state = std::env::var_os("XDG_STATE_HOME").map(std::path::PathBuf::from);
+            let link = paths::anchor_client_link(state.as_deref(), &home);
+            if let Err(e) = paths::publish_anchor_client(&link, &repo_root) {
+                tracing::warn!(error = %e, "Could not publish the notch click client link");
+            }
+        }
+    }
     let anchor = if cli.overlay
         && matches!(
             cli.ui,

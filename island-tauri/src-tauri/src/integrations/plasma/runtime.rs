@@ -22,7 +22,10 @@ use crate::{
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
 use std::{
-    sync::{mpsc, Arc, Mutex},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        mpsc, Arc, Mutex,
+    },
     thread::JoinHandle,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -32,18 +35,24 @@ use tauri_specta::Event;
 const HEARTBEAT: Duration = Duration::from_secs(2);
 const MIN_WRITE_INTERVAL: Duration = Duration::from_millis(100);
 
+/// `home_widget` value meaning "routing off: every notch click is a plain toggle".
+const ROUTE_OFF: u32 = u32::MAX;
 enum StatusMsg {
     Stop,
     Refresh,
+    PinAt(u32),
 }
 /// Managed state: lets other modules request a (coalesced) status refresh.
-pub struct StatusNudge(mpsc::Sender<StatusMsg>);
+pub struct StatusNudge(mpsc::SyncSender<StatusMsg>);
 
 /// Ask the status worker for a refresh (e.g. after the input region changed). A missing or
 /// stopped worker is not an error: there is simply no status file to keep current.
 pub fn nudge_status(app: &tauri::AppHandle) {
     if let Some(nudge) = app.try_state::<StatusNudge>() {
-        if nudge.0.send(StatusMsg::Refresh).is_err() {
+        if matches!(
+            nudge.0.try_send(StatusMsg::Refresh),
+            Err(mpsc::TrySendError::Disconnected(_))
+        ) {
             tracing::debug!("Status worker already stopped");
         }
     }
@@ -52,7 +61,7 @@ pub fn nudge_status(app: &tauri::AppHandle) {
 pub struct NativeHost {
     instance: Arc<Mutex<InstanceGuard>>,
     panel: Mutex<Option<PanelSocket>>,
-    stop: mpsc::Sender<StatusMsg>,
+    stop: mpsc::SyncSender<StatusMsg>,
     worker: Mutex<Option<JoinHandle<()>>>,
     watcher: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
@@ -64,7 +73,47 @@ fn legacy_mode_name(mode: IslandMode) -> &'static str {
         IslandMode::Large => "pinned",
     }
 }
-fn snapshot(app: &tauri::AppHandle, anchor: &Option<Anchor>, bounds: &Value) -> Result<Value> {
+/// Sample the services the collapsed notch reflects. Missing or disabled modules simply
+/// contribute nothing; this never blocks on a worker.
+fn live_state(app: &tauri::AppHandle) -> super::notch_live::NotchLive {
+    use super::notch_live::{timer_live, NotchLive};
+    let mut live = NotchLive {
+        working: app
+            .try_state::<Services>()
+            .is_some_and(|s| s.terminal.working()),
+        ..Default::default()
+    };
+    if let Some(system) =
+        app.try_state::<Arc<crate::integrations::system_services::SystemServices>>()
+    {
+        if let Some((t, age)) = system.apps.timer().ok().and_then(|t| t.latest()) {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            live.timer = timer_live(
+                &t.countdown_status,
+                t.remaining_ms,
+                &t.pomodoro_status,
+                t.phase_remaining_ms,
+                age,
+                now,
+            );
+        }
+        live.mic_muted = system
+            .apps
+            .toggles()
+            .is_ok_and(|t| t.current().mic_muted == Some(true));
+    }
+    live
+}
+
+fn snapshot(
+    app: &tauri::AppHandle,
+    anchor: &Option<Anchor>,
+    bounds: &Value,
+    live: &super::notch_live::NotchLive,
+) -> Result<Value> {
     use crate::window::input_region::InputRegionBackend;
     let services = app.state::<Services>();
     let region = app.state::<IslandRuntime>();
@@ -72,9 +121,7 @@ fn snapshot(app: &tauri::AppHandle, anchor: &Option<Anchor>, bounds: &Value) -> 
         .region
         .lock()
         .map_err(|_| anyhow::anyhow!("Region lock poisoned"))?;
-    let rectangles: Vec<_> = controller
-        .backend()
-        .readback()?
+    let rectangles: Vec<_> = crate::window::shape::band_rows(&controller.backend().readback()?)
         .into_iter()
         .map(|r| json!({"x":r.x,"y":r.y,"width":r.width,"height":r.height}))
         .collect();
@@ -117,47 +164,77 @@ fn snapshot(app: &tauri::AppHandle, anchor: &Option<Anchor>, bounds: &Value) -> 
         "anchor":anchor,"bounds":bounds,"windowId":xid,"rectangles":rectangles,"pty":services.terminal.pid().unwrap_or(0),
         "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
         "notchBorder":{"enabled":settings.notch_border_enabled,"color":border_color,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width},
-        "background":background,"text":palette.as_ref().map(|p|&p.text),"dim":palette.as_ref().map(|p|&p.dim)}),
+        "background":background,"text":palette.as_ref().map(|p|&p.text),"dim":palette.as_ref().map(|p|&p.dim),
+        "live":live.to_json()}),
     )
 }
-/// After the notch width changes, Plasma re-lays the panel out: rediscover the notch box and
-/// move the island's notch endpoint (`--native-pill-*`) and native-pill input exclusion to it.
-fn follow_notch_geometry(app: tauri::AppHandle) {
-    let spawned = std::thread::Builder::new().name("ripple-notch-follow".into()).spawn(move || {
-        // Plasma applies the KConfig push and relayouts asynchronously.
-        std::thread::sleep(Duration::from_millis(700));
-        let anchor = match tauri::async_runtime::block_on(super::anchor::discover()) {
-            Ok(anchor) if anchor.native => anchor,
-            Ok(_) => return,
-            Err(error) => {
-                tracing::debug!(%error, "Notch rediscovery after width change failed");
-                return;
-            }
-        };
-        let runtime = app.state::<IslandRuntime>();
-        let (ox, oy, _, _) = runtime.placement;
-        let pill = crate::contract::island::RoundedRect {
-            x: anchor.pill.x - ox,
-            y: anchor.pill.y - oy,
-            width: anchor.pill.width,
-            height: anchor.pill.height,
-            radius: anchor.pill_radius,
-        };
-        if let Ok(mut controller) = runtime.region.lock() {
-            controller.set_pill_exclusion(Some(pill));
+/// Source widget ids are resolved only against fresh, connected native anchors.
+fn select_monitor_anchor(
+    anchors: &[Anchor],
+    primary: Option<&Anchor>,
+    current: Option<&Anchor>,
+    clicked: Option<u32>,
+    enabled: bool,
+) -> Result<Option<Anchor>> {
+    if let Some(widget) = clicked {
+        let target = anchors
+            .iter()
+            .find(|a| a.widget == widget)
+            .context("Clicked notch is disconnected or unavailable")?;
+        if !enabled && primary.is_none_or(|a| a.output != target.output) {
+            anyhow::bail!("Notch on every monitor is disabled");
         }
-        if let Some(window) = app.get_webview_window(ISLAND_LABEL) {
-            let values = json!({"x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius});
-            let script = format!("(()=>{{const v={values};for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');window.dispatchEvent(new CustomEvent('island-native-pill'));}})()");
-            if let Err(error) = window.eval(&script) {
-                tracing::debug!(%error, "Notch geometry forward failed");
-            }
-        }
-        tracing::info!(width = anchor.pill.width, x = anchor.pill.x, "Island follows the resized notch");
-    });
-    if let Err(error) = spawned {
-        tracing::debug!(%error, "Notch follow thread unavailable");
+        return Ok(Some(target.clone()));
     }
+    if enabled {
+        if let Some(found) = current.and_then(|c| anchors.iter().find(|a| a.output == c.output)) {
+            return Ok(Some(found.clone()));
+        }
+    }
+    Ok(primary.filter(|a| a.native).cloned().or_else(|| {
+        if enabled {
+            anchors.first().cloned()
+        } else {
+            None
+        }
+    }))
+}
+
+fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
+    use crate::window::{placement::over_panel, ISLAND_OVERLAY_HEIGHT, ISLAND_OVERLAY_WIDTH};
+    let target = over_panel(anchor, ISLAND_OVERLAY_WIDTH, ISLAND_OVERLAY_HEIGHT)?;
+    let runtime = app.state::<IslandRuntime>();
+    let pill = crate::contract::island::RoundedRect {
+        x: anchor.pill.x - f64::from(target.x),
+        y: anchor.pill.y - f64::from(target.y),
+        width: anchor.pill.width,
+        height: anchor.pill.height,
+        radius: anchor.pill_radius,
+    };
+    {
+        let mut controller = runtime
+            .region
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Region poisoned"))?;
+        controller.backend_mut().reposition(target)?;
+        controller.relocated(pill)?;
+    }
+    *runtime
+        .placement
+        .lock()
+        .map_err(|_| anyhow::anyhow!("Placement poisoned"))? = (
+        f64::from(target.x),
+        f64::from(target.y),
+        f64::from(target.width),
+        f64::from(target.height),
+    );
+    let window = app
+        .get_webview_window(ISLAND_LABEL)
+        .context("Missing island window")?;
+    let values =
+        json!({"x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius});
+    window.eval(format!("(()=>{{const v={values};for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');window.dispatchEvent(new Event('island-native-pill'));window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('island-surfaces-changed'));}})()"))?;
+    Ok(json!({"x":target.x,"y":target.y,"width":target.width,"height":target.height}))
 }
 
 fn panel_style_payload(raw: &Value) -> Value {
@@ -170,6 +247,7 @@ fn panel_style_payload(raw: &Value) -> Value {
         "stealth",
         "notchBorder",
         "notchWidth",
+        "live",
     ];
     Value::Object(
         keys.into_iter()
@@ -177,9 +255,10 @@ fn panel_style_payload(raw: &Value) -> Value {
             .collect(),
     )
 }
-fn panel_style_script(panel: u32, widget: u32, style: &Value) -> String {
+fn panel_style_script(targets: &[(u32, u32)], style: &Value) -> String {
     let encoded = json!(style.to_string());
-    format!("var p=panels().filter(p=>p.id==={panel})[0];var w=p&&p.widgets().filter(w=>w.id==={widget}&&(w.type==='local.hermes.island.notch3'||w.type==='local.hermes.island.notch2'||w.type==='local.hermes.island.notch'))[0];if(w){{w.currentConfigGroup=['General'];w.writeConfig('notchAppearance',{encoded});w.reloadConfig();print('notch-style-applied');}}")
+    let targets = json!(targets.iter().map(|(p, w)| [*p, *w]).collect::<Vec<_>>());
+    format!("var t={targets};var n=0;panels().forEach(function(p){{p.widgets().forEach(function(w){{if(!t.some(function(x){{return x[0]===p.id&&x[1]===w.id}}))return;if(['local.hermes.island.notch3','local.hermes.island.notch2','local.hermes.island.notch'].indexOf(w.type)<0)return;w.currentConfigGroup=['General'];w.writeConfig('notchAppearance',{encoded});w.reloadConfig();n++;}})}});print('notch-style-applied '+n);")
 }
 
 #[cfg(test)]
@@ -195,10 +274,18 @@ mod notch_tests {
         assert_eq!(style["background"], json!("#123456"));
         assert!(style.get("private").is_none());
         assert!(style.get("pid").is_none());
-        let script = panel_style_script(145, 407, &style);
-        assert!(script.contains("407"));
+        let script = panel_style_script(&[(145, 407), (97, 500)], &style);
+        assert!(script.contains("[[145,407],[97,500]]"));
         assert!(script.contains("notchAppearance"));
         assert!(!script.contains("private"));
+    }
+    #[test]
+    fn monitor_script_never_creates_panels_and_reports_placement() {
+        let script = include_str!("monitor-notches.js");
+        assert!(!script.contains("new Panel"));
+        assert!(!script.contains("p.remove()"));
+        assert!(script.contains("report.notches.push"));
+        assert!(script.contains("__ENABLED__") && script.contains("__STYLE__"));
     }
 }
 
@@ -212,9 +299,12 @@ impl NativeHost {
             .get_webview_window(ISLAND_LABEL)
             .context("Missing island window")?;
         let runtime = app.state::<IslandRuntime>();
-        let bounds = if runtime.wayland {
+        let mut bounds = if runtime.wayland {
             // Wayland never reports a surface's global position: publish the placement used.
-            let (x, y, width, height) = runtime.placement;
+            let (x, y, width, height) = *runtime
+                .placement
+                .lock()
+                .map_err(|_| anyhow::anyhow!("Placement poisoned"))?;
             json!({"x":x.round() as i64,"y":y.round() as i64,"width":width.round() as i64,"height":height.round() as i64})
         } else {
             let position = window.outer_position()?;
@@ -222,14 +312,34 @@ impl NativeHost {
             json!({"x":position.x,"y":position.y,"width":size.width,"height":size.height})
         };
         let actor = app.state::<IslandActor>().handle.clone();
-        let initial = snapshot(app, &anchor, &bounds)?;
+        let mut last_live = live_state(app);
+        let initial = snapshot(app, &anchor, &bounds, &last_live)?;
         instance.update_status(&initial)?;
         let cached = Arc::new(Mutex::new(initial));
         let state = cached.clone();
         let handle = app.clone();
         let router = actor.clone();
+        let (stop, receive) = mpsc::sync_channel(32);
+        let clicks = stop.clone();
+        // Widget id of the notch the island currently sits on, published by the status worker
+        // (ROUTE_OFF while "notch on every monitor" is off). A click on THAT notch is a plain
+        // toggle, so it is dispatched right here like the classic `pin`, never queued behind the
+        // worker; only a click on another monitor's notch needs the router.
+        let home_widget = Arc::new(AtomicU32::new(ROUTE_OFF));
+        let home = home_widget.clone();
         let panel = PanelSocket::start(&mut instance, move |command| {
             let (kind, intent) = match command {
+                PanelCommand::PinAt(widget) => {
+                    let current = home.load(Ordering::Acquire);
+                    if current == ROUTE_OFF || current == widget {
+                        (Some(AnchorKind::Pin), Some(Intent::PanelPin))
+                    } else {
+                        clicks
+                            .try_send(StatusMsg::PinAt(widget))
+                            .map_err(|_| anyhow::anyhow!("Monitor router stopped"))?;
+                        (Some(AnchorKind::Pin), None)
+                    }
+                }
                 PanelCommand::Status => (None, None),
                 PanelCommand::Enter => (Some(AnchorKind::Enter), Some(Intent::PanelEnter)),
                 PanelCommand::Leave => (Some(AnchorKind::Leave), Some(Intent::PanelLeave)),
@@ -259,7 +369,6 @@ impl NativeHost {
         let instance = Arc::new(Mutex::new(instance));
         let guard = instance.clone();
         let handle = app.clone();
-        let (stop, receive) = mpsc::channel();
         app.manage(StatusNudge(stop.clone()));
         let allow_panel_push = !app.state::<Services>().runtime.test_instance;
         let worker = std::thread::Builder::new()
@@ -267,21 +376,132 @@ impl NativeHost {
             .spawn(move || {
                 let mut last_write = Instant::now();
                 let mut last_panel_style = Value::Null;
-                loop {
-                    match receive.recv_timeout(HEARTBEAT) {
+                let mut anchor = anchor;
+                let mut last_enabled: Option<bool> = None;
+                let mut anchors = Vec::<Anchor>::new();
+                let mut primary: Option<Anchor> = None;
+                let mut monitor_report = Value::Null;
+                let mut monitor_error: Option<String> = None;
+                let mut unavailable = Vec::<String>::new();
+                let mut pending = std::collections::VecDeque::new();
+                'worker: loop {
+                    let message = pending.pop_front().map(Ok).unwrap_or_else(|| receive.recv_timeout(HEARTBEAT));
+                    let clicked = match message {
                         Ok(StatusMsg::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
-                        Ok(StatusMsg::Refresh) | Err(mpsc::RecvTimeoutError::Timeout) => {}
-                    }
-                    // Coalesce bursts: wait out the minimum interval, absorbing further nudges.
-                    let wait = MIN_WRITE_INTERVAL.saturating_sub(last_write.elapsed());
-                    if !wait.is_zero() {
-                        match receive.recv_timeout(wait) {
-                            Ok(StatusMsg::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
-                            Ok(StatusMsg::Refresh) | Err(mpsc::RecvTimeoutError::Timeout) => {}
+                        Ok(StatusMsg::PinAt(widget)) => Some(widget),
+                        Ok(StatusMsg::Refresh) | Err(mpsc::RecvTimeoutError::Timeout) => None,
+                    };
+                    while let Ok(message) = receive.try_recv() {
+                        match message {
+                            StatusMsg::Stop => break 'worker,
+                            StatusMsg::PinAt(_) => pending.push_back(message),
+                            StatusMsg::Refresh => {},
                         }
                     }
+                    // Never coalesce away a click (including a rapid second-monitor click).
+                    std::thread::sleep(MIN_WRITE_INTERVAL.saturating_sub(last_write.elapsed()));
                     let update = (|| -> Result<()> {
-                        let next = snapshot(&handle, &anchor, &bounds)?;
+                        let settings = handle.state::<Services>().settings.get()?;
+                        let enabled = settings.show_notch_on_every_monitor;
+                        let live = live_state(&handle).stabilised(Some(&last_live));
+                        // Plasma is reconciled only at startup and when the setting (or notch
+                        // width) changes: never periodically, never on a click, never retried.
+                        if allow_panel_push && last_enabled != Some(enabled) {
+                            last_enabled = Some(enabled);
+                            let result = (|| -> Result<()> {
+                                let style = panel_style_payload(&snapshot(&handle, &anchor, &bounds, &live)?);
+                                let script = include_str!("monitor-notches.js")
+                                    .replace("__ENABLED__", if enabled { "true" } else { "false" })
+                                    .replace("__STYLE__", &style.to_string());
+                                let reconcile = || -> Result<Value> {
+                                    let mut command = std::process::Command::new("/usr/bin/qdbus6");
+                                    command.args(["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", &script]);
+                                    let out = crate::services::process::run_bounded(command, Duration::from_secs(3), 65536, false)?;
+                                    Ok(serde_json::from_slice(&out).unwrap_or(Value::Null))
+                                };
+                                monitor_report = reconcile()?;
+                                // One fixed second pass (not a retry): it adds nothing when the first
+                                // pass succeeded and only re-asserts the centre slot of new notches.
+                                if monitor_report["added"].as_array().is_some_and(|a| !a.is_empty()) {
+                                    let second = reconcile()?;
+                                    monitor_report["ordered"] = second["ordered"].clone();
+                                    monitor_report["notches"] = second["notches"].clone();
+                                }
+                                tracing::info!(report = %monitor_report, "Monitor notches reconciled");
+                                primary = tauri::async_runtime::block_on(super::anchor::discover()).ok();
+                                if enabled {
+                                    let (found, missing) = super::anchor::discover_all()?;
+                                    anchors = found;
+                                    unavailable = missing;
+                                } else {
+                                    anchors.clear();
+                                    unavailable.clear();
+                                    // Turning the option off brings the island home to the primary notch.
+                                    if let Some(home) = primary.clone().filter(|p| anchor.as_ref().is_some_and(|a| a.output != p.output)) {
+                                        bounds = relocate(&handle, &home)?;
+                                        anchor = Some(home);
+                                    }
+                                }
+                                Ok(())
+                            })();
+                            monitor_error = result.err().map(|e| e.to_string());
+                            if let Some(error) = &monitor_error { tracing::warn!(%error, "Monitor notch routing unavailable"); }
+                        }
+                        // Clicks use the cached anchors only (no Plasma or kscreen calls here).
+                        let mut click_handled = false;
+                        if clicked.is_some() && enabled {
+                            match select_monitor_anchor(&anchors, primary.as_ref(), anchor.as_ref(), clicked, enabled) {
+                                Ok(Some(target)) => {
+                                    let changed_output = anchor.as_ref().is_none_or(|a| a.output != target.output);
+                                    if anchor.as_ref() != Some(&target) {
+                                        bounds = relocate(&handle, &target)?;
+                                        anchor = Some(target);
+                                    }
+                                    // Same output toggles; another output opens/transfers, never collapses.
+                                    let intent = if changed_output { Intent::Pin } else { Intent::PanelPin };
+                                    tauri::async_runtime::block_on(handle.state::<IslandActor>().handle.dispatch(intent))?;
+                                    click_handled = true;
+                                    // After the click is served, re-read positions once: Plasma may have
+                                    // moved the notches since startup (restart, reorder). One bounded
+                                    // read per click, never a loop; it can only correct the placement.
+                                    match super::anchor::discover_all() {
+                                        Ok((found, missing)) => {
+                                            anchors = found;
+                                            unavailable = missing;
+                                            let output = anchor.as_ref().map(|a| a.output.clone());
+                                            if let Some(fresh) = anchors.iter().find(|a| Some(&a.output) == output.as_ref()).cloned() {
+                                                if anchor.as_ref() != Some(&fresh) {
+                                                    bounds = relocate(&handle, &fresh)?;
+                                                    anchor = Some(fresh);
+                                                }
+                                            }
+                                        }
+                                        Err(error) => tracing::debug!(%error, "Notch position refresh unavailable"),
+                                    }
+                                }
+                                Ok(None) => {}
+                                Err(error) => tracing::debug!(%error, "Notch click falls back to the primary toggle"),
+                            }
+                        }
+                        // A click is never lost: anything unroutable falls back to the primary toggle.
+                        if clicked.is_some() && !click_handled {
+                            if let Err(error) = tauri::async_runtime::block_on(handle.state::<IslandActor>().handle.dispatch(Intent::PanelPin)) {
+                                tracing::warn!(%error, "Fallback notch click failed");
+                            }
+                        }
+                        home_widget.store(
+                            match anchor.as_ref() {
+                                Some(a) if enabled && a.native => a.widget,
+                                Some(_) if enabled => 0,
+                                _ => ROUTE_OFF,
+                            },
+                            Ordering::Release,
+                        );
+                        let mut next = snapshot(&handle, &anchor, &bounds, &live)?;
+                        last_live = live;
+                        next["monitorNotches"] = monitor_report.clone();
+                        next["monitorNotchError"] = json!(monitor_error);
+                        next["notchUnavailableOutputs"] = json!(unavailable);
                         guard
                             .lock()
                             .map_err(|_| anyhow::anyhow!("Instance lock poisoned"))?
@@ -289,17 +509,20 @@ impl NativeHost {
                         let style = panel_style_payload(&next);
                         *cached.lock().map_err(|_| anyhow::anyhow!("Panel cache poisoned"))? = next;
                         if allow_panel_push && style != last_panel_style {
-                            if let Some(anchor) = anchor.as_ref().filter(|a| a.native) {
+                            // One script call restyles every notch (primary plus other monitors).
+                            let mut targets: Vec<(u32, u32)> = anchor.iter().chain(anchors.iter()).filter(|a| a.native).map(|a| (a.panel, a.widget)).collect();
+                            targets.sort_unstable();
+                            targets.dedup();
+                            if !targets.is_empty() {
                                 let mut command = std::process::Command::new("/usr/bin/qdbus6");
-                                command.args(["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", &panel_style_script(anchor.panel, anchor.widget, &style)]);
+                                command.args(["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", &panel_style_script(&targets, &style)]);
                                 match crate::services::process::run_bounded(command, Duration::from_secs(1), 4096, false) {
                                     Ok(_) => {
                                         let width_changed = !last_panel_style.is_null()
                                             && last_panel_style.get("notchWidth") != style.get("notchWidth");
                                         last_panel_style = style;
-                                        if width_changed {
-                                            follow_notch_geometry(handle.clone());
-                                        }
+                                        // A new width moves the notches: re-discover once (a setting change, not a loop).
+                                        if width_changed { last_enabled = None; }
                                     }
                                     Err(error) => tracing::debug!(%error, "Native notch appearance push unavailable"),
                                 }
@@ -319,7 +542,10 @@ impl NativeHost {
         let nudge = stop.clone();
         let watcher = tauri::async_runtime::spawn(async move {
             while changes.changed().await.is_ok() {
-                if nudge.send(StatusMsg::Refresh).is_err() {
+                if matches!(
+                    nudge.try_send(StatusMsg::Refresh),
+                    Err(mpsc::TrySendError::Disconnected(_))
+                ) {
                     break;
                 }
             }
@@ -368,6 +594,52 @@ impl NativeHost {
             .shutdown()
     }
 }
+#[cfg(test)]
+mod monitor_tests {
+    use super::*;
+    fn anchor(name: &str, x: i32, id: u32) -> Anchor {
+        super::super::anchor::anchor_from_data(&json!({"outputs":[{"name":name,"connected":true,"enabled":true,"priority":1,"pos":{"x":x,"y":0},"size":{"width":1920,"height":1080}}]}),
+        &json!([{"id":id,"x":x,"y":0,"height":32,"location":"top","widgets":[{"id":id,"type":"local.hermes.island.notch3","x":800,"width":144}]}])).unwrap()
+    }
+    #[test]
+    fn clicked_source_wins_primary_and_unplug_replug_setting_off_are_safe() {
+        let a = anchor("A", 0, 11);
+        let b = anchor("B", -1920, 22);
+        let both = vec![a.clone(), b.clone()];
+        assert_eq!(
+            select_monitor_anchor(&both, Some(&a), Some(&a), Some(22), true).unwrap(),
+            Some(b.clone())
+        );
+        assert_eq!(
+            select_monitor_anchor(&both, Some(&a), Some(&b), None, true).unwrap(),
+            Some(b.clone())
+        );
+        assert_eq!(
+            select_monitor_anchor(&both, Some(&a), Some(&b), None, false).unwrap(),
+            Some(a.clone())
+        );
+        assert!(select_monitor_anchor(&both, Some(&a), Some(&a), Some(22), false).is_err());
+        assert!(select_monitor_anchor(&both, Some(&a), Some(&a), Some(999), true).is_err());
+        assert_eq!(
+            select_monitor_anchor(std::slice::from_ref(&a), Some(&a), Some(&b), None, true)
+                .unwrap(),
+            Some(a.clone())
+        );
+        assert!(select_monitor_anchor(
+            std::slice::from_ref(&a),
+            Some(&a),
+            Some(&b),
+            Some(22),
+            true
+        )
+        .is_err());
+        assert_eq!(
+            select_monitor_anchor(&both, Some(&a), Some(&a), Some(22), true).unwrap(),
+            Some(b)
+        );
+    }
+}
+
 impl Drop for NativeHost {
     fn drop(&mut self) {
         if let Err(error) = self.shutdown() {

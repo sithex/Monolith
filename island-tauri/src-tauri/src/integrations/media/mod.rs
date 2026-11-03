@@ -1,6 +1,6 @@
 //! Now playing (SPEC §3.5 "Now playing", §8 Phase 6 "Music extras").
 //!
-//! * `model.rs` is the audited `staging/mpris-core` (player set, preferred-player choice,
+//! * `model.rs` is the audited former `staging/mpris-core` (player set, preferred-player choice,
 //!   position extrapolation), `lrclib.rs` = `staging/lrclib-core`, `lrc.rs` =
 //!   `staging/lrc-lyrics`, `spectrum.rs` = `staging/spectrum-bands`, all ported unchanged
 //!   (one documented amendment: `lrclib::parse_response` requires a JSON object).

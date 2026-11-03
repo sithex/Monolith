@@ -52,9 +52,8 @@ that, plus autostart, updating and the problems you're likely to hit.
 
 | Path | What's there |
 |---|---|
-| `island-tauri/src-tauri/` | Rust core: window, input region, PTY, settings, and every integration |
+| `island-tauri/src-tauri/` | Rust core: window, input region, PTY, settings, and every integration (pure parsers and models live beside each integration as `core`/`model` modules) |
 | `island-tauri/ui/` | React + Framer Motion front end |
-| `island-tauri/staging/` | Small standalone Rust crates (parsers and models) that the core pulls in |
 | `island-tauri/native/vblank-fix/` | An `LD_PRELOAD` shim so WebKitGTK animates at your monitor's real refresh rate |
 | `island/plasma-anchor/` | The Plasma notch widget (QML) |
 | `island/*.py` | Helpers the notch and the theme sync call |

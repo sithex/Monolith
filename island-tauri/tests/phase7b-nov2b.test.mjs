@@ -7,7 +7,7 @@ import { load } from './phase7b-loader.mjs';
 const { SCHEMES, GREEN, customPalette, schemePalette, mixHex } = load('ui/island/tokens/schemes.ts');
 const { themePayload } = load('ui/island/hermes-theme.ts');
 const { keepIslandColours } = load('ui/views/terminal-colours.ts');
-const { geometryReport } = load('ui/island/geometry.ts');
+const { geometryReport, sideBackFor } = load('ui/island/geometry.ts');
 const src = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const HEX = /^#[0-9a-f]{6}$/;
 
@@ -83,7 +83,7 @@ test('the island clock replicates the native notch clock in the notch box and ne
   assert.match(css, /\.clock span \{ display: block; position: relative; top: 1px; height: 14px; font-size: 12px; font-weight: 700; line-height: 14px; \}/, 'PanelPill.qml: 12 px bold, 14 px tall');
   assert.match(css, /\.clock small \{ display: block; height: 12px; margin-top: 0; font-size: 10px; font-weight: 600;/, 'PanelPill.qml: 10 px demibold, spacing -1');
   const qml = readFileSync(new URL('../../island/plasma-anchor/contents/ui/PanelPill.qml', import.meta.url), 'utf8');
-  assert.match(qml, /font\.pixelSize: pill\.showDate \? 12 : 14/); assert.match(qml, /font\.pixelSize: 10/); assert.match(qml, /spacing: -1/);
+  assert.match(qml, /twoLines: pill\.showDate \|\| pill\.timerShown/); assert.match(qml, /font\.pixelSize: parent\.twoLines \? 12 : 14/); assert.match(qml, /font\.pixelSize: 10/); assert.match(qml, /spacing: -1/);
 });
 
 test('glass strength drives the body and side-button transparency', () => {
@@ -121,4 +121,20 @@ test('the solid top strip eases into the glass instead of a hard 42 px edge', ()
   const css = src('ui/island/surface.css');
   assert.doesNotMatch(css, /var\(--ui-background\) 42px,/);
   assert.ok((css.match(/var\(--glass-cut\) \* \.\d+\), transparent\) \d+px/g) ?? []).length >= 8, 'multi-stop eased ramp');
+});
+
+test('a page side button becomes Back while its page is showing, and returns to where you were', () => {
+  const back = { view: 'terminal', label: 'Terminal', go() {} };
+  assert.equal(sideBackFor({ type: 'appGrid' }, 'launcher', back), back, 'Apps on the app grid = Back');
+  assert.equal(sideBackFor({ type: 'settings' }, 'settings', { ...back, view: 'music' }).view, 'music', 'back target is the page you came from');
+  assert.equal(sideBackFor({ type: 'appGrid' }, 'settings', back), null, 'another page: normal icon');
+  assert.equal(sideBackFor({ type: 'openApp', view: 'terminal' }, 'terminal', back), null, 'nowhere else to go: no Back');
+  assert.equal(sideBackFor({ type: 'playPause' }, 'music', { ...back, view: 'launcher' }), null, 'quick actions never turn into Back');
+  assert.equal(sideBackFor({ type: 'appGrid' }, undefined, back), null);
+  const side = src('ui/island/SideControls.tsx');
+  assert.match(side, /if \(returning\) back!\.go\(\)/, 'the tap runs the island back history, not a fresh navigation');
+  assert.match(side, /returning \? 'back' : actionIcon/);
+  // The spinning wrapper must fill the button: the icon is sized in % of its container.
+  assert.match(src('ui/island/polish.css'), /\.live-side-button \.side-icon \{[^}]*width: 100%; height: 100%/);
+  assert.match(src('ui/island/Island.tsx'), /<SideControls[^>]*back=\{\{ view: previous, label: viewLabels\[previous\], go: goBack \}\}/);
 });

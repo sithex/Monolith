@@ -11,7 +11,7 @@ test('withdrawal delay never intercepts the JS-driven shell size spring at zero 
     'the base surface must scope CSS transitions to translation, even without data-glide');
 });
 import { load } from './phase7b-loader.mjs';
-const { axisSpring, springProgress, arrivalTime, sidePose, sideDropPath, WITHDRAW_SECONDS, glassFadePlan, glassOpenness, GLASS_STRETCH, surfaceRadius } = load('ui/island/motion-profile.ts');
+const { axisSpring, springProgress, arrivalTime, sidePose, sideDropPath, WITHDRAW_SECONDS, glassFadePlan, glassOpenness, GLASS_STRETCH, surfaceRadius, handOffFade, axisSpring: spring2 } = load('ui/island/motion-profile.ts');
 
 test('glass lip: solid out of the notch, opens over the last 48 px, shuts at once on close', () => {
   const open = glassFadePlan(26, 640, true, 0);
@@ -26,6 +26,24 @@ test('glass lip: solid out of the notch, opens over the last 48 px, shuts at onc
   assert.equal(glassOpenness(glassFadePlan(640, 500, true, 1), 520), 1, 'a shrinking open page keeps its glass');
 });
 
+test('notch hand-off fade stays inside the notch footprint (never see-through past it)', () => {
+  const pill = { width: 144, height: 26 };
+  assert.equal(handOffFade(144, 26, pill), 0);
+  assert.equal(handOffFade(144, 40, pill), 1);
+  assert.equal(handOffFade(200, 27, pill), 1, 'a bar wider than the notch stays opaque even at notch height');
+  assert.equal(handOffFade(156, 26, pill), .5);
+  // Replay the real close springs (width settles after height): whenever the shell is
+  // translucent it is within 24 px of the notch width and 14 px of its height.
+  const w = spring2(1040, 144, 'width'), h = spring2(672, 26, 'height');
+  for (let f = 1; f <= 240; f++) {
+    const s = f / 240, W = 1040 + (144 - 1040) * springProgress(w, s), H = 672 + (26 - 672) * springProgress(h, s);
+    const o = handOffFade(W, H, pill);
+    if (o < 1) assert.ok(W - 144 <= 24 && H - 26 <= 14, `frame ${f}: translucent at ${W.toFixed(1)}x${H.toFixed(1)}`);
+  }
+  const src = readFileSync(new URL('../ui/island/IslandSurface.tsx', import.meta.url), 'utf8');
+  assert.match(src, /handOffFade\(/, 'the shell fade uses both axes');
+});
+
 test('closing radius follows the drawn height into the notch, never a square box', () => {
   assert.equal(surfaceRadius(640), 28); assert.ok(Math.abs(surfaceRadius(26) - 8.84) < 1e-9);
   for (let h = 26; h <= 120; h++) assert.ok(surfaceRadius(h) >= 8.8, `radius at ${h}px`);
@@ -34,10 +52,18 @@ test('closing radius follows the drawn height into the notch, never a square box
   assert.doesNotMatch(src, /setTimeout/, 'notch arrival is a function of the drawn size, never a timer racing a reopen');
 });
 
-test('native-pill still frames release ShapeInput and KWin blur at the first withdrawing frame', () => {
+test('native-pill close: blur held only until the solid frame is on screen, released long before the fade', () => {
   const src = readFileSync(new URL('../ui/island/geometry.ts', import.meta.url), 'utf8');
-  assert.match(src, /settled \|\| \(still && nativePill\(\) !== null\)/,
-    'an unsettled still frame keeps KWin blurring the fading shell: the grey box over the notch clock');
+  assert.match(src, /settled \|\| \(still && !blurHeld && nativePill\(\) !== null\)/,
+    'still frames settle (releasing blur) once the hold ends; never left unsettled into the notch fade (grey box)');
+  assert.match(src, /blurHeld\) schedule\(\)/, 'the hold keeps reporting so the settled report is always sent');
+  const ms = +src.match(/BLUR_RELEASE_MS = (\d+)/)[1];
+  assert.ok(ms >= 50, 'covers WebKit presenting the solid frame after the rAF (see-through flash otherwise)');
+  // The fade into the notch starts only within 14 px of the notch height: replay the close
+  // spring and require the hold to end well before that.
+  const h = axisSpring(672, 26, 'height');
+  const fadeStart = Array.from({ length: 480 }, (_, f) => f / 1000).find(s => 672 + (26 - 672) * springProgress(h, s) <= 40);
+  assert.ok(ms / 1000 < fadeStart / 2, `hold ${ms} ms vs fade at ${fadeStart * 1000} ms`);
 });
 
 test('shell uses physical axis springs, not visual-duration guesses or suction tweens', () => {

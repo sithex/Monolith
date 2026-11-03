@@ -107,6 +107,19 @@ impl<B: InputRegionBackend> InputRegionController<B> {
         self.applied.as_deref().map(ack_rows).unwrap_or(0)
     }
 
+    pub fn backend_mut(&mut self) -> &mut B {
+        &mut self.backend
+    }
+
+    /// A monitor transfer invalidates cached surface/scale geometry, not actor or PTY state.
+    pub fn relocated(&mut self, pill: RoundedRect) -> Result<(), IslandError> {
+        self.pill_exclusion = Some(pill);
+        self.applied = None;
+        self.painted = None;
+        self.settled = None;
+        self.install()
+    }
+
     pub fn backend(&self) -> &B {
         &self.backend
     }

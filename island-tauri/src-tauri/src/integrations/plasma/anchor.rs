@@ -189,6 +189,45 @@ pub fn anchor_from_data(outputs: &Value, panels: &Value) -> Result<Anchor, Islan
         "No valid clock or native anchor on primary top panel",
     ))
 }
+/// Enumerate each enabled output independently, preserving logical (including negative)
+/// origins. Missing panels remain explicit failures rather than selecting another display.
+pub fn anchors_from_data(outputs: &Value, panels: &Value) -> (Vec<Anchor>, Vec<String>) {
+    let mut anchors = Vec::new();
+    let mut unavailable = Vec::new();
+    if let Some(list) = outputs["outputs"].as_array() {
+        for output in list
+            .iter()
+            .filter(|o| o["connected"] == true && o["enabled"] != false)
+        {
+            let mut selected = output.clone();
+            selected["priority"] = serde_json::json!(1);
+            match anchor_from_data(&serde_json::json!({"outputs":[selected]}), panels) {
+                Ok(anchor) if anchor.native => anchors.push(anchor),
+                _ => unavailable.push(output["name"].as_str().unwrap_or("unknown").to_owned()),
+            }
+        }
+    }
+    (anchors, unavailable)
+}
+
+#[cfg(target_os = "linux")]
+pub fn discover_all() -> Result<(Vec<Anchor>, Vec<String>), IslandError> {
+    let [outputs, panels] = discovery_commands();
+    let run = |cmd| {
+        crate::services::process::run_bounded(
+            cmd,
+            std::time::Duration::from_secs(3),
+            1024 * 1024,
+            false,
+        )
+    };
+    let outputs: Value = serde_json::from_slice(&run(outputs)?)
+        .map_err(|_| IslandError::invalid("Invalid outputs"))?;
+    let panels: Value = serde_json::from_slice(&run(panels)?)
+        .map_err(|_| IslandError::invalid("Invalid panels"))?;
+    Ok(anchors_from_data(&outputs, &panels))
+}
+
 /// SPEC §2.3: popup starts BELOW the panel. Small screens shrink the viewport
 /// rather than moving it over the panel or letting its bounds escape the screen.
 pub fn below_panel(anchor: &Anchor, width: u32, height: u32) -> Result<Placement, IslandError> {
@@ -224,7 +263,7 @@ pub fn below_panel(anchor: &Anchor, width: u32, height: u32) -> Result<Placement
 }
 
 #[cfg(target_os = "linux")]
-pub const DISCOVERY_SCRIPT: &str = "print(JSON.stringify(panels().map(p=>{var g=screenGeometry(p.screen);return {id:p.id,location:p.location,height:p.height,floating:p.floating,x:g.x+(p.offset||0),y:g.y,screenX:g.x,screenY:g.y,widgets:p.widgets().map(w=>{var r=w.geometry;return {id:w.id,type:w.type,x:r.x,y:r.y,width:r.width,height:r.height}})}})))";
+pub const DISCOVERY_SCRIPT: &str = "print(JSON.stringify(panels().map(p=>{var g=screenGeometry(p.screen);return {id:p.id,location:p.location,height:p.height,floating:p.floating,x:g.x+(p.alignment==='center'?(g.width-p.length)/2+(p.offset||0):p.alignment==='right'?g.width-p.length-(p.offset||0):(p.offset||0)),y:g.y,screenX:g.x,screenY:g.y,widgets:p.widgets().map(w=>{var r=w.geometry;return {id:w.id,type:w.type,x:r.x,y:r.y,width:r.width,height:r.height}})}})))";
 #[cfg(target_os = "linux")]
 pub fn discovery_commands() -> [std::process::Command; 2] {
     let mut outputs = std::process::Command::new("kscreen-doctor");
@@ -268,6 +307,23 @@ pub async fn discover() -> Result<Anchor, IslandError> {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn every_monitor_keeps_logical_negative_origins_and_missing_outputs_explicit() {
+        let outputs = json!({"outputs":[
+            {"connected":true,"enabled":true,"priority":1,"name":"A","pos":{"x":0,"y":0},"size":{"width":1920,"height":1080},"scale":1},
+            {"connected":true,"enabled":true,"priority":2,"name":"B","pos":{"x":-1536,"y":-200},"size":{"width":1536,"height":864},"scale":1.25},
+            {"connected":true,"enabled":true,"priority":3,"name":"no-panel","pos":{"x":1920,"y":0},"size":{"width":1920,"height":1080}},
+            {"connected":false,"enabled":true,"name":"unplugged"}]});
+        let panels = json!([
+            {"id":1,"screenX":0,"screenY":0,"x":0,"y":0,"height":32,"location":"top","widgets":[{"id":11,"type":"local.hermes.island.notch3","x":800,"width":144}]},
+            {"id":2,"screenX":-1536,"screenY":-200,"x":-1536,"y":-200,"height":32,"location":"top","widgets":[{"id":22,"type":"local.hermes.island.notch3","x":600,"width":144}]}]);
+        let (anchors, unavailable) = anchors_from_data(&outputs, &panels);
+        assert_eq!(anchors.len(), 2);
+        assert_eq!(unavailable, ["no-panel"]);
+        assert_eq!(anchors[1].pill.x, -936.);
+        assert_eq!(anchors[1].pill.y, -200.);
+        assert_eq!(anchors[1].screen.width, 1536.); // no double scaling
+    }
     fn outputs() -> Value {
         json!({"outputs":[{"connected":true,"enabled":true,"priority":1,"name":"DP-1","pos":{"x":1920,"y":0},"size":{"width":2560,"height":1440}}]})
     }

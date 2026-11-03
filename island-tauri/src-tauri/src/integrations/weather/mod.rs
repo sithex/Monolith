@@ -1,6 +1,6 @@
 //! Weather service (SPEC §3.5 "Weather", §5 `weather_refresh` / `weather_geocode`).
 //!
-//! `policy.rs` is the audited pure core ported unchanged from `staging/weather-core`
+//! `policy.rs` is the audited pure core ported unchanged from the former `staging/weather-core` crate (git history)
 //! (URLs, parsing, WMO conditions, stale/refresh rules); `open_meteo.rs` moves bytes with a
 //! 10 s timeout and a 256 KiB body cap. This module owns the settings gate and the worker.
 //!

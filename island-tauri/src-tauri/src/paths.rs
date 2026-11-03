@@ -232,3 +232,87 @@ mod tests {
         fs::remove_dir_all(elsewhere).unwrap();
     }
 }
+
+/// Stable, machine-independent location the Plasma notch widget runs its click client from:
+/// `$XDG_STATE_HOME/monolith/anchor-client.py` (default `~/.local/state/...`). It is a
+/// symlink to this checkout's `island/anchor-client.py`, so the widget never hardcodes
+/// where the repository lives. The client resolves the link, so it still finds the repo.
+pub fn anchor_client_link(state_home: Option<&Path>, home: &Path) -> PathBuf {
+    state_home
+        .filter(|p| p.is_absolute())
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| home.join(".local/state"))
+        .join("monolith/anchor-client.py")
+}
+
+/// Point the link at `repo_root`'s client. Only ever replaces a symlink (never a real file)
+/// and swaps atomically, so a click racing startup sees either the old or the new target.
+pub fn publish_anchor_client(link: &Path, repo_root: &Path) -> std::io::Result<bool> {
+    let target = repo_root.join("island/anchor-client.py");
+    if !target.is_file() {
+        return Ok(false);
+    }
+    match std::fs::symlink_metadata(link) {
+        Ok(meta) if !meta.file_type().is_symlink() => return Ok(false),
+        Ok(_) if std::fs::read_link(link).ok().as_deref() == Some(target.as_path()) => {
+            return Ok(true)
+        }
+        _ => {}
+    }
+    let parent = link.parent().ok_or(std::io::ErrorKind::InvalidInput)?;
+    std::fs::create_dir_all(parent)?;
+    let staging = parent.join(format!(".anchor-client.{}.tmp", std::process::id()));
+    let _ = std::fs::remove_file(&staging);
+    std::os::unix::fs::symlink(&target, &staging)?;
+    std::fs::rename(&staging, link).inspect_err(|_| {
+        let _ = std::fs::remove_file(&staging);
+    })?;
+    Ok(true)
+}
+
+#[cfg(test)]
+mod anchor_link_tests {
+    use super::*;
+
+    #[test]
+    fn link_location_honours_absolute_xdg_state_home_only() {
+        let home = Path::new("/home/u");
+        assert_eq!(
+            anchor_client_link(None, home),
+            Path::new("/home/u/.local/state/monolith/anchor-client.py")
+        );
+        assert_eq!(
+            anchor_client_link(Some(Path::new("/s")), home),
+            Path::new("/s/monolith/anchor-client.py")
+        );
+        assert_eq!(
+            anchor_client_link(Some(Path::new("rel")), home),
+            Path::new("/home/u/.local/state/monolith/anchor-client.py")
+        );
+    }
+
+    #[test]
+    fn publish_creates_retargets_and_never_clobbers_real_files() {
+        let base = std::env::temp_dir().join(format!("anchor-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (a, b) = (base.join("a"), base.join("b"));
+        for repo in [&a, &b] {
+            std::fs::create_dir_all(repo.join("island")).unwrap();
+            std::fs::write(repo.join("island/anchor-client.py"), "").unwrap();
+        }
+        let link = base.join("state/monolith/anchor-client.py");
+        assert!(publish_anchor_client(&link, &a).unwrap());
+        assert_eq!(std::fs::read_link(&link).unwrap(), a.join("island/anchor-client.py"));
+        assert!(publish_anchor_client(&link, &a).unwrap());
+        assert!(publish_anchor_client(&link, &b).unwrap());
+        assert_eq!(std::fs::read_link(&link).unwrap(), b.join("island/anchor-client.py"));
+        // Missing client in the checkout: leave things alone.
+        assert!(!publish_anchor_client(&link, &base.join("nowhere")).unwrap());
+        // A real file the user put there is never replaced.
+        std::fs::remove_file(&link).unwrap();
+        std::fs::write(&link, "mine").unwrap();
+        assert!(!publish_anchor_client(&link, &a).unwrap());
+        assert_eq!(std::fs::read_to_string(&link).unwrap(), "mine");
+        std::fs::remove_dir_all(&base).unwrap();
+    }
+}

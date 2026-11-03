@@ -44,7 +44,7 @@ pub struct IslandRuntime {
     pub actor_geometry: bool,
     /// Where the window was placed (global logical px). Wayland cannot report a toplevel's
     /// position, so status `bounds` use this on the native Wayland path.
-    pub placement: (f64, f64, f64, f64),
+    pub placement: Mutex<(f64, f64, f64, f64)>,
     pub wayland: bool,
 }
 
@@ -272,7 +272,7 @@ pub fn create_island_window(
     app.manage(IslandRuntime {
         region: Arc::new(Mutex::new(controller)),
         actor_geometry: matches!(cli.ui, UiKind::Legacy | UiKind::Island),
-        placement: (origin.x, origin.y, config.width, config.height),
+        placement: Mutex::new((origin.x, origin.y, config.width, config.height)),
         wayland: on_wayland,
     });
 

@@ -1009,6 +1009,7 @@ export type Settings = {
 	displayBackend?: DisplayBackend,
 	/**  Additive (Nov 2c): native notch width in logical px (144 = the original slot). */
 	notchWidth?: number,
+	showNotchOnEveryMonitor?: boolean,
 };
 
 export type SettingsChanged = Settings;
@@ -1072,6 +1073,7 @@ export type SettingsPatch = {
 	customText?: string,
 	displayBackend?: DisplayBackend,
 	notchWidth?: number,
+	showNotchOnEveryMonitor?: boolean,
 };
 
 export type SystemStats = {

@@ -54,7 +54,12 @@ The notch is a Plasma widget. Install it, then add it to the panel where you wan
 
 ```sh
 kpackagetool6 -t Plasma/Applet -i ~/Hermes/Monolith/island/plasma-anchor
+mkdir -p ~/.local/state/monolith
+ln -sf ~/Hermes/Monolith/island/anchor-client.py ~/.local/state/monolith/anchor-client.py
 ```
+
+The link tells the notch where this copy of Monolith lives, so clicking it can start the island the first
+time. The island keeps the link up to date on every start, so moving the folder only needs one manual launch.
 
 Right-click the panel, choose **Add or Manage Widgets**, find **Hermes Island Notch** and drag it into place.
 Most people put it in the middle of a top panel, in place of the clock. It only works on a horizontal panel.
@@ -70,8 +75,8 @@ using the old compiled version until you remove the widget from the panel and ad
 
 Click the notch. The island opens on the Hermes terminal.
 
-The built-in launch command points at the author's own wrapper script, which you won't have. Go to
-**Settings → General → Terminal** and enter `hermes`, then restart the terminal. A few other values work:
+With **Settings → General → Terminal** left empty, the island runs `hermes chat --tui` from your `PATH`.
+To run something else, enter it there and restart the terminal. A few values that work:
 
 - `hermes --tui` forces the newer interface; `hermes --cli` forces the classic one.
 - Any executable path with arguments works too. The field isn't a shell, so `~`, `$HOME`, pipes and aliases

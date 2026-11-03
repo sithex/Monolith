@@ -2,6 +2,7 @@
 pub mod anchor;
 #[cfg(target_os = "linux")]
 pub mod kwin_place;
+pub mod notch_live;
 #[cfg(target_os = "linux")]
 pub mod panel_socket;
 #[cfg(target_os = "linux")]

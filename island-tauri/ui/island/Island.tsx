@@ -121,5 +121,5 @@ export function Island() {
         </IslandShell>
       </ViewPager>
     </motion.div>
-  </IslandSurface><SideControls navigate={navigate} fail={fail} /><ColorPickerPanel /><Toast previews={false} />{error && <p role="alert">{error}</p>}</main>;
+  </IslandSurface><SideControls navigate={navigate} fail={fail} view={view} back={{ view: previous, label: viewLabels[previous], go: goBack }} /><ColorPickerPanel /><Toast previews={false} />{error && <p role="alert">{error}</p>}</main>;
 }

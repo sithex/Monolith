@@ -27,6 +27,41 @@ TestCase {
         const component = Qt.createComponent("../plasma-anchor/contents/ui/main.qml");
         compare(component.status, Component.Ready, component.errorString());
     }
+    function test_live_states_timer_working_and_mic() {
+        const notch = createTemporaryObject(factory, testCase);
+        const date = findChild(notch, "panelDate");
+        const outline = findChild(notch, "notchOutline");
+        const mic = findChild(notch, "notchMicMuted");
+        compare(date.text, "Sun, Nov 1");
+        // Running countdown replaces the date line and ticks down in mm:ss.
+        notch.timerEndsAt = Date.now() + 65500;
+        tryVerify(function() { return /^1:0[56]$/.test(date.text); }, 2000, date.text);
+        compare(date.color, notch.accent);
+        // Paused: static remaining time with a pause mark.
+        notch.timerEndsAt = 0; notch.timerPausedMs = 3723000;
+        compare(date.text, "❚❚ 1:02:03");
+        notch.timerPausedMs = -1;
+        compare(date.text, "Sun, Nov 1");
+        // Timer still shows with the date hidden.
+        notch.showDate = false; notch.timerEndsAt = Date.now() + 9000;
+        verify(date.visible);
+        notch.timerEndsAt = 0;
+        verify(!date.visible);
+        // Hermes working: accent breath on the border, gone when it stops.
+        const idleStroke = outline.strokeColor;
+        notch.working = true;
+        tryVerify(function() { return notch.workPulse > .3; }, 2500);
+        verify(outline.strokeWidth >= 1);
+        notch.working = false;
+        compare(outline.strokeColor, idleStroke);
+        // Mic muted mark stays clear of the clock and the music bars.
+        notch.micMuted = true;
+        tryCompare(mic, "opacity", .85);
+        verify(mic.x + mic.width < findChild(notch, "panelClock").mapToItem(notch, 0, 0).x);
+        notch.micMuted = false;
+        tryCompare(mic, "opacity", 0);
+        compare(notch.width, 144); compare(notch.height, 26);
+    }
     function test_music_indicator_only_animates_while_playing_without_resizing() {
         const notch = createTemporaryObject(factory, testCase);
         const indicator = findChild(notch, "notchMusicIndicator");

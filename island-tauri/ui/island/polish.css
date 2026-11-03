@@ -84,6 +84,9 @@
 
 /* ---- Quick-action side buttons ------------------------------------------ */
 .live-side-button[data-lit='true'] { background: var(--ui-accent); color: var(--ui-on-accent); border-color: transparent; }
+/* Icon wrapper (spins between the page icon and Back). It fills the button so the icon's
+   percentage size (surface.css: 46% of the button) still resolves against the button. */
+.live-side-button .side-icon { display: grid; place-items: center; width: 100%; height: 100%; line-height: 0; }
 .live-side-button[data-quick='true'] svg { transition: transform .3s var(--v-ease); }
 .live-side-button[data-quick='true']:active svg { transform: scale(.85); }
 

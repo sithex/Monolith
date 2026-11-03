@@ -9,6 +9,7 @@
 //! The fixture shell (`bash --noprofile --norc`) exists for tests only and re-checks
 //! `HERMES_ISLAND_TEST=1` itself (defense in depth behind the CLI gate).
 
+pub mod activity;
 pub mod flow;
 pub mod pty;
 
@@ -64,6 +65,8 @@ pub struct TerminalConfig {
     pub fixture: bool,
     /// Unacknowledged bytes at which the reader pauses.
     pub credit_limit: usize,
+    /// PATH used to find plain `hermes` when the private wrapper is absent.
+    pub search_path: Option<std::ffi::OsString>,
 }
 
 impl TerminalConfig {
@@ -73,6 +76,7 @@ impl TerminalConfig {
             home,
             fixture,
             credit_limit: DEFAULT_CREDIT_LIMIT,
+            search_path: std::env::var_os("PATH"),
         }
     }
 }
@@ -136,6 +140,13 @@ struct SharedState {
     state: Mutex<State>,
     /// Serializes sends and attach; ack never takes it, so synchronous sink acks are safe.
     delivery: Mutex<()>,
+    /// Hermes' busy/idle title marker, for the notch's "Hermes is working" pulse.
+    activity: Mutex<activity::TitleActivity>,
+}
+impl SharedState {
+    fn activity(&self) -> MutexGuard<'_, activity::TitleActivity> {
+        self.activity.lock().unwrap_or_else(|e| e.into_inner())
+    }
 }
 type Shared = Arc<SharedState>;
 
@@ -196,6 +207,38 @@ pub fn fixture_allowed(env_value: Option<&str>) -> Result<(), IslandError> {
     }
 }
 
+/// Empty `terminalCommand`: the author's private wrapper when it exists (unchanged behaviour
+/// on that machine), otherwise plain `hermes chat --tui` resolved like any custom program.
+/// A fresh clone therefore works without editing Settings first.
+fn default_hermes_command(
+    home: &std::path::Path,
+    cwd: &std::path::Path,
+    path: Option<&std::ffi::OsStr>,
+) -> Result<CommandBuilder, IslandError> {
+    match resolve_hermes(home) {
+        Ok((python, script)) => {
+            let mut c = CommandBuilder::new(python);
+            c.arg("-I");
+            c.arg(script);
+            c.args(["chat", "--tui"]);
+            Ok(c)
+        }
+        Err(_) => {
+            let hermes = pty::resolve_custom_program(
+                "hermes", home, cwd, path,
+            )
+            .map_err(|_| {
+                IslandError::unavailable(
+                    "Hermes not found on PATH. Install Hermes Agent or set Settings → General → Terminal",
+                )
+            })?;
+            let mut c = CommandBuilder::new(hermes);
+            c.args(["chat", "--tui"]);
+            Ok(c)
+        }
+    }
+}
+
 fn io_error(error: impl ToString) -> IslandError {
     IslandError::io(error.to_string())
 }
@@ -209,6 +252,7 @@ impl Terminal {
             shared: Arc::new(SharedState {
                 state: Mutex::new(State::new(flow)),
                 delivery: Mutex::new(()),
+                activity: Mutex::new(activity::TitleActivity::default()),
             }),
             run: Mutex::new(Run::default()),
         }
@@ -232,6 +276,14 @@ impl Terminal {
 
     pub fn pid(&self) -> Option<u32> {
         lock(&self.shared).pid
+    }
+
+    /// True while the running session is producing sustained output (see `activity`).
+    pub fn working(&self) -> bool {
+        if !lock(&self.shared).running {
+            return false;
+        }
+        self.shared.activity().working()
     }
 
     pub fn snapshot(&self) -> TerminalSnapshot {
@@ -404,12 +456,11 @@ impl Terminal {
                 .unwrap_or_default();
             let argv = crate::contract::settings::parse_terminal_command(&value)?;
             let mut c = if value.trim().is_empty() {
-                let (python, script) = resolve_hermes(&self.cfg.home)?;
-                let mut c = CommandBuilder::new(python);
-                c.arg("-I");
-                c.arg(script);
-                c.args(["chat", "--tui"]);
-                c
+                default_hermes_command(
+                    &self.cfg.home,
+                    &self.cfg.root,
+                    self.cfg.search_path.as_deref(),
+                )?
             } else {
                 let program = argv.first().filter(|s| !s.is_empty()).ok_or_else(|| {
                     IslandError::invalid("Invalid terminalCommand: empty executable")
@@ -510,6 +561,7 @@ impl Terminal {
             thread::spawn(move || {
                 let mut buffer = [0u8; 16384];
                 let mut pending = Vec::new();
+                shared.activity().reset();
                 while !cancel.load(Ordering::Acquire) {
                     // Credit: stop reading while too much is unacknowledged. Blocks on a
                     // condvar (no polling); woken by ack, re-attach, cancel and child exit.
@@ -521,6 +573,7 @@ impl Terminal {
                         Ok(0) => break,
                         Ok(n) => {
                             flow.read(n);
+                            shared.activity().output(&buffer[..n]);
                             pending.extend_from_slice(&buffer[..n]);
                             let text = decode(&mut pending, false);
                             publish(&shared, &text);

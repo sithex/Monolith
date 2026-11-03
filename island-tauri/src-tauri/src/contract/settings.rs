@@ -158,6 +158,8 @@ pub struct Settings {
     /// Additive (Nov 2c): native notch width in logical px (144 = the original slot).
     #[serde(default = "default_notch_width")]
     pub notch_width: f64,
+    #[serde(default)]
+    pub show_notch_on_every_monitor: bool,
 }
 
 fn default_display_backend() -> DisplayBackend {
@@ -242,6 +244,7 @@ impl Default for Settings {
             custom_text: String::new(),
             display_backend: default_display_backend(),
             notch_width: default_notch_width(),
+            show_notch_on_every_monitor: false,
         }
     }
 }
@@ -356,6 +359,10 @@ impl Settings {
             ("customText", json!(self.custom_text)),
             ("displayBackend", json!(self.display_backend)),
             ("notchWidth", json_number(self.notch_width)),
+            (
+                "showNotchOnEveryMonitor",
+                json!(self.show_notch_on_every_monitor),
+            ),
         ])
     }
 
@@ -562,6 +569,9 @@ pub struct SettingsPatch {
     #[serde(default, deserialize_with = "present")]
     #[specta(optional, type = f64)]
     pub notch_width: Option<f64>,
+    #[serde(default, deserialize_with = "present")]
+    #[specta(optional, type = bool)]
+    pub show_notch_on_every_monitor: Option<bool>,
 }
 
 /// Wire wrapper that accepts ONLY a JSON object. A derived struct `Deserialize` would also
@@ -787,6 +797,9 @@ impl SettingsPatch {
         }
         if let Some(v) = self.display_backend {
             next.display_backend = v;
+        }
+        if let Some(v) = self.show_notch_on_every_monitor {
+            next.show_notch_on_every_monitor = v;
         }
         if let Some(v) = self.notch_width {
             next.notch_width = number("notchWidth", v, NOTCH_WIDTH_RANGE)?.round();
@@ -1058,7 +1071,7 @@ mod tests {
         expected.sort();
         // 40 existing keys + four independent notch border settings + glass strength,
         // Hermes theme sync, three Custom scheme seed colours, backend/notch width, terminal command.
-        assert_eq!(keys.len(), 52);
+        assert_eq!(keys.len(), 53);
         assert_eq!(keys, expected);
         assert_eq!(settings.hover_delay, 180.0);
         assert_eq!(settings.ui_font, UiFont::System);

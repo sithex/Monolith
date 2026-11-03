@@ -18,6 +18,12 @@ export function layoutActionView(action: LayoutAction): IslandView {
     default: return 'launcher';
   }
 }
+/** A page side button turns into Back while its own page is showing and there is somewhere
+ *  else to return to; quick actions never do. Returns the back target or null. */
+export function sideBackFor<B extends { view: IslandView }>(action: LayoutAction, view: IslandView | undefined, back: B | null | undefined): B | null {
+  if (!back || view === undefined || back.view === view || isQuickAction(action.type)) return null;
+  return layoutActionView(action) === view ? back : null;
+}
 export function visibleLayout(layout: LayoutModel, views: readonly IslandView[]): LayoutModel {
   return { ...layout, buttons: layout.buttons.filter(b => isQuickAction(b.action.type) || ['launcher', 'terminal', 'settings', 'quickInfo'].includes(layoutActionView(b.action)) || views.includes(layoutActionView(b.action))) };
 }
@@ -104,6 +110,8 @@ export function geometryReport(outer: HTMLElement, state: IslandState, settled: 
       radius: parseFloat(getComputedStyle(outer).borderRadius) || 0 }, ...buttons, ...extensions] };
 }
 /** Single coalesced owner. Side geometry is projected synchronously, never a native round-trip feedback loop. */
+/** How long a closing shell keeps KWin's blur under it (see the reporter's flush). */
+export const BLUR_RELEASE_MS = 80;
 export function createGeometryReporter(outer: HTMLElement, current: () => IslandState,
   offsets: () => { x: number; y: number }, send: (report: GeometryReport) => Promise<unknown>,
   fail: (error: unknown) => void, layout?: () => LayoutModel) {
@@ -113,6 +121,7 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
   // Translation glide: offset changes and open/close travel to/from the pill animate via a CSS
   // transform transition instead of jumping (a dragged offset slider used to teleport the island).
   let lastOffset: { x: number; y: number } | null = null, lastStill: boolean | null = null, glideUntil = 0;
+  let stillSince = -Infinity;
   let glideTimer: ReturnType<typeof setTimeout> | null = null;
   const root = outer.ownerDocument?.documentElement;
   const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -147,6 +156,13 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
     const own = ownTranslation(), measured = outer.getBoundingClientRect();
     const rect: Rect = { x: measured.x - own.x, y: measured.y - own.y, width: measured.width, height: measured.height };
     const still = state.mode === 'still';
+    if (still && lastStill === false) stillSince = performance.now();
+    // WebKit presents the solid "glass shut" frame a frame or two after this rAF, while Rust
+    // drops the KWin blur the moment it receives the settled still report. Releasing at once
+    // showed the still-translucent shell over UNblurred windows for a frame. So for
+    // BLUR_RELEASE_MS the still shell reports unsettled (blur follows its measured, shrinking,
+    // opaque box; input is already released for any still frame under the notch).
+    const blurHeld = still && performance.now() - stillSince < BLUR_RELEASE_MS;
     if (lastOffset && (lastOffset.x !== offset.x || lastOffset.y !== offset.y) && !still) startGlide('move');
     else if (lastStill !== null && lastStill !== still && (offset.x !== 0 || offset.y !== 0)) startGlide(still ? 'in' : 'out');
     lastOffset = offset; lastStill = still;
@@ -160,7 +176,7 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
       const element = Array.from(outer.ownerDocument?.querySelectorAll<HTMLElement>('[data-side-button]') ?? []).find(e => e.dataset.sideButton === b.id);
       if (element) Object.assign(element.style, { left: `${b.rect.x}px`, top: `${b.rect.y}px`, width: `${b.rect.width}px`, height: `${b.rect.height}px`, borderRadius: `${b.rect.width / 2}px` });
     }
-    const report = geometryReport(outer, state, settled || (still && nativePill() !== null), devicePixelRatio);
+    const report = geometryReport(outer, state, settled || (still && !blurHeld && nativePill() !== null), devicePixelRatio);
     const keySurface = JSON.stringify(report.rects[0]);
     if (keySurface !== surfaceKey) { surfaceKey = keySurface; window.dispatchEvent?.(new Event('island-geometry')); }
     // Under the native notch a still shell owns no input and is opaque (glass shuts at
@@ -172,8 +188,9 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
     const key = report.mode === 'still' && report.settled && nativePill() !== null
       ? JSON.stringify({ rev: report.stateRev, mode: report.mode, scale: report.scale }) : JSON.stringify(report);
     if (key !== last) { last = key; pending = report; void drain(); }
-    // Follow a running translation glide every frame so ShapeInput tracks the moving surface.
-    if (performance.now() < glideUntil) schedule();
+    // Follow a running translation glide every frame so ShapeInput tracks the moving surface,
+    // and keep reporting through the blur hold so the final settled report is sent.
+    if (performance.now() < glideUntil || blurHeld) schedule();
   };
   const schedule = (complete?: boolean) => {
     if (disposed) return;

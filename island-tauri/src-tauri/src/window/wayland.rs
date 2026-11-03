@@ -183,6 +183,31 @@ impl WaylandSurface {
         })
     }
 
+    /// Layer-shell monitor changes remap the window. Rebind only if GDK replaced
+    /// wl_surface, otherwise keep the unique blur object and refresh scale.
+    pub fn refresh(&mut self, window: &gtk::ApplicationWindow) -> Result<(), IslandError> {
+        let gdk_window = window
+            .window()
+            .ok_or_else(|| IslandError::unavailable("window not realized after transfer"))?;
+        // SAFETY: live GDK Wayland window on the GTK main thread.
+        let raw = unsafe {
+            gdk_wayland_sys::gdk_wayland_window_get_wl_surface(
+                ToGlibPtr::<*mut gdk::ffi::GdkWindow>::to_glib_none(&gdk_window).0
+                    as *mut gdk_wayland_sys::GdkWaylandWindow,
+            )
+        };
+        if raw.is_null() {
+            return Err(IslandError::unavailable("surface missing after transfer"));
+        }
+        let id = unsafe { ObjectId::from_ptr(WlSurface::interface(), raw.cast()) }
+            .map_err(|_| IslandError::unavailable("invalid transferred surface"))?;
+        if id != self.surface.id() {
+            *self = Self::new(window)?;
+        }
+        self.scale = window.scale_factor().max(1);
+        Ok(())
+    }
+
     fn region(&self, rows: &[ShapeRow]) -> WlRegion {
         let region = self.compositor.create_region(&self.qh, ());
         for r in rows {

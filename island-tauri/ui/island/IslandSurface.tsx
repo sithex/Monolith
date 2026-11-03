@@ -8,7 +8,7 @@ import { useLayout, useLauncher } from '../stores/apps';
 import { UI_SPRING } from './components/IslandShell';
 import { createGeometryReporter, fitSurface, effectiveLayout, visibleLayout, nativePill, presetSize } from './geometry';
 import { pointerIntent } from './navigation';
-import { arrivalTime, axisSpring, glassFadePlan, glassOpenness, GLASS_OPEN, surfaceRadius, WITHDRAW_SECONDS } from './motion-profile';
+import { arrivalTime, axisSpring, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, surfaceRadius, WITHDRAW_SECONDS } from './motion-profile';
 export { UI_SPRING };
 /** The shell has handed the notch back: invisible, out of every morph rule. */
 function arrive(root: HTMLElement) {
@@ -138,8 +138,10 @@ export function IslandSurface({ children, fail }: { children: ReactNode; fail(er
         // Seamless notch hand-off: over the last few pixels the shell (already the notch's
         // exact silhouette and fill) fades out, so the native notch and its clock show
         // through instead of a second, clipped clock. Opening starts from that same fade.
+        // The fade waits for BOTH axes (handOffFade): width settles after height, and a
+        // shell still wider than the notch would fade straight to whatever is behind the panel.
         if (Number.isFinite(h)) {
-          const fade = Math.max(0, Math.min(1, (h - pill.height) / 14));
+          const fade = handOffFade(Number.isFinite(w) ? w : pill.width, h, pill);
           if (current.current.mode === 'still' && fade <= 0) arrive(root);
           else { root.style.opacity = fade >= 1 ? '' : String(+fade.toFixed(3)); delete root.dataset.arrived; }
         }

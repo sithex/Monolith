@@ -101,6 +101,60 @@ impl PlatformBackend {
         self
     }
 
+    /// Move the existing GTK/webview, never construct another window or terminal.
+    /// Called off-main-thread, serialized with geometry reports by the region owner.
+    pub fn reposition(
+        &mut self,
+        target: crate::integrations::plasma::anchor::Placement,
+    ) -> Result<(), IslandError> {
+        let window = self.window.clone();
+        let surface = self.wayland.clone();
+        let (tx, rx) = mpsc::channel();
+        self.window
+            .run_on_main_thread(move || {
+                let result = (|| {
+                    let gtk = window
+                        .gtk_window()
+                        .map_err(|e| IslandError::unavailable(e.to_string()))?;
+                    if let Some(surface) = surface {
+                        use gtk_layer_shell::{Edge, LayerShell};
+                        let monitor = gtk
+                            .display()
+                            .monitor_at_point(target.x + 1, target.y + 1)
+                            .ok_or_else(|| {
+                                IslandError::unavailable("clicked monitor disconnected")
+                            })?;
+                        let area = monitor.geometry();
+                        if target.x < area.x()
+                            || target.y < area.y()
+                            || target.x >= area.x() + area.width()
+                            || target.y >= area.y() + area.height()
+                        {
+                            return Err(IslandError::unavailable(
+                                "clicked monitor no longer exists",
+                            ));
+                        }
+                        LayerShell::set_monitor(&gtk, &monitor);
+                        gtk.set_layer_shell_margin(Edge::Left, target.x - area.x());
+                        gtk.set_layer_shell_margin(Edge::Top, target.y - area.y());
+                        gtk.resize(target.width as i32, target.height as i32);
+                        surface
+                            .lock()
+                            .map_err(|_| IslandError::internal("surface lock poisoned"))?
+                            .refresh(&gtk)?;
+                    } else {
+                        gtk.move_(target.x, target.y);
+                        gtk.resize(target.width as i32, target.height as i32);
+                    }
+                    Ok(())
+                })();
+                let _ = tx.send(result);
+            })
+            .map_err(|e| IslandError::unavailable(e.to_string()))?;
+        rx.recv_timeout(MAIN_THREAD_TIMEOUT)
+            .map_err(|_| IslandError::timeout("monitor transfer timed out"))?
+    }
+
     pub fn xid(&self) -> u32 {
         self.xid
     }
@@ -120,12 +174,18 @@ impl PlatformBackend {
             return Ok(());
         };
         let (tx, rx) = mpsc::channel();
+        let self_window = self.window.clone();
         self.window
             .run_on_main_thread(move || {
+                let gtk = self_window.gtk_window();
                 let result = surface
                     .lock()
                     .map_err(|_| IslandError::internal("Wayland surface lock poisoned"))
-                    .and_then(|mut s| f(&mut s));
+                    .and_then(|mut s| {
+                        let gtk = gtk.map_err(|e| IslandError::unavailable(e.to_string()))?;
+                        s.refresh(&gtk)?;
+                        f(&mut s)
+                    });
                 if tx.send(result).is_err() {
                     tracing::warn!("Wayland surface result dropped: caller already timed out");
                 }
@@ -241,6 +301,9 @@ fn apply_on_main_thread(
 
 impl InputRegionBackend for PlatformBackend {
     fn apply(&mut self, region: &[ShapeRow]) -> Result<(), IslandError> {
+        let applied = region;
+        // Identical coverage, far fewer rectangles for GTK, the compositor and the blur hint.
+        let region = &crate::window::shape::band_rows(region)[..];
         let rects: Vec<gtk::cairo::RectangleInt> = region
             .iter()
             .map(|r| {
@@ -275,7 +338,7 @@ impl InputRegionBackend for PlatformBackend {
                 }
                 Ok(())
             })?;
-            self.wayland_applied = region.to_vec();
+            self.wayland_applied = applied.to_vec();
             return Ok(());
         }
         if self.blur && !self.independent_blur {
@@ -295,6 +358,7 @@ impl InputRegionBackend for PlatformBackend {
         if !self.independent_blur {
             return Ok(());
         }
+        let region = &crate::window::shape::band_rows(region)[..];
         if self.wayland.is_some() {
             let rows = region.to_vec();
             return self.on_wayland(move |surface| surface.set_blur_region(&rows));

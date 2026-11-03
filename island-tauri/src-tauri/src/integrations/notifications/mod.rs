@@ -1,4 +1,4 @@
-//! Notification hub; the pure core is ported from the audited staging crate.
+//! Notification hub; the pure core is ported from the audited former staging crate (git history).
 pub mod dbus;
 pub mod hermes_ingest;
 pub mod hub;

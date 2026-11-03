@@ -26,6 +26,7 @@ pub struct TimerService {
     stop: watch::Sender<bool>,
     pub topic: Latest<TimerChanged>,
     worker: Mutex<Option<tauri::async_runtime::JoinHandle<Result<(), IslandError>>>>,
+    clock: Arc<dyn Clock + Send + Sync>,
 }
 fn snapshot(
     core: &core::TimerCore,
@@ -142,6 +143,7 @@ impl TimerService {
             stop,
             topic: Latest::new(),
             worker: Mutex::new(None),
+            clock: clock.clone(),
         });
         service
             .topic
@@ -199,6 +201,16 @@ impl TimerService {
             .lock()
             .map_err(|_| IslandError::internal("Timer worker poisoned"))? = Some(task);
         Ok(service)
+    }
+    /// The latest snapshot plus how many ms ago (on the timer's own clock) it was sampled,
+    /// so callers can extrapolate a running countdown without querying the worker.
+    pub fn latest(&self) -> Option<(TimerChanged, u64)> {
+        let value = self.topic.latest()?;
+        let age = self
+            .clock
+            .now_ms()
+            .saturating_sub(value.sampled_at_ms.max(0.0) as u64);
+        Some((value, age))
     }
     pub async fn request(&self, op: Option<TimerOp>) -> Result<TimerChanged, IslandError> {
         if *self.stop.borrow() {

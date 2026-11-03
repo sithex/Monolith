@@ -14,6 +14,9 @@ export function NotchControls({ settings, background, accent, patch }: {
     </div></div>;
   return <section className="settings-card" aria-label="Notch appearance"><h3>Notch</h3>
     <p className="muted">Taskbar notch only. The open island keeps its own appearance.</p>
+    <label className="settings-row"><span>Show notch on every monitor</span><input type="checkbox" className="switch" aria-label="Show notch on every monitor"
+      checked={settings.showNotchOnEveryMonitor === true} onChange={e => patch({ showNotchOnEveryMonitor: e.target.checked })} /></label>
+    <p className="muted">Plasma: one window follows the clicked notch. Displays without a top panel get a small dedicated notch panel. Requires the updated notch widget.</p>
     {color('panelClockColor', 'Notch color', background)}
     <div className="settings-row"><span>Width</span><DraftRange aria-label="Notch width" min={110} max={320} step={2}
       value={settings.notchWidth ?? 144} onCommit={(value, final) => { if (final) patch({ notchWidth: value }); }} />

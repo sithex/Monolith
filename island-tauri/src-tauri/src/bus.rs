@@ -80,6 +80,11 @@ impl<T: Clone + Send + Sync + 'static> Latest<T> {
         self.tx.send_replace(Some(value));
     }
 
+    /// The most recently published value, if any.
+    pub fn latest(&self) -> Option<T> {
+        self.tx.borrow().clone()
+    }
+
     /// Subscribe to raw values (tests and in-process consumers); `None` until first publish.
     pub fn subscribe(&self) -> watch::Receiver<Option<T>> {
         self.tx.subscribe()

@@ -1,7 +1,0 @@
-{
-  "version": 0,
-  "modules": [
-    {"id":"terminal","enabled":true,"order":4294967295,"config":{"type":"terminal","fontSize":15.5}},
-    {"id":"future-widget","enabled":true,"order":7,"config":{"future_flag":true,"nested":{"mode":"opaque"}}}
-  ]
-}

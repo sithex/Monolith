@@ -1,6 +1,6 @@
 //! Bluetooth device service (SPEC §3.5 "Bluetooth").
 //!
-//! `model.rs` is the audited pure core ported unchanged from `staging/bluetooth-core`. This
+//! `model.rs` is the audited pure core ported unchanged from the former `staging/bluetooth-core` crate (git history). This
 //! module owns the mutable model, the revisioned `BluetoothChanged` topic and the availability
 //! report; `bluez.rs` feeds it from `org.bluez` (ObjectManager + Device1/Battery1/Adapter1).
 //! Read only: nothing here connects, disconnects, pairs or powers anything.

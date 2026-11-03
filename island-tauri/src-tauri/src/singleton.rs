@@ -163,6 +163,40 @@ mod linux {
         tracing::info!(pid, "Reclaimed stale status and panel socket");
         Ok(())
     }
+    /// What happened to a leftover `ingest.sock` at startup.
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum IngestReclaim {
+        Absent,
+        Removed,
+        /// Left untouched: live, foreign, not a socket, or unverifiable. Binding will then
+        /// fail loudly instead of the island silently taking over someone else's path.
+        Kept(&'static str),
+    }
+    /// A crash or power loss can leave `ingest.sock` behind with nobody listening; `bind`
+    /// then refuses forever. Called only with BOTH instance locks held, so no legitimate
+    /// island can own it. Removed only when it is a socket of ours that refuses connections
+    /// and was not swapped between verification and removal.
+    pub fn reclaim_stale_ingest(data: &Path, euid: u32) -> Result<IngestReclaim> {
+        let path = data.join("ingest.sock");
+        let meta = match fs::symlink_metadata(&path) {
+            Ok(meta) => meta,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(IngestReclaim::Absent),
+            Err(e) => return Err(e).context("Checking existing ingest socket"),
+        };
+        if !meta.file_type().is_socket() || meta.uid() != euid {
+            return Ok(IngestReclaim::Kept("not a socket of ours"));
+        }
+        match probe_socket(&path)? {
+            Probe::Refused => {}
+            Probe::Live => return Ok(IngestReclaim::Kept("live listener")),
+            Probe::Unverifiable(_) => return Ok(IngestReclaim::Kept("unverifiable")),
+        }
+        if Identity::at(&path)? != Identity(meta.dev(), meta.ino()) {
+            return Ok(IngestReclaim::Kept("changed during verification"));
+        }
+        fs::remove_file(&path).context("Removing stale ingest socket")?;
+        Ok(IngestReclaim::Removed)
+    }
     impl InstanceGuard {
         pub fn acquire(data: &Path) -> Result<Self> {
             match fs::DirBuilder::new().mode(0o700).create(data) {
@@ -217,6 +251,12 @@ mod linux {
             // reclaimed only when PROVEN stale; anything live, foreign or unverifiable is refused.
             // SAFETY: geteuid has no preconditions.
             reclaim_stale(data, unsafe { libc::geteuid() })?;
+            // SAFETY: geteuid has no preconditions.
+            match reclaim_stale_ingest(data, unsafe { libc::geteuid() })? {
+                IngestReclaim::Removed => tracing::info!("Reclaimed stale ingest socket"),
+                IngestReclaim::Kept(why) => tracing::warn!(why, "Leaving existing ingest socket untouched"),
+                IngestReclaim::Absent => {}
+            }
             // The crash-leftover sweep is allowed only after BOTH locks and successful
             // status/socket validation. A live PID's pending rename remains untouched.
             crate::status_temps::reclaim(data, unsafe { libc::geteuid() })?;
@@ -315,6 +355,64 @@ pub(crate) mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+    #[test]
+    fn stale_ingest_socket_is_reclaimed_but_live_and_foreign_paths_are_kept() {
+        use super::linux::{reclaim_stale_ingest, IngestReclaim};
+        let euid = unsafe { libc::geteuid() };
+        let fixture = Fixture::new();
+        let path = fixture.0.join("ingest.sock");
+        assert_eq!(reclaim_stale_ingest(&fixture.0, euid).unwrap(), IngestReclaim::Absent);
+        // Live listener: untouched.
+        let live = UnixListener::bind(&path).unwrap();
+        assert_eq!(
+            reclaim_stale_ingest(&fixture.0, euid).unwrap(),
+            IngestReclaim::Kept("live listener")
+        );
+        assert!(path.exists());
+        // Listener gone, socket file left behind (crash / power loss): reclaimed.
+        drop(live);
+        // Parallel tests fork children; a child briefly holds inherited fds between fork and
+        // exec, so the closed listener can look live for a moment. Production just keeps it.
+        let mut outcome = reclaim_stale_ingest(&fixture.0, euid).unwrap();
+        for _ in 0..100 {
+            if outcome == IngestReclaim::Removed {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            outcome = reclaim_stale_ingest(&fixture.0, euid).unwrap();
+        }
+        assert_eq!(outcome, IngestReclaim::Removed);
+        assert!(!path.exists());
+        // A stale socket owned by someone else is never removed.
+        drop(UnixListener::bind(&path).unwrap());
+        assert_eq!(
+            reclaim_stale_ingest(&fixture.0, euid.wrapping_add(1)).unwrap(),
+            IngestReclaim::Kept("not a socket of ours")
+        );
+        fs::remove_file(&path).unwrap();
+        // A regular file at that path is never removed.
+        fs::write(&path, b"not a socket").unwrap();
+        assert_eq!(
+            reclaim_stale_ingest(&fixture.0, euid).unwrap(),
+            IngestReclaim::Kept("not a socket of ours")
+        );
+        fs::remove_file(&path).unwrap();
+        // Full startup path: a stale ingest socket no longer blocks the next launch.
+        // Wait until no forked child still holds the dropped listener (see above); once it
+        // refuses it can never become live again, so `acquire` then sees a truly stale socket.
+        drop(UnixListener::bind(&path).unwrap());
+        for _ in 0..100 {
+            if std::os::unix::net::UnixStream::connect(&path)
+                .is_err_and(|e| e.kind() == std::io::ErrorKind::ConnectionRefused)
+            {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let guard = acquire(&fixture.0).unwrap();
+        assert!(!path.exists());
+        drop(guard);
     }
     #[test]
     fn instance_lock_excludes_second_owner_without_unlinking_socket() {

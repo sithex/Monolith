@@ -948,9 +948,45 @@ fn real_hermes_resolution_needs_a_launcher_and_is_never_spawned_here() {
     let home = scratch("no-hermes");
     let mut cfg = TerminalConfig::new(home.clone(), home.clone(), false);
     cfg.credit_limit = 1024;
+    // No wrapper and no `hermes` on this PATH: the real one must never be found or spawned.
+    cfg.search_path = Some(home.clone().into_os_string());
     let t = Terminal::new(cfg);
     let error = t.start().unwrap_err();
     assert_eq!(error.code, ErrorCode::Unavailable);
     assert!(t.pid().is_none());
+    fs::remove_dir_all(home).unwrap();
+}
+
+#[test]
+fn empty_command_uses_private_wrapper_only_when_present_else_plain_hermes() {
+    use std::os::unix::fs::PermissionsExt;
+    let home = scratch("default-command");
+    let bin = home.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    let hermes = bin.join("hermes");
+    fs::write(&hermes, "#!/bin/sh\n# fixture only; never executed\n").unwrap();
+    fs::set_permissions(&hermes, fs::Permissions::from_mode(0o755)).unwrap();
+    let path = std::ffi::OsString::from(&bin);
+    // A fresh clone: no ~/Hermes/Dropdown/custom_hermes.py -> plain `hermes chat --tui`.
+    let c = default_hermes_command(&home, &home, Some(&path)).unwrap();
+    assert_eq!(
+        c.get_argv(),
+        &vec![hermes.clone().into_os_string(), "chat".into(), "--tui".into()]
+    );
+    // Neither the wrapper nor hermes on PATH: a clear, actionable error.
+    let empty = home.join("empty");
+    fs::create_dir_all(&empty).unwrap();
+    let err = default_hermes_command(&empty, &empty, Some(empty.as_os_str())).unwrap_err();
+    assert!(err.to_string().contains("Settings"), "{err}");
+    // The author's machine: launcher + wrapper present -> unchanged behaviour.
+    let launcher = home.join(".hermes/hermes-agent/.hermes/bin/hermes");
+    let script = home.join("Hermes/Dropdown/custom_hermes.py");
+    fs::create_dir_all(launcher.parent().unwrap()).unwrap();
+    fs::create_dir_all(script.parent().unwrap()).unwrap();
+    fs::write(&script, "# fixture only; never executed\n").unwrap();
+    fs::write(&launcher, "#!/bin/sh\nexec /usr/bin/python3\n").unwrap();
+    let c = default_hermes_command(&home, &home, Some(&path)).unwrap();
+    assert_eq!(c.get_argv()[0], std::ffi::OsString::from("/usr/bin/python3"));
+    assert_eq!(c.get_argv()[2], script.into_os_string());
     fs::remove_dir_all(home).unwrap();
 }

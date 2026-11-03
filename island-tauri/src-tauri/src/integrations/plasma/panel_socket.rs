@@ -25,6 +25,7 @@ pub enum PanelCommand {
     Enter,
     Leave,
     Pin,
+    PinAt(u32),
 }
 /// Only one complete, allowlisted newline frame is legal per connection.
 pub fn parse_command(bytes: &[u8]) -> Option<PanelCommand> {
@@ -36,7 +37,17 @@ pub fn parse_command(bytes: &[u8]) -> Option<PanelCommand> {
         b"enter\n" => Some(PanelCommand::Enter),
         b"leave\n" => Some(PanelCommand::Leave),
         b"pin\n" => Some(PanelCommand::Pin),
-        _ => None,
+        _ => {
+            let text = std::str::from_utf8(bytes).ok()?;
+            let id = text.strip_prefix("pin ")?.strip_suffix('\n')?;
+            if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            id.parse::<u32>()
+                .ok()
+                .filter(|id| *id > 0)
+                .map(PanelCommand::PinAt)
+        }
     }
 }
 
@@ -309,6 +320,22 @@ fn serve(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn source_specific_pin_is_strict_and_backwards_compatible() {
+        use super::{parse_command as parse, PanelCommand};
+        assert_eq!(parse(b"pin 42\n"), Some(PanelCommand::PinAt(42)));
+        assert_eq!(parse(b"pin\n"), Some(PanelCommand::Pin));
+        for input in [
+            b"pin 0\n".as_slice(),
+            b"pin -2\n",
+            b"pin 4294967296\n",
+            b"pin 2;quit\n",
+            b"pin 2\nquit\n",
+        ] {
+            assert_eq!(parse(input), None);
+        }
+    }
+
     use super::*;
     use crate::singleton::{acquire, tests::Fixture};
     use std::{net::Shutdown, sync::mpsc};

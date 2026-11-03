@@ -76,6 +76,15 @@ export function glassFadePlan(start: number, end: number, endsInGlass: boolean, 
   return { solidHeight: Math.max(start, end), range: 1 };
 }
 
+/** Shell opacity during the hand-off to the native notch: 1 until the shell is within 14 px
+ *  of the notch height AND 24 px of its width, then fading to 0 exactly at the notch box.
+ *  Gating on both axes keeps the fade inside the (opaque) notch's footprint. */
+export const HAND_OFF_HEIGHT = 14, HAND_OFF_WIDTH = 24;
+export function handOffFade(width: number, height: number, pill: { width: number; height: number }): number {
+  const byHeight = (height - pill.height) / HAND_OFF_HEIGHT, byWidth = (width - pill.width) / HAND_OFF_WIDTH;
+  return Math.max(0, Math.min(1, Math.max(byHeight, byWidth)));
+}
+
 export function surfaceRadius(height: number): number {
   return Number.isFinite(height) ? Math.min(28, Math.max(0, height) * .34) : 0;
 }

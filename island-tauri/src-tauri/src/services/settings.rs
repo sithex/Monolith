@@ -195,6 +195,30 @@ mod tests {
     }
 
     #[test]
+    fn multi_monitor_option_is_opt_in_persisted_and_strict() {
+        let dir = scratch("monitor-option");
+        let svc = service(&dir, "", false);
+        assert!(!svc.get().unwrap().show_notch_on_every_monitor);
+        svc.patch(&patch(json!({"showNotchOnEveryMonitor":true})))
+            .unwrap();
+        let saved: serde_json::Value =
+            serde_json::from_slice(&fs::read(dir.join("settings.json")).unwrap()).unwrap();
+        assert_eq!(saved["showNotchOnEveryMonitor"], true);
+        assert!(Settings::from_file_value(&saved).show_notch_on_every_monitor);
+        assert!(!Settings::from_file_value(&json!({})).show_notch_on_every_monitor);
+        for bad in [json!(null), json!("true"), json!(1)] {
+            assert!(serde_json::from_value::<SettingsPatch>(
+                json!({"showNotchOnEveryMonitor":bad})
+            )
+            .is_err());
+        }
+        svc.patch(&patch(json!({"showNotchOnEveryMonitor":false})))
+            .unwrap();
+        assert!(!svc.get().unwrap().show_notch_on_every_monitor);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn settings_defaults_validation_atomic_persistence() {
         let dir = scratch("settings");
         let svc = service(&dir, "", false);
@@ -206,7 +230,7 @@ mod tests {
                 .as_object()
                 .unwrap()
                 .len(),
-            52 // Includes displayBackend/notchWidth and additive terminalCommand.
+            53 // Includes the opt-in multi-monitor notch setting.
         );
         assert_eq!(defaults.hover_delay, 180.0);
         assert_eq!(defaults.ui_font, UiFont::System);

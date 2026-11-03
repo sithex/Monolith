@@ -1,6 +1,6 @@
 //! Battery/power service (SPEC §3.5 "Battery/power" + "Battery alerts").
 //!
-//! `model.rs` is the audited pure core ported unchanged from `staging/power-core`. This module
+//! `model.rs` is the audited pure core ported unchanged from the former `staging/power-core` crate (git history). This module
 //! owns the mutable state, the revisioned `PowerState` topic, the alert engine wiring and the
 //! availability report; `upower.rs` feeds it from UPower's `DisplayDevice` over D-Bus.
 

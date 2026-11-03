@@ -26,6 +26,8 @@ pub enum PanelCommand {
     Leave,
     Pin,
     PinAt(u32),
+    /// The widget saw its panel dock/float (e.g. a maximized window): re-read its position.
+    Moved,
 }
 /// Only one complete, allowlisted newline frame is legal per connection.
 pub fn parse_command(bytes: &[u8]) -> Option<PanelCommand> {
@@ -37,6 +39,7 @@ pub fn parse_command(bytes: &[u8]) -> Option<PanelCommand> {
         b"enter\n" => Some(PanelCommand::Enter),
         b"leave\n" => Some(PanelCommand::Leave),
         b"pin\n" => Some(PanelCommand::Pin),
+        b"moved\n" => Some(PanelCommand::Moved),
         _ => {
             let text = std::str::from_utf8(bytes).ok()?;
             let id = text.strip_prefix("pin ")?.strip_suffix('\n')?;
@@ -356,6 +359,8 @@ mod tests {
     fn panel_protocol_is_bounded_and_requires_a_complete_command() {
         assert_eq!(parse_command(b"pin\n"), Some(PanelCommand::Pin));
         assert_eq!(parse_command(b"status\n"), Some(PanelCommand::Status));
+        assert_eq!(parse_command(b"moved\n"), Some(PanelCommand::Moved));
+        assert_eq!(parse_command(b"moved 4\n"), None);
         for input in [
             b"pin".as_slice(),
             b"launch\n",

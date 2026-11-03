@@ -35,8 +35,8 @@ def request(command):
 
 
 def parse_args(args):
-    if len(args) not in (1, 2) or args[0] not in {'status', 'launch', 'enter', 'leave', 'pin'}:
-        raise ValueError('Expected status, launch, enter, leave or pin [widget-id]')
+    if len(args) not in (1, 2) or args[0] not in {'status', 'launch', 'enter', 'leave', 'pin', 'moved'}:
+        raise ValueError('Expected status, launch, enter, leave, moved or pin [widget-id]')
     source = ''
     if len(args) == 2:
         if args[0] not in {'pin', 'launch'} or not args[1].isascii() or not args[1].isdigit() or not 0 < int(args[1]) <= 4294967295:

@@ -46,6 +46,12 @@ PlasmoidItem {
             root.requests.complete();
         }
     }
+    // Plasma docks a floating panel against the screen edge while a window is maximized (and
+    // floats it again after), shifting this widget by the float margin. Tell the island once
+    // the slide has finished so it re-reads the notch position; nothing is polled.
+    readonly property int displayHints: Plasmoid.containmentDisplayHints
+    onDisplayHintsChanged: if (root.online) panelSettled.restart()
+    Timer { id: panelSettled; interval: 450; onTriggered: root.requests.enqueue("moved") }
     Timer { interval: 15000; running: true; repeat: true; triggeredOnStart: true; onTriggered: root.requests.enqueue("status") }
     Timer { interval: Math.max(100, 60000 - Date.now() % 60000); running: true; onTriggered: { root.now = new Date(); interval = Math.max(100, 60000 - Date.now() % 60000); restart(); } }
     // Settings → Notch → Width (pushed as notchWidth; 144 = the original slot).

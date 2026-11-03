@@ -41,6 +41,8 @@ enum StatusMsg {
     Stop,
     Refresh,
     PinAt(u32),
+    /// A notch's panel docked or floated: re-read positions once (event-driven, coalesced).
+    Moved,
 }
 /// Managed state: lets other modules request a (coalesced) status refresh.
 pub struct StatusNudge(mpsc::SyncSender<StatusMsg>);
@@ -341,6 +343,11 @@ impl NativeHost {
                     }
                 }
                 PanelCommand::Status => (None, None),
+                PanelCommand::Moved => {
+                    // Best effort: a full queue already has a pending refresh to piggyback on.
+                    let _ = clicks.try_send(StatusMsg::Moved);
+                    (None, None)
+                }
                 PanelCommand::Enter => (Some(AnchorKind::Enter), Some(Intent::PanelEnter)),
                 PanelCommand::Leave => (Some(AnchorKind::Leave), Some(Intent::PanelLeave)),
                 PanelCommand::Pin => (Some(AnchorKind::Pin), Some(Intent::PanelPin)),
@@ -386,15 +393,17 @@ impl NativeHost {
                 let mut pending = std::collections::VecDeque::new();
                 'worker: loop {
                     let message = pending.pop_front().map(Ok).unwrap_or_else(|| receive.recv_timeout(HEARTBEAT));
+                    let mut moved = matches!(message, Ok(StatusMsg::Moved));
                     let clicked = match message {
                         Ok(StatusMsg::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
                         Ok(StatusMsg::PinAt(widget)) => Some(widget),
-                        Ok(StatusMsg::Refresh) | Err(mpsc::RecvTimeoutError::Timeout) => None,
+                        Ok(StatusMsg::Refresh | StatusMsg::Moved) | Err(mpsc::RecvTimeoutError::Timeout) => None,
                     };
                     while let Ok(message) = receive.try_recv() {
                         match message {
                             StatusMsg::Stop => break 'worker,
                             StatusMsg::PinAt(_) => pending.push_back(message),
+                            StatusMsg::Moved => moved = true,
                             StatusMsg::Refresh => {},
                         }
                     }
@@ -481,6 +490,34 @@ impl NativeHost {
                                 }
                                 Ok(None) => {}
                                 Err(error) => tracing::debug!(%error, "Notch click falls back to the primary toggle"),
+                            }
+                        }
+                        // The widget reported its panel docked/floated (Plasma shifts a floating panel's
+                        // contents when a window is maximized): re-read once and follow the notch.
+                        if moved && !click_handled {
+                            // No anchor yet (startup raced a Plasma restart): fall back to the
+                            // primary notch, exactly like a fresh start would.
+                            let fresh = if enabled && anchor.is_some() {
+                                match super::anchor::discover_all() {
+                                    Ok((found, missing)) => {
+                                        anchors = found;
+                                        unavailable = missing;
+                                        let output = anchor.as_ref().map(|a| a.output.clone());
+                                        anchors.iter().find(|a| Some(&a.output) == output.as_ref()).cloned()
+                                    }
+                                    Err(error) => { tracing::debug!(%error, "Notch move refresh unavailable"); None }
+                                }
+                            } else {
+                                match tauri::async_runtime::block_on(super::anchor::discover()) {
+                                    Ok(found) => { primary = Some(found.clone()); Some(found) }
+                                    Err(error) => { tracing::debug!(%error, "Notch move refresh unavailable"); None }
+                                }
+                            };
+                            if let Some(fresh) = fresh.filter(|f| anchor.as_ref().is_none_or(|a| a.output == f.output)) {
+                                if anchor.as_ref() != Some(&fresh) {
+                                    bounds = relocate(&handle, &fresh)?;
+                                    anchor = Some(fresh);
+                                }
                             }
                         }
                         // A click is never lost: anything unroutable falls back to the primary toggle.

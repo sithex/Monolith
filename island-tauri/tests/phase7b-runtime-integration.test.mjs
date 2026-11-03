@@ -41,6 +41,19 @@ function globals(values, run) {
 const component=(tree,name)=>nodes(tree).find(n=>n.type?.name===name);
 const labeled=(tree,label)=>nodes(tree).find(n=>n.props?.['aria-label']===label);
 const textButton=(tree,text)=>nodes(tree).find(n=>n.type==='button'&&n.props.children===text);
+test('compact notice dismiss is revision-scoped, resume opens existing terminal, agent notice opens agents',()=>{
+  const calls=[];let state={mode:'hover',rev:9,terminalStarted:true,hoverCause:{type:'panelPill'}};let items=[];
+  const h=driver({'ui/island/preview-notice.css':{},'ui/ipc/island-state.ts':{useIslandState:()=>state,dispatch:async intent=>calls.push(intent)},'ui/ipc/notifications.ts':{useNotifications:()=>items}});
+  const {PreviewNotice}=h.load('ui/island/PreviewNotice.tsx');const fail=e=>{throw e;};
+  let tree=h.render(PreviewNotice,{fail});assert.ok(nodes(tree).some(n=>n.type==='strong'&&n.props.children==='Resume terminal'));
+  labeled(tree,'Dismiss preview').props.onClick({stopPropagation(){}});assert.deepEqual(calls.pop(),{type:'dismissPreview',rev:9});
+  nodes(tree).find(n=>n.props?.['data-testid']==='open').props.onClick();assert.deepEqual(calls.pop(),{type:'selectView',view:'terminal'});
+  items=[{id:'new-run',title:'Agent run started',appName:'Agents'}];state={...state,rev:10,hoverCause:{type:'notification',id:'new-run'}};
+  tree=h.render(PreviewNotice,{fail});assert.ok(nodes(tree).some(n=>n.type==='strong'&&n.props.children==='Agent run started'));
+  state={...state,rev:11,hoverCause:{type:'pointer'}};tree=h.render(PreviewNotice,{fail}); // crossing retains event, not generic resume
+  nodes(tree).find(n=>n.props?.['data-testid']==='open').props.onClick();assert.deepEqual(calls.pop(),{type:'selectView',view:'agents'});
+  h.dispose();
+});
 const clip={rev:1,id:'c-1',kind:'text',preview:'Fixture',bytes:7,pinned:false,copiedAt:1000,sourceApp:null};
 const row={uid:'fixture-event',summary:'Fixture title',location:'Fixture room',startS:1793611800,endS:1793615400,allDay:false,source:'local',readOnly:false};
 const calendar={rev:1,available:true,detail:'ready',configured:false,stale:false,ageMs:null,updatedAt:null,agenda:[row]};

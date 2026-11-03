@@ -18,6 +18,7 @@ import { SettingsView } from '../views/SettingsView';
 import { MonitorView } from '../views/MonitorView';
 import { AiStatsView } from '../views/AiStatsView';
 import { Toast } from '../widgets/Toast';
+import { PreviewNotice } from './PreviewNotice';
 import { createClickSound } from './click-sound';
 import './island.css';
 import './polish.css';
@@ -102,7 +103,7 @@ export function Island() {
     <Topline fail={fail} />
     <AnimatePresence>{state.mode === 'hover' && <motion.div key="preview" className="preview island-content" {...reveal}
       exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.9, y: -10, transition: { duration: 0.14, ease: [0.5, 0, 0.9, 0.4] } }}
-      style={{ position: 'absolute', top: 42, left: 0, right: 0 }}><h2>A quiet place to think.</h2><p className="muted">{state.terminalStarted ? 'Your session is still here.' : 'Your real Hermes session, one click away.'}</p><button className="primary" data-testid="open" onClick={() => { void dispatch({ type: 'pin' }).catch(fail); }}>{state.terminalStarted ? 'Resume terminal' : 'Open terminal'} ↗</button></motion.div>}</AnimatePresence>
+      style={{ position: 'absolute', top: 42, left: 0, right: 0 }}><PreviewNotice fail={fail} /></motion.div>}</AnimatePresence>
     <motion.div ref={wrap} className="terminal-wrap island-content" hidden={!active && !lingering} aria-hidden={!active} style={closing ?? undefined} {...openMotion}>
       <ViewPager fail={fail} views={views}>
         <IslandShell title={viewLabels[view]} home={view === 'terminal'} intents={{ navigate: () => navigate('terminal') }} back={{ label: viewLabels[previous], go: goBack }}
@@ -120,5 +121,5 @@ export function Island() {
         </IslandShell>
       </ViewPager>
     </motion.div>
-  </IslandSurface><SideControls navigate={navigate} fail={fail} /><ColorPickerPanel /><Toast />{error && <p role="alert">{error}</p>}</main>;
+  </IslandSurface><SideControls navigate={navigate} fail={fail} /><ColorPickerPanel /><Toast previews={false} />{error && <p role="alert">{error}</p>}</main>;
 }

@@ -1195,7 +1195,9 @@ export type TogglesOp = { type: "powerProfile"; profile: string } | { type: "cyc
 
 export type UiFont = "system" | "openrunde";
 
-export type UiIntent = { type: "pointerEnter" } | { type: "pointerLeave" } | { type: "pin" } | { type: "collapse" } | { type: "selectView"; view: IslandView } | { type: "setDnd"; on: boolean } | { type: "setClipboardPaused"; paused: boolean } | { type: "restartTerminal" } | { type: "quit" };
+export type UiIntent = { type: "pointerEnter" } | { type: "pointerLeave" } | { type: "pin" } | { type: "collapse" } | 
+/**  Dismiss only the preview the user saw; never a newly opened terminal. */
+{ type: "dismissPreview"; rev: number } | { type: "selectView"; view: IslandView } | { type: "setDnd"; on: boolean } | { type: "setClipboardPaused"; paused: boolean } | { type: "restartTerminal" } | { type: "quit" };
 
 /**  Which UI the island window loads (CLI `--ui`). */
 export type UiKind = 

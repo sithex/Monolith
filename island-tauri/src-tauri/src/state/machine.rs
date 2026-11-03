@@ -39,6 +39,7 @@ pub enum Intent {
     Pin,
     PanelPin,
     Collapse,
+    DismissPreview(u32),
     SelectView(IslandView),
     SetDnd(bool),
     SetClipboardPaused(bool),
@@ -58,6 +59,7 @@ impl From<UiIntent> for Intent {
             UiIntent::PointerLeave => Self::PointerLeave,
             UiIntent::Pin => Self::Pin,
             UiIntent::Collapse => Self::Collapse,
+            UiIntent::DismissPreview { rev } => Self::DismissPreview(rev),
             UiIntent::SelectView { view } => Self::SelectView(view),
             UiIntent::SetDnd { on } => Self::SetDnd(on),
             UiIntent::SetClipboardPaused { paused } => Self::SetClipboardPaused(paused),
@@ -102,6 +104,7 @@ pub struct Machine {
     panel_inside: bool,
     activities: BTreeMap<String, Activity>,
     presentation: Presentation,
+    seen_notifications: std::collections::VecDeque<String>,
 }
 impl Machine {
     pub fn new(settings: &Settings) -> Self {
@@ -122,6 +125,7 @@ impl Machine {
             panel_inside: false,
             activities: BTreeMap::new(),
             presentation: Presentation::default(),
+            seen_notifications: Default::default(),
         }
     }
     pub fn pointer_inside(&self) -> bool {
@@ -270,15 +274,15 @@ impl Machine {
                         Timer::HoverDelay if self.state.mode == IslandMode::Still => {
                             self.state.mode = IslandMode::Hover;
                             self.state.hover_cause = self.pending_hover.take();
+                            self.schedule(Timer::ToastTtl, 6000, now);
                         }
                         Timer::LeaveGrace if self.state.mode == IslandMode::Hover => self.still(),
-                        Timer::ToastTtl
-                            if matches!(
-                                self.state.hover_cause,
-                                Some(HoverCause::Notification { .. })
-                            ) =>
-                        {
-                            self.still()
+                        Timer::ToastTtl if self.state.mode == IslandMode::Hover => {
+                            if self.pointer_inside || self.panel_inside {
+                                self.schedule(Timer::ToastTtl, 6000, now);
+                            } else {
+                                self.still();
+                            }
                         }
                         _ => {}
                     }
@@ -301,6 +305,12 @@ impl Machine {
                 }
                 if settings.click_sounds {
                     effects.push(Effect::PlayClick);
+                }
+            }
+            Intent::DismissPreview(rev) => {
+                if self.state.mode == IslandMode::Hover && self.state.rev == rev {
+                    self.cancel_all();
+                    self.still();
                 }
             }
             Intent::Collapse => {
@@ -326,6 +336,15 @@ impl Machine {
             Intent::Quit => effects.push(Effect::Quit),
             Intent::NotificationsSync(unread) => self.state.unread = unread,
             Intent::NotificationArrived(id) => {
+                // Repeated service polling is not a new event. Bound retention; a new
+                // notification id (including a new agent transition) can notify again.
+                if self.seen_notifications.contains(&id) {
+                    return Ok(effects);
+                }
+                if self.seen_notifications.len() == 128 {
+                    self.seen_notifications.pop_front();
+                }
+                self.seen_notifications.push_back(id.clone());
                 self.state.unread = self.state.unread.saturating_add(1);
                 if self.state.mode == IslandMode::Still
                     && !self.state.dnd
@@ -378,6 +397,65 @@ impl Machine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn compact_preview_dismiss_expiry_polling_and_terminal_lifetime() {
+        let s = Settings::default();
+        let mut m = Machine::new(&s);
+        let effects = step(&mut m, Intent::Pin, &s, 0);
+        assert!(effects.contains(&Effect::StartTerminal));
+        step(&mut m, Intent::Collapse, &s, 1);
+        step(
+            &mut m,
+            Intent::NotificationArrived("agent:run-1".into()),
+            &s,
+            2,
+        );
+        let rev = m.state.rev;
+        let effects = step(&mut m, Intent::DismissPreview(rev), &s, 3);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        assert!(m.state.terminal_started);
+        assert!(!effects.contains(&Effect::StartTerminal));
+        for now in 4..20 {
+            step(
+                &mut m,
+                Intent::NotificationArrived("agent:run-1".into()),
+                &s,
+                now,
+            );
+        }
+        assert_eq!(m.state.mode, IslandMode::Still);
+        step(
+            &mut m,
+            Intent::NotificationArrived("agent:run-2".into()),
+            &s,
+            20,
+        );
+        assert_eq!(m.state.mode, IslandMode::Hover);
+        step(&mut m, Intent::DismissPreview(rev), &s, 21); // stale click cannot dismiss a new event
+        assert_eq!(m.state.mode, IslandMode::Hover);
+        m.tick(&s, &Fake(6020)).unwrap();
+        assert_eq!(m.state.mode, IslandMode::Still);
+        step(
+            &mut m,
+            Intent::NotificationArrived("agent:run-2".into()),
+            &s,
+            6021,
+        );
+        assert_eq!(m.state.mode, IslandMode::Still);
+        let effects = step(&mut m, Intent::Pin, &s, 6022);
+        assert!(!effects.contains(&Effect::StartTerminal));
+        let current = m.state.rev;
+        step(&mut m, Intent::DismissPreview(current), &s, 6023);
+        assert_eq!(m.state.mode, IslandMode::Large);
+        for now in 6024..6030 {
+            let effects = step(&mut m, Intent::Pin, &s, now); // transfer uses Pin, not toggle
+            assert!(!effects.contains(&Effect::StartTerminal));
+            assert_eq!(m.state.mode, IslandMode::Large);
+        }
+        step(&mut m, Intent::PanelPin, &s, 6030); // same monitor toggles
+        assert_eq!(m.state.mode, IslandMode::Still);
+    }
+
     struct Fake(u64);
     impl Clock for Fake {
         fn now_ms(&self) -> u64 {
@@ -504,6 +582,8 @@ mod tests {
         );
         assert_eq!(m.state.mode, IslandMode::Hover);
         step(&mut m, Intent::Collapse, &s, 10001);
+        // Expiry pauses only while hovered; leave before the next notification.
+        step(&mut m, Intent::PointerLeave, &s, 10001);
         step(
             &mut m,
             Intent::NotificationArrived("next".into()),
@@ -599,7 +679,10 @@ mod tests {
         let rev = m.state.rev;
         let e = step(&mut m, Intent::PointerLeave, &s, 200);
         assert!(e.is_empty());
-        assert!(m.timers.is_empty(), "no LeaveGrace for a spurious leave");
+        assert!(
+            !m.timers.contains_key(&Timer::LeaveGrace),
+            "no LeaveGrace for a spurious leave"
+        );
         assert_eq!(m.state.rev, rev, "a no-op leave must not bump the revision");
         m.tick(&s, &Fake(10_000)).unwrap();
         assert_eq!(m.state.mode, IslandMode::Hover);

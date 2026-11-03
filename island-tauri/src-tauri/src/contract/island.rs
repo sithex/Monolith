@@ -65,9 +65,19 @@ pub enum UiIntent {
     PointerLeave,
     Pin,
     Collapse,
-    SelectView { view: IslandView },
-    SetDnd { on: bool },
-    SetClipboardPaused { paused: bool },
+    /// Dismiss only the preview the user saw; never a newly opened terminal.
+    DismissPreview {
+        rev: u32,
+    },
+    SelectView {
+        view: IslandView,
+    },
+    SetDnd {
+        on: bool,
+    },
+    SetClipboardPaused {
+        paused: bool,
+    },
     RestartTerminal,
     Quit,
 }

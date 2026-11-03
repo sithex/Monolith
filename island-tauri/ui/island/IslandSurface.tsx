@@ -67,8 +67,8 @@ export function IslandSurface({ children, fail }: { children: ReactNode; fail(er
   useLayoutEffect(() => { owner.current?.schedule(!animating.current); }, [state.rev, state.mode, state.view, settings, layout.rev, launcher.rev, contentH]);
   const preset = layout.layout.preset;
   const { width: customWidth, maxHeight: customHeight } = presetSize(preset);
-  const width = state.mode === 'still' ? 150 : state.mode === 'hover' ? 420 : !layout.unchangedSizing ? customWidth : state.view === 'terminal' ? 1040 : 640;
-  const baseHeight = state.mode === 'still' ? 42 : state.mode === 'hover' ? 220 : state.view === 'terminal' ? 672 : state.view === 'monitor' ? 500 : state.view === 'ai' ? 740 : 640;
+  const width = state.mode === 'still' ? 150 : state.mode === 'hover' ? 360 : !layout.unchangedSizing ? customWidth : state.view === 'terminal' ? 1040 : 640;
+  const baseHeight = state.mode === 'still' ? 42 : state.mode === 'hover' ? 116 : state.view === 'terminal' ? 672 : state.view === 'monitor' ? 500 : state.view === 'ai' ? 740 : 640;
   // An explicit preset replaces the legacy per-app ceiling; otherwise increasing the
   // height slider never grows the terminal past 672px (or Settings past 640px).
   // Content-sized pages still shrink to their content below this ceiling.

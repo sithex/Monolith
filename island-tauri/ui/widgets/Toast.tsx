@@ -6,8 +6,8 @@ import { useNotifications } from "../ipc/notifications";
 import { notificationsDismiss } from "../ipc/client";
 import { NotificationPrivacySettings } from "./NotificationPrivacySettings";
 import "../styles/toast.css";
-export function Toast() {
-  return <><NotificationToast /><NotificationPrivacySettings /></>;
+export function Toast({ previews = true }: { previews?: boolean } = {}) {
+  return <>{previews && <NotificationToast />}<NotificationPrivacySettings /></>;
 }
 function NotificationToast() {
   const state = useIslandState();

@@ -38,9 +38,18 @@ if __name__ == '__main__':
     try:
         if operation == 'launch':
             if not online():
-                subprocess.Popen([str(ROOT / 'island-tauri/run.sh'), '--overlay'], cwd=ROOT,
-                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL, start_new_session=True)
+                # Own systemd scope: the island must not live in plasmashell's cgroup,
+                # or restarting/crashing Plasma takes it down too.
+                argv = [str(ROOT / 'island-tauri/run.sh'), '--overlay']
+                scoped = ['systemd-run', '--user', '--scope', '--collect', '--quiet', '--'] + argv
+                try:
+                    subprocess.Popen(scoped, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                     start_new_session=True)
+                except OSError:
+                    subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                     start_new_session=True)
             deadline = time.monotonic() + 8
             while time.monotonic() < deadline:
                 try:

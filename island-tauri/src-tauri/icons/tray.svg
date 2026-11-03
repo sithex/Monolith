@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+ <defs>
+  <linearGradient id="face" x1="0" y1="0" x2="1" y2="0">
+   <stop offset="0" stop-color="#3a423c"/><stop offset="0.5" stop-color="#1a201b"/><stop offset="1" stop-color="#0b0f0c"/>
+  </linearGradient>
+  <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.2"/></filter>
+ </defs>
+ <!-- ground glow -->
+ <ellipse cx="32" cy="58" rx="23" ry="3" fill="#80ff36" opacity="0.55" filter="url(#glow)"/>
+ <!-- slab: stepped pyramid-topped monolith -->
+ <path d="M16 59 L19.5 17 L32 4 L44.5 17 L48 59 Z" fill="url(#face)" stroke="#aab4ac" stroke-width="2" stroke-linejoin="round"/>
+ <!-- side facet -->
+ <path d="M32 4 L44.5 17 L48 59 L36 59 L35 17 Z" fill="#000" opacity="0.35"/>
+ <!-- tier lines -->
+ <path d="M19 26 H45 M18.2 36 H45.8" stroke="#80ff36" stroke-width="1.6" opacity="0.55"/>
+ <!-- crystal glow -->
+ <path d="M32 15 L37.5 26 L32 37 L26.5 26 Z" fill="#80ff36" filter="url(#glow)"/>
+ <path d="M32 15 L37.5 26 L32 37 L26.5 26 Z" fill="#b6ff86" stroke="#80ff36" stroke-width="1"/>
+ <!-- base channel -->
+ <path d="M32 40 V54" stroke="#80ff36" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/>
+</svg>

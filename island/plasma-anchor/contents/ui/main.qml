@@ -20,7 +20,7 @@ PlasmoidItem {
     property var requests: Requests.create(function(operation) {backend.connectSource(root.command + " " + operation);})
     property string clockText: Qt.formatTime(now, "hh:mm AP")
     property string dateText: Qt.formatDate(now, "ddd, MMM d")
-    property string command: "/usr/bin/python3 /home/nick/Hermes/Ripple/island/anchor-client.py"
+    property string command: "/usr/bin/python3 /home/nick/Hermes/Monolith/island/anchor-client.py"
     preferredRepresentation: compactRepresentation
     Plasmoid.icon: "utilities-terminal"
     Plasmoid.constraintHints: PlasmaCore.Types.CanFillArea

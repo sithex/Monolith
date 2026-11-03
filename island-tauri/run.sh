@@ -33,4 +33,11 @@ except Exception: v=None
 print(v if v in ("wayland","x11") else "wayland")' "$ROOT/.island-data-overlay/settings.json" 2>/dev/null || echo wayland)
 fi
 export GDK_BACKEND="${HERMES_ISLAND_GDK_BACKEND:-$backend}"
+# Detached overlay launches (autostart, panel, tray restart) keep their log in the data dir
+# (tray → View log); the previous run's log is kept as monolith.log.1.
+if [[ "$overlay" == 1 && ! -t 2 && -d "$ROOT/.island-data-overlay" ]]; then
+  log="$ROOT/.island-data-overlay/monolith.log"
+  [[ -f "$log" ]] && mv -f -- "$log" "$log.1"
+  exec 2>>"$log"
+fi
 exec "$BINARY" "$@"

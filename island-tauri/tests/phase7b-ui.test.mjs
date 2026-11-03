@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { load } from './phase7b-loader.mjs';
 const { ClipboardView } = load('ui/island/components/ClipboardView.tsx');
-const { NowPlaying, playerStream } = load('ui/island/components/NowPlaying.tsx');
+const { NowPlaying, LyricsStage, playerStream } = load('ui/island/components/NowPlaying.tsx');
 const render = (component, props) => renderToStaticMarkup(createElement(component, props));
 const clip = (id, copiedAt) => ({ id, kind:'text', preview:`Preview ${id}`, bytes:20, pinned:false, copiedAt, sourceApp:null, ageLabel:'Now' });
 test('ClipboardView renders newest first including actionable entry identities without mutating the input', () => {
@@ -45,10 +45,19 @@ test('NowPlaying chooses writable MPRIS volume first and stream fallback never c
 test('NowPlaying displays JPEG artwork, opt-in lyrics and a capture-free playing indicator', () => {
   const model=media(1000);model.nowPlaying.artUrl='data:image/jpeg;base64,AAAA';
   let html=render(NowPlaying,{model,intents:{media(){}},lyricsEnabled:false});
-  assert.match(html,/src="data:image\/jpeg;base64,AAAA"/); assert.match(html,/Enable lyrics from LRCLIB/); assert.match(html,/Title, artist, album and duration are shared/); assert.match(html,/Playing indicator/);
-  model.nowPlaying.playing=false;model.lyrics={status:'synced',lines:[{timeMs:0,text:'First'},{timeMs:1000,text:'Current'}],plain:'First\nCurrent',activeIndex:1};
+  assert.match(html,/src="data:image\/jpeg;base64,AAAA"/); assert.match(html,/aria-label="Show lyrics"/); assert.doesNotMatch(html,/Synced lyrics/); assert.match(html,/Playing indicator/);
+  // Off: the stage only asks for consent and names what LRCLIB receives.
+  const toggles=[]; const stage=props=>capture(LyricsStage,{model,track:model.nowPlaying,reduced:false,seek:null,onEnabled:enabled=>toggles.push(enabled),...props});
+  html=render(LyricsStage,{model,track:model.nowPlaying,reduced:false,enabled:false,seek:null});
+  assert.match(html,/Title, artist, album and duration are shared/);
+  nodes(stage({enabled:false})).find(n=>n.props?.['aria-label']==='Enable lyrics from LRCLIB').props.onClick(); assert.deepEqual(toggles,[true]);
+  model.nowPlaying.playing=false;model.lyrics={status:'synced',lines:[{timeMs:0,text:'First'},{timeMs:1000,text:'Current'},{timeMs:5000,text:''}],plain:'First\nCurrent',activeIndex:1};
   html=render(NowPlaying,{model,intents:{media(){}},lyricsEnabled:true});
-  assert.match(html,/Paused indicator/);assert.match(html,/aria-current="true">Current/);
-  const toggles=[]; const tree=capture(NowPlaying,{model,intents:{media(){}},lyricsEnabled:true,onLyricsEnabled:enabled=>toggles.push(enabled)});
-  nodes(tree).find(n=>n.props?.['aria-label']==='Enable lyrics from LRCLIB').props.onChange({target:{checked:false}});assert.deepEqual(toggles,[false]);
+  assert.match(html,/Paused indicator/);assert.match(html,/aria-label="Hide lyrics"/);assert.match(html,/aria-current="true"[^>]*><button[^>]*>Current</);
+  assert.match(html,/aria-label="Instrumental"/,'an empty LRC line is an instrumental break');
+  // Clicking a line seeks there; Turn off disables lookups.
+  const calls=[]; const tree=capture(NowPlaying,{model,intents:{media:op=>calls.push(op)},lyricsEnabled:true,onLyricsEnabled:enabled=>toggles.push(enabled)});
+  const el=nodes(tree).find(n=>n.type===LyricsStage); el.props.seek(1000); assert.deepEqual(calls,[{type:'seek',positionMs:1000}]);
+  el.props.onEnabled(false); assert.deepEqual(toggles,[true,false]);
+  const line=nodes(stage({enabled:true,seek:ms=>calls.push(ms)})).filter(n=>n.type==='button'&&n.props?.children==='First')[0]; line.props.onClick(); assert.deepEqual(calls.at(-1),0);
 });

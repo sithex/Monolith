@@ -141,21 +141,26 @@ fn private_watcher_registers_real_tray_and_menu_dispatches_actor_intents() {
     let menu = probe(&s, "dump");
     for label in [
         "Show/Hide island",
-        "Open terminal",
-        "Notifications (0)",
         "Do Not Disturb",
-        "Settings…",
+        "Restart Monolith",
         "Restart terminal",
+        "Restart Plasma panel",
+        "Open Monolith folder",
+        "Open data folder",
+        "View log",
+        "Start at login",
         "Quit",
     ] {
         assert!(menu.contains(label), "missing {label}: {menu}");
     }
     let pid = app.0.id();
     wait_tray(&s, pid, 0, false);
-    probe(&s, "Settings…");
-    wait_for("tray settings intent", Duration::from_secs(10), || {
-        (actor_state(&s)["view"] == "settings" && actor_state(&s)["mode"] == "large").then_some(())
-    });
+    for gone in ["Open terminal", "Notifications (", "Settings…", "Clipboard"] {
+        assert!(
+            !menu.contains(gone),
+            "in-app entry {gone} still in tray: {menu}"
+        );
+    }
     probe(&s, "Do Not Disturb");
     wait_for("tray DND intent", Duration::from_secs(5), || {
         (actor_state(&s)["dnd"] == true).then_some(())
@@ -177,10 +182,6 @@ fn private_watcher_registers_real_tray_and_menu_dispatches_actor_intents() {
     wait_tray(&s, pid, 1, true);
     notify(&s, "Tray count second");
     wait_tray(&s, pid, 2, true);
-    probe(&s, "Notifications (2)");
-    wait_for("tray notifications intent", Duration::from_secs(5), || {
-        (actor_state(&s)["view"] == "notifications").then_some(())
-    });
     eval(&s, "(async()=>{const rows=await window.__TAURI_INTERNALS__.invoke('notifications_list');if(rows.length!==2)throw new Error('expected two tray fixtures');await window.__TAURI_INTERNALS__.invoke('notifications_dismiss',{id:rows[0].id});return true})()");
     wait_tray(&s, pid, 1, true);
     eval(
@@ -190,8 +191,11 @@ fn private_watcher_registers_real_tray_and_menu_dispatches_actor_intents() {
     wait_tray(&s, pid, 0, true);
     probe(&s, "Do Not Disturb");
     wait_tray(&s, pid, 0, false);
-    probe(&s, "Open terminal");
-    wait_for("tray terminal intent", Duration::from_secs(10), || {
+    eval(
+        &s,
+        "window.__TAURI_INTERNALS__.invoke('island_dispatch',{intent:{type:'selectView',view:'terminal'}})",
+    );
+    wait_for("terminal view selected", Duration::from_secs(10), || {
         (actor_state(&s)["view"] == "terminal" && actor_state(&s)["terminalStarted"] == true)
             .then_some(())
     });

@@ -84,8 +84,9 @@ impl LockedArrangement {
         match op {
             LauncherOp::Begin {} => core.begin_edit().map_err(invalid)?,
             LauncherOp::Move { id, to } => {
-                if self.items.iter().any(|i| i.id == *id && i.locked) {
-                    return Err(IslandError::invalid("Locked launcher tile cannot move"));
+                // Hermes home keeps the first slot; Settings can't be hidden but moves freely.
+                if id == "terminal" {
+                    return Err(IslandError::invalid("Hermes home tile cannot move"));
                 }
                 core.move_item(id, *to as usize).map_err(invalid)?;
             }

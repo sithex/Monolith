@@ -152,7 +152,7 @@ impl Services {
                 cfg.repo_root.clone(),
                 cfg.home.clone(),
             )),
-            voice: Arc::new(voice::VoiceService::new(&cfg.home)),
+            voice: Arc::new(voice::VoiceService::isolated(&cfg.home, cfg.test_instance)),
             ai: Arc::new(ai_usage::AiUsageService::new(
                 cfg.repo_root.clone(),
                 cfg.home.clone(),

@@ -143,3 +143,11 @@
 .color-pop-link { height: 28px; padding: 0 6px; border: 0; background: transparent; color: var(--ui-dim) !important; cursor: pointer; white-space: nowrap; }
 .color-pop-link:hover { color: var(--ui-text) !important; }
 .color-pop-done { height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--ui-accent); color: var(--ui-on-accent, #000) !important; font-weight: 600 !important; cursor: pointer; }
+
+/* Hermes page voice controls (title row, right): saved-voice picker + TTS mute. */
+.voice-controls { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.voice-controls .dropdown { flex: 0 1 168px; width: 168px; }
+.island .voice-controls .dropdown-trigger { min-height: 28px; padding: 4px 8px 4px 10px; border-radius: 9px; font-size: 12px; }
+.voice-controls .dropdown-menu { left: auto; min-width: 100%; z-index: 40; }
+.island .voice-controls .voice-mute[data-muted='true'] { color: #ff6961; background: rgb(255 69 58 / .14); }
+.island .voice-controls .voice-mute[data-muted='true']:hover:not(:disabled) { background: rgb(255 69 58 / .22); }

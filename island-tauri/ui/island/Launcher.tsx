@@ -16,6 +16,8 @@ const LONG_PRESS_MS = 450;
 
 type Drag = { id: string; from: 'shown' | 'hidden'; pointer: number; grabX: number; grabY: number; x: number; y: number; w: number };
 const label = (i: LauncherItem) => i.view ? viewLabels[i.view] : i.id;
+/** Only Hermes home is pinned in place. Settings is `locked` (can't be hidden) but moves freely. */
+const fixed = (i: LauncherItem) => i.id === 'terminal';
 /** Insert `id` into `list` at `index` (removing it first). */
 function place(list: string[], id: string, index: number) {
   const next = list.filter(v => v !== id);
@@ -72,6 +74,7 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     setDrag({ ...d, x: e.clientX - d.grabX, y: e.clientY - d.grabY });
     const { shown: s, hidden: h } = arrangement.current;
     if (inside(hiddenGrid.current, e.clientX, e.clientY)) {
+      if (byId.get(d.id)?.locked) return;   // Settings can be moved but never hidden
       setOverHidden(true);
       if (!h.includes(d.id)) { setShown(s.filter(v => v !== d.id)); setHidden([...h, d.id]); }
       return;
@@ -102,19 +105,19 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   }, [drag?.id, drag?.pointer]);
 
   const onDown = (item: LauncherItem, e: ReactPointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0 || (item.locked && state.editing)) return;
+    if (e.button !== 0 || (fixed(item) && state.editing)) return;
     const target = e.currentTarget, pointerId = e.pointerId;
     press.current = { timer: null, x: e.clientX, y: e.clientY, id: item.id, armed: state.editing };
     if (!state.editing) press.current.timer = setTimeout(() => {   // iOS: hold to enter jiggle mode, keep holding to drag
       const p = press.current; if (!p) return;
       p.armed = true; p.timer = null; suppressClick.current = true; void send({ type: 'begin' });
-      if (!item.locked) { press.current = null; pickUp(item.id, { clientX: p.x, clientY: p.y, pointerId }, target); }
+      if (!fixed(item)) { press.current = null; pickUp(item.id, { clientX: p.x, clientY: p.y, pointerId }, target); }
     }, LONG_PRESS_MS);
   };
   const onMove = (item: LauncherItem, e: ReactPointerEvent<HTMLButtonElement>) => {
     const p = press.current; if (!p || p.id !== item.id || dragRef.current) return;
     if (Math.hypot(e.clientX - p.x, e.clientY - p.y) <= 6) return;
-    if (p.armed && !item.locked) { press.current = null; pickUp(item.id, e, e.currentTarget); }
+    if (p.armed && !fixed(item)) { press.current = null; pickUp(item.id, e, e.currentTarget); }
     else { if (p.timer) clearTimeout(p.timer); press.current = null; }
   };
   const onUp = () => { if (press.current?.timer) clearTimeout(press.current.timer); press.current = null; setTimeout(() => { if (!dragRef.current) suppressClick.current = false; }, 0); };
@@ -124,7 +127,7 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     // Rust's move indices are unchanged, but it is never drawn.
     const item = byId.get(id); if (!item || item.view === 'controls') return null;
     const view = item.view, name = label(item), dragging = drag?.id === id;
-    const wiggle = state.editing && !reduced && !item.locked && !dragging;
+    const wiggle = state.editing && !reduced && !fixed(item) && !dragging;
     return <motion.div key={id} layout={!reduced} className="tile-wrap" data-tile={id} data-disabled={zone === 'hidden'} style={{ opacity: dragging ? 0 : 1 }}
       animate={{ rotate: wiggle ? [-1.6, 1.6] : 0 }}
       transition={wiggle ? { rotate: { duration: 0.24, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut', delay: (index % 4) * 0.05 }, layout: TILE_SPRING } : TILE_SPRING}>
@@ -132,7 +135,7 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
         aria-label={`Open ${name}`} data-testid={zone === 'shown' ? `view-${view ?? id}` : `hidden-${view ?? id}`} aria-disabled={!item.known || zone === 'hidden'} data-locked={item.locked}
         onPointerDown={e => onDown(item, e)} onPointerMove={e => onMove(item, e)} onPointerUp={onUp} onPointerCancel={onUp}
         onKeyDown={e => {
-          if (!state.editing || zone !== 'shown' || item.locked || !e.altKey) return;
+          if (!state.editing || zone !== 'shown' || fixed(item) || !e.altKey) return;
           const to = e.key === 'ArrowLeft' ? index - 1 : e.key === 'ArrowRight' ? index + 1 : -1;
           if (to >= 0) { e.preventDefault(); void send({ type: 'move', id, to }); }
         }}
@@ -142,7 +145,7 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
       <AnimatePresence>{state.editing && !item.locked && <motion.button key="badge" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={{ type: 'spring', visualDuration: 0.25, bounce: 0.3 }}
         className={`tile-badge ${zone === 'shown' ? 'remove' : 'add'}`} aria-label={zone === 'shown' ? `Hide ${name}` : `Show ${name}`}
         onPointerDown={e => e.stopPropagation()} onClick={() => { void send(zone === 'shown' ? { type: 'disable', id } : { type: 'enable', id }).catch(() => undefined); }}>{zone === 'shown' ? '−' : '+'}</motion.button>}</AnimatePresence>
-      {state.editing && zone === 'shown' && !item.locked && <span className="sr-only">
+      {state.editing && zone === 'shown' && !fixed(item) && <span className="sr-only">
         <button aria-label={`Move ${name} earlier`} disabled={index === 0} onClick={() => { void send({ type: 'move', id, to: index - 1 }).catch(() => undefined); }}>←</button>
         <button aria-label={`Move ${name} later`} disabled={index === shown.length - 1} onClick={() => { void send({ type: 'move', id, to: index + 1 }).catch(() => undefined); }}>→</button></span>}
     </motion.div>;

@@ -20,8 +20,25 @@ pub struct Paths {
     pub lock: PathBuf,
 }
 
-/// Repository root (`.../Ripple`), derived from this crate's location at compile time.
+/// Repository root. Resolved at runtime from the running executable (the nearest ancestor
+/// holding `island-tauri/run.sh`), so renaming or moving the checkout keeps working with the
+/// existing build. Falls back to the compile-time crate location.
 pub fn repo_root() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| root_containing(&exe))
+        .unwrap_or_else(compile_time_root)
+}
+
+fn root_containing(start: &Path) -> Option<PathBuf> {
+    start
+        .ancestors()
+        .skip(1)
+        .find(|dir| dir.join("island-tauri/run.sh").is_file())
+        .map(Path::to_path_buf)
+}
+
+fn compile_time_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(2)
@@ -199,5 +216,19 @@ mod tests {
     #[test]
     fn repo_root_points_at_the_checkout() {
         assert!(repo_root().join("island-tauri/SPEC.md").exists());
+        assert_eq!(repo_root(), compile_time_root());
+    }
+
+    #[test]
+    fn repo_root_follows_a_moved_checkout() {
+        let root = scratch("moved");
+        let exe = root.join("island-tauri/src-tauri/target/release/hermes-island");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        fs::write(root.join("island-tauri/run.sh"), "").unwrap();
+        assert_eq!(root_containing(&exe), Some(root.clone()));
+        let elsewhere = scratch("unrelated");
+        assert_eq!(root_containing(&elsewhere.join("bin/app")), None);
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(elsewhere).unwrap();
     }
 }

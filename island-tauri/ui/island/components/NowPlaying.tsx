@@ -23,8 +23,10 @@ export function NowPlaying({ model, intents, mixer = null, onStreamVolume, lyric
 }) {
   const reduced = useReducedMotionPreference();
   const track = model.nowPlaying;
-  const lines = useRef<HTMLOListElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  // The lyrics stage is open by default once lyrics are enabled; the quote button folds it
+  // away (Apple Music style) without turning the LRCLIB lookups off.
+  const [showLyrics, setShowLyrics] = useState(lyricsEnabled);
   // The epoch sample crosses IPC; elapsed time after mounting uses a monotonic
   // clock so a wall-clock adjustment cannot send the playhead backwards.
   const [nowMs, setNowMs] = useState<number | null>(null);
@@ -51,22 +53,61 @@ export function NowPlaying({ model, intents, mixer = null, onStreamVolume, lyric
     sync();
     return () => { clearInterval(timer); observer?.disconnect(); document.removeEventListener('visibilitychange', sync); };
   }, [track?.playing, track?.status, track?.positionMs, track?.sampledAtMs, track?.rate, track?.busName, track?.trackId, track?.title]);
-  useEffect(() => {
-    const container = lines.current;
-    const current = container?.querySelector<HTMLElement>('[aria-current="true"]');
-    if (container && current) container.scrollTo({ top: Math.max(0, current.offsetTop - container.clientHeight / 2 + current.clientHeight / 2), behavior: reduced ? 'instant' : 'smooth' });
-  }, [model.lyrics.activeIndex, model.lyrics.lines, reduced]);
   if (!track) return <Empty icon="music">No player · Your music appears here</Empty>;
   const stream = playerStream(track, mixer?.available ? mixer.streams : []);
   const mprisVolume = track.volumeWritable && track.volumePercent != null;
   const volume = mprisVolume ? track.volumePercent : stream?.volumePercent ?? null;
   const { position, length } = mediaProgress(track, nowMs);
-  return <div ref={root} className="app-stack now-playing"><div className="track-header"><div className="artwork"><Icon name="music"/><SafeImage src={track.artUrl} alt={`${track.title} artwork`}/></div><div className="track-description"><div className="track-source"><small className="muted">{track.player}</small><span className="music-indicator" role="img" aria-label={track.playing ? 'Playing indicator' : 'Paused indicator'} data-playing={track.playing} data-static={reduced}>{[0,1,2,3,4].map(i => <i key={i}><b/></i>)}</span></div><h2>{track.title || 'Unknown title'}</h2><p>{track.artist || 'Unknown artist'}</p><small className="muted">{track.album}</small></div></div>
-    <div className="track-progress">{position !== null && length !== null ? <progress aria-label="Track progress" max={length} value={Math.min(length, position)}/> : <p className="muted">Position unavailable</p>}<div className="app-footer muted"><span>{position === null ? 'Unknown' : duration(position)}</span><span className="title-spacer"/><span>{length === null ? 'Unknown' : duration(length)}</span></div></div>
-    <div className="transport"><button className="transport-skip" aria-label="Previous track" disabled={!track.canControl || !track.canGoPrevious} onClick={() => intents.media({ type: 'previous' })}><TransportGlyph kind="previous" /></button><button className="transport-main" aria-label={track.playing ? 'Pause' : 'Play'} data-playing={track.playing} disabled={!track.canControl} onClick={() => intents.media({ type: 'playPause' })}><TransportGlyph kind="play" /><TransportGlyph kind="pause" /></button><button className="transport-skip" aria-label="Next track" disabled={!track.canControl || !track.canGoNext} onClick={() => intents.media({ type: 'next' })}><TransportGlyph kind="next" /></button></div>
-    <div className="player-volume"><span className="muted">Volume</span>{volume !== null ? <DraftRange aria-label="Player volume" min={0} max={100} step={1} value={Math.min(100, Math.max(0, volume))} onCommit={percent => mprisVolume ? intents.media({ type:'volume',percent }) : stream && onStreamVolume?.(stream.index,percent)} /> : <span className="muted">Unavailable for this player</span>}<small className="muted">{volume === null ? '' : `${Math.round(volume)}%`}</small></div>
-    <section className="card lyrics" aria-label="Lyrics"><div className="lyrics-heading"><h3>Lyrics</h3><label className="lyrics-switch"><input type="checkbox" aria-label="Enable lyrics from LRCLIB" checked={lyricsEnabled} onChange={event => onLyricsEnabled?.(event.target.checked)} />Enable</label></div>{!lyricsEnabled ? <p className="muted">Enable to look up this track on LRCLIB. Title, artist, album and duration are shared.</p> : model.lyrics.status === 'synced' ? <ol ref={lines} className="app-list synced-lyrics">{model.lyrics.lines.map((line, index) => <li key={`${line.timeMs}-${index}`} aria-current={index === model.lyrics.activeIndex ? 'true' : undefined}>{line.text || '♪'}</li>)}</ol> : model.lyrics.plain ? <p className="plain-lyrics">{model.lyrics.plain}</p> : <p className="muted">{model.lyrics.status === 'loading' ? 'Loading lyrics…' : model.lyrics.status === 'instrumental' ? 'Instrumental' : model.lyrics.status === 'error' ? 'Lyrics lookup failed. Try disabling and enabling lyrics again.' : 'No lyrics found for this track'}</p>}</section>
+  return <div ref={root} className="now-playing" data-lyrics={showLyrics}>
+    {showLyrics && <div className="np-backdrop" aria-hidden="true"><SafeImage src={track.artUrl} alt="" /></div>}
+    <div className="np-player app-stack">
+      <div className="track-header"><div className="artwork"><Icon name="music"/><SafeImage src={track.artUrl} alt={`${track.title} artwork`}/></div><div className="track-description"><div className="track-source"><small className="muted">{track.player}</small><span className="music-indicator" role="img" aria-label={track.playing ? 'Playing indicator' : 'Paused indicator'} data-playing={track.playing} data-static={reduced}>{[0,1,2,3,4].map(i => <i key={i}><b/></i>)}</span></div><h2>{track.title || 'Unknown title'}</h2><p>{track.artist || 'Unknown artist'}</p><small className="muted">{track.album}</small></div></div>
+      <div className="track-progress">{position !== null && length !== null ? <progress aria-label="Track progress" max={length} value={Math.min(length, position)}/> : <p className="muted">Position unavailable</p>}<div className="app-footer muted"><span>{position === null ? 'Unknown' : duration(position)}</span><span className="title-spacer"/><span>{length === null ? 'Unknown' : duration(length)}</span></div></div>
+      <div className="transport"><button className="transport-skip" aria-label="Previous track" disabled={!track.canControl || !track.canGoPrevious} onClick={() => intents.media({ type: 'previous' })}><TransportGlyph kind="previous" /></button><button className="transport-main" aria-label={track.playing ? 'Pause' : 'Play'} data-playing={track.playing} disabled={!track.canControl} onClick={() => intents.media({ type: 'playPause' })}><TransportGlyph kind="play" /><TransportGlyph kind="pause" /></button><button className="transport-skip" aria-label="Next track" disabled={!track.canControl || !track.canGoNext} onClick={() => intents.media({ type: 'next' })}><TransportGlyph kind="next" /></button></div>
+      <div className="player-volume"><span className="muted">Volume</span>{volume !== null ? <DraftRange aria-label="Player volume" min={0} max={100} step={1} value={Math.min(100, Math.max(0, volume))} onCommit={percent => mprisVolume ? intents.media({ type:'volume',percent }) : stream && onStreamVolume?.(stream.index,percent)} /> : <span className="muted">Unavailable for this player</span>}<small className="muted">{volume === null ? '' : `${Math.round(volume)}%`}</small>
+        <button type="button" className="lyrics-toggle" aria-label={showLyrics ? 'Hide lyrics' : 'Show lyrics'} aria-pressed={showLyrics} title="Lyrics" onClick={() => setShowLyrics(on => !on)}><Icon name="quote" /></button></div>
+    </div>
+    {showLyrics && <LyricsStage model={model} track={track} reduced={reduced} enabled={lyricsEnabled} onEnabled={onLyricsEnabled}
+      seek={track.canControl && track.canSeek ? positionMs => intents.media({ type: 'seek', positionMs }) : null} />}
   </div>;
+}
+
+/**
+ * Apple Music style lyrics: big bold lines, the current one bright, the rest dimmed and
+ * softly blurred by distance; the stage follows the song unless you scroll it yourself,
+ * and a click on a line seeks there. Instrumental breaks breathe as three dots.
+ */
+export function LyricsStage({ model, track, reduced, enabled, onEnabled, seek }: {
+  model: NowPlayingModel; track: Track; reduced: boolean; enabled: boolean;
+  onEnabled?(enabled: boolean): void; seek: ((positionMs: number) => void) | null;
+}) {
+  const list = useRef<HTMLDivElement>(null), userUntil = useRef(0);
+  const { lyrics } = model, active = lyrics.activeIndex;
+  useEffect(() => {
+    const box = list.current, line = box?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!box || !line || Date.now() < userUntil.current) return;
+    // Keep the current line about a third of the way down, like Apple Music.
+    box.scrollTo({ top: Math.max(0, line.offsetTop - box.clientHeight * 0.3), behavior: reduced ? 'instant' : 'smooth' });
+  }, [active, lyrics.lines, reduced]);
+  // Scrolling by hand pauses the follow for a few seconds.
+  const hold = () => { userUntil.current = Date.now() + 3500; };
+  let body;
+  if (!enabled) body = <div className="lyrics-consent"><p>Lyrics come from LRCLIB. Title, artist, album and duration are shared.</p>
+    <button type="button" className="pill-button primary" aria-label="Enable lyrics from LRCLIB" onClick={() => onEnabled?.(true)}>Show lyrics</button></div>;
+  else if (lyrics.status === 'synced') body = <ol className="am-lyrics" aria-label="Synced lyrics">{lyrics.lines.map((line, index) => {
+    const current = index === active, distance = active === null ? 2 : Math.min(4, Math.abs(index - active));
+    const gap = !line.text.trim();
+    return <li key={`${line.timeMs}-${index}`} aria-current={current ? 'true' : undefined} data-past={active !== null && index < active} style={{ ['--d' as string]: distance }}>
+      <button type="button" disabled={!seek} tabIndex={seek ? 0 : -1} onClick={() => { userUntil.current = 0; seek?.(line.timeMs); }}>
+        {gap ? <span className="am-dots" role="img" aria-label="Instrumental" data-live={current && track.playing && !reduced}><i /><i /><i /></span> : line.text}
+      </button></li>;
+  })}</ol>;
+  else if (lyrics.plain) body = <div className="am-plain">{lyrics.plain.split('\n').map((text, i) => <p key={i}>{text || '\u00a0'}</p>)}</div>;
+  else body = <p className="lyrics-note">{lyrics.status === 'loading' ? 'Loading lyrics…' : lyrics.status === 'instrumental' ? 'Instrumental' : lyrics.status === 'error' ? 'Lyrics lookup failed. Turn lyrics off and on to retry.' : 'No lyrics found for this track'}</p>;
+  return <section className="np-lyrics" aria-label="Lyrics" data-reduced={reduced}>
+    <div ref={list} className="np-lyrics-scroll" onWheel={hold} onPointerDown={hold}>{body}</div>
+    {enabled && <div className="lyrics-credit"><small>Lyrics from LRCLIB</small><button type="button" className="lyrics-off" onClick={() => onEnabled?.(false)}>Turn off</button></div>}
+  </section>;
 }
 
 /** Filled, optically centred transport glyphs (24 px grid); play/pause cross-fade in place. */

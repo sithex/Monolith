@@ -74,6 +74,8 @@ export const commands = {
 	/**  `provider` is an enum allow-list: anything else is rejected before this runs. */
 	aiConnect: (provider: AiProvider) => typedError<AiConnectResult, IslandError>(__TAURI_INVOKE("ai_connect", { provider })),
 	voiceCommand: (op: VoiceOp) => typedError<VoiceStatus, IslandError>(__TAURI_INVOKE("voice_command", { op })),
+	/**  Hermes page voice picker + TTS mute (optional helpers; missing ones report unavailable). */
+	voicePanel: (op: VoicePanelOp) => typedError<VoicePanel, IslandError>(__TAURI_INVOKE("voice_panel", { op })),
 	notificationsList: () => typedError<IslandNotification[], IslandError>(__TAURI_INVOKE("notifications_list")),
 	notificationsDismiss: (id: string) => typedError<null, IslandError>(__TAURI_INVOKE("notifications_dismiss", { id })),
 	notificationsClear: () => typedError<null, IslandError>(__TAURI_INVOKE("notifications_clear")),
@@ -1229,6 +1231,21 @@ export type VisualChanged = {
 };
 
 export type VoiceOp = "status" | "toggle";
+
+export type VoicePanel = {
+	voicesAvailable: boolean,
+	active: string | null,
+	choices: string[],
+	muteAvailable: boolean,
+	muted: boolean,
+};
+
+/**
+ *  Hermes page voice controls: saved-voice picker (`hermes-fish`) and the TTS mute switch
+ *  (`~/Hermes/Voices/tts_mute.py`). Both are optional helpers; an install without them just
+ *  reports them unavailable and the page hides the controls.
+ */
+export type VoicePanelOp = { type: "refresh" } | { type: "toggleMute" } | { type: "select"; name: string };
 
 export type VoiceState = "muted" | "unmuted";
 

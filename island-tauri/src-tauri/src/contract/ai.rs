@@ -134,6 +134,27 @@ pub struct VoiceStatus {
     pub state: VoiceState,
 }
 
+/// Hermes page voice controls: saved-voice picker (`hermes-fish`) and the TTS mute switch
+/// (`~/Hermes/Voices/tts_mute.py`). Both are optional helpers; an install without them just
+/// reports them unavailable and the page hides the controls.
+#[derive(Clone, Debug, Deserialize, specta::Type)]
+#[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
+pub enum VoicePanelOp {
+    Refresh {},
+    ToggleMute {},
+    Select { name: String },
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VoicePanel {
+    pub voices_available: bool,
+    pub active: Option<String>,
+    pub choices: Vec<String>,
+    pub mute_available: bool,
+    pub muted: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

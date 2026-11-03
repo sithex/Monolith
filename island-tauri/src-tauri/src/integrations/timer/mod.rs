@@ -1,5 +1,6 @@
 //! A bounded Rust app actor owns TimerCore. No view owns timer state; the existing
 //! StateActor remains the sole IslandState owner and receives activity intents only.
+pub mod alarm;
 pub mod core;
 use crate::{
     bus::Latest,

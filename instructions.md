@@ -23,20 +23,20 @@ Optional extras, each needed by one feature:
 
 ## 2. Where to put it
 
-Clone it to `~/Hermes/Ripple`:
+Clone it to `~/Hermes/Monolith`:
 
 ```sh
-git clone https://github.com/sithex/Monolith.git ~/Hermes/Ripple
+git clone https://github.com/sithex/Monolith.git ~/Hermes/Monolith
 ```
 
-The folder is still called Ripple because that's the path the Plasma widget expects. If you clone somewhere
-else, open `island/plasma-anchor/contents/ui/main.qml` and change the path on the `property string command`
+The app itself finds its folder at runtime, but the Plasma widget has the path written in. If you clone
+somewhere else, open `island/plasma-anchor/contents/ui/main.qml` and change the path on the `property string command`
 line (near the top) to point at your copy of `island/anchor-client.py`.
 
 ## 3. Build
 
 ```sh
-cd ~/Hermes/Ripple/island-tauri
+cd ~/Hermes/Monolith/island-tauri
 npm ci
 ./build.sh
 ```
@@ -53,7 +53,7 @@ animations at 60 fps.
 The notch is a Plasma widget. Install it, then add it to the panel where you want the island to grow from:
 
 ```sh
-kpackagetool6 -t Plasma/Applet -i ~/Hermes/Ripple/island/plasma-anchor
+kpackagetool6 -t Plasma/Applet -i ~/Hermes/Monolith/island/plasma-anchor
 ```
 
 Right-click the panel, choose **Add or Manage Widgets**, find **Hermes Island Notch** and drag it into place.
@@ -65,7 +65,7 @@ using the old compiled version until you remove the widget from the panel and ad
 ## 5. First run
 
 ```sh
-~/Hermes/Ripple/island-tauri/run.sh --overlay
+~/Hermes/Monolith/island-tauri/run.sh --overlay
 ```
 
 Click the notch. The island opens on the Hermes terminal.
@@ -81,14 +81,15 @@ Saving the setting doesn't touch a terminal that's already running. It applies t
 
 ## 6. Start it on login
 
-Create `~/.config/autostart/hermes-island.desktop`:
+Once it's running, right-click the tray icon and tick **Start at login**. That writes the entry below for you
+(pointing at wherever this copy lives). To do it by hand, create `~/.config/autostart/hermes-island.desktop`:
 
 ```ini
 [Desktop Entry]
 Type=Application
 Name=Hermes Island
-Exec="/home/YOU/Hermes/Ripple/island-tauri/run.sh" --overlay
-Path=/home/YOU/Hermes/Ripple
+Exec="/home/YOU/Hermes/Monolith/island-tauri/run.sh" --overlay
+Path=/home/YOU/Hermes/Monolith
 Terminal=false
 X-KDE-autostart-phase=2
 ```
@@ -101,11 +102,24 @@ Replace `YOU` with your username. Desktop files don't expand `~`.
   doing. Quitting the island ends that terminal session.
 - **Hover the notch** to tint it; the island doesn't open on hover.
 - **The app grid** sits behind the terminal. Hold a tile (or use the `⋯` menu) to enter edit mode, then drag
-  tiles to reorder or hide them. The Hermes home and Settings tiles stay put.
+  tiles to reorder or hide them. The Hermes home tile stays first; Settings can move anywhere after it but
+  can't be hidden.
+- **Voice picker and mute button** sit on the right of the Hermes page's title row when your Hermes has the
+  two small voice helpers. See [docs/voice-controls.md](docs/voice-controls.md) for what they are and a
+  prompt that has your own Hermes set them up.
+- **Timer** rings when a countdown ends (a short chime for each Pomodoro phase) through PipeWire's
+  `pw-play` (or `paplay`) and the freedesktop sound theme. Dismissing or resetting the timer stops the ring.
+- **Lyrics**: on Now Playing, the quote button opens the lyrics beside the artwork. Click a line to jump
+  there; scroll by hand and it stops following the song for a few seconds.
 - **Side buttons** are set up in Settings → Layout. A slot only shows up if it fits on the island at its
   current size, so you get more slots on a bigger island.
 - **Size** (Compact, Spacious, Bigger or Custom) is in Settings → Layout too. Colours, glass strength and the
   notch look are in Settings → Appearance.
+
+- **The tray icon** (right-click) has the things the island itself can't do: Restart Monolith, Restart
+  terminal, Restart Plasma panel (when the notch misbehaves), Open Monolith folder, Open data folder, View log
+  (`.island-data-overlay/monolith.log`, previous run in `monolith.log.1`) and Start at login. Show/Hide,
+  Do Not Disturb and Quit are there too.
 
 Your settings live in `.island-data-overlay/` inside the repo. That folder is in `.gitignore`, so it never
 gets committed. It holds your calendar link and clipboard history, among other things.
@@ -113,13 +127,13 @@ gets committed. It holds your calendar link and clipboard history, among other t
 ## Updating
 
 ```sh
-cd ~/Hermes/Ripple
+cd ~/Hermes/Monolith
 git pull
 cd island-tauri && npm ci && ./build.sh
 ```
 
-The build replaces the binary while the old one is still running, so restart the island afterwards. Quit it
-from the tray icon (or `kill` the PID in `.island-data-overlay/status.json`), wait for it to exit, then run
+The build replaces the binary while the old one is still running, so restart the island afterwards: right-click
+the tray icon → **Restart Monolith**. Or quit it from the tray icon (or `kill` the PID in `.island-data-overlay/status.json`), wait for it to exit, then run
 `run.sh --overlay` again. Starting a second copy while the first is still running does nothing, because only
 one instance is allowed.
 

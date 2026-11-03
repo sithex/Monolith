@@ -1,15 +1,24 @@
 //! The tray is an input adapter only: every action is a typed actor intent.
 use crate::{
-    contract::island::{IslandMode, IslandState, IslandView, UiIntent},
+    contract::island::{IslandMode, IslandState, UiIntent},
     error::IslandError,
     state::actor::Handle,
 };
-use std::sync::Mutex;
+use std::{
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{TrayIcon, TrayIconBuilder},
 };
 
+const ICON: &[u8] = include_bytes!("../icons/tray.png");
+
+/// Menu entries that are actor intents. Everything else on the menu is a host-side
+/// system action (`system_action`), which never mutates island state directly.
 pub fn action(id: &str, state: &IslandState) -> Option<UiIntent> {
     Some(match id {
         "toggle" => {
@@ -19,24 +28,212 @@ pub fn action(id: &str, state: &IslandState) -> Option<UiIntent> {
                 UiIntent::Collapse
             }
         }
-        "terminal" => UiIntent::SelectView {
-            view: IslandView::Terminal,
-        },
-        "notifications" => UiIntent::SelectView {
-            view: IslandView::Notifications,
-        },
-        "clipboard" => UiIntent::SelectView {
-            view: IslandView::Clipboard,
-        },
         "dnd" => UiIntent::SetDnd { on: !state.dnd },
-        "settings" => UiIntent::SelectView {
-            view: IslandView::Settings,
-        },
         "restart" => UiIntent::RestartTerminal,
         "quit" => UiIntent::Quit,
         _ => return None,
     })
 }
+
+/// Tray entries that act on the desktop/session rather than on the island UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemAction {
+    RestartApp,
+    RestartPlasma,
+    OpenFolder,
+    OpenData,
+    ViewLog,
+    Autostart,
+}
+
+pub fn system_action(id: &str) -> Option<SystemAction> {
+    Some(match id {
+        "restart-app" => SystemAction::RestartApp,
+        "restart-plasma" => SystemAction::RestartPlasma,
+        "open-folder" => SystemAction::OpenFolder,
+        "open-data" => SystemAction::OpenData,
+        "view-log" => SystemAction::ViewLog,
+        "autostart" => SystemAction::Autostart,
+        _ => return None,
+    })
+}
+
+/// Start `argv` in its own transient systemd scope so it outlives this process (and is not
+/// killed with our cgroup when we quit). Falls back to a plain child if systemd-run is absent.
+fn launch_detached(argv: &[String], unit: Option<&str>) -> std::io::Result<u32> {
+    let mut command = Command::new("systemd-run");
+    command.args(["--user", "--scope", "--collect", "--quiet"]);
+    if let Some(unit) = unit {
+        command.arg(format!("--unit={unit}"));
+    }
+    command.arg("--").args(argv);
+    let spawned = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .or_else(|_| {
+            Command::new(&argv[0])
+                .args(&argv[1..])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+        })?;
+    let pid = spawned.id();
+    std::thread::spawn(move || {
+        let mut child = spawned;
+        let _ = child.wait();
+    });
+    Ok(pid)
+}
+
+fn cgroup_of(pid: u32) -> Option<String> {
+    std::fs::read_to_string(format!("/proc/{pid}/cgroup")).ok()
+}
+
+pub fn autostart_file() -> Option<PathBuf> {
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
+    Some(config.join("autostart/hermes-island.desktop"))
+}
+
+/// Enabled = the entry exists and is not marked `Hidden=true` (how Plasma disables entries).
+pub fn autostart_enabled(text: Option<&str>) -> bool {
+    text.is_some_and(|t| {
+        !t.lines()
+            .any(|l| l.trim().eq_ignore_ascii_case("hidden=true"))
+    })
+}
+
+pub fn autostart_entry(root: &Path) -> String {
+    format!(
+        "[Desktop Entry]\nType=Application\nName=Monolith\nComment=Monolith dynamic island overlay\n\
+         Exec=\"{}/island-tauri/run.sh\" --overlay\nPath={}\nTerminal=false\n\
+         X-KDE-autostart-phase=2\n",
+        root.display(),
+        root.display()
+    )
+}
+
+fn set_autostart(on: bool) -> std::io::Result<()> {
+    let path = autostart_file().ok_or_else(|| std::io::Error::other("no config directory"))?;
+    if on {
+        // Rewrite from the running checkout: also repairs entries left pointing at an old path.
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(&path, autostart_entry(&crate::paths::repo_root()))
+    } else {
+        match std::fs::read_to_string(&path) {
+            Ok(text) => {
+                let mut kept: Vec<&str> = text
+                    .lines()
+                    .filter(|l| !l.trim().to_ascii_lowercase().starts_with("hidden="))
+                    .collect();
+                kept.push("Hidden=true");
+                std::fs::write(&path, kept.join("\n") + "\n")
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+fn run_system(action: SystemAction, router: &Handle) -> Result<(), String> {
+    let root = crate::paths::repo_root();
+    let data = root.join(".island-data-overlay");
+    let s = |p: &Path| p.display().to_string();
+    match action {
+        SystemAction::RestartApp => {
+            let pid = std::process::id();
+            let run = root.join("island-tauri/run.sh");
+            if !run.is_file() {
+                return Err(format!("{} missing", run.display()));
+            }
+            let mut argv = vec![
+                "/bin/sh".to_owned(),
+                "-c".to_owned(),
+                // Wait (bounded) for this instance to release its locks, then relaunch.
+                "i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 150 ]; do sleep 0.2; i=$((i+1)); done; shift; exec \"$@\"".to_owned(),
+                "monolith-relaunch".to_owned(),
+                pid.to_string(),
+                s(&run),
+            ];
+            argv.extend(std::env::args().skip(1));
+            let ours = cgroup_of(pid);
+            let helper = launch_detached(
+                &argv,
+                Some(&format!(
+                    "monolith-{pid}-{}",
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0)
+                )),
+            )
+            .map_err(|e| format!("relaunch helper: {e}"))?;
+            // Quit only after the helper has left our cgroup, or a service-managed instance
+            // would take it down on exit.
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while Instant::now() < deadline {
+                let theirs = cgroup_of(helper);
+                if theirs.is_some() && theirs != ours {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            router
+                .try_dispatch(UiIntent::Quit.into())
+                .map_err(|e| e.to_string())
+        }
+        SystemAction::RestartPlasma => launch_detached(
+            &[
+                "systemctl".into(),
+                "--user".into(),
+                "restart".into(),
+                "plasma-plasmashell.service".into(),
+            ],
+            None,
+        )
+        .map(drop)
+        .map_err(|e| e.to_string()),
+        SystemAction::OpenFolder => launch_detached(&["xdg-open".into(), s(&root)], None)
+            .map(drop)
+            .map_err(|e| e.to_string()),
+        SystemAction::OpenData => launch_detached(&["xdg-open".into(), s(&data)], None)
+            .map(drop)
+            .map_err(|e| e.to_string()),
+        SystemAction::ViewLog => launch_detached(
+            &[
+                "konsole".into(),
+                "--separate".into(),
+                "-p".into(),
+                "tabtitle=Monolith log".into(),
+                "-e".into(),
+                "tail".into(),
+                "-n".into(),
+                "300".into(),
+                "-F".into(),
+                s(&data.join("monolith.log")),
+            ],
+            None,
+        )
+        .map(drop)
+        .map_err(|e| e.to_string()),
+        SystemAction::Autostart => {
+            let now = autostart_enabled(
+                autostart_file()
+                    .and_then(|p| std::fs::read_to_string(p).ok())
+                    .as_deref(),
+            );
+            set_autostart(!now).map_err(|e| e.to_string())
+        }
+    }
+}
+
 /// Tauri's GTK tray backend silently ignores `set_tooltip`. Ayatana 0.6 exposes the
 /// tooltip as GObject properties, but libappindicator-rs does not expose its GObject.
 /// Capture it through the public `new-icon` signal while refreshing OUR icon once;
@@ -95,15 +292,14 @@ mod linux_tooltip {
                 if hook == 0 {
                     return Err(IslandError::unavailable("Cannot observe AppIndicator"));
                 }
-                let refreshed =
-                    tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
-                        .and_then(|image| image.try_into())
-                        .map_err(|_| IslandError::internal("Cannot decode tray icon"))
-                        .and_then(|image| {
-                            inner
-                                .set_icon(Some(image))
-                                .map_err(|_| IslandError::unavailable("Cannot refresh tray icon"))
-                        });
+                let refreshed = tauri::image::Image::from_bytes(ICON)
+                    .and_then(|image| image.try_into())
+                    .map_err(|_| IslandError::internal("Cannot decode tray icon"))
+                    .and_then(|image| {
+                        inner
+                            .set_icon(Some(image))
+                            .map_err(|_| IslandError::unavailable("Cannot refresh tray icon"))
+                    });
                 unsafe { glib::gobject_ffi::g_signal_remove_emission_hook(signal, hook) };
                 refreshed?;
                 let object = captured
@@ -141,23 +337,8 @@ impl Tray {
         // not be lost, and the first refresh must not wait for another actor publication.
         let mut state = actor.watch();
         let initial = state.borrow().clone();
-        use tauri::Manager;
-        let clipboard = app
-            .state::<std::sync::Arc<crate::integrations::clipboard::Clipboard>>()
-            .inner()
-            .clone();
-        let mut clipboard_state = clipboard.watch_status();
-        let initial_clipboard = clipboard_state.borrow().clone();
         let build = || -> tauri::Result<_> {
             let toggle = MenuItem::with_id(app, "toggle", "Show/Hide island", true, None::<&str>)?;
-            let terminal = MenuItem::with_id(app, "terminal", "Open terminal", true, None::<&str>)?;
-            let notifications = MenuItem::with_id(
-                app,
-                "notifications",
-                format!("Notifications ({})", initial.unread),
-                true,
-                None::<&str>,
-            )?;
             let dnd = CheckMenuItem::with_id(
                 app,
                 "dnd",
@@ -166,62 +347,90 @@ impl Tray {
                 initial.dnd,
                 None::<&str>,
             )?;
-            let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
-            let clipboard_open =
-                MenuItem::with_id(app, "clipboard", "Clipboard history", true, None::<&str>)?;
-            let pause = CheckMenuItem::with_id(
-                app,
-                "clipboard-pause",
-                "Clipboard paused",
-                initial_clipboard.enabled,
-                initial_clipboard.paused,
-                None::<&str>,
-            )?;
-            let separator = PredefinedMenuItem::separator(app)?;
+            let restart_app =
+                MenuItem::with_id(app, "restart-app", "Restart Monolith", true, None::<&str>)?;
             let restart =
                 MenuItem::with_id(app, "restart", "Restart terminal", true, None::<&str>)?;
+            let restart_plasma = MenuItem::with_id(
+                app,
+                "restart-plasma",
+                "Restart Plasma panel",
+                true,
+                None::<&str>,
+            )?;
+            let open_folder = MenuItem::with_id(
+                app,
+                "open-folder",
+                "Open Monolith folder",
+                true,
+                None::<&str>,
+            )?;
+            let open_data =
+                MenuItem::with_id(app, "open-data", "Open data folder", true, None::<&str>)?;
+            let view_log = MenuItem::with_id(app, "view-log", "View log", true, None::<&str>)?;
+            let autostart = CheckMenuItem::with_id(
+                app,
+                "autostart",
+                "Start at login",
+                true,
+                autostart_enabled(
+                    autostart_file()
+                        .and_then(|p| std::fs::read_to_string(p).ok())
+                        .as_deref(),
+                ),
+                None::<&str>,
+            )?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
                 &[
                     &toggle,
-                    &terminal,
-                    &notifications,
                     &dnd,
-                    &settings,
-                    &clipboard_open,
-                    &pause,
-                    &separator,
+                    &PredefinedMenuItem::separator(app)?,
+                    &restart_app,
                     &restart,
+                    &restart_plasma,
+                    &PredefinedMenuItem::separator(app)?,
+                    &open_folder,
+                    &open_data,
+                    &view_log,
+                    &PredefinedMenuItem::separator(app)?,
+                    &autostart,
                     &quit,
                 ],
             )?;
             let router = actor.clone();
+            let autostart_item = autostart.clone();
             let icon = TrayIconBuilder::with_id("hermes-island")
-                .icon(tauri::image::Image::from_bytes(include_bytes!(
-                    "../icons/32x32.png"
-                ))?)
+                .icon(tauri::image::Image::from_bytes(ICON)?)
                 .menu(&menu)
-                .tooltip(format!("Hermes Island — {} unread", initial.unread))
+                .tooltip(format!("Monolith — {} unread", initial.unread))
                 .on_menu_event(move |_, event| {
-                    let intent = if event.id.as_ref() == "clipboard-pause" {
-                        clipboard
-                            .status()
-                            .ok()
-                            .map(|s| UiIntent::SetClipboardPaused { paused: !s.paused })
-                    } else {
-                        action(event.id.as_ref(), &router.state())
-                    };
-                    if let Some(intent) = intent {
+                    let id = event.id.as_ref();
+                    if let Some(system) = system_action(id) {
+                        if let Err(error) = run_system(system, &router) {
+                            tracing::warn!(%error, ?system, "Tray system action failed");
+                        }
+                        if system == SystemAction::Autostart {
+                            let on = autostart_enabled(
+                                autostart_file()
+                                    .and_then(|p| std::fs::read_to_string(p).ok())
+                                    .as_deref(),
+                            );
+                            if let Err(error) = autostart_item.set_checked(on) {
+                                tracing::warn!(%error, "Tray autostart refresh failed");
+                            }
+                        }
+                    } else if let Some(intent) = action(id, &router.state()) {
                         if let Err(error) = router.try_dispatch(intent.into()) {
                             tracing::warn!(%error, "Tray action refused by actor");
                         }
                     }
                 })
                 .build(app)?;
-            Ok((icon, notifications, dnd, pause))
+            Ok((icon, dnd))
         };
-        let (icon, notifications, dnd, pause) =
+        let (icon, dnd) =
             build().map_err(|_| IslandError::unavailable("Cannot create system tray"))?;
         #[cfg(target_os = "linux")]
         let tooltip = linux_tooltip::Tooltip::new(&icon)?;
@@ -229,22 +438,10 @@ impl Tray {
         let task = tauri::async_runtime::spawn(async move {
             loop {
                 let next = state.borrow_and_update().clone();
-                let clip = clipboard_state.borrow_and_update().clone();
-                if let Err(error) = pause
-                    .set_checked(clip.paused)
-                    .and_then(|()| pause.set_enabled(clip.enabled))
-                {
-                    tracing::warn!(%error, "Tray clipboard pause update failed");
-                }
-                if let Err(error) =
-                    notifications.set_text(format!("Notifications ({})", next.unread))
-                {
-                    tracing::warn!(%error, "Tray count update failed");
-                }
                 if let Err(error) = dnd.set_checked(next.dnd) {
                     tracing::warn!(%error, "Tray DND update failed");
                 }
-                let text = format!("Hermes Island — {} unread", next.unread);
+                let text = format!("Monolith — {} unread", next.unread);
                 #[cfg(target_os = "linux")]
                 let updated = tooltip.set(&update_icon, text);
                 #[cfg(not(target_os = "linux"))]
@@ -252,9 +449,8 @@ impl Tray {
                 if let Err(error) = updated {
                     tracing::warn!(%error, "Tray tooltip update failed");
                 }
-                tokio::select! {
-                    changed = state.changed() => { if changed.is_err() { break; } },
-                    changed = clipboard_state.changed() => { if changed.is_err() { break; } },
+                if state.changed().await.is_err() {
+                    break;
                 }
             }
         });
@@ -279,7 +475,7 @@ impl Tray {
 mod tests {
     use super::*;
     use crate::{
-        contract::settings::Settings,
+        contract::{island::IslandView, settings::Settings},
         state::{
             actor::{self, MonotonicClock, Sink, Snapshot},
             machine::{Clock, Effect, Intent, Machine},
@@ -299,16 +495,19 @@ mod tests {
             Arc::new(MonotonicClock::default()),
             Quiet,
         );
-        for (id, view) in [
-            ("terminal", IslandView::Terminal),
-            ("notifications", IslandView::Notifications),
-            ("settings", IslandView::Settings),
-        ] {
-            let intent = action(id, &actor.state()).unwrap();
-            let changed = actor.dispatch(intent.into()).await.unwrap();
-            assert_eq!(changed.state.view, view);
-            assert_eq!(changed.state.mode, IslandMode::Large);
+        for id in ["terminal", "notifications", "settings", "clipboard"] {
+            assert!(action(id, &actor.state()).is_none(), "{id} is in-app only");
         }
+        actor
+            .dispatch(
+                UiIntent::SelectView {
+                    view: IslandView::Terminal,
+                }
+                .into(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(actor.state().mode, IslandMode::Large);
         actor
             .dispatch(action("toggle", &actor.state()).unwrap().into())
             .await
@@ -335,6 +534,32 @@ mod tests {
         assert!(action("unknown", &actor.state()).is_none());
         actor.shutdown();
         task.await.unwrap().unwrap();
+    }
+    #[test]
+    fn system_entries_are_not_actor_intents() {
+        for (id, want) in [
+            ("restart-app", SystemAction::RestartApp),
+            ("restart-plasma", SystemAction::RestartPlasma),
+            ("open-folder", SystemAction::OpenFolder),
+            ("open-data", SystemAction::OpenData),
+            ("view-log", SystemAction::ViewLog),
+            ("autostart", SystemAction::Autostart),
+        ] {
+            assert_eq!(system_action(id), Some(want));
+        }
+        assert_eq!(system_action("quit"), None);
+        assert_eq!(system_action("restart"), None);
+    }
+    #[test]
+    fn autostart_state_and_entry() {
+        assert!(!autostart_enabled(None));
+        assert!(autostart_enabled(Some("[Desktop Entry]\nExec=x\n")));
+        assert!(!autostart_enabled(Some("[Desktop Entry]\nHidden=true\n")));
+        assert!(autostart_enabled(Some("[Desktop Entry]\nHidden=false\n")));
+        let entry = autostart_entry(Path::new("/opt/Mono lith"));
+        assert!(entry.contains("Exec=\"/opt/Mono lith/island-tauri/run.sh\" --overlay\n"));
+        assert!(entry.contains("Path=/opt/Mono lith\n"));
+        assert!(autostart_enabled(Some(&entry)));
     }
     #[test]
     fn restart_and_quit_are_effects_of_the_actor_not_tray_side_effects() {

@@ -78,11 +78,11 @@ fn locked_direct_and_indirect_moves_disables_enables_and_commit_are_atomic() {
             to: 0,
         },
         LauncherOp::Move {
-            id: "settings".into(),
-            to: 2,
+            id: "b".into(),
+            to: 0,
         },
         LauncherOp::Move {
-            id: "b".into(),
+            id: "settings".into(),
             to: 0,
         },
         LauncherOp::Disable {
@@ -97,7 +97,21 @@ fn locked_direct_and_indirect_moves_disables_enables_and_commit_are_atomic() {
         assert!(draft.editing());
     }
     // Settings floats (Nick, Nov 2): hiding a tile in front of it or enabling a hidden one
-    // shifts Settings' index and is legal; Settings itself can still never be hidden or dragged.
+    // shifts Settings' index and is legal; Settings itself can never be hidden. Since Nov 3
+    // Nick may also drag Settings anywhere after Hermes home.
+    let mut moved = LockedArrangement::new(input.clone()).unwrap();
+    moved.apply(&LauncherOp::Begin {}).unwrap();
+    moved
+        .apply(&LauncherOp::Move {
+            id: "settings".into(),
+            to: 5,
+        })
+        .unwrap();
+    let commit = moved.apply(&LauncherOp::Commit {}).unwrap().unwrap();
+    assert_eq!(
+        commit.order,
+        ["terminal", "a", "hidden", "b", "c", "settings"]
+    );
     let hidden_before = vec![
         item("terminal", true, true),
         item("hidden", false, false),

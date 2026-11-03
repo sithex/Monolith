@@ -56,6 +56,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::ai::ai_usage,
             commands::ai::ai_connect,
             commands::voice::voice_command,
+            commands::voice::voice_panel,
             commands::notifications::notifications_list,
             commands::notifications::notifications_dismiss,
             commands::notifications::notifications_clear,

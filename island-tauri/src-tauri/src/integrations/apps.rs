@@ -14,7 +14,11 @@ use crate::{
         power::PowerService,
         scratchpad::ScratchpadService,
         tiles::TilesService,
-        timer::{core::TimerEvent, CompletionSink, TimerService},
+        timer::{
+            alarm::{AlarmPlayer, Chime},
+            core::TimerEvent,
+            CompletionSink, TimerService,
+        },
         toggles::TogglesService,
         updates::UpdatesService,
     },
@@ -57,13 +61,18 @@ pub struct AppServices {
 pub struct TimerHubSink {
     pub hub: Arc<Hub>,
     pub actor: Handle,
+    /// `None` in test instances: they never make real sounds.
+    pub alarm: Option<AlarmPlayer>,
 }
 impl CompletionSink for TimerHubSink {
     fn complete(&self, event: TimerEvent, now: u64) -> Result<(), IslandError> {
-        let title = match event {
-            TimerEvent::CountdownFinished => "Timer finished",
-            TimerEvent::PomodoroPhaseEnded { .. } => "Pomodoro phase finished",
+        let (title, chime) = match event {
+            TimerEvent::CountdownFinished => ("Timer finished", Chime::Alarm),
+            TimerEvent::PomodoroPhaseEnded { .. } => ("Pomodoro phase finished", Chime::Phase),
         };
+        if let Some(alarm) = &self.alarm {
+            alarm.play(chime);
+        }
         self.hub.insert(NotificationInput {
             source: NotificationSource::Alert,
             app_name: "Timer".into(),
@@ -90,6 +99,9 @@ impl CompletionSink for TimerHubSink {
         }))
     }
     fn clear(&self) -> Result<(), IslandError> {
+        if let Some(alarm) = &self.alarm {
+            alarm.stop();
+        }
         self.actor
             .try_dispatch(Intent::RemoveActivity("timer-completed".into()))
     }
@@ -206,6 +218,7 @@ impl AppServices {
                     Arc::new(TimerHubSink {
                         hub: self.hub.clone(),
                         actor: self.actor.clone(),
+                        alarm: (!self.test_instance).then(AlarmPlayer::default),
                     }),
                 )?;
                 self.forward(&timer.topic);

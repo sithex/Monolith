@@ -28,6 +28,8 @@ import {
   type UiIntent,
   type VoiceOp,
   type VoiceStatus,
+  type VoicePanel,
+  type VoicePanelOp,
 } from "./bindings";
 
 export type {
@@ -54,6 +56,8 @@ export type {
   UiIntent,
   VoiceOp,
   VoiceStatus,
+  VoicePanel,
+  VoicePanelOp,
 };
 
 type Result<T> = { status: "ok"; data: T } | { status: "error"; error: IslandError };
@@ -121,6 +125,7 @@ export const aiUsage = (): Promise<AiUsage> => unwrap(commands.aiUsage());
 export const aiConnect = (provider: AiProvider): Promise<AiConnectResult> =>
   unwrap(commands.aiConnect(provider));
 export const voiceCommand = (op: VoiceOp): Promise<VoiceStatus> => unwrap(commands.voiceCommand(op));
+export const voicePanel = (op: VoicePanelOp): Promise<VoicePanel> => unwrap(commands.voicePanel(op));
 
 export const newTerminalChannel = (): Channel<TerminalEvent> => new Channel<TerminalEvent>();
 

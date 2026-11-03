@@ -9,7 +9,7 @@ export interface Dashboard {
   hourly: { startS: number; tokens: number | null; sessions: number }[];
   byModel: CostLine[]; byProject: CostLine[]; heatmap: number[][]; rowsIgnored: number | null;
 }
-export type IconName = 'terminal' | 'grid' | 'timer' | 'settings' | 'volume' | 'music' | 'controls' | 'clipboard' | 'calendar' | 'bell' | 'download' | 'note' | 'spark' | 'monitor' | 'back' | 'more' | 'mic' | 'moon' | 'power' | 'coffee' | 'network' | 'camera' | 'picker' | 'weather' | 'sun' | 'cloud' | 'rain' | 'snow' | 'storm' | 'bluetooth' | 'play' | 'next' | 'prev' | 'minimize' | 'resize' | 'compact' | 'spacious' | 'bigger';
+export type IconName = 'terminal' | 'grid' | 'timer' | 'settings' | 'volume' | 'music' | 'controls' | 'clipboard' | 'calendar' | 'bell' | 'download' | 'note' | 'spark' | 'monitor' | 'back' | 'more' | 'mic' | 'moon' | 'power' | 'coffee' | 'network' | 'camera' | 'picker' | 'weather' | 'sun' | 'cloud' | 'rain' | 'snow' | 'storm' | 'bluetooth' | 'play' | 'next' | 'prev' | 'minimize' | 'resize' | 'compact' | 'spacious' | 'bigger' | 'volumeOff' | 'quote';
 export interface IslandIntents { navigate(appId: string): void }
 export interface ModuleSettingsModel {
   version: number;

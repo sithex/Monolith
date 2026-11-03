@@ -73,6 +73,7 @@ fn timer_completion_reaches_own_hub_and_activity_after_view_switch() {
         Arc::new(TimerHubSink {
             hub: hub.clone(),
             actor: handle.clone(),
+            alarm: None,
         }),
     )
     .unwrap();

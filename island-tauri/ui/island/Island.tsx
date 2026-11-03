@@ -8,6 +8,7 @@ import { Topline } from './Topline';
 import { ViewPager } from './ViewPager';
 import { Launcher, viewLabels } from './Launcher';
 import { SideControls } from './SideControls';
+import { VoiceControls } from './VoiceControls';
 import { ColorPickerPanel } from './components/ColorField';
 import { AppsView } from '../views/AppsView';
 import { configureAppTopics, useLauncher } from '../stores/apps';
@@ -104,7 +105,8 @@ export function Island() {
       style={{ position: 'absolute', top: 42, left: 0, right: 0 }}><h2>A quiet place to think.</h2><p className="muted">{state.terminalStarted ? 'Your session is still here.' : 'Your real Hermes session, one click away.'}</p><button className="primary" data-testid="open" onClick={() => { void dispatch({ type: 'pin' }).catch(fail); }}>{state.terminalStarted ? 'Resume terminal' : 'Open terminal'} ↗</button></motion.div>}</AnimatePresence>
     <motion.div ref={wrap} className="terminal-wrap island-content" hidden={!active && !lingering} aria-hidden={!active} style={closing ?? undefined} {...openMotion}>
       <ViewPager fail={fail} views={views}>
-        <IslandShell title={viewLabels[view]} home={view === 'terminal'} intents={{ navigate: () => navigate('terminal') }} back={{ label: viewLabels[previous], go: goBack }}>
+        <IslandShell title={viewLabels[view]} home={view === 'terminal'} intents={{ navigate: () => navigate('terminal') }} back={{ label: viewLabels[previous], go: goBack }}
+          actions={<VoiceControls shown={view === 'terminal'} active={active && view === 'terminal'} fail={fail} />}>
           <div className="view-pane" data-pane={view}>
             <div className="app-pane" hidden={view !== 'launcher'}>{view === 'launcher' && <Launcher navigate={navigate} fail={fail} />}</div>
             <motion.div className="app-pane terminal-pane" hidden={view !== 'terminal'} initial={false} animate={{ opacity: view === 'terminal' ? 1 : 0 }}>

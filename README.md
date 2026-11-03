@@ -38,8 +38,8 @@ X11, but nobody tests that. Windows and macOS would each need a port.
 Short version, after installing the dependencies listed in [instructions.md](instructions.md):
 
 ```sh
-git clone https://github.com/sithex/Monolith.git ~/Hermes/Ripple
-cd ~/Hermes/Ripple/island-tauri
+git clone https://github.com/sithex/Monolith.git ~/Hermes/Monolith
+cd ~/Hermes/Monolith/island-tauri
 npm ci
 ./build.sh
 ./run.sh --overlay

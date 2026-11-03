@@ -32,6 +32,9 @@ html[data-glass='true'] { --v-fill: var(--v-fill-soft); }
 html { --glass-strength: .55; }
 html[data-glass='true'] .island {
   --glass-cut: calc(var(--glass-open, 1) * var(--glass-strength) * 100%);
+  /* Size the ramp to the border box: with the default padding-box origin the gradient tile
+     repeats under the 1px border, painting a solid row along the bottom edge (the tile's
+     top) and a translucent row along the top (its bottom). Sides were unaffected. */
   /* Eased (smoothstep) ramp from the solid notch strip into the glass over ~100 px, so
      there is no visible seam where the solid top meets the frosted body. */
   background: linear-gradient(to bottom,
@@ -47,6 +50,9 @@ html[data-glass='true'] .island {
     color-mix(in srgb, var(--ui-background) calc(100% - var(--glass-cut) * .972), transparent) 134px,
     color-mix(in srgb, var(--ui-background) calc(100% - var(--glass-cut)), transparent) 146px,
     color-mix(in srgb, var(--ui-background) calc(100% - var(--glass-cut)), transparent) 100%);
+  /* After the shorthand, which would reset them. */
+  background-origin: border-box;
+  background-repeat: no-repeat;
 }
 html[data-glass='true'] .island[data-state='still'] { background: var(--ui-background); }
 /* Inner layers must not repaint an opaque fill over the frosted body. */

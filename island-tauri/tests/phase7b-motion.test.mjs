@@ -112,3 +112,12 @@ test('liquid neck exists only during edge emergence and never leaves a settled b
     assert.doesNotMatch(sideDropPath(side, 44, 12, .8), /NaN|Infinity/);
   }
 });
+
+test('glass gradient covers the border box (no 1px solid/translucent rows on top and bottom edges)', () => {
+  const css = readFileSync(new URL('../ui/island/surface.css', import.meta.url), 'utf8');
+  const rule = css.match(/html\[data-glass='true'\] \.island \{[\s\S]*?\n\}/)[0];
+  const shorthand = rule.indexOf('background: linear-gradient');
+  assert.ok(shorthand > 0);
+  for (const prop of ['background-origin: border-box', 'background-repeat: no-repeat'])
+    assert.ok(rule.indexOf(prop) > shorthand, `${prop} must follow the background shorthand, which resets it`);
+});

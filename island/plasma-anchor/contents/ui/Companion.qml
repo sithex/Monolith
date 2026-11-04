@@ -5,6 +5,8 @@ import QtQuick.Window
 // What it looks like is a character drawn by a file in characters/ (see `characters`);
 // each one gets this item as `face` and draws itself from its state.
 //
+// Full guide (performance, fidelity, tests, verifying): docs/notch-companion-characters.md
+//
 // Adding a character: draw it in characters/<Name>.qml (a `property Item face`, plus
 // optional `preferredSize` and `gazeScale`), list it in `characters` below, add the
 // variant to `CompanionCharacter` in the island's settings contract and a tile to

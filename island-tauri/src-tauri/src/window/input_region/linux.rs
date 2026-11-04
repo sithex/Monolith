@@ -32,6 +32,9 @@ pub struct PlatformBackend {
     /// Native Wayland surface (`xid` is 0 then); every request runs on the GTK main thread.
     wayland: Option<std::sync::Arc<std::sync::Mutex<crate::window::wayland::WaylandSurface>>>,
     wayland_applied: Vec<ShapeRow>,
+    /// HiDPI X11: GTK shapes are logical, so XShape reports the logical rectangles scaled
+    /// back up. `(applied, expected readback)` lets verification accept exactly that.
+    x11_scaled: Option<(Vec<ShapeRow>, Vec<ShapeRow>)>,
     /// Phase 2.5 spike (tests only): mirror every applied region into `BLUR_PROPERTY`.
     blur: bool,
     independent_blur: bool,
@@ -72,6 +75,7 @@ impl PlatformBackend {
                 xid: 0,
                 wayland: Some(std::sync::Arc::new(std::sync::Mutex::new(surface))),
                 wayland_applied: Vec::new(),
+                x11_scaled: None,
                 blur: false,
                 independent_blur: false,
                 blur_conn: None,
@@ -83,6 +87,7 @@ impl PlatformBackend {
             xid,
             wayland: None,
             wayland_applied: Vec::new(),
+            x11_scaled: None,
             blur: false,
             independent_blur: false,
             blur_conn: None,
@@ -277,17 +282,22 @@ fn x11_window_id(window: &WebviewWindow) -> Result<u32, IslandError> {
     }
 }
 
-fn apply_on_main_thread(
-    window: &WebviewWindow,
-    rects: &[gtk::cairo::RectangleInt],
-) -> Result<(), IslandError> {
+/// Applies physical `rows` as GTK's input shape and returns the GTK scale used. GTK widget
+/// shapes are in logical (scale-independent) pixels: passing physical rows at scale 2 put the
+/// clickable area at twice the offset, off the island, so nothing could be hovered or clicked.
+fn apply_on_main_thread(window: &WebviewWindow, rows: &[ShapeRow]) -> Result<i32, IslandError> {
     let gtk_window = window
         .gtk_window()
         .map_err(|e| IslandError::unavailable(format!("no GTK window: {e}")))?;
+    let scale = gtk_window.scale_factor().max(1);
+    let rects: Vec<gtk::cairo::RectangleInt> = crate::window::shape::logical_rects(rows, scale)
+        .into_iter()
+        .map(|(x, y, w, h)| gtk::cairo::RectangleInt::new(x, y, w, h))
+        .collect();
     let region = if rects.is_empty() {
         gtk::cairo::Region::create()
     } else {
-        gtk::cairo::Region::create_rectangles(rects)
+        gtk::cairo::Region::create_rectangles(&rects)
     };
     gtk_window.input_shape_combine_region(Some(&region));
     // GDK queues the XShape request on its own connection; flush it so another X connection
@@ -296,7 +306,7 @@ fn apply_on_main_thread(
         Some(display) => display.sync(),
         None => return Err(IslandError::unavailable("no default GDK display")),
     }
-    Ok(())
+    Ok(scale)
 }
 
 impl InputRegionBackend for PlatformBackend {
@@ -304,30 +314,26 @@ impl InputRegionBackend for PlatformBackend {
         let applied = region;
         // Identical coverage, far fewer rectangles for GTK, the compositor and the blur hint.
         let region = &crate::window::shape::band_rows(region)[..];
-        let rects: Vec<gtk::cairo::RectangleInt> = region
-            .iter()
-            .map(|r| {
-                gtk::cairo::RectangleInt::new(
-                    i32::from(r.x),
-                    i32::from(r.y),
-                    i32::from(r.width),
-                    i32::from(r.height),
-                )
-            })
-            .collect();
+        let rows = region.to_vec();
         let (tx, rx) = mpsc::channel();
         let window = self.window.clone();
         self.window
             .run_on_main_thread(move || {
-                let result = apply_on_main_thread(&window, &rects);
+                let result = apply_on_main_thread(&window, &rows);
                 if tx.send(result).is_err() {
                     tracing::warn!("input region result dropped: caller already timed out");
                 }
             })
             .map_err(|e| IslandError::unavailable(format!("main thread unavailable: {e}")))?;
-        rx.recv_timeout(MAIN_THREAD_TIMEOUT).map_err(|_| {
+        let scale = rx.recv_timeout(MAIN_THREAD_TIMEOUT).map_err(|_| {
             IslandError::timeout("GTK main thread did not apply the input region")
         })??;
+        self.x11_scaled = (scale > 1).then(|| {
+            (
+                crate::window::shape::normalize_rows(applied),
+                crate::window::shape::rescaled_rows(applied, scale),
+            )
+        });
         if self.wayland.is_some() {
             let rows = region.to_vec();
             let blur_rows = (self.blur && !self.independent_blur).then(|| rows.clone());
@@ -352,7 +358,13 @@ impl InputRegionBackend for PlatformBackend {
         if self.wayland.is_some() {
             return Ok(self.wayland_applied.clone());
         }
-        read_input_region(self.xid)
+        let actual = read_input_region(self.xid)?;
+        if let Some((applied, expected)) = &self.x11_scaled {
+            if crate::window::shape::normalize_rows(&actual) == *expected {
+                return Ok(applied.clone());
+            }
+        }
+        Ok(actual)
     }
     fn paint(&mut self, region: &[ShapeRow]) -> Result<(), IslandError> {
         if !self.independent_blur {

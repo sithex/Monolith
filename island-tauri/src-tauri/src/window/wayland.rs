@@ -210,15 +210,10 @@ impl WaylandSurface {
 
     fn region(&self, rows: &[ShapeRow]) -> WlRegion {
         let region = self.compositor.create_region(&self.qh, ());
-        for r in rows {
-            // Rows are physical pixels; Wayland regions are surface-local logical pixels.
-            let s = self.scale;
-            region.add(
-                i32::from(r.x) / s,
-                i32::from(r.y) / s,
-                (i32::from(r.width) + s - 1) / s,
-                (i32::from(r.height) + s - 1) / s,
-            );
+        // Rows are physical pixels; Wayland regions are surface-local logical pixels. Same
+        // outward rounding as GTK's own input shape, so the two never disagree.
+        for (x, y, width, height) in crate::window::shape::logical_rects(rows, self.scale) {
+            region.add(x, y, width, height);
         }
         region
     }

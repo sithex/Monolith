@@ -207,6 +207,38 @@ pub fn covers(rows: &[ShapeRow], px: i32, py: i32) -> bool {
     })
 }
 
+/// Physical rows → logical `(x, y, width, height)` rectangles for an integer device scale
+/// (GTK widget shapes and Wayland regions are logical). Rounds outward so every physical
+/// pixel of the panel stays covered; scale 1 is the identity.
+pub fn logical_rects(rows: &[ShapeRow], scale: i32) -> Vec<(i32, i32, i32, i32)> {
+    let s = scale.max(1);
+    rows.iter()
+        .map(|r| {
+            let (x, y) = (i32::from(r.x), i32::from(r.y));
+            let (right, bottom) = (x + i32::from(r.width), y + i32::from(r.height));
+            let (lx, ly) = (x.div_euclid(s), y.div_euclid(s));
+            let (lr, lb) = ((right + s - 1).div_euclid(s), (bottom + s - 1).div_euclid(s));
+            (lx, ly, lr - lx, lb - ly)
+        })
+        .collect()
+}
+
+/// What the windowing system reports back (physical) after `logical_rects(rows, scale)` was
+/// applied: each logical rectangle scaled up again, normalized.
+pub fn rescaled_rows(rows: &[ShapeRow], scale: i32) -> Vec<ShapeRow> {
+    let s = scale.max(1);
+    let rects: Vec<ShapeRow> = logical_rects(rows, s)
+        .into_iter()
+        .map(|(x, y, w, h)| ShapeRow {
+            x: saturate_i16(x * s),
+            y: saturate_i16(y * s),
+            width: u16::try_from(w * s).unwrap_or(u16::MAX),
+            height: u16::try_from(h * s).unwrap_or(u16::MAX),
+        })
+        .collect();
+    normalize_rows(&rects)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -407,5 +439,24 @@ mod tests {
         let got = band_rows(&[a, b]);
         assert_eq!(got, vec![a, b]);
         assert!(band_rows(&[]).is_empty());
+    }
+
+    #[test]
+    fn hidpi_rows_become_logical_rects_rounded_outward() {
+        let row = |x, y, width, height| ShapeRow { x, y, width, height };
+        // Scale 1 is the identity: today's single-scale desktops are unchanged.
+        assert_eq!(logical_rects(&[row(515, 8, 150, 42)], 1), vec![(515, 8, 150, 42)]);
+        // Scale 2: the still pill at physical 1030,16 300×84 is logical 515,8 150×42,
+        // not the doubled 2060,32 that made the island unclickable.
+        assert_eq!(logical_rects(&[row(1030, 16, 300, 84)], 2), vec![(515, 8, 150, 42)]);
+        // Odd edges expand outward so no physical pixel of the panel is lost.
+        assert_eq!(logical_rects(&[row(3, 5, 4, 1)], 2), vec![(1, 2, 3, 1)]);
+        assert_eq!(logical_rects(&[row(1, 1, 1, 1)], 0), vec![(1, 1, 1, 1)]);
+        // Readback expectation: logical rects scaled back up, covering the original rows.
+        let rows = [row(3, 5, 4, 1)];
+        let back = rescaled_rows(&rows, 2);
+        assert_eq!(back, normalize_rows(&[row(2, 4, 6, 2)]));
+        assert!(covers(&back, 3, 5) && covers(&back, 6, 5));
+        assert_eq!(rescaled_rows(&rows, 1), normalize_rows(&rows));
     }
 }

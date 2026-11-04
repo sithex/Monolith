@@ -41,7 +41,22 @@ Item {
         return (h > 0 ? h + ":" + pad(m) : m) + ":" + pad(s);
     }
     readonly property bool motion: Kirigami.Units.longDuration > 0
-    property real workPulse: 0
+    // Every notch repaint costs Plasma and KWin, on every monitor. The working pulse and the
+    // music bars share one stepped clock (~8 updates/s, whole-pixel bar heights) instead of
+    // frame-rate animations, and with the companion on they move only on the monitor the
+    // pointer is on; elsewhere they hold a still frame that still shows the state.
+    readonly property bool animateHere: !companion || pointerAt <= 0 || companionFace.attended
+    property int frame: 0
+    Timer {
+        id: stepper
+        objectName: "notchStepper"
+        interval: 125
+        repeat: true
+        running: (pill.working || pill.playing) && pill.visible && pill.motion && pill.animateHere
+        onTriggered: pill.frame = (pill.frame + 1) % 7560
+    }
+    // 0..1 accent breath, a 2.25 s cycle in 18 steps; steady at .6 when not animating.
+    readonly property real workPulse: !working ? 0 : stepper.running ? (1 - Math.cos(frame * Math.PI / 9)) / 2 : .6
     readonly property bool hovered: pointer.containsMouse
     property real hoverProgress: hovered || activeFocus ? 1 : 0
     signal activated()
@@ -66,14 +81,6 @@ Item {
         repeat: true
         triggeredOnStart: true
         onTriggered: { pill.nowMs = Date.now(); interval = 1000 - pill.nowMs % 1000 + 5; }
-    }
-    // Hermes working: a slow accent breath through the fill and border.
-    SequentialAnimation on workPulse {
-        running: pill.working && pill.visible && pill.motion
-        loops: Animation.Infinite
-        NumberAnimation { to: 1; duration: 1100; easing.type: Easing.InOutSine }
-        NumberAnimation { to: 0; duration: 1100; easing.type: Easing.InOutSine }
-        onRunningChanged: if (!running) pill.workPulse = pill.working ? 0.6 : 0
     }
     Shape {
         id: surface
@@ -141,26 +148,26 @@ Item {
         height: 12
         spacing: 2
         opacity: pill.playing ? 1 : 0
-        readonly property bool animating: pill.playing && pill.visible && Kirigami.Units.longDuration > 0
+        readonly property bool animating: pill.playing && stepper.running
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
         Repeater {
             model: 4
             Rectangle {
                 id: bar
                 required property int index
-                property real level: 3
+                // Each bar bounces between its own low and high in whole pixels, on its own
+                // period, so the four never move in lockstep.
+                readonly property int low: 3 + index % 3
+                readonly property int high: 11 - index % 2 * 3
+                readonly property int period: 5 + index * 2
+                readonly property int phase: ((musicIndicator.animating ? pill.frame : 0) + index * 3) % (2 * period)
+                readonly property int level: low + Math.round((high - low) * (phase < period ? phase : 2 * period - phase) / period)
                 objectName: "notchMusicBar" + index
                 width: 2
                 height: pill.playing ? level : 2
-                y: (musicIndicator.height - height) / 2
+                y: Math.floor((musicIndicator.height - height) / 2)
                 radius: 1
                 color: pill.textColor
-                SequentialAnimation on level {
-                    running: musicIndicator.animating
-                    loops: Animation.Infinite
-                    NumberAnimation { to: 11 - bar.index % 2 * 3; duration: 270 + bar.index * 83; easing.type: Easing.InOutSine }
-                    NumberAnimation { to: 3 + bar.index % 3; duration: 360 + bar.index * 57; easing.type: Easing.InOutSine }
-                }
             }
         }
     }

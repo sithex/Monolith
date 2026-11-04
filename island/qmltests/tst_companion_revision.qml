@@ -153,5 +153,12 @@ TestCase {
         s.rows = ["c"]; s.colors = { a: "#fff" };
         compare(s.runs.length, 0);
         s.rows = ["constructor"]; compare(s.runs.length, 0);
+        // A rebinding that draws the same picture keeps the existing runs (no rebuild).
+        s.rows = ["aab.", "..bb"]; s.colors = { a: "#ff0000", b: "#00ff00" };
+        const kept = s.runs;
+        s.rows = ["aab.", "..bb"];
+        verify(s.runs === kept, "same pixels must not rebuild the sprite");
+        s.rows = ["aaa.", "..bb"];
+        verify(s.runs !== kept);
     }
 }

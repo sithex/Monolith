@@ -210,6 +210,26 @@ TestCase {
         tryCompare(mic, "opacity", 0);
         compare(notch.width, 144); compare(notch.height, 26);
     }
+    function test_motion_is_stepped_and_only_where_the_pointer_is() {
+        const notch = createTemporaryObject(factory, testCase);
+        const stepper = findChild(notch, "notchStepper");
+        compare(stepper.running, false, "nothing ticks while idle");
+        notch.playing = true;
+        verify(stepper.running);
+        verify(stepper.interval >= 100, "a stepped clock, not frame rate");
+        const start = notch.frame;
+        tryVerify(function() { return notch.frame > start + 2; }, 1500);
+        for (let i = 0; i < 4; ++i)
+            verify(Number.isInteger(findChild(notch, "notchMusicBar" + i).height), "bars move in whole pixels");
+        // Companion on and the pointer on another monitor: hold a still frame here.
+        notch.companion = true;
+        notch.pointerX = -50000; notch.pointerY = -50000; notch.pointerAt = Date.now();
+        compare(stepper.running, false);
+        notch.working = true;
+        compare(notch.workPulse, .6, "a still, visible working tint");
+        notch.working = false; notch.playing = false;
+        compare(notch.workPulse, 0);
+    }
     function test_music_indicator_only_animates_while_playing_without_resizing() {
         const notch = createTemporaryObject(factory, testCase);
         const indicator = findChild(notch, "notchMusicIndicator");

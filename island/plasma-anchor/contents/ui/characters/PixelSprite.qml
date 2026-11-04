@@ -3,9 +3,10 @@ import QtQuick
 // Crisp pixel art from text rows: each character is one sprite pixel (one logical px),
 // looked up in `colors`; anything not in `colors` (e.g. ".") is transparent. Drawn as one
 // unantialiased Rectangle per horizontal run, so at 100% scale every pixel lands exactly
-// on a screen pixel. Static: the runs are rebuilt only when `rows` or `colors` change,
-// so swap sprites for rare state changes (hover, sleep, habit frames), never per tick.
-// Move whole sprites with integer x/y instead.
+// on a screen pixel. The runs (and so the Rectangles) are replaced only when the drawn
+// pixels actually change: a `rows` binding that re-evaluates every animation frame (a
+// blink, a doze) but lands on the same picture costs nothing. Still, swap sprites only for
+// rare state changes and move whole sprites with integer x/y.
 Item {
     id: sprite
     property var rows: []
@@ -15,7 +16,18 @@ Item {
     width: implicitWidth
     height: implicitHeight
 
-    readonly property var runs: build(rows, colors)
+    property var runs: []
+    property string drawn: ""
+    function refresh() {
+        const next = build(rows, colors);
+        const key = next.map(r => r.x + "," + r.y + "," + r.w + "," + r.color).join(";");
+        if (key === drawn) return;
+        drawn = key;
+        runs = next;
+    }
+    onRowsChanged: refresh()
+    onColorsChanged: refresh()
+    Component.onCompleted: refresh()
     function build(rows, colors) {
         const out = [];
         for (let y = 0; y < rows.length; y++) {

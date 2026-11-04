@@ -83,6 +83,42 @@ TestCase {
         verify(face.shownX - before <= .5);
         face.shownXChanged.disconnect(count); face.shownYChanged.disconnect(count);
     }
+    function test_companion_characters_switch_and_isaac_cries() {
+        const notch = createTemporaryObject(factory, testCase);
+        notch.companion = true;
+        const face = findChild(notch, "notchCompanion");
+        const clock = findChild(notch, "panelClock");
+        compare(face.shownCharacter, "blob");
+        compare(face.width, 16);
+        notch.companionCharacter = "isaac";
+        compare(face.shownCharacter, "isaac");
+        compare(face.width, 18);
+        verify(findChild(face, "isaacMouth"));
+        // His eyes follow the pointer too, and stay inside his head.
+        const eye = findChild(face, "companionEye0");
+        const restX = eye.x;
+        const centre = face.mapToGlobal(face.width / 2, face.height / 2);
+        notch.pointerX = centre.x + 2500; notch.pointerY = centre.y; notch.pointerAt = Date.now();
+        tryVerify(function() { return eye.x > restX + 1; }, 1000);
+        verify(eye.x + eye.width <= face.width);
+        // A tear falls and is gone again: a one-off, nothing left running.
+        const tear = findChild(face, "isaacTear");
+        verify(!tear.visible);
+        face.art.cry(1);
+        verify(tear.visible);
+        tryVerify(function() { return !tear.visible; }, 2000);
+        // The mute mark moves past the bigger head and stays clear of the clock.
+        const mic = findChild(notch, "notchMicMuted");
+        notch.micMuted = true;
+        tryCompare(mic, "opacity", .85);
+        verify(face.x + face.width <= mic.x);
+        verify(mic.x + mic.width < clock.mapToItem(notch, 0, 0).x);
+        // An unknown character (older or newer settings) falls back to the blob.
+        notch.companionCharacter = "ghost";
+        compare(face.shownCharacter, "blob");
+        compare(face.width, 16);
+        verify(findChild(face, "companionBody"));
+    }
     function test_main_component_compiles() {
         const component = Qt.createComponent("../plasma-anchor/contents/ui/main.qml");
         compare(component.status, Component.Ready, component.errorString());

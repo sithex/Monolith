@@ -1,6 +1,7 @@
 import type { Settings, SettingsPatch } from '../ipc/client';
 import { DraftRange } from './components/AppPrimitives';
 import { ColorSwatch } from './components/ColorField';
+import { CompanionPicker } from './companionCharacters';
 
 export function NotchControls({ settings, background, accent, patch }: {
   settings: Settings; background: string; accent: string; patch(value: SettingsPatch): void;
@@ -20,6 +21,8 @@ export function NotchControls({ settings, background, accent, patch }: {
     <label className="settings-row"><span>Companion</span><input type="checkbox" className="switch" aria-label="Notch companion"
       checked={settings.companionEnabled !== false} onChange={e => patch({ companionEnabled: e.target.checked })} /></label>
     <p className="muted">A small face in the notch whose eyes follow your pointer. Plasma only.</p>
+    {settings.companionEnabled !== false && <div className="settings-row"><span>Character</span>
+      <CompanionPicker value={settings.companionCharacter ?? 'blob'} onPick={id => patch({ companionCharacter: id })} /></div>}
     {color('panelClockColor', 'Notch color', background)}
     <div className="settings-row"><span>Width</span><DraftRange aria-label="Notch width" min={110} max={320} step={2}
       value={settings.notchWidth ?? 144} onCommit={(value, final) => { if (final) patch({ notchWidth: value }); }} />

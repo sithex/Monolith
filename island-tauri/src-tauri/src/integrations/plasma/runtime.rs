@@ -168,6 +168,7 @@ fn snapshot(
         "anchor":anchor,"bounds":bounds,"windowId":xid,"rectangles":rectangles,"pty":services.terminal.pid().unwrap_or(0),
         "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
         "companion":settings.companion_enabled,
+        "companionCharacter":settings.companion_character,
         "notchBorder":{"enabled":settings.notch_border_enabled,"color":border_color,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width},
         "background":background,"text":palette.as_ref().map(|p|&p.text),"dim":palette.as_ref().map(|p|&p.dim),
         "live":live.to_json()}),
@@ -253,6 +254,7 @@ fn panel_style_payload(raw: &Value) -> Value {
         "notchBorder",
         "notchWidth",
         "companion",
+        "companionCharacter",
         "live",
     ];
     Value::Object(

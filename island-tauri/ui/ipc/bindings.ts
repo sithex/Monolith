@@ -389,6 +389,16 @@ export type ClipboardStatusChanged = {
 
 export type CloseReason = "expired" | "dismissed" | "cleared" | "evicted" | "filtered" | "replaced" | "serverClosed";
 
+/**
+ *  Who lives in the notch. New characters are new variants here, a file in the notch
+ *  widget's `characters/` folder and an entry in the UI's character list.
+ */
+export type CompanionCharacter = 
+/**  The round face (after Vorssaint's companion). */
+"blob" | 
+/**  A crying boy in a basement, after The Binding of Isaac. */
+"isaac";
+
 export type CueKind = "click";
 
 export type DiskStats = {
@@ -1017,6 +1027,7 @@ export type Settings = {
 	showNotchOnEveryMonitor?: boolean,
 	/**  Additive (Nov 3): the small companion face in the notch whose eyes follow the pointer. */
 	companionEnabled?: boolean,
+	companionCharacter?: CompanionCharacter,
 };
 
 export type SettingsChanged = Settings;
@@ -1082,6 +1093,7 @@ export type SettingsPatch = {
 	notchWidth?: number,
 	showNotchOnEveryMonitor?: boolean,
 	companionEnabled?: boolean,
+	companionCharacter?: CompanionCharacter,
 };
 
 export type SystemStats = {

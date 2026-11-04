@@ -30,3 +30,20 @@ test('notch companion switch is on by default and patches companionEnabled',()=>
  find({}).props.onChange({target:{checked:false}});
  assert.deepEqual(calls,[{companionEnabled:false}]);
 });
+
+test('companion character picker lists every character and patches the choice',()=>{
+ const calls=[];
+ const all=s=>children(NotchControls({settings:s,background:'#000000',accent:'#00ff00',patch:p=>calls.push(p)}));
+ const picker=s=>all(s).find(e=>e.props?.value!==undefined&&typeof e.props?.onPick==='function'&&e.props?.value!==e.props?.label&&!('resetLabel' in e.props));
+ // Hidden while the companion is off.
+ assert.equal(picker({companionEnabled:false}),undefined);
+ const p=picker({});
+ assert.equal(p.props.value,'blob');
+ const tiles=children(p.type(p.props)).filter(e=>e.props?.role==='radio');
+ assert.deepEqual(tiles.map(e=>e.props['aria-label']),['Blob','Isaac']);
+ assert.deepEqual(tiles.map(e=>e.props['aria-checked']),[true,false]);
+ tiles[1].props.onClick();
+ assert.deepEqual(calls,[{companionCharacter:'isaac'}]);
+ const chosen=picker({companionCharacter:'isaac'});
+ assert.equal(chosen.props.value,'isaac');
+});

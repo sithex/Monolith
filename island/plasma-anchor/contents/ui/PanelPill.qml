@@ -23,6 +23,7 @@ Item {
     property bool micMuted: false
     // Notch companion: a small face at the left whose eyes follow the global pointer.
     property bool companion: false
+    property string companionCharacter: "blob"
     property real pointerX: 0
     property real pointerY: 0
     property real pointerAt: 0
@@ -168,8 +169,9 @@ Item {
         objectName: "notchCompanion"
         x: 9
         anchors.verticalCenter: parent.verticalCenter
-        width: 16
-        height: 16
+        character: pill.companionCharacter
+        width: preferredSize
+        height: preferredSize
         visible: opacity > 0
         opacity: pill.companionShown ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
@@ -186,7 +188,7 @@ Item {
         id: micMutedMark
         objectName: "notchMicMuted"
         source: "microphone-sensitivity-muted-symbolic"
-        x: pill.companionShown ? 29 : 15
+        x: pill.companionShown ? companionFace.x + companionFace.width + 4 : 15
         anchors.verticalCenter: parent.verticalCenter
         width: 12
         height: 12

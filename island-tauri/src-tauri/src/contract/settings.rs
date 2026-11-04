@@ -40,6 +40,18 @@ pub enum DisplayBackend {
     X11,
 }
 
+/// Who lives in the notch. New characters are new variants here, a file in the notch
+/// widget's `characters/` folder and an entry in the UI's character list.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum CompanionCharacter {
+    /// The round face (after Vorssaint's companion).
+    #[default]
+    Blob,
+    /// A crying boy in a basement, after The Binding of Isaac.
+    Isaac,
+}
+
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum UiFont {
@@ -163,6 +175,8 @@ pub struct Settings {
     /// Additive (Nov 3): the small companion face in the notch whose eyes follow the pointer.
     #[serde(default = "default_true")]
     pub companion_enabled: bool,
+    #[serde(default)]
+    pub companion_character: CompanionCharacter,
 }
 
 fn default_display_backend() -> DisplayBackend {
@@ -249,6 +263,7 @@ impl Default for Settings {
             notch_width: default_notch_width(),
             show_notch_on_every_monitor: false,
             companion_enabled: true,
+            companion_character: CompanionCharacter::Blob,
         }
     }
 }
@@ -368,6 +383,7 @@ impl Settings {
                 json!(self.show_notch_on_every_monitor),
             ),
             ("companionEnabled", json!(self.companion_enabled)),
+            ("companionCharacter", json!(self.companion_character)),
         ])
     }
 
@@ -580,6 +596,9 @@ pub struct SettingsPatch {
     #[serde(default, deserialize_with = "present")]
     #[specta(optional, type = bool)]
     pub companion_enabled: Option<bool>,
+    #[serde(default, deserialize_with = "present")]
+    #[specta(optional, type = CompanionCharacter)]
+    pub companion_character: Option<CompanionCharacter>,
 }
 
 /// Wire wrapper that accepts ONLY a JSON object. A derived struct `Deserialize` would also
@@ -811,6 +830,9 @@ impl SettingsPatch {
         }
         if let Some(v) = self.companion_enabled {
             next.companion_enabled = v;
+        }
+        if let Some(v) = self.companion_character {
+            next.companion_character = v;
         }
         if let Some(v) = self.notch_width {
             next.notch_width = number("notchWidth", v, NOTCH_WIDTH_RANGE)?.round();
@@ -1082,8 +1104,8 @@ mod tests {
         expected.sort();
         // 40 existing keys + four independent notch border settings + glass strength,
         // Hermes theme sync, three Custom scheme seed colours, backend/notch width, terminal command,
-        // notch on every monitor and the notch companion.
-        assert_eq!(keys.len(), 54);
+        // notch on every monitor and the notch companion with its character.
+        assert_eq!(keys.len(), 55);
         assert_eq!(keys, expected);
         assert_eq!(settings.hover_delay, 180.0);
         assert_eq!(settings.ui_font, UiFont::System);

@@ -106,7 +106,7 @@ impl SettingsService {
 mod tests {
     use super::*;
     use crate::{
-        contract::settings::{ObjectOnly, UiFont},
+        contract::settings::{CompanionCharacter, ObjectOnly, UiFont},
         services::scratch,
     };
     use serde_json::json;
@@ -236,6 +236,30 @@ mod tests {
                 serde_json::from_value::<SettingsPatch>(json!({"companionEnabled":bad})).is_err()
             );
         }
+        // The character: blob by default, persisted, unknown names refused and, in an
+        // older or hand-edited file, ignored rather than breaking the other settings.
+        assert_eq!(
+            svc.get().unwrap().companion_character,
+            CompanionCharacter::Blob
+        );
+        svc.patch(&patch(json!({"companionCharacter":"isaac"})))
+            .unwrap();
+        let saved: serde_json::Value =
+            serde_json::from_slice(&fs::read(dir.join("settings.json")).unwrap()).unwrap();
+        assert_eq!(saved["companionCharacter"], "isaac");
+        assert_eq!(
+            Settings::from_file_value(&saved).companion_character,
+            CompanionCharacter::Isaac
+        );
+        for bad in [json!(null), json!("Isaac"), json!("../x"), json!(1)] {
+            assert!(
+                serde_json::from_value::<SettingsPatch>(json!({"companionCharacter":bad})).is_err()
+            );
+        }
+        let odd =
+            Settings::from_file_value(&json!({"companionCharacter":"ghost","notchWidth":200}));
+        assert_eq!(odd.companion_character, CompanionCharacter::Blob);
+        assert_eq!(odd.notch_width, 200.0);
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -251,7 +275,7 @@ mod tests {
                 .as_object()
                 .unwrap()
                 .len(),
-            54 // Includes the opt-in multi-monitor notch setting and the notch companion.
+            55 // Includes the opt-in multi-monitor notch setting and the notch companion.
         );
         assert_eq!(defaults.hover_delay, 180.0);
         assert_eq!(defaults.ui_font, UiFont::System);

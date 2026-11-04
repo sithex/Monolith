@@ -98,6 +98,7 @@ PlasmoidItem {
         working: root.live.working === true
         micMuted: root.live.micMuted === true
         companion: root.companion
+        companionCharacter: String(root.appearance.companionCharacter || "blob")
         pointerX: root.pointerX
         pointerY: root.pointerY
         pointerAt: root.pointerAt

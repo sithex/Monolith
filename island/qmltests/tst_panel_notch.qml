@@ -1,5 +1,6 @@
 import QtQuick
 import QtTest
+import QtQuick.Window
 import "../plasma-anchor/contents/ui" as Panel
 
 TestCase {
@@ -111,6 +112,8 @@ TestCase {
         face.happy = false;
         tryVerify(function() { return stream.opacity > .9; }, 1000);
         // Choppy flow: the bands step at 8 ticks a second, no faster, and stop on hover.
+        notch.pointerX = centre.x; notch.pointerY = centre.y + 40; notch.pointerAt = Date.now() + 5;
+        verify(face.attended);
         const art = face.art;
         let ticks = 0;
         const tick = function() { ticks++; };
@@ -125,6 +128,15 @@ TestCase {
         wait(400);
         compare(art.flowFrame, frame);
         face.happy = false;
+        // Pointer on another monitor: this notch's flow rests (one panel redraws, not all).
+        notch.pointerX = Screen.virtualX + Screen.width + 500; notch.pointerAt = Date.now() + 10;
+        verify(!face.attended);
+        const still = art.flowFrame;
+        wait(400);
+        compare(art.flowFrame, still);
+        notch.pointerX = Screen.virtualX + 10; notch.pointerY = Screen.virtualY + 10; notch.pointerAt = Date.now() + 11;
+        verify(face.attended);
+        tryVerify(function() { return art.flowFrame !== still; }, 1000);
         // Idle shot: a tear flies, splashes and is gone, nothing left running.
         const shot = findChild(face, "isaacShot");
         verify(!shot.visible);

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 
 // The notch companion's brain: where it looks, when it blinks, dozes, ponders and smiles.
 // What it looks like is a character drawn by a file in characters/ (see `characters`);
@@ -56,6 +57,13 @@ Item {
     // After each idle blink: for characters with a habit of their own (tears, a twitch).
     // `resting` = the pointer has been still for a few seconds.
     signal blinked(bool resting)
+
+    // True on the monitor the pointer is on. With a notch on every monitor, characters
+    // run their constant animations only there, so one panel redraws instead of all of
+    // them; until the pointer first moves, none do.
+    readonly property bool attended: pointerAt > 0
+        && (pointerX >= Screen.virtualX && pointerX < Screen.virtualX + Screen.width
+            && pointerY >= Screen.virtualY && pointerY < Screen.virtualY + Screen.height)
 
     readonly property real maxX: .13
     readonly property real maxY: .09

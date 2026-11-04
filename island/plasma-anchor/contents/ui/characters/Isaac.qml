@@ -30,7 +30,7 @@ Item {
     Connections {
         target: art.face
         function onBlinked(resting) {
-            if (resting && !art.face.happy && !art.face.thinking && !art.face.sleepy && art.face.motion && Math.random() < .3)
+            if (resting && art.face.attended && !art.face.happy && !art.face.thinking && !art.face.sleepy && art.face.motion && Math.random() < .3)
                 art.shoot();
         }
     }
@@ -182,14 +182,15 @@ Item {
 
     // Choppy pixel-style flow: the streams' bands step down `flowSteps` frames per cycle
     // at 8 ticks a second, both streams on the same tick (one panel redraw per tick).
-    // Stops while cheered up, dozing or with animations off.
+    // Only on the monitor the pointer is on; stops while cheered up, dozing or with
+    // animations off.
     readonly property int flowSteps: 8
     property int flowFrame: 0
     Timer {
         id: flowTick
         interval: 125
         repeat: true
-        running: art.flowing && art.face && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
+        running: art.flowing && art.face && art.face.attended && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
         onTriggered: art.flowFrame = (art.flowFrame + 1) % art.flowSteps
     }
     // Flow and drip are alternatives; flow is on.
@@ -206,7 +207,7 @@ Item {
     Timer {
         id: dripper
         interval: 3500
-        running: !art.flowing && art.face && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
+        running: !art.flowing && art.face && art.face.attended && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
         repeat: true
         onTriggered: {
             if (!dripAnim.running) {

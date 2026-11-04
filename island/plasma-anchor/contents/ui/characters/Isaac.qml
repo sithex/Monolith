@@ -78,8 +78,9 @@ Item {
                 width: art.size * .15
                 height: art.size * .25
                 radius: width / 2
-                x: art.size * modelData - width / 2 + (modelData < .5 ? art.size * .01 : -art.size * .01)
-                y: art.size * .6
+                // Hangs from the eye wherever it looks, so turning his head keeps them joined.
+                x: art.size * modelData - width / 2 + (modelData < .5 ? art.size * .01 : -art.size * .01) + art.face.shownX * .7
+                y: art.size * .6 + Math.min(0, art.face.shownY)
                 color: art.tearColor
                 border.color: art.tearEdge
                 border.width: Math.max(.4, art.size * .02)

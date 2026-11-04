@@ -71,6 +71,7 @@ Item {
 
         // Tears streaming from under each eye down his cheeks, always (dry on hover).
         Repeater {
+            id: streams
             model: [.25, .75]
             Rectangle {
                 required property real modelData
@@ -157,6 +158,54 @@ Item {
             }
         }
     }
+
+    // A drip every few seconds: a bead runs down one stream and drops off his cheek.
+    // About 0.9 s of animation, then nothing until the next; none while cheered up,
+    // dozing or with animations turned off.
+    property int dripEye: 0
+    property real dripAt: 0         // 0 … 1 down the stream, then off it
+    // What's drawn moves in 12 steps (about half a pixel each): the animation ticks every
+    // frame, but the bead only changes, and the panel only redraws, 12 times a drip.
+    readonly property real dripStep: Math.round(dripAt * 12) / 12
+    Timer {
+        id: dripper
+        interval: 3500
+        running: art.face && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
+        repeat: true
+        onTriggered: {
+            if (!dripAnim.running) {
+                art.dripEye = Math.random() < .5 ? 0 : 1;
+                dripAnim.start();
+            }
+            interval = 3500 + Math.random() * 2500;
+        }
+    }
+    Rectangle {
+        objectName: "isaacDrip"
+        parent: head
+        readonly property Item stream: streams.itemAt(art.dripEye)
+        width: art.size * .13
+        height: art.size * (.12 + .05 * Math.max(0, art.dripStep - .7) / .3)
+        radius: width / 2
+        color: art.tearColor
+        border.color: art.tearEdge
+        border.width: Math.max(.4, art.size * .02)
+        antialiasing: true
+        visible: dripAnim.running && stream !== null
+        x: stream ? stream.x + (stream.width - width) / 2 : 0
+        y: stream ? stream.y + art.dripStep * (stream.height + art.size * .1) - height / 2 : 0
+        opacity: art.dripStep < .75 ? 1 : 1 - (art.dripStep - .75) / .25
+        Rectangle {
+            width: parent.width * .35
+            height: width
+            radius: width / 2
+            x: parent.width * .22
+            y: parent.height * .2
+            color: "white"
+            opacity: .7
+        }
+    }
+    NumberAnimation { id: dripAnim; target: art; property: "dripAt"; from: 0; to: 1; duration: 900; easing.type: Easing.InQuad }
 
     // The tear shot: from the eye on the side he's looking, a short arc, then a splash.
     // Right goes into the gap before the clock, left to the notch's rounded edge.

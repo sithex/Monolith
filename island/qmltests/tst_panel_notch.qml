@@ -110,6 +110,20 @@ TestCase {
         tryVerify(function() { return findChild(face, "isaacSmile").opacity > .9; }, 1000);
         face.happy = false;
         tryVerify(function() { return stream.opacity > .9; }, 1000);
+        // Slow drip: a bead runs down a stream and is gone, nothing left running.
+        const drip = findChild(face, "isaacDrip");
+        verify(!drip.visible);
+        face.art.dripEye = 1;
+        face.art.dripAt = 0;
+        findChild(face, "isaacDrip");
+        let moves = 0;
+        const counted = function() { moves++; };
+        tryVerify(function() { return drip.visible; }, 7000);
+        drip.yChanged.connect(counted);
+        tryVerify(function() { return !drip.visible; }, 2000);
+        drip.yChanged.disconnect(counted);
+        // Stepped, not per frame: at most a dozen redraws for the whole drip.
+        verify(moves <= 12, "drip moved " + moves + " times");
         // Idle shot: a tear flies, splashes and is gone, nothing left running.
         const shot = findChild(face, "isaacShot");
         verify(!shot.visible);

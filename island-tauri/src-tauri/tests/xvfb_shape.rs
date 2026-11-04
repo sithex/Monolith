@@ -13,7 +13,7 @@
 //!    large → still ShapeInput readback, window ARGB pixels transparent outside the island.
 //! 2. `preview_cycle_non_native_pill` — non-native mode (the still pill keeps a region), 32-bit ARGB
 //!    visual, preview title. (A real compositor capture is NOT possible here: xfwm4 refuses the
-//!    llvmpipe GL renderer and no other compositor is installed; see VERIFICATION.md.)
+//!    llvmpipe GL renderer and no other compositor is installed; see docs/history/VERIFICATION.md.)
 //! 3. `click_through_is_physical_without_window_manager` — XTest clicks against an underlay
 //!    window prove pointer events really pass through outside the shape and not inside it.
 #![cfg(target_os = "linux")]

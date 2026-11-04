@@ -30,7 +30,7 @@ serde_json = "1"
 specta = { version = "=2.0.0-rc.26", features = ["derive", "serde_json"] }
 specta-typescript = "=0.0.13"
 tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
-tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread", "net", "io-util", "fs", "signal", "process"] }
+tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread", "net", "io-util", "process"] }
 thiserror = "2"
 portable-pty = "0.9"
 shell-words = "1"
@@ -83,6 +83,14 @@ unwrap_used = "warn"
 expect_used = "warn"
 todo = "deny"
 unimplemented = "deny"
+
+# Tests and debug builds: line tables are enough for backtraces, and skipping full debug
+# info for dependencies cuts link time and target/ size a lot (87 test binaries link WebKit).
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
 
 [profile.release]
 lto = "thin"

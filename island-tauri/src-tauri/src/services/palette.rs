@@ -21,7 +21,9 @@ use std::{
 };
 
 pub const DEBOUNCE: Duration = Duration::from_millis(120);
-pub const FALLBACK: Duration = Duration::from_secs(30);
+pub const FALLBACK: Duration = Duration::from_secs(30 * 60);
+/// Re-read this often when no file watcher could be started at all.
+pub const UNWATCHED_FALLBACK: Duration = Duration::from_secs(30);
 
 /// Strict validation (identical to island-rust `parse_palette`): a string `name` and eight
 /// `#rrggbb` roles; everything else in the payload is discarded.
@@ -199,7 +201,17 @@ impl PaletteWatcher {
     ) -> Self {
         let (tx, rx) = mpsc::channel::<Message>();
         let event_tx = tx.clone();
-        let mut watcher = match notify::recommended_watcher(move |event| {
+        let skins = profile.join("skins");
+        let config = profile.join("config.yaml");
+        let (filter_profile, filter_skins) = (profile.clone(), skins.clone());
+        let mut watcher = match notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+            // Drop unrelated events here, before they reach the worker: the profile directory
+            // also holds Hermes' busy database and logs.
+            if let Ok(event) = &event {
+                if !palette_path_changed(&filter_profile, event) && !event.paths.contains(&filter_skins) {
+                    return;
+                }
+            }
             // A send error only means the worker already stopped.
             if event_tx.send(Message::Fs(event)).is_err() {
                 tracing::trace!("palette watcher event after shutdown");
@@ -211,15 +223,22 @@ impl PaletteWatcher {
                 None
             }
         };
-        let skins = profile.join("skins");
+        // Watch config.yaml itself rather than the whole profile directory: the directory sees
+        // a constant stream of database writes, and every one of them woke this watcher. The
+        // file watch is re-armed after each change (an atomic replace swaps the inode).
+        // Without a config.yaml yet, the directory is watched so its creation is still seen.
+        let mut config_watched = false;
         if let Some(watcher) = watcher.as_mut() {
             use notify::Watcher;
-            for dir in [&profile, &skins] {
+            config_watched = watcher.watch(&config, notify::RecursiveMode::NonRecursive).is_ok();
+            let dirs: &[&PathBuf] = if config_watched { &[&skins] } else { &[&profile, &skins] };
+            for dir in dirs {
                 if let Err(error) = watcher.watch(dir, notify::RecursiveMode::NonRecursive) {
                     tracing::warn!(%error, dir = %dir.display(), "cannot watch palette directory");
                 }
             }
         }
+        let fallback = if watcher.is_some() { fallback } else { fallback.min(UNWATCHED_FALLBACK) };
         let worker = std::thread::spawn(move || {
             use notify::Watcher;
             let publish = |service: &PaletteService| {
@@ -263,6 +282,22 @@ impl PaletteWatcher {
                 let now = Instant::now();
                 if pending.is_some_and(|deadline| now >= deadline) || now >= refreshed + fallback {
                     pending = None;
+                    // Re-arm the config.yaml watch BEFORE reading, so a replace that lands
+                    // after this point is still seen.
+                    if config_watched {
+                        if let Some(watcher) = watcher.as_mut() {
+                            if let Err(error) = watcher.unwatch(&config) {
+                                tracing::trace!(%error, "config unwatch");
+                            }
+                            if let Err(error) = watcher.watch(&config, notify::RecursiveMode::NonRecursive) {
+                                tracing::debug!(%error, "config re-watch failed; watching the profile directory");
+                                config_watched = false;
+                                if let Err(error) = watcher.watch(&profile, notify::RecursiveMode::NonRecursive) {
+                                    tracing::warn!(%error, "cannot watch palette directory");
+                                }
+                            }
+                        }
+                    }
                     publish(&service);
                     refreshed = Instant::now();
                 }
@@ -499,6 +534,31 @@ mod tests {
         let start = Instant::now();
         watcher.stop();
         assert!(start.elapsed() < Duration::from_secs(2));
+        watcher.stop();
+        fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn config_file_watch_survives_repeated_atomic_replaces() {
+        let (home, profile, service) = fixture("config.yaml");
+        fs::write(profile.join("config.yaml"), "#a1a1a1").unwrap();
+        let (sink, events) = collector();
+        let mut watcher =
+            PaletteWatcher::start(service, profile.clone(), Duration::from_secs(3600), sink);
+        assert_eq!(events.recv_timeout(Duration::from_secs(5)).unwrap().accent, "#a1a1a1");
+        // Each replace swaps the inode; the watch must be re-armed every time.
+        for accent in ["#b2b2b2", "#c3c3c3", "#d4d4d4"] {
+            atomic_replace(&profile.join("config.yaml"), accent);
+            assert_eq!(events.recv_timeout(Duration::from_secs(5)).unwrap().accent, accent);
+        }
+        // In-place edits are seen too.
+        fs::write(profile.join("config.yaml"), "#e5e5e5").unwrap();
+        assert_eq!(events.recv_timeout(Duration::from_secs(5)).unwrap().accent, "#e5e5e5");
+        // Database churn in the profile directory publishes nothing.
+        for _ in 0..20 {
+            fs::write(profile.join("state.db-wal"), "x").unwrap();
+        }
+        assert!(events.recv_timeout(Duration::from_millis(700)).is_err());
         watcher.stop();
         fs::remove_dir_all(home).unwrap();
     }

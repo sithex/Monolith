@@ -1,5 +1,7 @@
 # Companion pack implementation spec
 
+> Historical: the original pack spec. Obelisk was later removed; see `../notch-companion-characters.md` for the current set.
+
 Five stable IDs: `notchmimic` (Null), `obelisk` (Little Obelisk), `companioncube` (Companion Cube · Portal), `nurgling` (Nurgling), `hollowknight` (Hollow Knight). Preserve Blob default and unknown fallback.
 
 Original vector-like QML renditions in 20 px allocated squares, with static Shape geometry and plain Item translations for movement. Null has gripping hands, ivory eyes and hover teeth; Obelisk has charcoal facets and yellow slit; Cube has corner bumpers, cross panels and pink heart (no eyes); Nurgling has green belly, horns and cheeky teeth; Knight has forked ivory horns, black eye sockets and dark cloak. Appropriate eyes use the brain's bounded gaze without extra Behavior. Fixed character palettes use scheme-responsive edge contrast.

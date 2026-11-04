@@ -11,8 +11,6 @@ node_modules
 dist
 dist-ssr
 *.local
-native/mac-notch/build/
-native/mac-notch/prebuilds/
 
 # Editor directories and files
 .vscode/*
@@ -32,13 +30,7 @@ native/mac-notch/prebuilds/
 island/backups/
 island/__pycache__/
 island/evidence/
+/evidence/
+island-tauri/evidence/
 test-results/
-playwright-report/
-island-rust/target/
-island-rust/evidence/
-island-rust/tests/__pycache__/
-island-native/target/
-island-native/evidence/
-island-native/tests/__pycache__/
-.island-data-native-test/
 __pycache__/

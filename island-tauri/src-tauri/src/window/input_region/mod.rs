@@ -84,11 +84,6 @@ impl<B: InputRegionBackend> InputRegionController<B> {
         self
     }
 
-    /// The native notch moved/resized at runtime (Settings → Notch width): exclude its new box.
-    pub fn set_pill_exclusion(&mut self, pill_exclusion: Option<RoundedRect>) {
-        self.pill_exclusion = pill_exclusion;
-    }
-
     /// Apply empty input before show, without deduplicating against the unknown X default.
     pub fn install(&mut self) -> Result<(), IslandError> {
         if self.exact_paint {

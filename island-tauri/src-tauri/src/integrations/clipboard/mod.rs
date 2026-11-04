@@ -229,7 +229,7 @@ impl Clipboard {
         self.shared.paused.store(paused, Ordering::Release);
         self.shared.epoch.fetch_add(1, Ordering::AcqRel);
         self.shared.status.send_modify(|s| s.paused = paused);
-        // The owned loop has at most a 250ms safety wake as well. No worker-slot lock,
+        // In-flight captures are dropped by the epoch check on the loop's next event. No worker-slot lock,
         // IO, thread join or history serialization is performed by this actor effect.
         Ok(())
     }

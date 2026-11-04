@@ -8,7 +8,7 @@
     "dev:ui": "vite",
     "build:ui": "vite build",
     "typecheck": "tsc --noEmit",
-    "test:ui": "node --test tests/phase7a-ui.test.mjs tests/phase7b-*.test.mjs",
+    "test:ui": "node --test tests/phase7a-ui.test.mjs tests/phase7b-*.test.mjs tests/island-state.test.mjs tests/notifications.test.mjs tests/xterm-ack-adapter.test.mjs",
     "tauri": "tauri"
   },
   "dependencies": {

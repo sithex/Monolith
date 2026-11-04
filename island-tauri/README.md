@@ -1,73 +1,37 @@
-# Hermes Island on Tauri v2 — build / run / test
+# island-tauri
 
-Phase 1 skeleton (SPEC.md §8). Commands only; design lives in `SPEC.md`, evidence in `VERIFICATION.md`.
+The Monolith app: a Tauri 2 window (Rust in `src-tauri/`, React in `ui/`).
 
-## Embedded terminal launch command
-
-In the live island, open **Settings → General → Terminal → Hermes launch command**.
-The field is saved separately from Hermes's own configuration. Editing or saving it never
-replaces a running terminal; it is read for each new terminal process. After Hermes exits,
-restart the terminal to use the new value, or restart the island.
-
-- **Blank / Reset to built-in:** preserves the original island launch path (the resolved
-  Hermes Python interpreter, `-I ~/Hermes/Dropdown/custom_hermes.py chat --tui`).
-- `hermes`: use Hermes's configured default interface.
-- `hermes --tui`: force the modern terminal interface.
-- `hermes --cli`: force the classic interface. Flags are lowercase.
-- A custom executable, including a quoted absolute path, may be supplied with arguments.
-
-This is an executable-and-arguments field, **not a shell**: quotes group arguments, but
-aliases, pipes, redirects, `$HOME`, `~` and command substitution are not expanded. Use an
-absolute path when necessary. No flags are appended to a custom command. Syntax errors are
-rejected when saving; a missing/non-executable program produces a launch error. Settings
-remain accessible so the command can be corrected or reset. Commands and arguments are
-not a secret store; do not put API keys here.
-
-A custom wrapper can have its own side effects. For example, Nick's `hermes-local` restarts
-his orb and plays a boot splash; plain `hermes` bypasses his custom banner/orb/voice wrapper.
-Neither behaviour is added by the island. Collapse/reopen continues the same PTY regardless
-of the saved command.
-
-## Prerequisites (Linux)
-
-Rust ≥ 1.85 (tested 1.99.1), Node + npm, `cargo install tauri-cli --version "^2.12" --locked`
-(installs to `~/.cargo/bin`), WebKitGTK 4.1 + GTK 3 dev packages, and for the GUI tests:
-`Xvfb`, `xfwm4`, `dbus-daemon`, `xfce4-xfconf` (the tests **fail** instead of skipping when these are missing).
-
-## Everything (clean-build gate)
+Setup, building, running and the development commands are in the repository's
+[`instructions.md`](../instructions.md). Short version, from this folder:
 
 ```sh
-CLEAN=1 island-tauri/scripts/phase1-gate.sh
+npm ci
+./build.sh               # UI, then the release binary (Tauri embeds dist/ at compile time)
+./run.sh --overlay       # start the island
+npm run typecheck && npm run test:ui
+cd src-tauri && cargo test --lib
 ```
 
-Runs typecheck, UI build, `cargo fmt --check`, `cargo clippy --all-targets --locked -- -D warnings`,
-`cargo test --locked` (unit + Xvfb integration), `cargo tree` checks, and fails if the live
-`island-rust` process changed. Omit `CLEAN=1` for an incremental run.
+## Terminal launch command
 
-## Individual steps
+**Settings → General → Terminal** sets the command the embedded terminal runs. Left blank, it runs
+`hermes chat --tui` from your `PATH`. It is an executable plus arguments, **not a shell**: quotes group
+arguments, but aliases, pipes, redirects, `$HOME`, `~` and command substitution are not expanded, so use
+absolute paths. Saving never replaces a running terminal; the new command applies the next time one
+starts (tray → Restart terminal). Don't put API keys in it.
 
-```sh
-cd island-tauri
-npm install
-npm run typecheck
-npm run build:ui                      # must run before cargo: tauri embeds dist/
-cd src-tauri
-cargo fmt --check
-cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                   # 33 unit tests + 3 Xvfb tests (~8 s)
-cargo test --locked --test xvfb_shape -- --nocapture --test-threads=1
-cargo test export_bindings -- --ignored   # regenerate ui/ipc/bindings.ts after changing contract/ or commands
-```
+## Layout
 
-## Running the app (Phase 1)
+| Path | What |
+|---|---|
+| `src-tauri/src/contract/` | Typed IPC contract; `cargo test export_bindings -- --ignored` regenerates `ui/ipc/bindings.ts` |
+| `src-tauri/src/state/` | The island state machine and the actor that owns it |
+| `src-tauri/src/integrations/` | Media, timer, calendar, clipboard, mixer, Plasma notch and the rest; pure parsers and models sit in each one's `core` module |
+| `src-tauri/tests/` | Integration tests; the `kwin_*` ones run a nested KWin and need a desktop session |
+| `ui/island/` | The island UI |
+| `ui/legacy/`, `legacy.html`, `spike.html` | Test-harness pages used by the GUI tests |
+| `tests/*.test.mjs` | Front-end tests (`npm run test:ui`) |
+| `native/vblank-fix/` | `LD_PRELOAD` shim so WebKitGTK animates at the monitor's refresh rate |
 
-Phase 1 only runs as an isolated test instance. A live launch is refused until Phase 3
-(singleton + status machinery) and `--data-dir` must never be a live directory.
-
-```sh
-GDK_BACKEND=x11 src-tauri/target/debug/hermes-island --test-instance --data-dir "$TMPDIR/island-scratch" [--overlay]
-```
-
-`--overlay` = a native Plasma pill owns Still (the popup is click-through while still). Debug keys in
-the page: `m` cycles still → hover → large, `1`/`2`/`3` select directly. Evidence PNGs from the GUI
-tests are written to `island-tauri/evidence/phase1/` (gitignored).
+Older specs and verification logs are in [`docs/history/`](../docs/history/).

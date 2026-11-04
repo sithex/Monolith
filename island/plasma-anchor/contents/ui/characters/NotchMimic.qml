@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 
-// Original miniature rendition; see docs/companion-pack-spec.md.
+// Original miniature rendition; see docs/history/companion-pack-spec.md.
 HabitCharacter {
     id: art
 

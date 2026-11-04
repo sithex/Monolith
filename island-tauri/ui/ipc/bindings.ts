@@ -394,7 +394,7 @@ export type CloseReason = "expired" | "dismissed" | "cleared" | "evicted" | "fil
  *  widget's `characters/` folder and an entry in the UI's character list.
  */
 export type CompanionCharacter = 
-/**  The round face (after Vorssaint's companion). */
+/**  The round face. */
 "blob" | 
 /**  A crying boy in a basement, after The Binding of Isaac. */
 "isaac" | "notchmimic" | "companioncube" | "nurgling" | "hollowknight" | 

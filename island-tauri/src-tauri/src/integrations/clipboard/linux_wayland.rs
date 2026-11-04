@@ -737,7 +737,10 @@ impl State {
     }
     fn next_wait(&self) -> Duration {
         let now = Instant::now();
-        let mut deadline = now + Duration::from_millis(250);
+        // Idle, nothing is time-bound: sleep until Wayland, a copy request or a stop wakes
+        // the loop (all three are fds in the poll set). Pauses need no wake: every capture
+        // re-checks `Shared::active` and a stale epoch is dropped at offer time.
+        let mut deadline = now + Duration::from_secs(60);
         if let Some(s) = &self.selected {
             deadline = deadline.min(s.deadline);
             if s.payload.is_some() && s.ready_at + QUIET > now {

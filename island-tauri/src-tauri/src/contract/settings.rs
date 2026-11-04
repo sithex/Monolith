@@ -45,7 +45,7 @@ pub enum DisplayBackend {
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, Default, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum CompanionCharacter {
-    /// The round face (after Vorssaint's companion).
+    /// The round face.
     #[default]
     Blob,
     /// A crying boy in a basement, after The Binding of Isaac.

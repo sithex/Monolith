@@ -33,6 +33,9 @@ use tauri::Manager;
 use tauri_specta::Event;
 
 const HEARTBEAT: Duration = Duration::from_secs(2);
+/// An unchanged status is rewritten only this often: just enough to keep `updated` fresh for
+/// readers that treat a status older than 8 s as offline (`anchor-client.py online()`).
+const STATUS_REFRESH: Duration = Duration::from_millis(3500);
 const MIN_WRITE_INTERVAL: Duration = Duration::from_millis(100);
 
 /// `home_widget` value meaning "routing off: every notch click is a plain toggle".
@@ -411,6 +414,10 @@ impl NativeHost {
                 let mut monitor_error: Option<String> = None;
                 let mut unavailable = Vec::<String>::new();
                 let mut pending = std::collections::VecDeque::new();
+                // Last written status without its `updated` stamp, and when it was written.
+                let mut last_body = Value::Null;
+                let mut last_status_write: Option<Instant> = None;
+                let mut last_error: Option<String> = None;
                 'worker: loop {
                     let message = pending.pop_front().map(Ok).unwrap_or_else(|| receive.recv_timeout(HEARTBEAT));
                     let mut moved = matches!(message, Ok(StatusMsg::Moved));
@@ -572,10 +579,19 @@ impl NativeHost {
                         next["monitorNotches"] = monitor_report.clone();
                         next["monitorNotchError"] = json!(monitor_error);
                         next["notchUnavailableOutputs"] = json!(unavailable);
-                        guard
-                            .lock()
-                            .map_err(|_| anyhow::anyhow!("Instance lock poisoned"))?
-                            .update_status(&next)?;
+                        let mut body = next.clone();
+                        if let Some(fields) = body.as_object_mut() {
+                            fields.remove("updated");
+                        }
+                        // Write when something changed, otherwise only as a liveness heartbeat.
+                        if body != last_body || last_status_write.is_none_or(|t| t.elapsed() >= STATUS_REFRESH) {
+                            guard
+                                .lock()
+                                .map_err(|_| anyhow::anyhow!("Instance lock poisoned"))?
+                                .update_status(&next)?;
+                            last_body = body;
+                            last_status_write = Some(Instant::now());
+                        }
                         let style = panel_style_payload(&next);
                         *cached.lock().map_err(|_| anyhow::anyhow!("Panel cache poisoned"))? = next;
                         if allow_panel_push && style != last_panel_style {
@@ -601,9 +617,22 @@ impl NativeHost {
                         Ok(())
                     })();
                     last_write = Instant::now();
-                    if let Err(error) = update {
-                        tracing::error!(%error,"Native status update failed; refusing further ownership writes");
-                        break;
+                    match update {
+                        Ok(()) => last_error = None,
+                        // Someone else owns status.json now: stop writing for good.
+                        Err(error) if error.downcast_ref::<super::status_file::OwnershipLost>().is_some() => {
+                            tracing::error!(%error, "Native status ownership lost; refusing further ownership writes");
+                            break;
+                        }
+                        // Anything else (a slow main thread, a busy Plasma) is transient: keep the
+                        // notch and status alive and try again on the next message or heartbeat.
+                        Err(error) => {
+                            let text = error.to_string();
+                            if last_error.as_deref() != Some(text.as_str()) {
+                                tracing::warn!(error = %text, "Native status update failed; retrying");
+                            }
+                            last_error = Some(text);
+                        }
                     }
                 }
             })?;

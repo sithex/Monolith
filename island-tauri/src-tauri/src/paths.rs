@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     fn repo_root_points_at_the_checkout() {
-        assert!(repo_root().join("island-tauri/SPEC.md").exists());
+        assert!(repo_root().join("island-tauri/run.sh").exists());
         assert_eq!(repo_root(), compile_time_root());
     }
 

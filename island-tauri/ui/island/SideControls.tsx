@@ -1,16 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { animate, motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from 'framer-motion';
-import { type LayoutAction, type LayoutModel, type IslandView } from '../ipc/client';
+import { type LayoutModel, type IslandView } from '../ipc/client';
 type LayoutButton = LayoutModel['buttons'][number];
 import { useIslandState } from '../ipc/island-state';
 import { useLayout, useLauncher } from '../stores/apps';
 import { Icon } from './components/Icon';
-import { layoutActionView, visibleLayout, isQuickAction, sideBackFor } from './geometry';
+import { visibleLayout, isQuickAction, sideBackFor } from './geometry';
 import { actionIcon, actionLabel, quickActive, runSideAction } from './side-actions';
 import { useSettings } from '../stores';
 import { useApp, useMedia } from '../stores/apps';
 import { sideDropPath, WITHDRAW_SECONDS } from './motion-profile';
-export function actionView(action: LayoutAction): IslandView { return layoutActionView(action); }
 
 /** Where a side button's Back goes: the page you came from (Island's back history). */
 export type SideBack = { view: IslandView; label: string; go(): void };

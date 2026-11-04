@@ -23,15 +23,14 @@ Optional extras, each needed by one feature:
 
 ## 2. Where to put it
 
-Clone it to `~/Hermes/Monolith`:
+Clone it anywhere. The commands below use `~/Hermes/Monolith`:
 
 ```sh
 git clone https://github.com/sithex/Monolith.git ~/Hermes/Monolith
 ```
 
-The app itself finds its folder at runtime, but the Plasma widget has the path written in. If you clone
-somewhere else, open `island/plasma-anchor/contents/ui/main.qml` and change the path on the `property string command`
-line (near the top) to point at your copy of `island/anchor-client.py`.
+Nothing has a path written in: the app finds its folder at runtime, and the notch finds the app through
+the link you create in step 4.
 
 ## 3. Build
 
@@ -145,7 +144,7 @@ one instance is allowed.
 ## Troubleshooting
 
 **Clicking the notch does nothing.** Check that the island is running (`pgrep -a hermes-island`) and that
-the path in `main.qml` matches where you cloned the repo. You can test the bridge on its own:
+`~/.local/state/monolith/anchor-client.py` links to your copy (step 4). You can test the bridge on its own:
 `python3 island/anchor-client.py pin` should open the island.
 
 **"Cannot bind ingest socket" after a crash or power cut.** A dead socket file was left behind. Make sure no
@@ -169,6 +168,13 @@ Front-end checks, run from `island-tauri`:
 ```sh
 npm run typecheck
 npm run test:ui
+```
+
+Notch widget and helper checks, run from the repo root:
+
+```sh
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input island/qmltests
+python3 -m unittest discover -s island/tests
 ```
 
 For live UI editing, build a debug binary with `--no-default-features`. That drops Tauri's
@@ -199,5 +205,5 @@ cargo test export_bindings -- --ignored
 Tauri embeds the built UI into the binary at compile time. After a UI change, a release build needs
 `npm run build:ui` before cargo. `build.sh` does that for you.
 
-`cargo test` and the phase gate scripts in `island-tauri/scripts/` build a large debug tree in
-`src-tauri/target/debug` (it reached 60 GB here). It's safe to delete; it all rebuilds.
+`cargo test` builds a large debug tree in `src-tauri/target/debug` (each file in `src-tauri/tests/` becomes
+its own binary). It's safe to delete; it all rebuilds. Most Rust work only needs `cargo test --lib`.

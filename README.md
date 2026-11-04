@@ -57,7 +57,7 @@ that, plus autostart, updating and the problems you're likely to hit.
 | `island-tauri/native/vblank-fix/` | An `LD_PRELOAD` shim so WebKitGTK animates at your monitor's real refresh rate |
 | `island/plasma-anchor/` | The Plasma notch widget (QML) |
 | `island/*.py` | Helpers the notch and the theme sync call |
-| `island-tauri/SPEC.md` | The design spec the Tauri rewrite was built from |
+| `docs/history/` | Build logs from the rewrite (historical; paths and runtimes in them are out of date) |
 
 ## License
 

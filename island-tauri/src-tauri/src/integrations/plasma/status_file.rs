@@ -9,7 +9,7 @@
 use anyhow::{ensure, Context, Result};
 use serde_json::Value;
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, OpenOptions},
     io::{Read, Write},
     os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
@@ -17,6 +17,17 @@ use std::{
 };
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
+
+/// The one status error that must stop the writer: someone else now owns `status.json`.
+/// Everything else (a transient IO or main-thread hiccup) is retried on the next update.
+#[derive(Debug)]
+pub struct OwnershipLost;
+impl std::fmt::Display for OwnershipLost {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Status ownership was replaced")
+    }
+}
+impl std::error::Error for OwnershipLost {}
 const LIMIT: usize = 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -92,7 +103,9 @@ impl StatusFile {
             "Status snapshot must name this process"
         );
         if self.published.is_some() {
-            ensure!(self.still_ours(), "Status ownership was replaced");
+            if !self.still_ours() {
+                return Err(OwnershipLost.into());
+            }
         } else {
             match fs::symlink_metadata(&self.path) {
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -116,9 +129,10 @@ impl StatusFile {
                 .open(&temp)
                 .context("Creating pending status")?;
             file.write_all(&bytes)?;
-            file.sync_all()?;
+            // No fsync: the snapshot is ephemeral (rebuilt every few seconds and removed on
+            // shutdown) and `rename` is already atomic for readers. Forcing it to disk made
+            // every heartbeat a filesystem commit.
             fs::rename(&temp, &self.path).context("Publishing status")?;
-            File::open(&self.data)?.sync_all()?;
             Ok(())
         })();
         if publish.is_err() {
@@ -235,7 +249,8 @@ mod tests {
         fs::remove_file(writer.path()).unwrap();
         let foreign = json!({"pid":std::process::id(),"foreign":true}).to_string();
         fs::write(writer.path(), &foreign).unwrap();
-        assert!(writer.update(&json!({"pid":std::process::id()})).is_err());
+        let error = writer.update(&json!({"pid":std::process::id()})).unwrap_err();
+        assert!(error.downcast_ref::<OwnershipLost>().is_some(), "{error}");
         writer.shutdown().unwrap();
         assert_eq!(fs::read_to_string(writer.path()).unwrap(), foreign);
     }

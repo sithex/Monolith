@@ -40,7 +40,7 @@ impl Update {
 
 /// Reboot-needing package names: the kernel (`linux`, `linux-*`, incl.
 /// `linux-cachyos` and headers) and graphics drivers (`nvidia*`, `mesa`).
-/// The exact list is documented in VERIFICATION.md under Decisions.
+/// The exact list is documented in docs/history/VERIFICATION.md under Decisions.
 pub fn is_kernel(name: &str) -> bool {
     name == "linux" || name.starts_with("linux-") || name.starts_with("nvidia") || name == "mesa"
 }

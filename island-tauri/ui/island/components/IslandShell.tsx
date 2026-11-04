@@ -26,8 +26,3 @@ export function IslandShell({ title, children, intents, home = false, back, acti
     <div className="shell-content">{children}</div>
   </section>;
 }
-export function TerminalHome({ children }: { children?: ReactNode }) {
-  return <div className="terminal-home" aria-label="Hermes terminal placeholder">
-    {children ?? <><div className="terminal-mark">H</div><h3>Your agent. At home.</h3><p>This is the terminal slot.</p><p className="muted">Phase 7 mounts the retained xterm session here.</p><div className="terminal-prompt"><span>hermes ›</span> <span className="muted">What shall we build?</span><span className="caret" /></div></>}
-  </div>;
-}

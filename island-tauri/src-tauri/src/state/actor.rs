@@ -133,6 +133,18 @@ impl Handle {
         self.stop.send_replace(true);
     }
 }
+/// Publish only a changed state: every publication rewrites the status file and wakes
+/// its watchers, and most effects (a refused focus, a cue) leave the state untouched.
+fn publish(latest: &watch::Sender<IslandState>, state: &IslandState) {
+    latest.send_if_modified(|current| {
+        if current == state {
+            false
+        } else {
+            *current = state.clone();
+            true
+        }
+    });
+}
 pub fn spawn(
     settings: Settings,
     clock: Arc<dyn Clock + Send + Sync>,
@@ -183,11 +195,15 @@ pub fn spawn(
                         Ok(next)=>{
                             effects.extend(next);
                             if request.ui_origin { effects.retain(|e| *e != Effect::PlayClick); }
-                            latest.send_replace(machine.state.clone());
+                            publish(&latest,&machine.state);
                             let snapshot=Snapshot::from(&machine);
+                            // A failed side effect (cue, clipboard pause, emit) is reported to the
+                            // caller but never takes the state authority down: a dead actor would
+                            // freeze the whole island with no way back short of a restart.
                             if let Err(error)=sink.apply(&effects,&snapshot) {
-                                if request.reply.send(Err(error.clone())).is_err() {tracing::debug!("State caller disconnected during effect failure");}
-                                return Err(error);
+                                tracing::warn!(?error,"State effect failed");
+                                if request.reply.send(Err(error)).is_err() {tracing::debug!("State caller disconnected during effect failure");}
+                                continue;
                             }
                             if request.reply.send(Ok(snapshot)).is_err() {tracing::debug!("State caller disconnected");}
                         }
@@ -196,8 +212,10 @@ pub fn spawn(
                 }
                 ()=timer=>{
                     let effects=machine.tick(&settings,&Now(clock.now_ms()))?;
-                    latest.send_replace(machine.state.clone());
-                    sink.apply(&effects,&Snapshot::from(&machine))?;
+                    publish(&latest,&machine.state);
+                    if let Err(error)=sink.apply(&effects,&Snapshot::from(&machine)) {
+                        tracing::warn!(?error,"State effect failed after a timer tick");
+                    }
                 }
             }
         }
@@ -285,7 +303,10 @@ mod tests {
                 .dnd
         );
         assert!(handle.dispatch(Intent::Pin).await.is_err());
-        assert!(task.await.unwrap().is_err());
+        // A failed effect is reported, but the actor keeps serving.
+        assert_eq!(handle.dispatch(Intent::Collapse).await.unwrap().state.mode, IslandMode::Still);
+        handle.shutdown();
+        task.await.unwrap().unwrap();
     }
     #[tokio::test(flavor = "current_thread")]
     async fn actor_queue_is_bounded_and_shutdown_is_not_queued_behind_work() {

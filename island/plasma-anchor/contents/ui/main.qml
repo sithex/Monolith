@@ -26,7 +26,7 @@ PlasmoidItem {
     property string command: "/usr/bin/python3 -I -S \"${XDG_STATE_HOME:-$HOME/.local/state}/monolith/anchor-client.py\""
     preferredRepresentation: compactRepresentation
     Plasmoid.icon: "utilities-terminal"
-    Plasmoid.constraintHints: PlasmaCore.Types.CanFillArea
+    Plasmoid.constraintHints: Plasmoid.CanFillArea
     // Hover feedback lives inside PanelPill; no tooltip or preview popup.
     toolTipMainText: ""
     toolTipSubText: ""

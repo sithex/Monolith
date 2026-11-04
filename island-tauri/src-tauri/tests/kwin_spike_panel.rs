@@ -348,7 +348,7 @@ fn wait_region(conn: &RustConnection, window: u32, want: &[ShapeRow], what: &str
     });
 }
 
-/// Mutation-testing hook ONLY (scripts/phase2_5_mutations.py): lets a deliberately broken region
+/// Mutation-testing hook ONLY (set SPIKE_MUTATION_SKIP_REGION_READBACK): lets a deliberately broken region
 /// reach the physical-input assertions instead of failing at the readback, like Phase 1.5 did.
 fn region_readback_enabled() -> bool {
     std::env::var_os("SPIKE_MUTATION_SKIP_REGION_READBACK").is_none()

@@ -1,9 +1,9 @@
 //! Frozen window identity contract (SPEC §2.3 step 1).
 //!
-//! PID + title + `WM_CLASS` are shared by `kwin_place` (Phase 3), the GUI tests and status
+//! PID + title + `WM_CLASS` are shared by the GUI tests and status
 //! tooling. The values below are not guesses: they were read back from the real X11 window of
 //! this binary (`_NET_WM_PID`, `_NET_WM_NAME`, `WM_CLASS`) under Xvfb + xfwm4 on 2026-10-29
-//! (see VERIFICATION.md) and `tests/xvfb_shape.rs::assert_identity` fails if the live window ever
+//! (see docs/history/VERIFICATION.md) and `tests/xvfb_shape.rs::assert_identity` fails if the live window ever
 //! disagrees. Change them only together with every consumer.
 //!
 //! * `_NET_WM_PID`  = the island process id (no re-exec, so `std::process::id()`).

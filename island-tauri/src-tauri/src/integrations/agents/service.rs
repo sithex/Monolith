@@ -17,6 +17,16 @@ use std::{
 };
 const READER: &str = include_str!("reader.py");
 pub const POLL: Duration = Duration::from_secs(15);
+/// Unchanged database files reuse the last rows this long before a forced re-read.
+const REUSE_ROWS: Duration = Duration::from_secs(300);
+/// Size and modification time of the database and its WAL: if neither moved, the rows did not.
+type Fingerprint = [Option<(u64, SystemTime)>; 2];
+fn fingerprint(path: &std::path::Path) -> Fingerprint {
+    let stamp = |p: &std::path::Path| std::fs::metadata(p).ok().and_then(|m| Some((m.len(), m.modified().ok()?)));
+    let mut wal = path.as_os_str().to_owned();
+    wal.push("-wal");
+    [stamp(path), stamp(std::path::Path::new(&wal))]
+}
 #[derive(Clone)]
 pub struct AgentConfig {
     database: Option<PathBuf>,
@@ -58,6 +68,8 @@ pub struct AgentService {
     stop: Mutex<bool>,
     wake: Condvar,
     worker: Mutex<Option<JoinHandle<()>>>,
+    /// Last rows read, so an untouched database costs a `stat` instead of a Python start.
+    rows: Mutex<Option<(Fingerprint, std::time::Instant, Vec<core::SessionRow>)>>,
     pub topic: Latest<AgentsChanged>,
 }
 impl AgentService {
@@ -83,6 +95,7 @@ impl AgentService {
             stop: Mutex::new(false),
             wake: Condvar::new(),
             worker: Mutex::new(None),
+            rows: Mutex::new(None),
             topic,
         })
     }
@@ -237,6 +250,17 @@ impl AgentService {
         {
             return Err(IslandError::unavailable("Agent database unavailable"));
         }
+        // The tracker re-classifies cached rows against the new `now`, so staleness still
+        // advances; only the SQL read is skipped. Its 24 h window is wider than the tracker's
+        // lookback, which filters the reused rows again.
+        let print = fingerprint(path);
+        if let Ok(cache) = self.rows.lock() {
+            if let Some((seen, at, rows)) = cache.as_ref() {
+                if *seen == print && at.elapsed() < REUSE_ROWS {
+                    return Ok(rows.clone());
+                }
+            }
+        }
         let mut command = Command::new("/usr/bin/python3");
         command
             .args(["-I", "-c", READER])
@@ -247,6 +271,9 @@ impl AgentService {
             .map_err(|_| IslandError::unavailable("Agent metadata invalid"))?;
         if rows.len() > 10_000 {
             return Err(IslandError::unavailable("Agent metadata row limit"));
+        }
+        if let Ok(mut cache) = self.rows.lock() {
+            *cache = Some((print, std::time::Instant::now(), rows.clone()));
         }
         Ok(rows)
     }

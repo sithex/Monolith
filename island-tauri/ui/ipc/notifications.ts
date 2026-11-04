@@ -26,7 +26,6 @@ export function seedNotifications(initial: IslandNotification[]) {
   const { droppedBootstrap } = store.diagnostics();
   if (droppedBootstrap) console.warn(`Notification bootstrap overflow: ${droppedBootstrap} deltas dropped (stale content suppressed)`);
 }
-export const notificationDiagnostics = store.diagnostics;
 export function useNotifications() {
   return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }

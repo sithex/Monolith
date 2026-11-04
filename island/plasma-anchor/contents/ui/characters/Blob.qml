@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 
-// The round companion (after Vorssaint's): an ivory ball in the notch's text colour
+// The round companion: an ivory ball in the notch's text colour
 // with two upright eyes. Draws itself from `face`, the brain in ../Companion.qml.
 Item {
     id: art

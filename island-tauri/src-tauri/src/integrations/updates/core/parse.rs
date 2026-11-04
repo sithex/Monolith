@@ -128,7 +128,7 @@ fn valid_pkg_name(name: &str) -> bool {
 /// Versions: non-empty, ≤ 128 bytes, no whitespace (guaranteed by
 /// tokenization), characters from `[0-9A-Za-z.:+~_-]`. The stricter
 /// `[epoch:]pkgver-pkgrel` shape is intentionally not enforced (see
-/// VERIFICATION.md Decisions).
+/// docs/history/VERIFICATION.md Decisions).
 fn valid_version(ver: &str) -> bool {
     let len = ver.len();
     if len == 0 || len > 128 {

@@ -40,10 +40,19 @@ test('companion character picker lists every character and patches the choice',(
  const p=picker({});
  assert.equal(p.props.value,'blob');
  const tiles=children(p.type(p.props)).filter(e=>e.props?.role==='radio');
- assert.deepEqual(tiles.map(e=>e.props['aria-label']),['Blob','Isaac']);
- assert.deepEqual(tiles.map(e=>e.props['aria-checked']),[true,false]);
+ assert.deepEqual(tiles.map(e=>e.props['aria-label']),['Blob','Isaac','Null','Little Obelisk','Companion Cube · Portal','Nurgling','Hollow Knight']);
+ assert.deepEqual(tiles.map(e=>e.props['aria-checked']),[true,false,false,false,false,false,false]);
  tiles[1].props.onClick();
  assert.deepEqual(calls,[{companionCharacter:'isaac'}]);
+ const ids=['blob','isaac','notchmimic','obelisk','companioncube','nurgling','hollowknight'];
+ calls.length=0;
+ tiles.forEach(t=>t.props.onClick());
+ assert.deepEqual(calls,ids.map(companionCharacter=>({companionCharacter})));
+ ids.forEach(companionCharacter=>{
+  const picked=picker({companionCharacter});
+  const radios=children(picked.type(picked.props)).filter(e=>e.props?.role==='radio');
+  assert.deepEqual(radios.map(e=>e.props['aria-checked']),ids.map(id=>id===companionCharacter));
+ });
  const chosen=picker({companionCharacter:'isaac'});
  assert.equal(chosen.props.value,'isaac');
 });

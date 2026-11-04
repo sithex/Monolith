@@ -23,8 +23,8 @@ Item {
     id: face
     // Character id from the island's settings; unknown ids fall back to the blob.
     property string character: "blob"
-    readonly property var characters: ({ blob: "characters/Blob.qml", isaac: "characters/Isaac.qml" })
-    readonly property string shownCharacter: characters[character] ? character : "blob"
+    readonly property var characters: ({ blob: "characters/Blob.qml", isaac: "characters/Isaac.qml", notchmimic: "characters/NotchMimic.qml", obelisk: "characters/Obelisk.qml", companioncube: "characters/CompanionCube.qml", nurgling: "characters/Nurgling.qml", hollowknight: "characters/HollowKnight.qml" })
+    readonly property string shownCharacter: Object.prototype.hasOwnProperty.call(characters, character) ? character : "blob"
     readonly property Item art: artLoader.item
     // The square the current character wants in the notch.
     readonly property real preferredSize: art && art.preferredSize > 0 ? art.preferredSize : 16

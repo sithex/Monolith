@@ -251,6 +251,24 @@ mod tests {
             Settings::from_file_value(&saved).companion_character,
             CompanionCharacter::Isaac
         );
+        for id in [
+            "notchmimic",
+            "obelisk",
+            "companioncube",
+            "nurgling",
+            "hollowknight",
+        ] {
+            svc.patch(&patch(json!({"companionCharacter": id})))
+                .unwrap();
+            let saved: serde_json::Value =
+                serde_json::from_slice(&fs::read(dir.join("settings.json")).unwrap()).unwrap();
+            assert_eq!(saved["companionCharacter"], id);
+            let restored = Settings::from_file_value(&saved);
+            assert_eq!(
+                serde_json::to_value(restored.companion_character).unwrap(),
+                id
+            );
+        }
         for bad in [json!(null), json!("Isaac"), json!("../x"), json!(1)] {
             assert!(
                 serde_json::from_value::<SettingsPatch>(json!({"companionCharacter":bad})).is_err()

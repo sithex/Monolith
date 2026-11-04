@@ -50,6 +50,11 @@ pub enum CompanionCharacter {
     Blob,
     /// A crying boy in a basement, after The Binding of Isaac.
     Isaac,
+    Notchmimic,
+    Obelisk,
+    Companioncube,
+    Nurgling,
+    Hollowknight,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]

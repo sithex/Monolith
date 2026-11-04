@@ -110,20 +110,21 @@ TestCase {
         tryVerify(function() { return findChild(face, "isaacSmile").opacity > .9; }, 1000);
         face.happy = false;
         tryVerify(function() { return stream.opacity > .9; }, 1000);
-        // Slow drip: a bead runs down a stream and is gone, nothing left running.
-        const drip = findChild(face, "isaacDrip");
-        verify(!drip.visible);
-        face.art.dripEye = 1;
-        face.art.dripAt = 0;
-        findChild(face, "isaacDrip");
-        let moves = 0;
-        const counted = function() { moves++; };
-        tryVerify(function() { return drip.visible; }, 7000);
-        drip.yChanged.connect(counted);
-        tryVerify(function() { return !drip.visible; }, 2000);
-        drip.yChanged.disconnect(counted);
-        // Stepped, not per frame: at most a dozen redraws for the whole drip.
-        verify(moves <= 12, "drip moved " + moves + " times");
+        // Choppy flow: the bands step at 8 ticks a second, no faster, and stop on hover.
+        const art = face.art;
+        let ticks = 0;
+        const tick = function() { ticks++; };
+        art.flowFrameChanged.connect(tick);
+        wait(1000);
+        art.flowFrameChanged.disconnect(tick);
+        verify(ticks >= 6 && ticks <= 9, "flow ticked " + ticks + " times in a second");
+        verify(findChild(face, "isaacFlow"));
+        verify(!findChild(face, "isaacDrip").visible);
+        face.happy = true;
+        const frame = art.flowFrame;
+        wait(400);
+        compare(art.flowFrame, frame);
+        face.happy = false;
         // Idle shot: a tear flies, splashes and is gone, nothing left running.
         const shot = findChild(face, "isaacShot");
         verify(!shot.visible);

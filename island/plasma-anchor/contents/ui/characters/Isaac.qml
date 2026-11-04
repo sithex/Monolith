@@ -88,6 +88,27 @@ Item {
                 antialiasing: true
                 opacity: 1 - art.cheer * .9
                 visible: opacity > .02
+                // Flow: two light bands slide down the stream, a step per tick.
+                Item {
+                    anchors.fill: parent
+                    anchors.margins: parent.border.width
+                    clip: true
+                    Repeater {
+                        model: 2
+                        Rectangle {
+                            required property int index
+                            objectName: "isaacFlow"
+                            readonly property real period: parent.height
+                            width: parent.width * .55
+                            height: Math.max(.6, art.size * .05)
+                            radius: height / 2
+                            x: (parent.width - width) / 2
+                            y: ((art.flowFrame / art.flowSteps + index / 2) % 1) * period - height / 2
+                            color: "#e4f6f7"
+                            opacity: .85
+                        }
+                    }
+                }
             }
         }
 
@@ -159,6 +180,21 @@ Item {
         }
     }
 
+    // Choppy pixel-style flow: the streams' bands step down `flowSteps` frames per cycle
+    // at 8 ticks a second, both streams on the same tick (one panel redraw per tick).
+    // Stops while cheered up, dozing or with animations off.
+    readonly property int flowSteps: 8
+    property int flowFrame: 0
+    Timer {
+        id: flowTick
+        interval: 125
+        repeat: true
+        running: art.flowing && art.face && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
+        onTriggered: art.flowFrame = (art.flowFrame + 1) % art.flowSteps
+    }
+    // Flow and drip are alternatives; flow is on.
+    readonly property bool flowing: true
+
     // A drip every few seconds: a bead runs down one stream and drops off his cheek.
     // About 0.9 s of animation, then nothing until the next; none while cheered up,
     // dozing or with animations turned off.
@@ -170,7 +206,7 @@ Item {
     Timer {
         id: dripper
         interval: 3500
-        running: art.face && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
+        running: !art.flowing && art.face && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
         repeat: true
         onTriggered: {
             if (!dripAnim.running) {

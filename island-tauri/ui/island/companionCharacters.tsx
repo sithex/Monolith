@@ -13,12 +13,15 @@ const blob = () => <svg viewBox="0 0 16 16" width="28" height="28" aria-hidden="
 </svg>;
 
 const isaac = () => <svg viewBox="0 0 18 18" width="28" height="28" aria-hidden="true">
-  <ellipse cx="9" cy="8.8" rx="8.1" ry="7.9" fill="#f2d0c0" stroke="#5a3a33" strokeWidth=".8" />
-  <ellipse cx="5.9" cy="9" rx="2.07" ry="2.34" fill="#1b1113" />
-  <ellipse cx="12.1" cy="9" rx="2.07" ry="2.34" fill="#1b1113" />
-  <circle cx="5.3" cy="8.1" r=".8" fill="#fff" /><circle cx="11.5" cy="8.1" r=".8" fill="#fff" />
-  <path d="M7.4 14.4 Q9 13 10.6 14.4" fill="none" stroke="#5a3a33" strokeWidth="1" strokeLinecap="round" />
-  <ellipse cx="12.1" cy="12.6" rx=".95" ry="1.3" fill="#9fd4ff" stroke="#4a8fd0" strokeWidth=".4" />
+  <ellipse cx="9" cy="8.8" rx="8.3" ry="7.6" fill="#cf9c9b" stroke="#140606" strokeWidth="1.4" />
+  <ellipse cx="9" cy="8.6" rx="7" ry="6.5" fill="#e3c6c5" />
+  <rect x="3.6" y="11" width="2.7" height="4.5" rx="1.35" fill="#9cc8cc" stroke="#68989c" strokeWidth=".35" />
+  <rect x="11.7" y="11" width="2.7" height="4.5" rx="1.35" fill="#9cc8cc" stroke="#68989c" strokeWidth=".35" />
+  <rect x="2.25" y="6.9" width="4.5" height="4.9" rx="1.9" fill="#140606" />
+  <rect x="11.25" y="6.9" width="4.5" height="4.9" rx="1.9" fill="#140606" />
+  <rect x="3.2" y="7.8" width="1.5" height="1.5" rx=".45" fill="#fff" /><rect x="12.2" y="7.8" width="1.5" height="1.5" rx=".45" fill="#fff" />
+  <rect x="7" y="11.5" width="4" height="2.9" rx=".9" fill="#140606" />
+  <rect x="7.75" y="12.9" width="2.5" height=".8" rx=".4" fill="#fff" />
 </svg>;
 
 export const COMPANION_CHARACTERS: readonly CompanionChoice[] = [

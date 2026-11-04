@@ -101,12 +101,22 @@ TestCase {
         notch.pointerX = centre.x + 2500; notch.pointerY = centre.y; notch.pointerAt = Date.now();
         tryVerify(function() { return eye.x > restX + 1; }, 1000);
         verify(eye.x + eye.width <= face.width);
-        // A tear falls and is gone again: a one-off, nothing left running.
-        const tear = findChild(face, "isaacTear");
-        verify(!tear.visible);
-        face.art.cry(1);
-        verify(tear.visible);
-        tryVerify(function() { return !tear.visible; }, 2000);
+        // Always crying; the tears dry while the pointer is on the notch.
+        const stream = findChild(face, "isaacStream");
+        verify(stream.visible);
+        compare(findChild(face, "isaacMouth").opacity, 1);
+        face.happy = true;
+        tryVerify(function() { return stream.opacity < .2; }, 1000);
+        tryVerify(function() { return findChild(face, "isaacSmile").opacity > .9; }, 1000);
+        face.happy = false;
+        tryVerify(function() { return stream.opacity > .9; }, 1000);
+        // Idle shot: a tear flies, splashes and is gone, nothing left running.
+        const shot = findChild(face, "isaacShot");
+        verify(!shot.visible);
+        face.art.shoot();
+        verify(shot.visible);
+        tryVerify(function() { return findChild(face, "isaacSplash").visible; }, 1000);
+        tryVerify(function() { return !shot.visible && !findChild(face, "isaacSplash").visible; }, 2000);
         // The mute mark moves past the bigger head and stays clear of the clock.
         const mic = findChild(notch, "notchMicMuted");
         notch.micMuted = true;

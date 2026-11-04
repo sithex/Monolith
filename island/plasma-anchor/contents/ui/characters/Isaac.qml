@@ -1,30 +1,37 @@
 import QtQuick
 import QtQuick.Shapes
 
-// Isaac, after The Binding of Isaac: a big pale head, two large dark eyes with a glint,
-// a small frown, and now and then a tear rolling down while the pointer rests.
-// Hovering the notch cheers him up for a moment. Drawn from `face`, the brain in
-// ../Companion.qml; his skin keeps its own colours whatever the notch's scheme.
+// Isaac, after The Binding of Isaac: a round, slightly wide head with a thick dark
+// outline, big black eyes set wide apart with a white glint, a small open wailing mouth
+// and tears always streaming down both cheeks. Hovering the notch cheers him up: the
+// tears dry and the mouth closes into a little smile.
+//
+// Idle habit: with the pointer resting, he now and then shoots a tear the way he looks
+// (his attack in the game); it arcs a little and splashes. A one-off of under half a
+// second; between shots nothing animates. Drawn from `face`, the brain in
+// ../Companion.qml; his colours are his own whatever the notch's scheme.
 Item {
     id: art
     property Item face
     readonly property real preferredSize: 18
-    // His eyes are large, so they travel a little less to stay inside his head.
-    readonly property real gazeScale: .8
+    // His eyes sit near the sides of his head, so they travel less.
+    readonly property real gazeScale: .6
     readonly property real size: face ? face.size : 0
-    readonly property color skin: "#f2d0c0"
-    readonly property color outline: "#5a3a33"
-    readonly property color eye: "#1b1113"
+    readonly property color skin: "#e3c6c5"
+    readonly property color rim: "#cf9c9b"
+    readonly property color outline: "#140606"
+    readonly property color tearColor: "#9cc8cc"
+    readonly property color tearEdge: "#68989c"
 
-    // -1 frown … 1 smile; changes only on hover, so the mouth re-tessellates rarely.
-    property real mood: face && face.happy ? 1 : -1
-    Behavior on mood { enabled: art.face && art.face.motion; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    // 1 while the pointer is on the notch: tears dry up, the mouth smiles.
+    property real cheer: face && face.happy ? 1 : 0
+    Behavior on cheer { enabled: art.face && art.face.motion; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
     Connections {
         target: art.face
         function onBlinked(resting) {
-            if (resting && !art.face.happy && !art.face.thinking && art.face.motion && Math.random() < .35)
-                art.cry(Math.random() < .5 ? 0 : 1);
+            if (resting && !art.face.happy && !art.face.thinking && !art.face.sleepy && art.face.motion && Math.random() < .3)
+                art.shoot();
         }
     }
 
@@ -35,40 +42,74 @@ Item {
         anchors.centerIn: parent
         transform: Translate { x: art.face.quarter(art.face.shownX * .25); y: art.face.quarter(art.face.shownY * .2) }
 
+        // Head: outline, then a darker rim of skin around the lighter face.
         Rectangle {
             objectName: "companionBody"
-            x: art.size * .05
-            y: art.size * .05
-            width: art.size * .9
-            height: art.size * .88
-            radius: width / 2
-            color: art.skin
-            border.color: art.outline
-            border.width: Math.max(.75, art.size * .045)
+            x: 0
+            y: art.size * .03
+            width: art.size
+            height: art.size * .92
+            radius: height / 2
+            color: art.outline
             antialiasing: true
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: Math.max(1, art.size * .08)
+                radius: height / 2
+                color: art.rim
+                antialiasing: true
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: Math.max(.5, art.size * .035)
+                    anchors.topMargin: Math.max(.5, art.size * .05)
+                    radius: height / 2
+                    color: art.skin
+                    antialiasing: true
+                }
+            }
+        }
+
+        // Tears streaming from under each eye down his cheeks, always (dry on hover).
+        Repeater {
+            model: [.25, .75]
+            Rectangle {
+                required property real modelData
+                objectName: "isaacStream"
+                width: art.size * .15
+                height: art.size * .25
+                radius: width / 2
+                x: art.size * modelData - width / 2 + (modelData < .5 ? art.size * .01 : -art.size * .01)
+                y: art.size * .6
+                color: art.tearColor
+                border.color: art.tearEdge
+                border.width: Math.max(.4, art.size * .02)
+                antialiasing: true
+                opacity: 1 - art.cheer * .9
+                visible: opacity > .02
+            }
         }
 
         Repeater {
-            model: [.33, .67]
+            model: [.25, .75]
             Rectangle {
                 required property real modelData
                 required property int index
                 objectName: "companionEye" + index
-                readonly property real eyeH: art.size * .26 * art.face.lid * art.face.blink
-                width: art.size * .23
+                readonly property real eyeH: art.size * .27 * art.face.lid * art.face.blink
+                width: art.size * .25
                 height: Math.max(1, eyeH)
-                radius: Math.min(width, height) / 2
+                radius: Math.min(width, height) * .42
                 x: art.size * modelData - width / 2 + art.face.shownX
-                y: art.size * .5 - height / 2 + art.face.shownY + (1 - art.face.lid) * art.size * .08
-                color: art.eye
+                y: art.size * .52 - height / 2 + art.face.shownY + (1 - art.face.lid) * art.size * .07
+                color: art.outline
                 antialiasing: true
-                // The glint that makes them look wet; gone when the eyes close.
+                // The glint, up and to the left as in the game; gone when the eyes close.
                 Rectangle {
-                    width: art.size * .09
+                    width: art.size * .085
                     height: width
-                    radius: width / 2
+                    radius: width * .3
                     x: parent.width * .2
-                    y: parent.height * .16
+                    y: parent.height * .18
                     color: "white"
                     visible: parent.height > art.size * .12
                     antialiasing: true
@@ -76,44 +117,102 @@ Item {
             }
         }
 
-        Shape {
+        // The wailing mouth: small, open, a row of teeth along the bottom.
+        Rectangle {
             objectName: "isaacMouth"
+            width: art.size * .22
+            height: art.size * .16
+            radius: art.size * .05
+            x: art.size * .5 - width / 2
+            y: art.size * .64
+            color: art.outline
+            antialiasing: true
+            opacity: 1 - art.cheer
+            visible: opacity > .02
+            Rectangle {
+                width: parent.width * .62
+                height: Math.max(.6, parent.height * .28)
+                x: (parent.width - width) / 2
+                y: parent.height * .5
+                color: "white"
+                radius: height / 2
+            }
+        }
+        // Cheered up: a little smile instead.
+        Shape {
+            objectName: "isaacSmile"
             anchors.fill: parent
+            opacity: art.cheer
+            visible: opacity > .02
             preferredRendererType: Shape.CurveRenderer
             ShapePath {
                 strokeColor: art.outline
-                strokeWidth: Math.max(.9, art.size * .06)
+                strokeWidth: Math.max(.9, art.size * .065)
                 fillColor: "transparent"
                 capStyle: ShapePath.RoundCap
-                startX: art.size * .41
-                startY: art.size * .8
-                PathQuad { x: art.size * .59; y: art.size * .8; controlX: art.size * .5; controlY: art.size * (.8 + .08 * art.mood) }
+                startX: art.size * .4
+                startY: art.size * .68
+                PathQuad { x: art.size * .6; y: art.size * .68; controlX: art.size * .5; controlY: art.size * .79 }
             }
         }
+    }
 
-        // A tear from under one eye: a short one-off animation, nothing between them.
+    // The tear shot: from the eye on the side he's looking, a short arc, then a splash.
+    // Right goes into the gap before the clock, left to the notch's rounded edge.
+    property real shot: 0           // 0 … 1 along the flight
+    property real splash: 0         // 0 … 1 of the splash after it lands
+    property int shotDir: 1
+    function shoot() {
+        if (shotAnim.running) return;
+        shotDir = face.shownX < 0 ? -1 : 1;
+        shotAnim.start();
+    }
+    readonly property real shotReach: shotDir > 0 ? size * .8 : size * .4
+    readonly property real shotStartX: size * (shotDir > 0 ? .75 : .25)
+    Rectangle {
+        objectName: "isaacShot"
+        width: art.size * .22
+        height: width
+        radius: width / 2
+        color: art.tearColor
+        border.color: art.tearEdge
+        border.width: Math.max(.5, art.size * .03)
+        antialiasing: true
+        visible: shotAnim.running && art.splash === 0
+        x: art.shotStartX + art.shotDir * art.shot * art.shotReach - width / 2
+        // Up a touch, then falling: a little gravity, like the game's tears.
+        y: art.size * .5 - height / 2 + art.size * (.6 * art.shot * art.shot - .3 * art.shot)
         Rectangle {
-            objectName: "isaacTear"
-            width: art.size * .11
-            height: art.size * .15
+            width: parent.width * .28
+            height: width
             radius: width / 2
-            color: "#9fd4ff"
-            border.color: "#4a8fd0"
-            border.width: Math.max(.5, art.size * .025)
-            antialiasing: true
-            visible: tearFall.running
-            x: art.size * (art.tearEye === 0 ? .33 : .67) - width / 2 + art.face.shownX * .5
-            y: art.size * .6 + art.drop * art.size * .32
-            opacity: 1 - art.drop * art.drop
+            x: parent.width * .22
+            y: parent.height * .2
+            color: "white"
+            opacity: .7
         }
     }
-
-    property int tearEye: 0
-    property real drop: 0
-    function cry(eye) {
-        if (tearFall.running) return;
-        tearEye = eye;
-        tearFall.start();
+    Rectangle {
+        objectName: "isaacSplash"
+        readonly property real landX: art.shotStartX + art.shotDir * art.shotReach
+        width: art.size * (.2 + .3 * art.splash)
+        height: width * .6
+        radius: height / 2
+        x: landX - width / 2
+        y: art.size * .8 - height / 2
+        color: "transparent"
+        border.color: art.tearColor
+        border.width: Math.max(.6, art.size * .05)
+        antialiasing: true
+        opacity: 1 - art.splash
+        visible: shotAnim.running && art.splash > 0
     }
-    NumberAnimation { id: tearFall; target: art; property: "drop"; from: 0; to: 1; duration: 900; easing.type: Easing.InQuad }
+    SequentialAnimation {
+        id: shotAnim
+        PropertyAction { target: art; property: "splash"; value: 0 }
+        NumberAnimation { target: art; property: "shot"; from: 0; to: 1; duration: 320; easing.type: Easing.Linear }
+        NumberAnimation { target: art; property: "splash"; from: 0.01; to: 1; duration: 180; easing.type: Easing.OutQuad }
+        PropertyAction { target: art; property: "splash"; value: 0 }
+        PropertyAction { target: art; property: "shot"; value: 0 }
+    }
 }

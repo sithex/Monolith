@@ -29,5 +29,8 @@ export function createTerminalFlow(writer: { write(data: string, parsed: () => v
     else if (event.type === 'data' && (seq === undefined || after(event.seq, seq))) {
       seq = event.seq; write(event.data, event.seq);
     }
-  }, dispose() { disposed = true; pending = null; } };
+  },
+  /** A respawned run numbers its output from scratch: accept its next snapshot. */
+  reset() { seq = undefined; pending = null; },
+  dispose() { disposed = true; pending = null; } };
 }

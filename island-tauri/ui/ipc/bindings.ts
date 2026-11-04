@@ -61,6 +61,11 @@ export const commands = {
 	 */
 	terminalAttach: (onEvent: Channel<TerminalEvent>) => typedError<TerminalSnapshot, IslandError>(__TAURI_INVOKE("terminal_attach", { onEvent })),
 	terminalInput: (data: string) => typedError<null, IslandError>(__TAURI_INVOKE("terminal_input", { data })),
+	/**
+	 *  Explicit user-initiated copy, independent of clipboard-history capture and
+	 *  WebKit's native Copy accelerator. GTK owns the clipboard on the main thread.
+	 */
+	terminalCopy: (text: string) => typedError<null, IslandError>(__TAURI_INVOKE("terminal_copy", { text })),
 	terminalResize: (cols: number, rows: number) => typedError<null, IslandError>(__TAURI_INVOKE("terminal_resize", { cols, rows })),
 	terminalRestart: () => typedError<TerminalSnapshot, IslandError>(__TAURI_INVOKE("terminal_restart")),
 	/**

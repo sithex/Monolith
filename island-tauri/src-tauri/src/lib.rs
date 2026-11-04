@@ -49,6 +49,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::settings::notch_scheme_set,
             commands::terminal::terminal_attach,
             commands::terminal::terminal_input,
+            commands::terminal::terminal_copy,
             commands::terminal::terminal_resize,
             commands::terminal::terminal_restart,
             commands::terminal::terminal_ack,

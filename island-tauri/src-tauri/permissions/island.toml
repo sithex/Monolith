@@ -19,6 +19,7 @@ permissions = [
   "allow-notch-scheme-set",
   "allow-terminal-attach",
   "allow-terminal-input",
+  "allow-terminal-copy",
   "allow-terminal-resize",
   "allow-terminal-restart",
   "allow-terminal-ack",

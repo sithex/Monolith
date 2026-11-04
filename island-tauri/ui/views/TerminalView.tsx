@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm/lib/xterm.js';
 import { FitAddon } from '@xterm/addon-fit';
-import { newTerminalChannel, terminalAttach, terminalInput, terminalResize, terminalAck, type Palette } from '../ipc/client';
+import { newTerminalChannel, terminalAttach, terminalInput, terminalCopy, terminalResize, terminalAck, terminalRestart, type Palette, type TerminalEvent } from '../ipc/client';
 import { runtimeStore } from '../stores';
 import { createTerminalFlow } from './terminal-flow';
 import { keepIslandColours } from './terminal-colours';
+import { terminalShortcut, keepTerminalClipboard, trackAppSelection } from './terminal-shortcuts';
+import { createAutoRestart } from './terminal-respawn';
 import '@xterm/xterm/css/xterm.css';
 export function TerminalView({ active, palette, fontSize, fail }: { active: boolean; palette: Palette; fontSize: number; fail(error: unknown): void }) {
   const host = useRef<HTMLDivElement>(null), term = useRef<Terminal | null>(null);
@@ -16,16 +18,35 @@ export function TerminalView({ active, palette, fontSize, fail }: { active: bool
     const terminal = new Terminal({ cursorBlink: true, fontFamily: '"DejaVu Sans Mono", monospace', fontSize,
       scrollback: 5000, theme: theme(palette), allowProposedApi: false, allowTransparency: true });
     const fitter = new FitAddon(); terminal.loadAddon(fitter); terminal.open(host.current); term.current = terminal;
+    const appSelection = trackAppSelection(terminal, host.current);
+    terminal.attachCustomKeyEventHandler(event => terminalShortcut(event, data => terminal.input(data, true),
+      { selection: () => terminal.getSelection(), copy: terminalCopy, fail, appSelection: appSelection.active, appCopied: appSelection.clear }));
     const osc = keepIslandColours(terminal);
+    osc.push(keepTerminalClipboard(terminal, terminalCopy, fail), appSelection);
     let disposed = false, running = false, frame: number | null = null, retry: ReturnType<typeof setTimeout> | null = null, deferred = 0;
     const flow = createTerminalFlow(terminal, terminalAck, fail);
-    const channel = newTerminalChannel();
-    channel.onmessage = event => {
+    // A Tauri channel numbers its messages per Rust handle, so re-attaching the SAME channel
+    // made the new run's events wait forever behind the old index. Each attach gets a fresh one.
+    let channel = newTerminalChannel();
+    const respawn = createAutoRestart({ fail, notice: text => terminal.write(`\r\n\x1b[2m${text}\x1b[0m\r\n`),
+      restart: async () => {
+        await terminalRestart();
+        if (disposed) return;
+        channel.onmessage = () => {};
+        channel = newTerminalChannel(); channel.onmessage = receive;
+        flow.reset();
+        const snapshot = await terminalAttach(channel);
+        if (disposed) return;
+        running = snapshot.running;
+        void terminalResize(terminal.cols, terminal.rows).catch(fail);
+      } });
+    function receive(event: TerminalEvent) {
       if (disposed) return;
       if (event.type === 'snapshot') running = event.running;
-      if (event.type === 'exit') { running = false; terminal.write(`\r\n[Hermes exited: ${event.code ?? 'unknown'}]\r\n`); }
+      if (event.type === 'exit') { running = false; terminal.write(`\r\n[Hermes exited: ${event.code ?? 'unknown'}]\r\n`); respawn.exited(); }
       flow.event(event);
-    };
+    }
+    channel.onmessage = receive;
     const input = terminal.onData(data => { if (running) void terminalInput(data).catch(fail); });
     resize.current = () => {
       if (!visible.current || disposed || frame !== null) return;
@@ -55,10 +76,11 @@ export function TerminalView({ active, palette, fontSize, fail }: { active: bool
     if (runtimeStore.getSnapshot().testHooks) {
       Object.defineProperty(window, '__islandTerminalTest', { configurable: true, value: {
         identity: terminal,
+        respawn: () => respawn.trace(),
         text: () => Array.from({ length: terminal.buffer.active.length }, (_, i) => terminal.buffer.active.getLine(i)?.translateToString(true) ?? '').join('\n'),
       } });
     }
-    return () => { disposed = true; osc.forEach(handler => handler.dispose()); flow.dispose(); observer.disconnect(); input.dispose(); terminal.dispose(); term.current = null; if (frame !== null) cancelAnimationFrame(frame); if (retry !== null) clearTimeout(retry); };
+    return () => { disposed = true; respawn.dispose(); osc.forEach(handler => handler.dispose()); flow.dispose(); observer.disconnect(); input.dispose(); terminal.dispose(); term.current = null; if (frame !== null) cancelAnimationFrame(frame); if (retry !== null) clearTimeout(retry); };
     // The first palette/font are supplied by bootstrap; subsequent changes update options below.
   }, []);
   useEffect(() => { if (term.current) { term.current.options.fontSize = fontSize; term.current.options.theme = theme(palette); resize.current(); } }, [palette, fontSize]);

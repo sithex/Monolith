@@ -20,6 +20,7 @@ const COMMANDS: &[&str] = &[
     "notch_scheme_set",
     "terminal_attach",
     "terminal_input",
+    "terminal_copy",
     "terminal_resize",
     "terminal_restart",
     "terminal_ack",

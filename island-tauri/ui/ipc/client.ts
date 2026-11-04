@@ -80,6 +80,7 @@ export const notificationsClear = () => unwrap(commands.notificationsClear());
 export const clipboardList = (query: string | null = null, limit = 100): Promise<ClipSummary[]> => unwrap(commands.clipboardList(query, limit));
 export const clipboardGet = (id: string): Promise<ClipContent> => unwrap(commands.clipboardGet(id));
 export const clipboardCopy = (id: string) => unwrap(commands.clipboardCopy(id));
+export const terminalCopy = (text: string) => unwrap(commands.terminalCopy(text));
 export const clipboardPin = (id: string, pinned: boolean) => unwrap(commands.clipboardPin(id, pinned));
 export const clipboardDelete = (id: string) => unwrap(commands.clipboardDelete(id));
 export const clipboardClear = () => unwrap(commands.clipboardClear());

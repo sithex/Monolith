@@ -42,6 +42,38 @@ pub async fn terminal_resize(
     blocking(move || terminal.resize(cols, rows)).await
 }
 
+/// Explicit user-initiated copy, independent of clipboard-history capture and
+/// WebKit's native Copy accelerator. GTK owns the clipboard on the main thread.
+#[tauri::command]
+#[specta::specta]
+pub async fn terminal_copy(text: String, window: tauri::WebviewWindow) -> Result<(), IslandError> {
+    if text.is_empty() {
+        return Ok(());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        window
+            .run_on_main_thread(move || {
+                let result = gdk::Display::default()
+                    .ok_or_else(|| IslandError::unavailable("clipboard display unavailable"))
+                    .map(|display| {
+                        gtk::Clipboard::for_display(&display, &gdk::SELECTION_CLIPBOARD)
+                            .set_text(&text);
+                    });
+                let _ = tx.send(result);
+            })
+            .map_err(|_| IslandError::unavailable("clipboard main thread unavailable"))?;
+        rx.await
+            .map_err(|_| IslandError::unavailable("clipboard write interrupted"))?
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = window;
+        Err(IslandError::unsupported("native terminal copy unavailable"))
+    }
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn terminal_restart(

@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Terminal } from "@xterm/xterm/lib/xterm.js";
 import { FitAddon } from "@xterm/addon-fit";
+import { terminalShortcut, keepTerminalClipboard, trackAppSelection } from "../views/terminal-shortcuts";
+import { terminalCopy } from "../ipc/client";
+import { createAutoRestart } from "../views/terminal-respawn";
 import { dispatch as dispatchIntent, subscribeCue, useIslandState } from "../ipc/island-state";
 import { toLegacyMode } from "../ipc/legacy-mode";
 import paletteTools from "./palette.cjs";
@@ -170,6 +173,11 @@ function EmbeddedTerminal({ active, onSession, onError, palette, fontSize, regis
     const fitter = new FitAddon();
     terminal.loadAddon(fitter);
     terminal.open(host.current);
+    const appSelection = trackAppSelection(terminal, host.current);
+    const clipboardOsc = keepTerminalClipboard(terminal, terminalCopy, onError);
+    terminal.attachCustomKeyEventHandler(event => terminalShortcut(event, data => terminal.input(data, true),
+      { selection: () => terminal.getSelection(), copy: terminalCopy, fail: onError,
+        appSelection: appSelection.active, appCopied: appSelection.clear }));
     fit.current = fitter;
     term.current = terminal;
     let ready = false,
@@ -183,10 +191,16 @@ function EmbeddedTerminal({ active, onSession, onError, palette, fontSize, regis
         seq = packet.seq;
       }
     });
+    const respawn = createAutoRestart({
+      restart: () => restartRef.current(),
+      notice: (text) => terminal.write(`\x1b[2m${text}\x1b[0m\r\n`),
+      fail: onError,
+    });
     const offExit = api.onExit(({ exitCode }) => {
       runningRef.current = false;
-      terminal.write(`\r\n[Hermes exited: ${exitCode}. Use Restart for a fresh session.]\r\n`);
+      terminal.write(`\r\n[Hermes exited: ${exitCode}]\r\n`);
       onSession({ running: false });
+      respawn.exited();
     });
     const input = terminal.onData((data) => {
       if (!runningRef.current) return; // ignore keystrokes after exit
@@ -237,6 +251,9 @@ function EmbeddedTerminal({ active, onSession, onError, palette, fontSize, regis
     observer.observe(host.current);
     return () => {
       disposed = true;
+      respawn.dispose();
+      appSelection.dispose();
+      clipboardOsc.dispose();
       observer.disconnect();
       offData();
       offExit();

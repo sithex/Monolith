@@ -411,6 +411,7 @@ mod tests {
             "companioncube",
             "nurgling",
             "hollowknight",
+            "frog",
         ] {
             assert!(companion.contains(&format!("\"{id}\"")));
         }

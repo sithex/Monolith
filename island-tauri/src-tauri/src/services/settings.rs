@@ -280,7 +280,13 @@ mod tests {
             Settings::from_file_value(&saved).companion_character,
             CompanionCharacter::Isaac
         );
-        for id in ["notchmimic", "companioncube", "nurgling", "hollowknight"] {
+        for id in [
+            "notchmimic",
+            "companioncube",
+            "nurgling",
+            "hollowknight",
+            "frog",
+        ] {
             svc.patch(&patch(json!({"companionCharacter": id})))
                 .unwrap();
             let saved: serde_json::Value =

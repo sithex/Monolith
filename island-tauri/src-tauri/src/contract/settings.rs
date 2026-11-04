@@ -54,6 +54,8 @@ pub enum CompanionCharacter {
     Companioncube,
     Nurgling,
     Hollowknight,
+    /// A little frog that snaps flies out of the air.
+    Frog,
 }
 
 // Deserialize the removed ID at the boundary only. A serde alias on Blob makes
@@ -69,6 +71,7 @@ impl<'de> Deserialize<'de> for CompanionCharacter {
             "companioncube" => Ok(Self::Companioncube),
             "nurgling" => Ok(Self::Nurgling),
             "hollowknight" => Ok(Self::Hollowknight),
+            "frog" => Ok(Self::Frog),
             _ => Err(serde::de::Error::unknown_variant(
                 &id,
                 &[
@@ -78,6 +81,7 @@ impl<'de> Deserialize<'de> for CompanionCharacter {
                     "companioncube",
                     "nurgling",
                     "hollowknight",
+                    "frog",
                 ],
             )),
         }

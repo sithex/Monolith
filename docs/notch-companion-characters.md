@@ -34,6 +34,34 @@ that already happened once.
 Unknown names fall back to the Blob on both sides, so old or hand-edited settings never
 break. Keep it that way.
 
+### Character art: pixel sprites are the default for game characters
+
+Small vector `Shape`s at 20 px antialias into grey mush at 1×: the first Cube, Nurgling
+and Hollow Knight were drawn that way, read as blobs live, and the Cube's tilt-rotation
+smeared it further. Characters from pixel games (and anything that must be recognisable
+at 16–20 px) are drawn as **crisp pixel sprites** instead:
+
+- Base the character on `characters/HabitCharacter.qml` and draw with
+  `characters/PixelSprite.qml`: text rows plus a colour map, one unantialiased
+  `Rectangle` per horizontal run. Every pixel lands on a screen pixel at 1×.
+- Design the sprite first as text rows in Python (Pillow, nearest-neighbour preview at
+  1× and 8×), iterate until it reads, then paste the rows into QML. Get proportions and
+  palette from the real reference sprite.
+- Layer it: static body sprite, then small moving sprites on top (pupils, a lid, a
+  tongue). Move them only by whole-pixel `x`/`y`; swap a sprite's `rows` only for rare
+  states (hover, doze, habit frame). Never rotate or scale pixel art.
+- Make it follow the pointer, always. Set `gazeScale: 1`, then quantise with
+  `gazePx(gazeX, k, lo, hi)` (whole sprite pixels, clamped) and move pupils by that. A
+  character with no eyes turns instead: the Cube slides its front face up to two pixels
+  toward the pointer and shows the side/top face it turns away from.
+- Habits are `habitFrames` × `habitInterval` stepped bursts drawn from `habitFrame`. Aim
+  directional habits at the pointer: set `habitDirection` in `onHabitStarted` and mirror
+  the effect sprite with `Scale { xScale: -1 }` around the slot centre.
+- Give every state a visible look: pointer tracking (left/right/up/down all differ),
+  blink, hover reaction (`objectName: "hoverMark"`), doze, and the habit.
+- Picker tiles: render the frames with `island/qmlrenders/render_pixel_companions.py`
+  and trace them with `island/qmlrenders/pixel_previews.py`, so the tile is the real art.
+
 ### What the brain gives a character (read through `face`)
 
 - `face.size`: side of the square in logical px.
@@ -60,25 +88,29 @@ while the mouse moved. The same look now costs about 1%.
 1. **Change nothing unless a pixel would change.** Snap moving values to the pixel grid
    (quarter px for the gaze, whole *device* px for pixel-art details) and return early
    when the snapped value is unchanged. An invisible change still triggers a redraw.
-2. **One animation layer.** Don't stack a `Behavior` on the raw value and another on
+2. **Compare against the target, not the animated value.** `Companion.retarget()` keeps
+   `targetX`/`targetY`. Comparing a new target with a `Behavior`-animated `shownX`
+   while a glide is running skips reversals (sleep→wake, glance→back) and leaves the
+   glide finishing at the stale target: eyes stuck looking down.
+3. **One animation layer.** Don't stack a `Behavior` on the raw value and another on
    the displayed value; small steps land in a single frame, and only real jumps (≥0.75 px:
    a flick, a glance) get a short glide (140 ms).
-3. **Bursts, not loops.** Habits are one-off animations of under a second, triggered by
+4. **Bursts, not loops.** Habits are one-off animations of under a second, triggered by
    `blinked(resting)` or a timer (tear shot ~0.5 s). Between bursts nothing runs.
-4. **Unavoidable constant animation** (Isaac's tear flow) must be:
+5. **Unavoidable constant animation** (Isaac's tear flow) must be:
    - stepped: about 8 ticks/s, and drawn in whole device pixels so ticks that wouldn't
      move a pixel draw nothing;
    - shared: one timer drives both sides, so it's one redraw per tick;
    - gated: `running: face.attended && face.visible && face.motion && !face.happy &&
      !face.sleepy`.
-5. **Only the attended monitor moves.** The user runs a notch on each of three monitors.
+6. **Only the attended monitor moves.** The user runs a notch on each of three monitors.
    The brain already freezes everything on monitors the pointer isn't on; any timer or
    animation a character adds must also check `face.attended`. Ungated, every notch
    redraws its own panel and the cost triples.
-6. **Don't bind `Shape` paths to moving values.** Shapes re-tessellate on every change.
+7. **Don't bind `Shape` paths to moving values.** Shapes re-tessellate on every change.
    Use plain `Rectangle`s for moving parts; keep Shapes static, or bound only to things
    that change rarely (the hover smile), and `visible: false` when hidden.
-7. **Nothing animates while hidden** (`visible`), on hover where it doesn't make sense,
+8. **Nothing animates while hidden** (`visible`), on hover where it doesn't make sense,
    or with animations off (`face.motion`).
 
 ## Look and fidelity rules
@@ -125,7 +157,16 @@ while the mouse moved. The same look now costs about 1%.
    running); constant animations tick at the intended rate and stop when hovered,
    unattended or dozing; redraw counts stay bounded (connect to `...Changed` signals and
    count).
-2. **Offscreen renders:** at **1×** (the real size) zoomed with nearest-neighbour, plus
+   For pixel companions `island/qmltests/tst_companion_revision.qml` is the pattern:
+   drive real pointer positions through the brain and compare a *picture signature*
+   (every visible run's rect and colour) — left/right/down must differ from centre,
+   sub-pixel jitter and other-monitor moves must not change it, every run stays
+   whole-pixel, unantialiased and inside the 20×20 slot in every gaze × habit × hover
+   state, and a real burst changes the picture then settles back exactly. Testing only
+   that a brain offset is clamped does not prove the art follows the mouse.
+2. **Offscreen renders:** `python island/qmlrenders/render_pixel_companions.py --output
+   <dir>` writes every look/hover/sleep/habit frame and 1×/8× contact sheets. Look at
+   the sheet critically before claiming anything. at **1×** (the real size) zoomed with nearest-neighbour, plus
    4× for detail. Grab several frames in a row and diff them with Pillow
    (`ImageChops.difference(a, b).getbbox()`) to prove things move.
 3. **Live:** install, then screenshot the real desktop several times and diff the notch

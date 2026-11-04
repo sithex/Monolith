@@ -397,7 +397,9 @@ export type CompanionCharacter =
 /**  The round face (after Vorssaint's companion). */
 "blob" | 
 /**  A crying boy in a basement, after The Binding of Isaac. */
-"isaac" | "notchmimic" | "companioncube" | "nurgling" | "hollowknight";
+"isaac" | "notchmimic" | "companioncube" | "nurgling" | "hollowknight" | 
+/**  A little frog that snaps flies out of the air. */
+"frog";
 
 export type CueKind = "click";
 

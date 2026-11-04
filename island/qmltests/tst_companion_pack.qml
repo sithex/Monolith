@@ -6,7 +6,7 @@ TestCase {
     id: suite
 
     property int strayTicks: 0
-    readonly property var ids: ["notchmimic", "companioncube", "nurgling", "hollowknight"]
+    readonly property var ids: ["notchmimic", "companioncube", "nurgling", "hollowknight", "frog"]
 
     function test_pack_data() {
         return ids.map((id) => {
@@ -44,11 +44,12 @@ TestCase {
             compare(art.step, Math.round(art.step));
         };
         art.habitFrameChanged.connect(count);
-        tryCompare(art, "habitRunning", false, 1100);
+        tryCompare(art, "habitRunning", false, 1600);
         compare(art.habitFrame, 0);
         const elapsed = Date.now() - startedAt;
-        verify(elapsed >= 650 && elapsed < 1000, "burst elapsed " + elapsed);
-        verify(changes >= 5 && changes <= 6);
+        const burst = art.habitFrames * art.habitInterval;
+        verify(elapsed >= burst - 100 && elapsed < burst + 250, "burst elapsed " + elapsed);
+        verify(changes >= art.habitFrames - 1 && changes <= art.habitFrames);
         face.blinked(true);
         compare(art.habitRunning, false);
         const quietChanges = changes;

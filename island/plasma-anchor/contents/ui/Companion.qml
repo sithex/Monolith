@@ -23,7 +23,7 @@ Item {
     id: face
     // Character id from the island's settings; unknown ids fall back to the blob.
     property string character: "blob"
-    readonly property var characters: ({ blob: "characters/Blob.qml", isaac: "characters/Isaac.qml", notchmimic: "characters/NotchMimic.qml", companioncube: "characters/CompanionCube.qml", nurgling: "characters/Nurgling.qml", hollowknight: "characters/HollowKnight.qml" })
+    readonly property var characters: ({ blob: "characters/Blob.qml", isaac: "characters/Isaac.qml", notchmimic: "characters/NotchMimic.qml", companioncube: "characters/CompanionCube.qml", nurgling: "characters/Nurgling.qml", hollowknight: "characters/HollowKnight.qml", frog: "characters/Frog.qml" })
     readonly property string shownCharacter: Object.prototype.hasOwnProperty.call(characters, character) ? character : "blob"
     readonly property Item art: artLoader.item
     // The square the current character wants in the notch.
@@ -91,11 +91,18 @@ Item {
         const sx = thinking ? .08 : sleepy ? 0 : lookX + glance;
         const sy = thinking ? -.07 : sleepy ? .05 : lookY;
         const tx = quarter(sx * size * reach), ty = quarter(sy * size * reach);
-        if (tx === shownX && ty === shownY) return;
+        // Compare with where the eyes are headed, not where a glide has got to so far:
+        // a target reversed mid-glide would otherwise look unchanged, and the glide
+        // would finish at the stale target and stay there.
+        if (tx === targetX && ty === targetY) return;
         glide = Math.abs(tx - shownX) >= .75 || Math.abs(ty - shownY) >= .75;
+        targetX = tx;
+        targetY = ty;
         shownX = tx;
         shownY = ty;
     }
+    property real targetX: 0
+    property real targetY: 0
     onThinkingChanged: retarget()
     onSleepyChanged: retarget()
     onGlanceChanged: retarget()

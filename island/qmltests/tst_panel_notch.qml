@@ -80,9 +80,11 @@ TestCase {
         // A small step near the notch lands at once, without a glide.
         notch.pointerX = centre.x + 40; notch.pointerY = centre.y; notch.pointerAt = Date.now() + 3;
         tryVerify(function() { return face.shownX < 1.25; }, 1000);
+        wait(200); // let that long glide land first
         const before = face.shownX;
         notch.pointerX = centre.x + 46; notch.pointerAt = Date.now() + 4;
-        verify(!face.glide);
+        // Lands at once: no glide left in flight toward the target.
+        compare(face.shownX, face.targetX);
         verify(face.shownX - before <= .5);
         face.shownXChanged.disconnect(count); face.shownYChanged.disconnect(count);
     }

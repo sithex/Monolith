@@ -1,82 +1,97 @@
 import QtQuick
-import QtQuick.Shapes
 
-// Original miniature from the official Nurglings reference; see revision verification.
+// A Nurgling (Warhammer), as crisp 1× pixel art from the official miniature references:
+// one crooked yellowed horn, small beady eyes, a broad toothy grin, a bloated paunch with
+// a ripe pustule and a navel, stubby limbs. The beady eyes follow the pointer.
+//
+// Hover: sticks its tongue out with a gleeful squint. Idle habit: a fit of giggles while
+// one of Grandfather Nurgle's flies buzzes round its horn. Dozing: eyes shut, and the fly
+// settles on the horn.
 HabitCharacter {
     id: art
-    Shape {
-        width: 20; height: 20
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            fillColor: "#ded2a2"; strokeColor: "#756341"; strokeWidth: 0.7
-            PathSvg { path: "M9 5 Q6 3 8 0 L9 0 Q7 2 12 3 L12 5 Z" }
-        }
-    }
-    Shape {
-        width: 20; height: 20
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            fillColor: "#788345"; strokeColor: "#343c25"; strokeWidth: 0.8
-            PathSvg { path: "M5 15 L4 19 8 19 9 16 M12 16 L13 19 17 19 15 15 Z" }
-        }
-    }
-    Shape {
-        width: 20; height: 20
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            fillColor: "#899449"; strokeColor: "#343c25"; strokeWidth: 0.8
-            PathSvg { path: "M5 9 Q2 8 1 12 L1 15 3 14 4 12 6 12 Z" }
-        }
-    }
-    Shape {
-        width: 20; height: 20
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            fillColor: "#929d50"; strokeColor: "#343c25"; strokeWidth: 0.8
-            PathSvg { path: "M6 4 Q9 2 13 4 L15 7 14 9 Q18 12 16 16 Q15 19 9 18 Q4 18 4 14 Q3 11 6 9 Q3 6 6 4 Z" }
-        }
-    }
-    Shape {
-        width: 20; height: 20
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            fillColor: "#b3b96a"; strokeColor: "transparent"; strokeWidth: 0
-            PathSvg { path: "M7 11 Q12 10 15 13 Q17 17 11 17 Q6 18 5 14 Z" }
-        }
-    }
+    gazeScale: 1
+    habitFrames: 8
+
+    readonly property int eyeX: gazePx(gazeX, 0.5, -1, 1)
+    readonly property int eyeY: gazePx(gazeY, 0.6, -1, 1)
+    readonly property bool giggling: habitFrame > 0
+    // Shakes with laughter: a pixel side to side on alternate frames.
+    readonly property int bodyX: giggling && habitFrame < 8 ? (habitFrame % 2 ? -1 : 1) : 0
+    readonly property bool squint: happy || giggling
+
+    readonly property var colors: ({
+        "O": "#27301a", "G": "#8fa548", "g": "#6f8436", "B": "#b9c46c", "H": "#e6dcb0", "h": "#a8996a",
+        "K": "#3a1e1a", "T": "#f0e8c8", "S": "#a8475a", "s": "#d07a7a", "F": "#5f7230",
+        "E": "#1a1a10", "Y": "#e8e070", "P": "#e0708a", "U": "#e8d070", "u": "#c8a850"
+    })
+    readonly property var flyColors: ({ "f": "#7d8a4a", "w": "#c8d6e0" })
+
     Item {
-        objectName: "scratchArm"
-        y: art.happy ? -2 : -art.snap(art.step * art.pixel)
-    Shape {
-        width: 20; height: 20
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            fillColor: "#8b984b"; strokeColor: "#343c25"; strokeWidth: 0.8
-            PathSvg { path: "M14 10 Q17 8 18 10 L19 14 17 15 16 12 14 13 Z" }
+        objectName: "nurglingBody"
+        x: art.bodyX
+        width: 20
+        height: 20
+        PixelSprite {
+            x: 1
+            colors: art.colors
+            rows: [
+                "..........OHO.....",
+                "..........OHhO....",
+                ".........OHhO.....",
+                "........OHhO......",
+                "....OOOOHhOOO.....",
+                "...OGGGGHGGGGO....",
+                "..OGGGGGGGGGGGO...",
+                "..OGGGGGGGGGGGO...",
+                "..OGGGGGGGGGGGO...",
+                ".OGKGGGGGGGGGKGO..",
+                ".OGKKTKTKTKTKKGO..",
+                ".OGgKKKKKKKKKgGO..",
+                "OGO.OgKTKTKgGO.OGO",
+                "OgGOGGgKKKgGGGOGgO",
+                ".OOGBBBBBBBBBBGOO.",
+                "..OGBBBBBBBBUuBGO.",
+                "..OGBBBBgBBBuBBGO.",
+                "..OGgBBBBBBBBBgGO.",
+                "...OOgGOOOOOGgOO..",
+                "...OFFFO...OFFFO.."
+            ]
+        }
+        // Beady eyes: two pixels, a yellow glint, sliding toward the pointer.
+        Repeater {
+            model: [{ x: 5, rows: ["EY", "EE"] }, { x: 11, rows: ["YE", "EE"] }]
+            PixelSprite {
+                required property var modelData
+                required property int index
+                objectName: "companionEye" + index
+                readonly property real open: art.face ? art.face.blink * art.face.lid : 1
+                x: modelData.x + (art.squint || open < 0.5 ? 0 : art.eyeX)
+                y: 7 + (art.squint || open < 0.5 ? 1 : art.eyeY)
+                colors: art.colors
+                rows: art.squint ? (index === 0 ? ["E.", ".E"] : [".E", "E."])
+                    : open < 0.5 ? ["EE"] : modelData.rows
+            }
+        }
+        // Tongue, poked out on hover.
+        PixelSprite {
+            objectName: "hoverMark"
+            visible: art.happy
+            x: 9
+            y: 12
+            colors: art.colors
+            rows: ["PP", "PP", ".P"]
         }
     }
-    Rectangle { x: 17; y: 13; width: 1; height: 2; radius: 0; color: "#d2c99c"; antialiasing: true;  }
-    Rectangle { x: 18; y: 13; width: 1; height: 1; radius: 0; color: "#d2c99c"; antialiasing: true;  }
+
+    // One of Nurgle's flies: circles the horn while giggling, sits on it while dozing.
+    readonly property var flyPath: [[0, 0], [15, 0], [17, 2], [16, 5], [14, 3], [15, 0], [17, 1], [16, 3], [17, 0]]
+    PixelSprite {
+        objectName: "nurglingFly"
+        readonly property var at: art.asleep ? [13, 0] : art.flyPath[Math.min(8, art.habitFrame)]
+        visible: art.asleep || (art.giggling && !art.happy)
+        x: at[0]
+        y: at[1]
+        colors: art.flyColors
+        rows: art.asleep ? ["wf"] : (art.habitFrame % 2 ? ["w.", ".f"] : [".w", "f."])
     }
-    Rectangle { x: 6 + art.face.shownX; y: 5 + art.face.shownY; width: 1; height: Math.max(0.5, art.face.blink * art.face.lid); radius: 0.6; color: "#242619"; antialiasing: true; objectName: "companionEye0" }
-    Rectangle { x: 11 + art.face.shownX; y: 5 + art.face.shownY; width: 1; height: Math.max(0.5, art.face.blink * art.face.lid); radius: 0.6; color: "#242619"; antialiasing: true; objectName: "companionEye1" }
-    Shape {
-        width: 20; height: 20
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            fillColor: "#35291e"; strokeColor: "transparent"; strokeWidth: 0
-            PathSvg { path: "M5 8 Q9 10 14 7 Q15 11 11 12 Q7 12 5 8 Z" }
-        }
-    }
-    Rectangle { x: 6; y: 9; width: 1; height: 1; radius: 0; color: "#e2d5aa"; antialiasing: true;  }
-    Rectangle { x: 8; y: 10; width: 1; height: 1; radius: 0; color: "#e2d5aa"; antialiasing: true;  }
-    Rectangle { x: 11; y: 9; width: 1; height: 1; radius: 0; color: "#e2d5aa"; antialiasing: true;  }
-    Rectangle { x: 13; y: 8; width: 1; height: 1; radius: 0; color: "#e2d5aa"; antialiasing: true;  }
-    Rectangle { x: 10; y: 10; width: 2; height: 3; radius: 0.7; color: "#bb6e64"; antialiasing: true; visible: art.happy; objectName: "hoverMark" }
-    Rectangle { x: 10; y: 14; width: 2; height: 2; radius: 1; color: "#646b36"; antialiasing: true;  }
-    Rectangle { x: 10; y: 14; width: 1; height: 1; radius: 0.5; color: "#3e4528"; antialiasing: true;  }
-    Rectangle { x: 6; y: 12; width: 2; height: 2; radius: 1; color: "#d2bb69"; antialiasing: true;  }
-    Rectangle { x: 14; y: 15; width: 1; height: 1; radius: 0.5; color: "#d2bb69"; antialiasing: true;  }
-    Rectangle { x: 5; y: 18; width: 1; height: 1; radius: 0; color: "#d2c99c"; antialiasing: true;  }
-    Rectangle { x: 14; y: 18; width: 1; height: 1; radius: 0; color: "#d2c99c"; antialiasing: true;  }
 }

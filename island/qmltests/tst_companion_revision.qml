@@ -2,111 +2,156 @@ import "../plasma-anchor/contents/ui" as Panel
 import QtQuick
 import QtTest
 
+// Pixel-art companions (Cube, Nurgling, Hollow Knight, Frog): real pointer input moves
+// the artwork, all drawing stays on whole pixels inside the 20×20 slot in every state,
+// sub-pixel brain jitter draws nothing, and the hover/habit/sleep looks appear.
 TestCase {
     id: suite
-    name: "CompanionRevision"
+    name: "CompanionPixel"
     width: 220; height: 220; visible: true; when: windowShown
+    readonly property var ids: ["companioncube", "nurgling", "hollowknight", "frog"]
+
     Component {
         id: factory
         Panel.Companion {
             x: 80; y: 80; width: 20; height: 20
-            character: "companioncube"
-            screenArea: Qt.rect(-2000,-2000,4000,4000)
+            motion: true
+            screenArea: Qt.rect(-2000, -2000, 4000, 4000)
         }
     }
     function point(face, dx, dy) {
-        const c = face.mapToGlobal(10,10);
+        const c = face.mapToGlobal(10, 10);
         face.pointerX = c.x + dx;
         face.pointerY = c.y + dy;
         face.pointerAt = Math.max(Date.now(), face.pointerAt + 1);
         wait(210);
     }
-    function pose(a) { return [a.shiftX,a.shiftY,a.tilt]; }
-    function test_nurgling_beady_gaze_blink_and_reaction() {
-        const f=createTemporaryObject(factory,suite,{character:"nurgling"}), a=f.art;
-        point(f,0,0);
-        const eye=findChild(f,"companionEye0"), arm=findChild(a,"scratchArm");
-        compare(eye.width,1,"beady 1px eyes preserve room for broad grin");
-        verify(arm !== null);
-        const normalEyeX=eye.x;
-        point(f,900,0); verify(eye.x>normalEyeX);
-        f.blink=0.08; verify(eye.height<1);
-        f.blink=1;
-        const normalY=arm.y;
-        f.happy=true;
-        verify(findChild(a,"hoverMark").visible);
-        verify(arm.y<normalY);
-        f.happy=false;
-        a.lastHabitAt=0;
+    // Every drawn pixel run, in face coordinates.
+    function runs(item, face, out) {
+        if (!item.visible) return out;
+        if (item instanceof Rectangle && item.width > 0 && item.height > 0) {
+            const a = item.mapToItem(face, 0, 0), b = item.mapToItem(face, item.width, item.height);
+            out.push({ x0: Math.min(a.x, b.x), y0: Math.min(a.y, b.y), x1: Math.max(a.x, b.x), y1: Math.max(a.y, b.y), aa: item.antialiasing, c: item.color.toString() });
+        }
+        for (let i = 0; i < item.children.length; i++) runs(item.children[i], face, out);
+        return out;
+    }
+    // A signature of what's drawn: changes iff the picture changes.
+    function picture(face) {
+        // Let a brain blink or side glance finish first: they're not the thing under test.
+        tryCompare(face, "blink", 1, 2000);
+        tryCompare(face, "glance", 0, 2000);
+        return JSON.stringify(runs(face.art, face, []).map(r => [r.x0, r.y0, r.x1, r.y1, r.c]));
+    }
+    function checkBounds(face, what) {
+        for (const r of runs(face.art, face, [])) {
+            verify(!r.aa, what + ": pixel art must not antialias");
+            for (const v of [r.x0, r.y0, r.x1, r.y1]) compare(v, Math.round(v), what + ": whole pixels " + JSON.stringify(r));
+            verify(r.x0 >= 0 && r.y0 >= 0 && r.x1 <= 20 && r.y1 <= 20, what + ": inside slot " + JSON.stringify(r));
+        }
+    }
+
+    function test_tracking_data() { return ids.map(id => ({ tag: id, id: id })); }
+    function test_tracking(data) {
+        const f = createTemporaryObject(factory, suite, { character: data.id });
+        point(f, 0, 0);
+        const centre = picture(f);
+        const seen = {};
+        for (const p of [["left", -900, 0], ["right", 900, 0], ["down", 0, 900]]) {
+            point(f, p[1], p[2]);
+            seen[p[0]] = picture(f);
+            verify(seen[p[0]] !== centre, data.id + " must visibly respond to pointer " + p[0]);
+        }
+        verify(seen.left !== seen.right, data.id + " left and right poses differ");
+        // Sub-pixel jitter with fresh timestamps draws nothing new.
+        point(f, 0, 0);
+        const still = picture(f);
+        for (let i = 0; i < 10; i++) {
+            point(f, (i % 2) * 0.3, 0.3);
+            compare(picture(f), still, data.id + " jitter must not redraw");
+        }
+        // Another monitor: holds the pose.
+        point(f, 900, 0);
+        const held = picture(f);
+        f.screenArea = Qt.rect(5000, 5000, 10, 10);
+        point(f, -900, 900);
+        compare(picture(f), held, data.id + " holds still when unattended");
+    }
+
+    function test_states_data() { return ids.map(id => ({ tag: id, id: id })); }
+    function test_states(data) {
+        const f = createTemporaryObject(factory, suite, { character: data.id }), a = f.art;
+        compare(a.gazeScale, 1);
+        for (const p of [[-900, -900], [0, 0], [900, 900], [-900, 300], [900, -300], [40, 30]]) {
+            point(f, p[0], p[1]);
+            a.lastHabitAt = 0; a.startHabit(); a.resetHabit();
+            for (let fr = 0; fr <= a.habitFrames; fr++) { a.habitFrame = fr; checkBounds(f, data.id + " habit " + fr); }
+            a.habitFrame = 0;
+            f.happy = true; checkBounds(f, data.id + " hover"); f.happy = false;
+            f.blink = 0.08; checkBounds(f, data.id + " blink"); f.blink = 1;
+        }
+        point(f, 0, 0);
+        const normal = picture(f);
+        f.happy = true;
+        verify(findChild(a, "hoverMark").visible, "hover mark");
+        verify(picture(f) !== normal, "hover looks different");
+        f.happy = false;
+        f.sleepy = true; f.lid = 0.42;
+        checkBounds(f, data.id + " asleep");
+        verify(picture(f) !== normal, "dozing looks different");
+        f.sleepy = false; f.lid = 1;
+        point(f, 0, 0);
+        // A real burst from the brain's idle blink changes the drawing and settles back.
+        a.lastHabitAt = 0;
         f.blinked(true);
         verify(a.habitRunning);
-        wait(160); verify(arm.y<normalY);
-        tryCompare(a,"habitRunning",false,1100);
-        compare(arm.y,normalY);
+        let changed = false;
+        for (let i = 0; i < a.habitFrames; i++) { wait(125); if (picture(f) !== normal) changed = true; }
+        verify(changed, data.id + " habit is visible");
+        tryCompare(a, "habitRunning", false, 1600);
+        const after = picture(f);
+        compare(after, normal, data.id + " settles back");
     }
-    function test_cube_pointer_tracking() {
-        const f = createTemporaryObject(factory, suite), a = f.art;
-        point(f, -900, 0);
-        verify(a.shiftX < 0, "real pointer left must translate Cube");
-        verify(a.tilt < 0);
-        point(f,900,0); verify(a.shiftX > 0); verify(a.tilt > 0);
-        point(f,0,-900); verify(a.shiftY < 0);
-        point(f,0,900); verify(a.shiftY > 0);
-        point(f,0,0); compare(pose(a),[0,0,0]);
-        let changes = 0;
-        function count() { changes++; }
-        a.shiftXChanged.connect(count); a.shiftYChanged.connect(count); a.tiltChanged.connect(count);
-        for (let i=0;i<12;i++) {
-            // A changed relay timestamp and sub-quantum real pointer jitter.
-            point(f, (i%2)*0.01, 0.01);
+
+    function test_directional_habits() {
+        for (const id of ["hollowknight", "frog"]) {
+            const f = createTemporaryObject(factory, suite, { character: id }), a = f.art;
+            point(f, 900, 200);
+            a.lastHabitAt = 0; a.startHabit();
+            compare(a.habitDirection, 1, id + " toward the pointer (right)");
+            a.resetHabit();
+            point(f, -900, 200);
+            a.lastHabitAt = 0; a.startHabit();
+            compare(a.habitDirection, -1, id + " toward the pointer (left)");
+            a.resetHabit();
         }
-        compare(changes,0,"duplicate snapped inputs must not change art transforms");
-        a.shiftXChanged.disconnect(count); a.shiftYChanged.disconnect(count); a.tiltChanged.disconnect(count);
     }
-    function test_cube_freeze_data() {
-        return ["visible","artVisible","motion","attended","sleepy"].map(g => ({tag:g,gate:g}));
+
+    // A gaze target reversed mid-glide must end at the new target (it used to compare
+    // with the half-animated value, skip the update and finish the stale glide).
+    function test_reversed_glide_settles() {
+        const f = createTemporaryObject(factory, suite, { character: "frog" });
+        point(f, 0, 0);
+        compare(f.shownY, 0);
+        f.sleepy = true;
+        f.sleepy = false;
+        wait(300);
+        compare(f.shownY, 0, "eyes return from a cancelled doze look");
+        f.glance = 0.09;
+        f.glance = 0;
+        wait(300);
+        compare(f.shownX, 0, "eyes return from a cancelled glance");
     }
-    function test_cube_freeze(data) {
-        const f = createTemporaryObject(factory,suite), a=f.art;
-        point(f,900,900);
-        a.lastHabitAt=0; a.startHabit(); wait(150);
-        if (data.gate === "artVisible") a.visible=false;
-        else if (data.gate === "attended") f.screenArea=Qt.rect(5000,5000,10,10);
-        else f[data.gate]=data.gate === "sleepy";
-        const held=pose(a);
-        if(data.gate === "sleepy") {
-            // Real pointer wakes the brain; change its existing target instead.
-            f.glance=-0.1;
-            wait(300);
-        } else point(f,-900,-900);
-        compare(pose(a),held, "inactive pose held: "+data.gate);
-        compare(a.habitRunning,false);
-        compare(findChild(a,"habitTick").running,false);
-    }
-    function test_cube_bounds_data() {
-        return [1,1.25,1.5,2].map(s => ({tag:String(s),scale:s}));
-    }
-    function test_cube_bounds(data) {
-        const f=createTemporaryObject(factory,suite,{scale:data.scale}), a=f.art;
-        const p=findChild(a,"cubePose"); verify(p !== null);
-        for(const x of [-900,0,900]) for(const y of [-900,0,900]) {
-            point(f,x,y);
-            for(const happy of [false,true]) {
-                f.happy=happy;
-                for(const frame of [0,1,2,3,4,5,6]) {
-                    a.habitFrame=frame;
-                    verify(Math.abs(p.rotation)<=8);
-                    compare(p.rotation%4,0);
-                    compare(a.shiftX/a.pixel,Math.round(a.shiftX/a.pixel));
-                    compare(a.shiftY/a.pixel,Math.round(a.shiftY/a.pixel));
-                    for(const c of [[2,2],[18,2],[2,18],[18,18]]) {
-                        const v=p.mapToItem(f,c[0],c[1]);
-                        verify(v.x >= 0 && v.y >=0 && v.x<=20 && v.y<=20,JSON.stringify(v));
-                    }
-                }
-            }
-        }
-        f.character="blob"; wait(250);
-        compare(f.shownCharacter,"blob");
+
+    function test_pixel_sprite() {
+        const s = createTemporaryObject(Qt.createComponent("../plasma-anchor/contents/ui/characters/PixelSprite.qml"), suite,
+            { rows: ["aab.", "..bb"], colors: { a: "#ff0000", b: "#00ff00" } });
+        compare(s.width, 4); compare(s.height, 2);
+        compare(s.runs.length, 3);
+        compare(JSON.stringify(s.runs.map(r => [r.x, r.y, r.w])), JSON.stringify([[0, 0, 2], [2, 0, 1], [2, 1, 2]]));
+        // Unknown keys never index the prototype.
+        s.rows = ["c"]; s.colors = { a: "#fff" };
+        compare(s.runs.length, 0);
+        s.rows = ["constructor"]; compare(s.runs.length, 0);
     }
 }

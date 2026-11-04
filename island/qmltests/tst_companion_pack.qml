@@ -6,7 +6,7 @@ TestCase {
     id: suite
 
     property int strayTicks: 0
-    readonly property var ids: ["notchmimic", "obelisk", "companioncube", "nurgling", "hollowknight"]
+    readonly property var ids: ["notchmimic", "companioncube", "nurgling", "hollowknight"]
 
     function test_pack_data() {
         return ids.map((id) => {
@@ -91,8 +91,7 @@ TestCase {
         face.happy = true;
         const mark = findChild(face, "hoverMark");
         verify(mark !== null);
-        if (data.id !== "obelisk")
-            verify(mark.visible);
+        verify(mark.visible);
 
         face.happy = false;
         face.sleepy = true;
@@ -111,7 +110,7 @@ TestCase {
         face.character = data.id;
         compare(face.shownCharacter, data.id);
         compare(face.art.habitFrame, 0);
-        for (const unknown of ["unknown", "null", "constructor", "__proto__", ""]) {
+        for (const unknown of ["obelisk", "unknown", "null", "constructor", "__proto__", ""]) {
             face.character = unknown;
             compare(face.shownCharacter, "blob");
         }

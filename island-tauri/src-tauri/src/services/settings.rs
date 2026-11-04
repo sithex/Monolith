@@ -219,6 +219,35 @@ mod tests {
     }
 
     #[test]
+    fn legacy_obelisk_migrates_and_resaves_without_losing_settings() {
+        let dir = scratch("legacy-obelisk");
+        let legacy = json!({"companionCharacter":"obelisk", "notchWidth":200,
+                            "companionEnabled":false, "accent":"#abcdef"});
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("settings.json"),
+            serde_json::to_vec(&legacy).unwrap(),
+        )
+        .unwrap();
+        let svc = service(&dir, "", false);
+        let restored = svc.get().unwrap();
+        assert_eq!(restored.companion_character, CompanionCharacter::Blob);
+        assert_eq!(restored.notch_width, 200.0);
+        assert!(!restored.companion_enabled);
+        assert_eq!(restored.accent, "#abcdef");
+        let direct: CompanionCharacter = serde_json::from_value(json!("obelisk")).unwrap();
+        assert_eq!(serde_json::to_value(direct).unwrap(), "blob");
+        svc.patch(&patch(json!({"notchWidth":201}))).unwrap();
+        let saved: serde_json::Value =
+            serde_json::from_slice(&fs::read(dir.join("settings.json")).unwrap()).unwrap();
+        assert_eq!(saved["companionCharacter"], "blob");
+        assert_eq!(saved["accent"], "#abcdef");
+        assert_eq!(saved["companionEnabled"], false);
+        assert_eq!(saved["notchWidth"], 201);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn notch_companion_is_on_by_default_persisted_and_strict() {
         let dir = scratch("companion-option");
         let svc = service(&dir, "", false);
@@ -251,13 +280,7 @@ mod tests {
             Settings::from_file_value(&saved).companion_character,
             CompanionCharacter::Isaac
         );
-        for id in [
-            "notchmimic",
-            "obelisk",
-            "companioncube",
-            "nurgling",
-            "hollowknight",
-        ] {
+        for id in ["notchmimic", "companioncube", "nurgling", "hollowknight"] {
             svc.patch(&patch(json!({"companionCharacter": id})))
                 .unwrap();
             let saved: serde_json::Value =

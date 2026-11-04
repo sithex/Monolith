@@ -5,12 +5,42 @@ import QtQuick.Shapes
 HabitCharacter {
     id: art
 
+    // Hold the last pose while inactive. Only the existing brain glides; these
+    // whole-device-pixel translations and five rotation steps have no animator.
+    readonly property bool tracking: !!face && visible && face.visible && face.attended && face.motion && !face.sleepy
+    property real shiftX: 0
+    property real shiftY: 0
+    property int tilt: 0
+    function updatePose() {
+        if (!tracking) return;
+        const x = snap(Math.max(-1, Math.min(1, face.shownX * 1.4)));
+        const y = snap(Math.max(-1, Math.min(1, face.shownY * 1.8)));
+        const angle = happy ? 0 : Math.max(-8, Math.min(8, 4 * Math.round(face.shownX * 1.5 + face.shownY * 0.75) + step * 4));
+        if (x !== shiftX) shiftX = x;
+        if (y !== shiftY) shiftY = y;
+        if (angle !== tilt) tilt = angle;
+    }
+    onTrackingChanged: updatePose()
+    onPixelChanged: updatePose()
+    onStepChanged: updatePose()
+    onHappyChanged: updatePose()
+    Component.onCompleted: updatePose()
+    Connections {
+        target: art.face
+        function onShownXChanged() { art.updatePose(); }
+        function onShownYChanged() { art.updatePose(); }
+    }
+
     Item {
+        objectName: "cubePose"
+        x: art.shiftX
+        y: art.shiftY
         width: 20
         height: 20
-        // A small, bounded stepped tip; the 16 px cube stays inside its 20 px slot.
-        // Only this Item's transform changes, never its static Shape geometry.
-        rotation: art.step * 4
+        // Static 14px extent leaves clearance even at +/-8 degrees plus 1px.
+        // Transform the complete drawing, never the static Shape paths.
+        scale: 0.875
+        rotation: art.tilt
         transformOrigin: Item.Center
 
         Rectangle {

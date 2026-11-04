@@ -395,6 +395,32 @@ mod tests {
     }
 
     #[test]
+    fn companion_bindings_only_expose_canonical_choices() {
+        let generated = std::fs::read_to_string(bindings_path()).unwrap();
+        let companion = generated
+            .split("export type CompanionCharacter =")
+            .nth(1)
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap();
+        for id in [
+            "blob",
+            "isaac",
+            "notchmimic",
+            "companioncube",
+            "nurgling",
+            "hollowknight",
+        ] {
+            assert!(companion.contains(&format!("\"{id}\"")));
+        }
+        assert!(
+            !companion.contains("obelisk"),
+            "legacy input must not leak into supported public choices"
+        );
+    }
+
+    #[test]
     fn bindings_are_current() {
         let fresh = scratch_file("bindings.ts");
         specta_builder()

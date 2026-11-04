@@ -42,7 +42,7 @@ pub enum DisplayBackend {
 
 /// Who lives in the notch. New characters are new variants here, a file in the notch
 /// widget's `characters/` folder and an entry in the UI's character list.
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default, specta::Type)]
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, Default, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum CompanionCharacter {
     /// The round face (after Vorssaint's companion).
@@ -51,10 +51,37 @@ pub enum CompanionCharacter {
     /// A crying boy in a basement, after The Binding of Isaac.
     Isaac,
     Notchmimic,
-    Obelisk,
     Companioncube,
     Nurgling,
     Hollowknight,
+}
+
+// Deserialize the removed ID at the boundary only. A serde alias on Blob makes
+// specta include "obelisk" in the public TS union, incorrectly advertising it as
+// a supported selectable value. Serialization and generated types stay canonical.
+impl<'de> Deserialize<'de> for CompanionCharacter {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let id = String::deserialize(deserializer)?;
+        match id.as_str() {
+            "blob" | "obelisk" => Ok(Self::Blob),
+            "isaac" => Ok(Self::Isaac),
+            "notchmimic" => Ok(Self::Notchmimic),
+            "companioncube" => Ok(Self::Companioncube),
+            "nurgling" => Ok(Self::Nurgling),
+            "hollowknight" => Ok(Self::Hollowknight),
+            _ => Err(serde::de::Error::unknown_variant(
+                &id,
+                &[
+                    "blob",
+                    "isaac",
+                    "notchmimic",
+                    "companioncube",
+                    "nurgling",
+                    "hollowknight",
+                ],
+            )),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
+import QtQuick.Window
 
 // Isaac, after The Binding of Isaac: a round, slightly wide head with a thick dark
 // outline, big black eyes set wide apart with a white glint, a small open wailing mouth
@@ -76,8 +77,8 @@ Item {
             Rectangle {
                 required property real modelData
                 objectName: "isaacStream"
-                width: art.size * .15
-                height: art.size * .25
+                width: art.size * .17
+                height: art.size * .3
                 radius: width / 2
                 // Hangs from the eye wherever it looks, so turning his head keeps them joined.
                 x: art.size * modelData - width / 2 + (modelData < .5 ? art.size * .01 : -art.size * .01) + art.face.shownX * .7
@@ -88,24 +89,26 @@ Item {
                 antialiasing: true
                 opacity: 1 - art.cheer * .9
                 visible: opacity > .02
-                // Flow: two light bands slide down the stream, a step per tick.
+                // Flow: light bands slide down the stream a whole screen pixel at a time,
+                // like the game's pixel art; a tick that wouldn't move them a pixel draws
+                // nothing. A sub-pixel band just smears into the stream at 100% scale.
                 Item {
                     anchors.fill: parent
-                    anchors.margins: parent.border.width
+                    anchors.topMargin: parent.border.width
                     clip: true
+                    readonly property real px: 1 / Math.max(1, Screen.devicePixelRatio)
                     Repeater {
                         model: 2
                         Rectangle {
                             required property int index
                             objectName: "isaacFlow"
                             readonly property real period: parent.height
-                            width: parent.width * .55
-                            height: Math.max(.6, art.size * .05)
-                            radius: height / 2
-                            x: (parent.width - width) / 2
-                            y: ((art.flowFrame / art.flowSteps + index / 2) % 1) * period - height / 2
-                            color: "#e4f6f7"
-                            opacity: .85
+                            readonly property real px: parent.px
+                            width: parent.width
+                            height: Math.max(px, Math.round(art.size * .06 / px) * px)
+                            x: 0
+                            y: Math.round(((art.flowFrame / art.flowSteps + index / 2) % 1) * period / px) * px
+                            color: "#f2fbfc"
                         }
                     }
                 }

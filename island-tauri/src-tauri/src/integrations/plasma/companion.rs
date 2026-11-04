@@ -2,7 +2,7 @@
 //!
 //! Plasma widgets cannot read the global pointer on Wayland, so a tiny KWin script
 //! (`companion-gaze.qml`, loaded only while the companion is on) sends it here as a
-//! `Pointer(x, y)` call, throttled in KWin to ~30 Hz and only while the pointer moves.
+//! `Pointer(x, y)` call, throttled in KWin to 20 Hz and only while the pointer moves.
 //! The island re-broadcasts it as the `Gaze(x, y)` signal, which every notch widget
 //! receives with Plasma's D-Bus `SignalWatcher` and turns into eye movement itself.
 //! Nothing here polls, and nothing runs while the pointer is still.
@@ -24,7 +24,7 @@ pub const INTERFACE: &str = "local.hermes.Monolith.Companion";
 /// The KWin plugin name the island owns; only this name is ever unloaded.
 pub const SCRIPT_NAME: &str = "monolith-companion-gaze";
 const SCRIPT: &str = include_str!("companion-gaze.qml");
-/// Faster calls than this are dropped (KWin sends at most one per 33 ms).
+/// Faster calls than this are dropped (KWin sends at most one per 50 ms).
 const MIN_INTERVAL: Duration = Duration::from_millis(12);
 /// Screen coordinates beyond this are nonsense, not a pointer.
 const MAX_COORDINATE: f64 = 1_000_000.0;
@@ -198,7 +198,7 @@ mod tests {
     #[test]
     fn script_is_throttled_event_driven_and_names_this_service() {
         assert!(SCRIPT.contains("onCursorPosChanged"));
-        assert!(SCRIPT.contains("interval: 33"));
+        assert!(SCRIPT.contains("interval: 50"));
         assert!(
             !SCRIPT.contains("repeat: true"),
             "never a free-running poll"

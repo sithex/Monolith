@@ -1,5 +1,5 @@
 // KWin declarative script loaded by the island while the notch companion is on.
-// Forwards the pointer position to the island at most ~30 times a second, only while
+// Forwards the pointer position to the island at most 20 times a second, only while
 // the pointer actually moves (a trailing single-shot timer, never a free-running poll).
 // Nothing is sent while a fullscreen window (a game, a video) has focus: the notch is
 // hidden then anyway. If the island is gone, sending pauses for a few seconds per failure.
@@ -22,7 +22,7 @@ Item {
     }
     Timer {
         id: tick
-        interval: 33
+        interval: 50
         onTriggered: {
             if (Date.now() < root.pausedUntil) return;
             const active = Workspace.activeWindow;

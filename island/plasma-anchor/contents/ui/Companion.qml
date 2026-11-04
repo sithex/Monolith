@@ -5,6 +5,10 @@ import QtQuick.Shapes
 // screen. The global pointer arrives as a D-Bus signal (see main.qml), already throttled
 // at the source and sent only while the pointer moves; everything here is event-driven
 // except a blink timer that runs only while the face is shown.
+//
+// Redraws are the cost (each one repaints the panel), so the gaze is kept in quarter
+// pixels: a pointer update that would not visibly move an eye changes nothing and draws
+// nothing. Small steps land in one frame; only real jumps (a flick, a glance) glide.
 Item {
     id: face
     // Global pointer position in logical px and when it last moved (ms, 0 = never).
@@ -18,10 +22,15 @@ Item {
     property color eyeColor: "#171717"
     readonly property real size: Math.min(width, height)
 
-    // Eye offset in shares of the face size: toward the pointer, more the farther it is,
-    // always inside the face.
+    // Eye offset toward the pointer in shares of the face size, inside the face.
     property real lookX: 0
     property real lookY: 0
+    // The offset actually drawn, in logical px on a quarter-pixel grid.
+    property real shownX: 0
+    property real shownY: 0
+    property bool glide: false
+    Behavior on shownX { enabled: face.motion && face.glide; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+    Behavior on shownY { enabled: face.motion && face.glide; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
     property real blink: 1          // vertical eye scale; dips to ~0 for a blink
     property bool sleepy: false
     // How open the eyes are when not blinking: heavy-lidded while dozing.
@@ -41,7 +50,23 @@ Item {
         // settle at the edge of the face instead of snapping there.
         lookX = maxX * dx / (Math.abs(dx) + 160);
         lookY = maxY * dy / (Math.abs(dy) + 90);
+        retarget();
     }
+    function quarter(v) { return Math.round(v * 4) / 4; }
+    // Where the eyes point: the pointer, a thinking look, a doze or a passing glance.
+    function retarget() {
+        const sx = thinking ? .08 : sleepy ? 0 : lookX + glance;
+        const sy = thinking ? -.07 : sleepy ? .05 : lookY;
+        const tx = quarter(sx * size), ty = quarter(sy * size);
+        if (tx === shownX && ty === shownY) return;
+        glide = Math.abs(tx - shownX) >= .75 || Math.abs(ty - shownY) >= .75;
+        shownX = tx;
+        shownY = ty;
+    }
+    onThinkingChanged: retarget()
+    onSleepyChanged: retarget()
+    onGlanceChanged: retarget()
+    onSizeChanged: retarget()
     onPointerAtChanged: {
         updateLook();
         if (sleepy) wake.restart();
@@ -52,18 +77,6 @@ Item {
     }
     onWorkingChanged: { if (working) ponder.restart(); else { ponder.stop(); thinking = false; } }
     onVisibleChanged: if (visible) updateLook()
-
-    Behavior on lookX { enabled: face.motion; SmoothedAnimation { velocity: .9; easing.type: Easing.OutCubic } }
-    Behavior on lookY { enabled: face.motion; SmoothedAnimation { velocity: .9; easing.type: Easing.OutCubic } }
-    Behavior on glance { enabled: face.motion; NumberAnimation { duration: 260; easing.type: Easing.InOutSine } }
-
-    // Where the eyes actually point: the pointer, a thinking look, or a passing glance.
-    readonly property real gazeX: thinking ? .08 : sleepy ? 0 : lookX + glance
-    readonly property real gazeY: thinking ? -.07 : sleepy ? .05 : lookY
-    property real shownX: gazeX
-    property real shownY: gazeY
-    Behavior on shownX { enabled: face.motion; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-    Behavior on shownY { enabled: face.motion; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
     // Dozes off after three quiet minutes, wakes with a wide-eyed blink.
     Timer { id: drowsy; interval: 180000; running: face.visible && !face.working; onTriggered: face.sleepy = true }
@@ -102,7 +115,7 @@ Item {
         height: face.size
         anchors.centerIn: parent
         // The whole head leans a little toward the pointer, the eyes a lot more.
-        transform: Translate { x: face.shownX * face.size * .25; y: face.shownY * face.size * .2 }
+        transform: Translate { x: face.quarter(face.shownX * .25); y: face.quarter(face.shownY * .2) }
 
         Rectangle {
             id: body
@@ -126,8 +139,8 @@ Item {
                 width: face.size * .12
                 height: Math.max(1, eyeH)
                 radius: width / 2
-                x: face.size * modelData - width / 2 + face.shownX * face.size
-                y: face.size * .52 - height / 2 + face.shownY * face.size + (1 - face.lid) * face.size * .1
+                x: face.size * modelData - width / 2 + face.shownX
+                y: face.size * .52 - height / 2 + face.shownY + (1 - face.lid) * face.size * .1
                 color: face.eyeColor
                 antialiasing: true
                 opacity: face.happy ? 0 : 1
@@ -148,7 +161,8 @@ Item {
                 strokeWidth: Math.max(1.2, face.size * .1)
                 fillColor: "transparent"
                 capStyle: ShapePath.RoundCap
-                readonly property real cx: face.size * .36 + face.shownX * face.size * .5
+                // Follows the gaze only while shown, so hidden arches never re-tessellate.
+                readonly property real cx: face.size * .36 + (face.happy ? face.quarter(face.shownX * .5) : 0)
                 readonly property real cy: face.size * .55
                 readonly property real span: face.size * .085
                 startX: cx - span
@@ -161,7 +175,7 @@ Item {
                 strokeWidth: Math.max(1.2, face.size * .1)
                 fillColor: "transparent"
                 capStyle: ShapePath.RoundCap
-                readonly property real cx: face.size * .64 + face.shownX * face.size * .5
+                readonly property real cx: face.size * .64 + (face.happy ? face.quarter(face.shownX * .5) : 0)
                 readonly property real cy: face.size * .55
                 readonly property real span: face.size * .085
                 startX: cx - span

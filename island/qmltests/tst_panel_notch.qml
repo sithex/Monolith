@@ -56,6 +56,33 @@ TestCase {
         notch.companion = false; notch.micMuted = false; notch.width = 144;
         tryCompare(face, "opacity", 0);
     }
+    function test_companion_ignores_moves_it_could_not_show() {
+        const notch = createTemporaryObject(factory, testCase);
+        notch.companion = true;
+        const face = findChild(notch, "notchCompanion");
+        const centre = face.mapToGlobal(face.width / 2, face.height / 2);
+        notch.pointerX = centre.x + 2500; notch.pointerY = centre.y + 900; notch.pointerAt = Date.now();
+        tryVerify(function() { return face.shownX > 1.5; }, 1000);
+        wait(200);
+        const x = face.shownX, y = face.shownY;
+        // On the grid, so nothing in between gets drawn.
+        compare(x * 4, Math.round(x * 4)); compare(y * 4, Math.round(y * 4));
+        // Far away, a 40 px move cannot visibly turn an eye: nothing changes, nothing animates.
+        let changes = 0;
+        const count = function() { changes++; };
+        face.shownXChanged.connect(count); face.shownYChanged.connect(count);
+        notch.pointerX = centre.x + 2540; notch.pointerAt = Date.now() + 1;
+        notch.pointerY = centre.y + 930; notch.pointerAt = Date.now() + 2;
+        compare(changes, 0);
+        // A small step near the notch lands at once, without a glide.
+        notch.pointerX = centre.x + 40; notch.pointerY = centre.y; notch.pointerAt = Date.now() + 3;
+        tryVerify(function() { return face.shownX < 1.25; }, 1000);
+        const before = face.shownX;
+        notch.pointerX = centre.x + 46; notch.pointerAt = Date.now() + 4;
+        verify(!face.glide);
+        verify(face.shownX - before <= .5);
+        face.shownXChanged.disconnect(count); face.shownYChanged.disconnect(count);
+    }
     function test_main_component_compiles() {
         const component = Qt.createComponent("../plasma-anchor/contents/ui/main.qml");
         compare(component.status, Component.Ready, component.errorString());

@@ -5,6 +5,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.plasma.private.mpris as Mpris
+import org.kde.plasma.workspace.dbus as DBus
 PlasmoidItem {
     id: root
     property bool online: false
@@ -59,6 +60,24 @@ PlasmoidItem {
     // Live states pushed with the appearance; ignored once the island is gone so a stale
     // KConfig value can never leave the notch pulsing.
     readonly property var live: root.online ? (root.appearance.live || {}) : ({})
+    // Notch companion (Settings → Appearance → Notch). The island relays the global pointer
+    // as a D-Bus signal sent only while the pointer moves; nothing here polls.
+    readonly property bool companion: root.appearance.companion !== false
+    property real pointerX: 0
+    property real pointerY: 0
+    property real pointerAt: 0
+    DBus.SignalWatcher {
+        enabled: root.companion
+        busType: DBus.BusType.Session
+        service: "local.hermes.Monolith"
+        path: "/Companion"
+        iface: "local.hermes.Monolith.Companion"
+        function dbusGaze(x, y) {
+            root.pointerX = Number(x) || 0;
+            root.pointerY = Number(y) || 0;
+            root.pointerAt = Date.now();
+        }
+    }
     compactRepresentation: PanelPill {
         Layout.minimumWidth: root.notchWidth
         Layout.maximumWidth: root.notchWidth
@@ -78,6 +97,10 @@ PlasmoidItem {
         borderWidth: (root.appearance.notchBorder || {}).width ?? 0.8
         working: root.live.working === true
         micMuted: root.live.micMuted === true
+        companion: root.companion
+        pointerX: root.pointerX
+        pointerY: root.pointerY
+        pointerAt: root.pointerAt
         timerEndsAt: (root.live.timer && !root.live.timer.paused) ? Number(root.live.timer.endsAt) || 0 : 0
         timerPausedMs: (root.live.timer && root.live.timer.paused) ? Number(root.live.timer.remainingMs) || 0 : -1
         // Pointer enter/leave animate the native notch only; click remains authoritative.

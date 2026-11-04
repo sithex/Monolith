@@ -21,3 +21,12 @@ test('notch appearance controls emit independent color and border settings',()=>
  assert.equal(input('Notch border opacity').props.value,60);
  assert.equal(input('Notch border thickness').props.value,2.5);
 });
+
+test('notch companion switch is on by default and patches companionEnabled',()=>{
+ const calls=[];
+ const find=s=>children(NotchControls({settings:s,background:'#000000',accent:'#00ff00',patch:p=>calls.push(p)})).find(e=>e.props?.['aria-label']==='Notch companion');
+ assert.equal(find({}).props.checked,true);
+ assert.equal(find({companionEnabled:false}).props.checked,false);
+ find({}).props.onChange({target:{checked:false}});
+ assert.deepEqual(calls,[{companionEnabled:false}]);
+});

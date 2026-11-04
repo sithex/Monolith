@@ -1,6 +1,8 @@
 //! Plasma bridge components. None starts a worker or queries the desktop on import.
 pub mod anchor;
 #[cfg(target_os = "linux")]
+pub mod companion;
+#[cfg(target_os = "linux")]
 pub mod kwin_place;
 pub mod notch_live;
 #[cfg(target_os = "linux")]

@@ -55,7 +55,7 @@ gtk = "0.18"
 gdk = "0.18"
 glib = "0.18"
 cairo-rs = "0.18"
-zbus = { version = "6", default-features = false, features = ["tokio"] }
+zbus = { version = "6", default-features = false, features = ["tokio", "service"] }
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 x11rb = { version = "0.14", features = ["shape", "xfixes"] }
 # Deviation (VERIFICATION.md): tauri does not re-export it; already in the tree at 0.6.2.

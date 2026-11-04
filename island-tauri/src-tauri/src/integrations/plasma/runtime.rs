@@ -66,6 +66,8 @@ pub struct NativeHost {
     stop: mpsc::SyncSender<StatusMsg>,
     worker: Mutex<Option<JoinHandle<()>>>,
     watcher: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    /// The notch companion's pointer relay (never in test instances).
+    companion: Mutex<Option<super::companion::CompanionBus>>,
 }
 /// The one explicit mapping from canonical modes to the legacy names external tooling reads.
 fn legacy_mode_name(mode: IslandMode) -> &'static str {
@@ -165,6 +167,7 @@ fn snapshot(
         "mode":legacy_mode_name(state.mode),"view":serde_json::to_value(state.view)?,"stateRev":state.rev,
         "anchor":anchor,"bounds":bounds,"windowId":xid,"rectangles":rectangles,"pty":services.terminal.pid().unwrap_or(0),
         "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
+        "companion":settings.companion_enabled,
         "notchBorder":{"enabled":settings.notch_border_enabled,"color":border_color,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width},
         "background":background,"text":palette.as_ref().map(|p|&p.text),"dim":palette.as_ref().map(|p|&p.dim),
         "live":live.to_json()}),
@@ -249,6 +252,7 @@ fn panel_style_payload(raw: &Value) -> Value {
         "stealth",
         "notchBorder",
         "notchWidth",
+        "companion",
         "live",
     ];
     Value::Object(
@@ -378,6 +382,19 @@ impl NativeHost {
         let handle = app.clone();
         app.manage(StatusNudge(stop.clone()));
         let allow_panel_push = !app.state::<Services>().runtime.test_instance;
+        // The companion's pointer relay. Optional: without it the eyes simply rest ahead.
+        let companion = if allow_panel_push {
+            match tauri::async_runtime::block_on(super::companion::CompanionBus::start()) {
+                Ok(bus) => Some(bus),
+                Err(error) => {
+                    tracing::warn!(%error, "Notch companion pointer relay unavailable");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let relay = companion.is_some();
         let worker = std::thread::Builder::new()
             .name("ripple-status".into())
             .spawn(move || {
@@ -385,6 +402,7 @@ impl NativeHost {
                 let mut last_panel_style = Value::Null;
                 let mut anchor = anchor;
                 let mut last_enabled: Option<bool> = None;
+                let mut last_companion: Option<bool> = None;
                 let mut anchors = Vec::<Anchor>::new();
                 let mut primary: Option<Anchor> = None;
                 let mut monitor_report = Value::Null;
@@ -412,6 +430,19 @@ impl NativeHost {
                     let update = (|| -> Result<()> {
                         let settings = handle.state::<Services>().settings.get()?;
                         let enabled = settings.show_notch_on_every_monitor;
+                        // The KWin pointer script runs only while the companion is on: loaded at
+                        // startup and when the setting flips, never retried in a loop.
+                        if relay && last_companion != Some(settings.companion_enabled) {
+                            last_companion = Some(settings.companion_enabled);
+                            let result = if settings.companion_enabled {
+                                super::companion::load_script()
+                            } else {
+                                super::companion::unload_script()
+                            };
+                            if let Err(error) = result {
+                                tracing::warn!(%error, "Notch companion pointer script unavailable");
+                            }
+                        }
                         let live = live_state(&handle).stabilised(Some(&last_live));
                         // Plasma is reconciled only at startup and when the setting (or notch
                         // width) changes: never periodically, never on a click, never retried.
@@ -593,6 +624,7 @@ impl NativeHost {
             stop,
             worker: Mutex::new(Some(worker)),
             watcher: Mutex::new(Some(watcher)),
+            companion: Mutex::new(companion),
         })
     }
     pub fn shutdown(&self) -> Result<()> {
@@ -624,6 +656,18 @@ impl NativeHost {
             worker
                 .join()
                 .map_err(|_| anyhow::anyhow!("Status worker panicked"))?;
+        }
+        if let Some(bus) = self
+            .companion
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Companion slot poisoned"))?
+            .take()
+        {
+            // Leave no pointer script behind in KWin once the island is gone.
+            if let Err(error) = super::companion::unload_script() {
+                tracing::debug!(%error, "Companion pointer script unload failed");
+            }
+            drop(bus);
         }
         self.instance
             .lock()

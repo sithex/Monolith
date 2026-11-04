@@ -219,6 +219,27 @@ mod tests {
     }
 
     #[test]
+    fn notch_companion_is_on_by_default_persisted_and_strict() {
+        let dir = scratch("companion-option");
+        let svc = service(&dir, "", false);
+        assert!(svc.get().unwrap().companion_enabled);
+        // An older settings file without the key keeps the companion on.
+        assert!(Settings::from_file_value(&json!({})).companion_enabled);
+        svc.patch(&patch(json!({"companionEnabled":false})))
+            .unwrap();
+        let saved: serde_json::Value =
+            serde_json::from_slice(&fs::read(dir.join("settings.json")).unwrap()).unwrap();
+        assert_eq!(saved["companionEnabled"], false);
+        assert!(!Settings::from_file_value(&saved).companion_enabled);
+        for bad in [json!(null), json!("false"), json!(0)] {
+            assert!(
+                serde_json::from_value::<SettingsPatch>(json!({"companionEnabled":bad})).is_err()
+            );
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn settings_defaults_validation_atomic_persistence() {
         let dir = scratch("settings");
         let svc = service(&dir, "", false);
@@ -230,7 +251,7 @@ mod tests {
                 .as_object()
                 .unwrap()
                 .len(),
-            53 // Includes the opt-in multi-monitor notch setting.
+            54 // Includes the opt-in multi-monitor notch setting and the notch companion.
         );
         assert_eq!(defaults.hover_delay, 180.0);
         assert_eq!(defaults.ui_font, UiFont::System);

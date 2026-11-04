@@ -23,6 +23,39 @@ TestCase {
         notch.borderOpacity = 0; fuzzyCompare(outline.strokeColor.a, 0, .001);
         notch.borderEnabled = false; compare(outline.strokeWidth, 0);
     }
+    function test_companion_eyes_follow_the_pointer_and_stay_clear() {
+        const notch = createTemporaryObject(factory, testCase);
+        const face = findChild(notch, "notchCompanion");
+        const eye = findChild(notch, "companionEye0");
+        const clock = findChild(notch, "panelClock");
+        // Off by default in the bare pill; main.qml turns it on from the island's settings.
+        verify(!face.visible);
+        notch.companion = true;
+        tryCompare(face, "opacity", 1);
+        verify(face.x + face.width < clock.mapToItem(notch, 0, 0).x);
+        const restX = eye.x, restY = eye.y;
+        // Pointer far to the right and below: the eyes go right and down, within the face.
+        const centre = face.mapToGlobal(face.width / 2, face.height / 2);
+        notch.pointerX = centre.x + 2000; notch.pointerY = centre.y + 900; notch.pointerAt = Date.now();
+        tryVerify(function() { return eye.x > restX + 1 && eye.y > restY; }, 2000, eye.x + "," + eye.y);
+        verify(eye.x + eye.width <= face.width);
+        // Far to the left and above: the other way.
+        notch.pointerX = centre.x - 2000; notch.pointerY = centre.y - 900; notch.pointerAt = Date.now() + 1;
+        tryVerify(function() { return eye.x < restX - 1 && eye.y < restY; }, 2000, eye.x + "," + eye.y);
+        verify(eye.x >= 0);
+        // The mic mark moves past the face and both stay clear of the clock.
+        const mic = findChild(notch, "notchMicMuted");
+        notch.micMuted = true;
+        tryCompare(mic, "opacity", .85);
+        verify(face.visible);
+        verify(face.x + face.width <= mic.x);
+        verify(mic.x + mic.width < clock.mapToItem(notch, 0, 0).x);
+        // A narrow notch gives the mic mark the companion's room.
+        notch.width = 120;
+        tryCompare(face, "opacity", 0);
+        notch.companion = false; notch.micMuted = false; notch.width = 144;
+        tryCompare(face, "opacity", 0);
+    }
     function test_main_component_compiles() {
         const component = Qt.createComponent("../plasma-anchor/contents/ui/main.qml");
         compare(component.status, Component.Ready, component.errorString());

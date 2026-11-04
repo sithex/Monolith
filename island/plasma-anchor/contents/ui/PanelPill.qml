@@ -21,6 +21,13 @@ Item {
     // Live states (Dynamic-Island style). All default to "nothing to show".
     property bool working: false
     property bool micMuted: false
+    // Notch companion: a small face at the left whose eyes follow the global pointer.
+    property bool companion: false
+    property real pointerX: 0
+    property real pointerY: 0
+    property real pointerAt: 0
+    // On a narrow notch the mic mark needs the companion's room.
+    readonly property bool companionShown: companion && !(micMuted && width < 140)
     property real timerEndsAt: 0       // Unix ms while a timer runs, else 0
     property real timerPausedMs: -1    // remaining ms while paused, else -1
     property real nowMs: Date.now()
@@ -156,11 +163,30 @@ Item {
             }
         }
     }
+    Companion {
+        id: companionFace
+        objectName: "notchCompanion"
+        x: 9
+        anchors.verticalCenter: parent.verticalCenter
+        width: 16
+        height: 16
+        visible: opacity > 0
+        opacity: pill.companionShown ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+        pointerX: pill.pointerX
+        pointerY: pill.pointerY
+        pointerAt: pill.pointerAt
+        happy: pill.hovered
+        working: pill.working
+        motion: pill.motion
+        bodyColor: pill.textColor
+        eyeColor: pill.background
+    }
     Kirigami.Icon {
         id: micMutedMark
         objectName: "notchMicMuted"
         source: "microphone-sensitivity-muted-symbolic"
-        x: 15
+        x: pill.companionShown ? 29 : 15
         anchors.verticalCenter: parent.verticalCenter
         width: 12
         height: 12

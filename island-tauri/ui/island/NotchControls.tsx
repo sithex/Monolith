@@ -17,6 +17,9 @@ export function NotchControls({ settings, background, accent, patch }: {
     <label className="settings-row"><span>Show notch on every monitor</span><input type="checkbox" className="switch" aria-label="Show notch on every monitor"
       checked={settings.showNotchOnEveryMonitor === true} onChange={e => patch({ showNotchOnEveryMonitor: e.target.checked })} /></label>
     <p className="muted">Plasma: one window follows the clicked notch. Displays without a top panel get a small dedicated notch panel. Requires the updated notch widget.</p>
+    <label className="settings-row"><span>Companion</span><input type="checkbox" className="switch" aria-label="Notch companion"
+      checked={settings.companionEnabled !== false} onChange={e => patch({ companionEnabled: e.target.checked })} /></label>
+    <p className="muted">A small face in the notch whose eyes follow your pointer. Plasma only.</p>
     {color('panelClockColor', 'Notch color', background)}
     <div className="settings-row"><span>Width</span><DraftRange aria-label="Notch width" min={110} max={320} step={2}
       value={settings.notchWidth ?? 144} onCommit={(value, final) => { if (final) patch({ notchWidth: value }); }} />

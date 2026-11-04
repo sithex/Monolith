@@ -160,6 +160,9 @@ pub struct Settings {
     pub notch_width: f64,
     #[serde(default)]
     pub show_notch_on_every_monitor: bool,
+    /// Additive (Nov 3): the small companion face in the notch whose eyes follow the pointer.
+    #[serde(default = "default_true")]
+    pub companion_enabled: bool,
 }
 
 fn default_display_backend() -> DisplayBackend {
@@ -245,6 +248,7 @@ impl Default for Settings {
             display_backend: default_display_backend(),
             notch_width: default_notch_width(),
             show_notch_on_every_monitor: false,
+            companion_enabled: true,
         }
     }
 }
@@ -363,6 +367,7 @@ impl Settings {
                 "showNotchOnEveryMonitor",
                 json!(self.show_notch_on_every_monitor),
             ),
+            ("companionEnabled", json!(self.companion_enabled)),
         ])
     }
 
@@ -572,6 +577,9 @@ pub struct SettingsPatch {
     #[serde(default, deserialize_with = "present")]
     #[specta(optional, type = bool)]
     pub show_notch_on_every_monitor: Option<bool>,
+    #[serde(default, deserialize_with = "present")]
+    #[specta(optional, type = bool)]
+    pub companion_enabled: Option<bool>,
 }
 
 /// Wire wrapper that accepts ONLY a JSON object. A derived struct `Deserialize` would also
@@ -800,6 +808,9 @@ impl SettingsPatch {
         }
         if let Some(v) = self.show_notch_on_every_monitor {
             next.show_notch_on_every_monitor = v;
+        }
+        if let Some(v) = self.companion_enabled {
+            next.companion_enabled = v;
         }
         if let Some(v) = self.notch_width {
             next.notch_width = number("notchWidth", v, NOTCH_WIDTH_RANGE)?.round();
@@ -1070,8 +1081,9 @@ mod tests {
             .collect();
         expected.sort();
         // 40 existing keys + four independent notch border settings + glass strength,
-        // Hermes theme sync, three Custom scheme seed colours, backend/notch width, terminal command.
-        assert_eq!(keys.len(), 53);
+        // Hermes theme sync, three Custom scheme seed colours, backend/notch width, terminal command,
+        // notch on every monitor and the notch companion.
+        assert_eq!(keys.len(), 54);
         assert_eq!(keys, expected);
         assert_eq!(settings.hover_delay, 180.0);
         assert_eq!(settings.ui_font, UiFont::System);

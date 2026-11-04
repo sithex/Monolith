@@ -1015,6 +1015,8 @@ export type Settings = {
 	/**  Additive (Nov 2c): native notch width in logical px (144 = the original slot). */
 	notchWidth?: number,
 	showNotchOnEveryMonitor?: boolean,
+	/**  Additive (Nov 3): the small companion face in the notch whose eyes follow the pointer. */
+	companionEnabled?: boolean,
 };
 
 export type SettingsChanged = Settings;
@@ -1079,6 +1081,7 @@ export type SettingsPatch = {
 	displayBackend?: DisplayBackend,
 	notchWidth?: number,
 	showNotchOnEveryMonitor?: boolean,
+	companionEnabled?: boolean,
 };
 
 export type SystemStats = {

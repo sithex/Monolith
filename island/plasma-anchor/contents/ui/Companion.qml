@@ -58,12 +58,16 @@ Item {
     // `resting` = the pointer has been still for a few seconds.
     signal blinked(bool resting)
 
-    // True on the monitor the pointer is on. With a notch on every monitor, characters
-    // run their constant animations only there, so one panel redraws instead of all of
-    // them; until the pointer first moves, none do.
-    readonly property bool attended: pointerAt > 0
-        && (pointerX >= Screen.virtualX && pointerX < Screen.virtualX + Screen.width
-            && pointerY >= Screen.virtualY && pointerY < Screen.virtualY + Screen.height)
+    // True on the monitor the pointer is on. With a notch on every monitor only that
+    // notch's companion moves, so one panel redraws instead of all of them; until the
+    // pointer first moves, none do.
+    // This notch's monitor in global logical px.
+    property rect screenArea: Qt.rect(Screen.virtualX, Screen.virtualY, Screen.width, Screen.height)
+    readonly property bool attended: pointerAt > 0 && pointerHere(pointerX, pointerY)
+    function pointerHere(x, y) {
+        return x >= screenArea.x && x < screenArea.x + screenArea.width
+            && y >= screenArea.y && y < screenArea.y + screenArea.height;
+    }
 
     readonly property real maxX: .13
     readonly property real maxY: .09
@@ -95,7 +99,11 @@ Item {
     onGlanceChanged: retarget()
     onSizeChanged: retarget()
     onArtChanged: retarget()
+    // On another monitor's notch the whole face holds still (no gaze, blinks, glances,
+    // dozing or thinking looks), so with a notch on every monitor only the one you're
+    // on ever redraws. It picks up again the moment the pointer arrives.
     onPointerAtChanged: {
+        if (pointerAt <= 0 || !pointerHere(pointerX, pointerY)) { ponder.stop(); return; }
         updateLook();
         if (sleepy) wake.restart();
         sleepy = false;
@@ -103,12 +111,15 @@ Item {
         thinking = false;
         if (working) ponder.restart();
     }
-    onWorkingChanged: { if (working) ponder.restart(); else { ponder.stop(); thinking = false; } }
-    onVisibleChanged: if (visible) updateLook()
+    onWorkingChanged: {
+        if (working) { if (attended) ponder.restart(); }
+        else { ponder.stop(); if (attended) thinking = false; }
+    }
+    onVisibleChanged: if (visible && attended) updateLook()
 
     // Dozes off after three quiet minutes, wakes with a wide-eyed blink.
-    Timer { id: drowsy; interval: 180000; running: face.visible && !face.working; onTriggered: face.sleepy = true }
-    Timer { id: ponder; interval: 1500; onTriggered: face.thinking = face.working }
+    Timer { id: drowsy; interval: 180000; running: face.visible && face.attended && !face.working; onTriggered: face.sleepy = true }
+    Timer { id: ponder; interval: 1500; onTriggered: face.thinking = face.working && face.attended }
     SequentialAnimation {
         id: wake
         NumberAnimation { target: face; property: "blink"; to: 1.25; duration: 120; easing.type: Easing.OutQuad }
@@ -123,7 +134,7 @@ Item {
     Timer {
         id: blinker
         interval: 3000
-        running: face.visible && face.motion && !face.sleepy && !face.happy
+        running: face.visible && face.attended && face.motion && !face.sleepy && !face.happy
         onTriggered: {
             blinkOnce.restart();
             const resting = Date.now() - face.pointerAt > 4000;

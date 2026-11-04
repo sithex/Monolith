@@ -27,6 +27,7 @@ TestCase {
     function test_companion_eyes_follow_the_pointer_and_stay_clear() {
         const notch = createTemporaryObject(factory, testCase);
         const face = findChild(notch, "notchCompanion");
+        face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
         const eye = findChild(notch, "companionEye0");
         const clock = findChild(notch, "panelClock");
         // Off by default in the bare pill; main.qml turns it on from the island's settings.
@@ -61,6 +62,7 @@ TestCase {
         const notch = createTemporaryObject(factory, testCase);
         notch.companion = true;
         const face = findChild(notch, "notchCompanion");
+        face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
         const centre = face.mapToGlobal(face.width / 2, face.height / 2);
         notch.pointerX = centre.x + 2500; notch.pointerY = centre.y + 900; notch.pointerAt = Date.now();
         tryVerify(function() { return face.shownX > 1.5; }, 1000);
@@ -88,6 +90,7 @@ TestCase {
         const notch = createTemporaryObject(factory, testCase);
         notch.companion = true;
         const face = findChild(notch, "notchCompanion");
+        face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
         const clock = findChild(notch, "panelClock");
         compare(face.shownCharacter, "blob");
         compare(face.width, 16);
@@ -129,12 +132,22 @@ TestCase {
         compare(art.flowFrame, frame);
         face.happy = false;
         // Pointer on another monitor: this notch's flow rests (one panel redraws, not all).
-        notch.pointerX = Screen.virtualX + Screen.width + 500; notch.pointerAt = Date.now() + 10;
+        const eyeBefore = findChild(face, "companionEye0").x;
+        notch.pointerX = 150000; notch.pointerAt = Date.now() + 10;
         verify(!face.attended);
         const still = art.flowFrame;
+        // The whole face holds still: no gaze, no blink, no flow.
+        let changed = 0;
+        const any = function() { changed++; };
+        face.shownXChanged.connect(any); face.shownYChanged.connect(any); face.blinkChanged.connect(any);
+        notch.pointerX = 150900; notch.pointerY = -300; notch.pointerAt = Date.now() + 12;
         wait(400);
         compare(art.flowFrame, still);
-        notch.pointerX = Screen.virtualX + 10; notch.pointerY = Screen.virtualY + 10; notch.pointerAt = Date.now() + 11;
+        compare(changed, 0);
+        compare(findChild(face, "companionEye0").x, eyeBefore);
+        verify(!findChild(face, "isaacShot").visible);
+        face.shownXChanged.disconnect(any); face.shownYChanged.disconnect(any); face.blinkChanged.disconnect(any);
+        notch.pointerX = centre.x + 10; notch.pointerY = centre.y + 10; notch.pointerAt = Date.now() + 11;
         verify(face.attended);
         tryVerify(function() { return art.flowFrame !== still; }, 1000);
         // Idle shot: a tear flies, splashes and is gone, nothing left running.

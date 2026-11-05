@@ -47,6 +47,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::settings::palette_get,
             commands::settings::hermes_theme_sync,
             commands::settings::notch_scheme_set,
+            commands::settings::settings_defaults,
+            commands::settings::display_outputs,
             commands::terminal::terminal_attach,
             commands::terminal::terminal_input,
             commands::terminal::terminal_copy,

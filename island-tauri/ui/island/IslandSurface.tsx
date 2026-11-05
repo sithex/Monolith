@@ -8,14 +8,16 @@ import { useLayout, useLauncher } from '../stores/apps';
 import { UI_SPRING } from './components/IslandShell';
 import { createGeometryReporter, fitSurface, effectiveLayout, visibleLayout, nativePill, presetSize } from './geometry';
 import { pointerIntent } from './navigation';
-import { arrivalTime, axisSpring, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, surfaceRadius, WITHDRAW_SECONDS } from './motion-profile';
+import { arrivalTime, axisSpring, motionSpeed, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, surfaceRadius, WITHDRAW_SECONDS } from './motion-profile';
 export { UI_SPRING };
 /** The shell has handed the notch back: invisible, out of every morph rule. */
 function arrive(root: HTMLElement) {
   root.style.opacity = '0'; root.dataset.arrived = 'true'; root.dataset.morphing = 'false';
 }
 export function IslandSurface({ children, fail }: { children: ReactNode; fail(error: unknown): void }) {
-  const state = useIslandState(), settings = useSettings(), reduced = useReducedMotion();
+  const state = useIslandState(), settings = useSettings();
+  // Settings → Motion → Reduce motion forces the same path as the OS preference.
+  const reduced = useReducedMotion() === true || settings.reduceMotion === true;
   const layout = useLayout(), launcher = useLauncher(), pill = nativePill(), palette = usePalette();
   const notchPath = useRef<SVGPathElement | null>(null);
   const outer = useRef<HTMLElement | null>(null), current = useRef(state), config = useRef(settings);
@@ -87,7 +89,7 @@ export function IslandSurface({ children, fail }: { children: ReactNode; fail(er
     const height = { ...axisSpring(drawn.height, targetH, 'height'), delay };
     return { sideDelay: reduced ? 0 : arrivalTime(drawn, { width: targetW, height: targetH }), withdrawing,
       transition: reduced ? { duration: 0 } : { width, height, left: width, top: height, borderRadius: height, default: height } };
-  }, [targetW, targetH, state.mode, reduced]);
+  }, [targetW, targetH, state.mode, reduced, motionSpeed()]);
   const radius = state.mode === 'still' ? (pill ? 0 : 20) : Math.min(28, Math.round(targetH * .34));
   const left = pill ? (state.mode === 'still' ? pill.x : pill.x + pill.width / 2 - fit.width / 2) : undefined, top = pill?.y;
   // Arrival under the notch is a pure function of the drawn size (onUpdate/onAnimationComplete),

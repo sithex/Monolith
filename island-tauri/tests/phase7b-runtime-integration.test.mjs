@@ -315,6 +315,50 @@ test('Settings wires the terminal launch preference without restarting or submit
   });}finally{d.dispose();}
 });
 
+test('Settings search shows matching rows from every tab, empty state, Esc clears; card Reset patches Rust defaults after inline confirm',async()=>{
+  const saved=[],appearances=[];
+  const settings={translucent:true,companionEnabled:true,reduceMotion:false,animationSpeed:150,terminalCursorStyle:'bar'};
+  const defaults={reduceMotion:false,animationSpeed:100,swipeNavigation:true,stealth:false,clickSounds:true,gameModeAuto:true,gameMode:false,openShortcut:'Meta+`',
+    customAccent:'',customBackground:'',customText:'',hermesThemeSync:false,accent:'',background:'',borderColor:''};
+  const d=driver({'ui/stores/index.ts':{useSettings:()=>settings,useAppearance:()=> 'album',usePalette:()=>({}),saveSettings:async p=>saved.push(p),saveAppearance:async a=>appearances.push(a)},
+    'ui/ipc/client.ts':{settingsDefaults:async()=>defaults,displayOutputs:async()=>['DP-1'],terminalCopy:async()=>{}}});
+  // globals() restores synchronously; this async body keeps its own fixture for the awaits.
+  const before={navigator:Object.getOwnPropertyDescriptor(globalThis,'navigator'),document:Object.getOwnPropertyDescriptor(globalThis,'document')};
+  for(const [k,v] of Object.entries({navigator:{userAgent:'Linux'},document:{documentElement:{dataset:{displayBackend:'wayland'}}}}))Object.defineProperty(globalThis,k,{value:v,writable:true,configurable:true});
+  try {await (async()=>{
+    const View=d.load('ui/views/SettingsView.tsx').SettingsView;
+    let tree=d.render(View);
+    const rows=t=>nodes(t).filter(n=>typeof n.props?.label==='string'&&n.type?.name==='Row').map(n=>n.props.label);
+    assert.ok(rows(tree).includes('Open shortcut')&&!rows(tree).includes('Terminal cursor'),'General tab only');
+    labeled(tree,'Search settings').props.onChange({target:{value:'CURSOR'}});tree=d.render(View);
+    assert.deepEqual(rows(tree),['Terminal cursor','Blinking cursor'],'Appearance rows found from the General tab');
+    assert.equal(nodes(tree).find(n=>n.props?.role==='tablist'),undefined,'tabs hide while searching');
+    labeled(tree,'Search settings').props.onChange({target:{value:'zzz'}});tree=d.render(View);
+    assert.match(nodes(tree).find(n=>n.props?.className==='settings-empty').props.children.join(''),/No settings match/);
+    let prevented=0;labeled(tree,'Search settings').props.onKeyDown({key:'Escape',preventDefault(){prevented++;},stopPropagation(){}});tree=d.render(View);
+    assert.equal(prevented,1);assert.equal(labeled(tree,'Search settings').props.value,'');
+    labeled(tree,'Search settings').props.onChange({target:{value:'animation'}});tree=d.render(View);
+    const motion=nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Motion');
+    assert.ok(motion?.props.onReset,'Motion card has a Reset');
+    await motion.props.onReset();
+    assert.deepEqual(saved,[{reduceMotion:false,animationSpeed:100}]);
+    labeled(tree,'Search settings').props.onChange({target:{value:'colour scheme'}});tree=d.render(View);
+    await nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Colour scheme').props.onReset();
+    assert.deepEqual(saved[1],{customAccent:'',customBackground:'',customText:'',hermesThemeSync:false,accent:'',background:'',borderColor:''});
+    assert.deepEqual(appearances,['skin'],'scheme reset returns to the default scheme');
+    assert.equal(nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Backup'),undefined);
+  })();}finally{d.dispose();for(const [k,v] of Object.entries(before))if(v)Object.defineProperty(globalThis,k,v);else delete globalThis[k];}
+});
+test('ResetHeader asks inline before resetting',async()=>{
+  const d=driver(),calls=[];
+  const H=d.load('ui/views/SettingsView.tsx').ResetHeader,props={title:'Motion',onReset:async()=>calls.push('reset')};
+  let tree=d.render(H,props);
+  labeled(tree,'Reset Motion').props.onClick();assert.deepEqual(calls,[],'first tap only arms');
+  tree=d.render(H,props);assert.ok(nodes(tree).some(n=>n.type==='small'&&n.props.children==='Reset?'));
+  labeled(tree,'Confirm reset Motion').props.onClick();await tick();assert.deepEqual(calls,['reset']);
+  d.dispose();
+});
+
 function commandHarness(value='',onSave=async()=>{}) {
   const d=driver(),C=d.load('ui/island/TerminalCommandSettings.tsx').TerminalCommandSettings;
   const props={value,onSave};return {...d,props,renderEditor:()=>d.render(C,props)};

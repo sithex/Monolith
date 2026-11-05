@@ -55,6 +55,13 @@ export const commands = {
 	 *  Hermes skin). Not persisted: the island page re-sends it on every load.
 	 */
 	notchSchemeSet: (palette: Palette | null) => typedError<null, IslandError>(__TAURI_INVOKE("notch_scheme_set", { palette })),
+	/**  Nov 5: the schema defaults, so the UI's per-section Reset never duplicates them. */
+	settingsDefaults: () => typedError<Settings, IslandError>(__TAURI_INVOKE("settings_defaults")),
+	/**
+	 *  Nov 5: connected, enabled output names (`kscreen-doctor -j`) for the notch monitor
+	 *  checklist. Read-only, bounded (3 s, 1 MiB); empty when KScreen is unavailable.
+	 */
+	displayOutputs: () => typedError<string[], IslandError>(__TAURI_INVOKE("display_outputs")),
 	/**
 	 *  Spawn the PTY on first call; later calls only replace the output channel (idempotent).
 	 *  Returns the snapshot (replay + `seq`); the channel then carries only newer chunks.

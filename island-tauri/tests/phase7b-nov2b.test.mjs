@@ -15,7 +15,8 @@ test('Green is the frozen necron look and every scheme id is a Rust Appearance',
   assert.deepEqual(GREEN, { background: '#080d0a', surface: '#121c15', border: '#3d6243', dim: '#8a9c8d', text: '#d8e2d7', primary: '#e7eee4', accent: '#80ff36', error: '#ff7272' });
   const ids = SCHEMES.map(s => s.id);
   assert.equal(new Set(ids).size, ids.length);
-  const union = src('ui/ipc/bindings.ts').match(/export type Appearance = ([^;]+);/)[1];
+  // Doc comments may contain ';' (the Album variant's does), so drop them before matching.
+  const union = src('ui/ipc/bindings.ts').replace(/\/\*\*[\s\S]*?\*\//g, '').match(/export type Appearance = ([^;]+);/)[1];
   for (const id of ids) assert.match(union, new RegExp(`"${id}"`), `${id} must exist in the Rust enum`);
   assert.equal(schemePalette('skin', {}), null, 'Hermes skin follows the live skin');
   assert.equal(SCHEMES[0].id, 'skin', 'following the Hermes skin stays the default (first) scheme');

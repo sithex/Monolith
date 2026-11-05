@@ -70,6 +70,8 @@ export const SCHEMES: Scheme[] = [
   { id: 'glacier', name: 'Glacier', note: 'accent #7fd8f0 · ice blue', dots: ['#164356', '#56c6e6', '#e6faff'],
     palette: roles('#061015', '#0d1d25', '#1b3643', '#88a9b5', '#e4f4f8', '#c2f0fb', '#7fd8f0') },
   { id: 'custom', name: 'Custom', note: 'your own colours', dots: ['#2a2a2d', '#9a9aa0', '#ffffff'], palette: null },
+  // Nov 5: derived at runtime from the playing artwork (island/album-scheme.ts); Skin when none.
+  { id: 'album', name: 'Album', note: 'from the playing artwork', dots: ['var(--skin-surface)', 'var(--skin-accent)', 'var(--skin-text)'], palette: null },
 ];
 
 export const schemeById = (id: Appearance) => SCHEMES.find(s => s.id === id) ?? SCHEMES[0]!;

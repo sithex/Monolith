@@ -1,11 +1,29 @@
 export const WITHDRAW_SECONDS = 0.16;
+
+/**
+ * Global animation speed (Settings → Motion → Animation speed, Nov 5): 1 = as designed,
+ * 2 = twice as fast, .5 = half speed. The island root sets it from `animationSpeed` (50..200 %)
+ * before children render; every spring/duration built here divides its time by it, so the
+ * shell morph, `arrivalTime` (side-button hand-off) and the content reveal stay in step.
+ * WITHDRAW_SECONDS and BLUR_RELEASE_MS are deliberately NOT scaled: they pair with CSS
+ * (`.island[data-withdrawing]` .16s) and the KWin blur region, not with spring length.
+ */
+let speed = 1;
+export function setMotionSpeed(percent: number): void {
+  speed = Number.isFinite(percent) ? Math.min(200, Math.max(50, percent)) / 100 : 1;
+}
+export const motionSpeed = () => speed;
+/** A designed duration (seconds or ms) at the current speed. */
+export const scaled = (time: number) => time / speed;
+/** A UI spring (framer `visualDuration` form) at the current speed. */
+export const uiSpring = (visualDuration: number, bounce: number) => ({ type: 'spring' as const, visualDuration: visualDuration / speed, bounce });
 type Axis = 'width' | 'height';
 type Size = { width: number; height: number };
 export type PhysicalSpring = { type: 'spring'; mass: number; stiffness: number; damping: number; restDelta: number; restSpeed: number };
 
 export function axisSpring(from: number, to: number, axis: Axis): PhysicalSpring {
   const growing = to > from;
-  const duration = axis === 'width' ? (growing ? .44 : .30) : (growing ? .38 : .26);
+  const duration = (axis === 'width' ? (growing ? .44 : .30) : (growing ? .38 : .26)) / speed;
   let ratio = growing ? (axis === 'width' ? .75 : .78) : 1;
   const travel = Math.abs(to - from);
   if (growing && travel > 12) {

@@ -61,6 +61,79 @@ pub async fn settings_patch(
     Ok(next)
 }
 
+/// Nov 5: the schema defaults, so the UI's per-section Reset never duplicates them.
+#[tauri::command]
+#[specta::specta]
+pub async fn settings_defaults() -> Result<Settings, IslandError> {
+    Ok(Settings::default())
+}
+
+/// Nov 5: connected, enabled output names (`kscreen-doctor -j`) for the notch monitor
+/// checklist. Read-only, bounded (3 s, 1 MiB); empty when KScreen is unavailable.
+#[tauri::command]
+#[specta::specta]
+pub async fn display_outputs() -> Result<Vec<String>, IslandError> {
+    #[cfg(target_os = "linux")]
+    {
+        blocking(|| {
+            let mut command = std::process::Command::new("kscreen-doctor");
+            command.arg("-j");
+            let raw = crate::services::process::run_bounded(
+                command,
+                std::time::Duration::from_secs(3),
+                1024 * 1024,
+                false,
+            )?;
+            let value: serde_json::Value = serde_json::from_slice(&raw)
+                .map_err(|_| IslandError::invalid("Invalid display helper JSON"))?;
+            Ok(output_names(&value))
+        })
+        .await
+    }
+    #[cfg(not(target_os = "linux"))]
+    Ok(Vec::new())
+}
+
+/// Names of connected, enabled outputs that pass the settings' output-name rule, deduped,
+/// in KScreen order (at most `MAX_NOTCH_MONITORS`).
+pub fn output_names(value: &serde_json::Value) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    for output in value["outputs"].as_array().into_iter().flatten() {
+        if output["connected"] != true || output["enabled"] == false {
+            continue;
+        }
+        if let Some(name) = output["name"].as_str() {
+            if crate::contract::settings::is_output_name(name) && !names.iter().any(|n| n == name) {
+                names.push(name.to_owned());
+            }
+        }
+        if names.len() == crate::contract::settings::MAX_NOTCH_MONITORS {
+            break;
+        }
+    }
+    names
+}
+
+#[cfg(test)]
+mod tests {
+    use super::output_names;
+    use serde_json::json;
+
+    #[test]
+    fn output_names_keep_connected_enabled_valid_unique_outputs() {
+        let value = json!({"outputs":[
+            {"name":"DP-1","connected":true,"enabled":true},
+            {"name":"HDMI-A-1","connected":true},
+            {"name":"eDP-1","connected":true,"enabled":false},
+            {"name":"DP-2","connected":false,"enabled":true},
+            {"name":"bad name;","connected":true,"enabled":true},
+            {"name":"DP-1","connected":true,"enabled":true}]});
+        assert_eq!(output_names(&value), ["DP-1", "HDMI-A-1"]);
+        assert!(output_names(&json!({})).is_empty());
+        assert!(output_names(&json!([1, 2])).is_empty());
+    }
+}
+
 /// Last known palette; computed (bounded) only when nothing is cached yet.
 #[tauri::command]
 #[specta::specta]

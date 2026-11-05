@@ -17,6 +17,8 @@ permissions = [
   "allow-palette-get",
   "allow-hermes-theme-sync",
   "allow-notch-scheme-set",
+  "allow-settings-defaults",
+  "allow-display-outputs",
   "allow-terminal-attach",
   "allow-terminal-input",
   "allow-terminal-copy",

@@ -154,3 +154,51 @@
 .voice-controls .dropdown-menu { left: auto; min-width: 100%; z-index: 40; }
 .island .voice-controls .voice-mute[data-muted='true'] { color: #ff6961; background: rgb(255 69 58 / .14); }
 .island .voice-controls .voice-mute[data-muted='true']:hover:not(:disabled) { background: rgb(255 69 58 / .22); }
+
+/* Album scheme (Nov 5): registered colours so a track change crossfades the palette instead
+   of snapping. Only the Album theme routes --skin-* through these (Island.tsx). */
+@property --album-background { syntax: '<color>'; inherits: true; initial-value: #111111; }
+@property --album-surface { syntax: '<color>'; inherits: true; initial-value: #222222; }
+@property --album-border { syntax: '<color>'; inherits: true; initial-value: #444444; }
+@property --album-dim { syntax: '<color>'; inherits: true; initial-value: #999999; }
+@property --album-text { syntax: '<color>'; inherits: true; initial-value: #dddddd; }
+@property --album-primary { syntax: '<color>'; inherits: true; initial-value: #eeeeee; }
+@property --album-accent { syntax: '<color>'; inherits: true; initial-value: #dddddd; }
+@property --album-error { syntax: '<color>'; inherits: true; initial-value: #ff8888; }
+html[data-theme='album'] {
+  transition-property: --album-background, --album-surface, --album-border, --album-dim, --album-text, --album-primary, --album-accent, --album-error;
+  transition-duration: var(--album-fade, 600ms); transition-timing-function: ease;
+}
+@media (prefers-reduced-motion: reduce) { html[data-theme='album'] { transition-duration: 0s; } }
+/* Settings → Motion → Reduce motion: the same as the OS preference for CSS keyframes. */
+html[data-reduce-motion='true'] .island *, html[data-reduce-motion='true'] .island *::before, html[data-reduce-motion='true'] .island *::after {
+  animation-duration: .001ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; scroll-behavior: auto !important;
+}
+html[data-theme='album'][data-reduce-motion='true'] { transition-duration: 0s; }
+
+/* Settings search, per-card reset, backup (Nov 5). */
+.settings-search { position: relative; display: flex; align-items: center; }
+.settings-search input { width: 100%; box-sizing: border-box; padding: 8px 34px 8px 12px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-xl); background: var(--v-fill); color: var(--ui-text); font: var(--fs-md)/1.4 var(--ui-font); }
+.settings-search input::placeholder { color: var(--v-dim); }
+.settings-search input:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.settings-search button { position: absolute; right: 6px; padding: 2px 6px; color: var(--v-dim); background: none; font-size: var(--fs-md); }
+.settings-card > header { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 2px; }
+.settings-card > header > h3 { flex: 1; margin: 0; font-size: var(--fs-sm); font-weight: 600; color: var(--v-dim); text-transform: uppercase; letter-spacing: .4px; }
+.settings-card > header .link, .settings-card > header small { font-size: var(--fs-sm); background: none; padding: 0; }
+.settings-card > header .link { color: var(--v-dim); }
+.settings-card > header .link:hover, .settings-card > header .link[data-armed='true'] { color: var(--ui-accent); }
+.settings-card > header small { color: var(--v-dim); }
+.settings-empty { padding: 24px 12px; text-align: center; color: var(--v-dim); font-size: var(--fs-md); }
+.settings-text-field { flex: 0 1 220px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; padding: 6px 0; }
+.settings-text-field .settings-field-error { margin: 4px 0 0; }
+.settings-row input[type='text'] { flex: 0 1 220px; min-width: 0; box-sizing: border-box; padding: 6px 10px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); background: rgb(0 0 0 / .25); color: var(--ui-text); font: var(--fs-md)/1.4 var(--ui-mono); }
+.settings-row input[type='text'][aria-invalid='true'] { border-color: var(--ui-error); }
+.settings-row input[type='text']:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.settings-field-error { margin: -6px 0 8px; color: var(--ui-error); font-size: var(--fs-sm); }
+.settings-checklist { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 12px; font-size: var(--fs-md); }
+.settings-checklist label { display: inline-flex; align-items: center; gap: 6px; font-family: var(--ui-mono); }
+.settings-checklist label[data-connected='false'] { color: var(--v-dim); }
+.settings-import { padding: 0 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.settings-import textarea { width: 100%; box-sizing: border-box; resize: vertical; background: rgb(0 0 0 / .25); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); padding: 8px 10px; font: var(--fs-sm)/1.4 var(--ui-mono); }
+.scheme-row[data-testid='appearance-album'] .scheme-dots i { transition: background-color var(--album-fade, 600ms) ease; }
+

@@ -59,6 +59,34 @@ that, plus autostart, updating and the problems you're likely to hit.
 | `island/*.py` | Helpers the notch and the theme sync call |
 | `docs/history/` | Build logs from the rewrite (historical; paths and runtimes in them are out of date) |
 
+## Tests and secrets hook
+
+See [the test commands and opt-in GUI suites](island-tauri/README.md#testing).
+Enable the tracked pre-commit hook from the repository root:
+
+```sh
+git config core.hooksPath .githooks
+bash scripts/check-secrets.sh          # staged changes
+bash scripts/check-secrets.sh --all    # every tracked index blob
+bash scripts/tests/check-secrets.sh    # isolated hook regression checks
+```
+
+The hook reads the complete staged versions of added, copied, renamed, modified and
+mode-changed files, selected by `git diff --cached`; unstaged edits cannot hide a staged
+secret. `--all` also checks unchanged tracked files. Symlink targets are scanned as text,
+without following them. It detects private-key headers, GitHub/OpenAI/Anthropic/Slack/AWS
+tokens, `.env` and `.env.*` files, `100.x.y.z` addresses, and absolute Linux/macOS home
+paths (including the committer's own paths, so results are consistent across machines).
+Reports contain file/line/category and `[REDACTED]`, never matching values. Exit 1 means
+findings; exit 2 or another nonzero status means the scan could not complete.
+
+`scripts/secrets-allowlist.txt` contains one POSIX extended regex per line, with blank
+lines and `#` comments ignored. Rules match `repository/path:category:matched-value`;
+anchor both ends and scope exceptions to exact synthetic fixtures. Exceptions apply
+per finding, so an allowed path cannot hide a token on the same line. The staged
+allowlist is used too. Do not allowlist real credentials. Historical findings remain
+visible to `--all`; they do not block commits that do not change those files.
+
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).

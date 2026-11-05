@@ -278,6 +278,7 @@ impl Drop for Sandbox {
 // ---------------------------------------------------------------------------------------------
 
 #[test]
+#[ignore = "requires Xvfb, an X11 window manager and WebKit; see README Testing"]
 fn overlay_cycle_with_window_manager() {
     let _g = lock();
     let mut sb = Sandbox::new("wm");
@@ -390,6 +391,7 @@ fn overlay_cycle_with_window_manager() {
 }
 
 #[test]
+#[ignore = "requires Xvfb, an X11 window manager and WebKit; see README Testing"]
 fn preview_cycle_non_native_pill() {
     let _g = lock();
     let mut sb = Sandbox::new("preview");
@@ -458,6 +460,7 @@ fn preview_cycle_non_native_pill() {
 }
 
 #[test]
+#[ignore = "requires Xvfb, an X11 window manager and WebKit; see README Testing"]
 fn click_through_is_physical_without_window_manager() {
     let _g = lock();
     let mut sb = Sandbox::new("xt");

@@ -1024,6 +1024,7 @@ fn setup_underlay(conn: &RustConnection, root: u32) -> u32 {
 // ---------------------------------------------------------------------------------------------
 
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn kwin_overlay_native_pill() {
     let _g = lock();
     let mut sb = Stack::new("native");
@@ -1228,6 +1229,7 @@ fn assert_mapped_after_cycle(
 }
 
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn kwin_preview_non_native_pill() {
     let _g = lock();
     let mut sb = Stack::new("preview");

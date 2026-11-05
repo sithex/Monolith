@@ -38,8 +38,7 @@ fn probe(s: &Stack, action: &str) -> String {
 }
 
 fn wait_tray(s: &Stack, pid: u32, unread: u32, dnd: bool) {
-    let label = format!("Notifications ({unread})");
-    let tooltip = format!("Hermes Island — {unread} unread");
+    let tooltip = format!("Monolith — {unread} unread");
     let snapshot = wait_for(
         &format!("native tray count/tooltip={unread}, DND={dnd}"),
         Duration::from_secs(10),
@@ -60,8 +59,9 @@ fn wait_tray(s: &Stack, pid: u32, unread: u32, dnd: bool) {
                 .filter(|row| row["label"] == "Do Not Disturb")
                 .collect();
             let state = actor_state(s);
-            (notifications.len() == 1
-                && notifications[0]["label"] == label
+            // Notifications now live in the app. The native tooltip still tracks
+            // unread count, and the native DND check still mirrors actor state.
+            (notifications.is_empty()
                 && checks.len() == 1
                 && checks[0]["properties"]["toggle-type"] == "checkmark"
                 && checks[0]["properties"]["toggle-state"] == i32::from(dnd)
@@ -100,6 +100,7 @@ fn notify(s: &Stack, title: &str) {
 }
 
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn private_watcher_registers_real_tray_and_menu_dispatches_actor_intents() {
     let _guard = lock();
     let mut s = Stack::new("phase4-tray");

@@ -29,6 +29,7 @@ fn invoke(s: &Stack, name: &str, args: Value) -> Value {
     )
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn remaining_controls_ipc_events_commands_bootstrap_and_module_cleanup_are_private() {
     let _lock = lock();
     let s = Stack::new("p6b2-controls");
@@ -158,6 +159,7 @@ fn remaining_controls_ipc_events_commands_bootstrap_and_module_cleanup_are_priva
         .any(|c| c[0] == "spectacle" && c[1] == json!(["-r"])));
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn agents_ipc_fixture_poll_event_and_module_cleanup_are_private() {
     let _lock = lock();
     let s = Stack::new("p6b2-agents");
@@ -230,6 +232,7 @@ fn agents_ipc_fixture_poll_event_and_module_cleanup_are_private() {
 }
 
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn brightness_ipc_event_and_module_disable_reenable_use_only_the_private_daemon() {
     let _lock = lock();
     let s = Stack::new("p6b2");

@@ -104,6 +104,7 @@ fn drag(s: &Stack, e: &mut Wheel, o: (i32, i32)) {
     until(s,"7b real drag changes authoritative order",8,"(()=>{const ids=[...document.querySelectorAll('[data-tile]')].map(e=>e.dataset.tile);return ids.indexOf('timer')>ids.indexOf('scratchpad')})()");
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn launcher_real_drag_done_persists_across_restart() {
     let _guard = lock();
     let (s, app, c, w, mut e, o) = start("7b-drag");
@@ -134,6 +135,7 @@ fn launcher_real_drag_done_persists_across_restart() {
     finish(s, app, e);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn launcher_real_cancel_does_not_persist() {
     let _guard = lock();
     let (s, app, c, w, mut e, o) = start("7b-cancel");
@@ -154,6 +156,7 @@ fn launcher_real_cancel_does_not_persist() {
     finish(s, app, e);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn launcher_real_disable_badge_hides_unlocked_module() {
     let _guard = lock();
     let (s, app, c, w, mut e, o) = start("7b-disable");
@@ -181,6 +184,7 @@ fn launcher_real_disable_badge_hides_unlocked_module() {
     finish(s, app, e);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn launcher_home_and_settings_are_not_movable_or_disableable() {
     let _guard = lock();
     let (s, app, c, w, mut e, o) = start("7b-locked");
@@ -192,6 +196,7 @@ fn launcher_home_and_settings_are_not_movable_or_disableable() {
     finish(s, app, e);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn timer_completed_activity_is_dismissable_by_real_input() {
     let _guard = lock();
     let (s, app, c, w, mut e, o) = start("7b-timer-dismiss");
@@ -224,6 +229,7 @@ fn timer_completed_activity_is_dismissable_by_real_input() {
     finish(s, app, e);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn frozen_prototype_keeps_real_terminal_and_motion_working() {
     let _guard = lock();
     let (s, app, c, w, mut e, o) = start("7b-frozen");
@@ -256,6 +262,7 @@ fn pacing(s: &Stack) -> Value {
     v
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn native_pill_side_union_and_launcher_app_pacing_use_real_input() {
     let _guard = lock();
     let (s, app, c, w, mut e, o) = start("7b-pacing");
@@ -307,6 +314,7 @@ fn captures(s: &Stack) -> Vec<u32> {
         .collect()
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn media_capture_stops_on_real_navigation_and_collapse() {
     let _guard = lock();
     assert!(

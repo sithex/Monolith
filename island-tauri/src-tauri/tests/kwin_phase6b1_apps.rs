@@ -28,6 +28,7 @@ fn fixture() -> String {
     "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:remote\r\nSUMMARY:Fixture appointment\r\nDTSTART:20261031T120000Z\r\nDTEND:20261031T130000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n".into()
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn apps_commands_events_and_secret_never_cross_ipc_logs_or_status() {
     let _guard = lock();
     let mut s = Stack::new("p6b1");

@@ -1,5 +1,5 @@
 //! Live states for the collapsed Plasma notch (Dynamic-Island style): "Hermes is working",
-//! a running/paused timer, and a muted microphone. Pure: callers sample the services.
+//! "Hermes is waiting for you", a running/paused timer, and a muted microphone. Pure: callers sample the services.
 //!
 //! The payload only changes on real transitions, because it rides the existing notch
 //! appearance push (one plasmashell script call per change, never per second). A running
@@ -21,6 +21,8 @@ pub enum TimerLive {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct NotchLive {
     pub working: bool,
+    /// Hermes asks for approval or an answer; the notch shows it over `working`.
+    pub waiting: bool,
     pub timer: Option<TimerLive>,
     pub mic_muted: bool,
 }
@@ -86,7 +88,7 @@ impl NotchLive {
                 pomodoro,
             }) => json!({"remainingMs": remaining_ms, "paused": true, "pomodoro": pomodoro}),
         };
-        json!({"working": self.working, "timer": timer, "micMuted": self.mic_muted})
+        json!({"working": self.working, "waiting": self.waiting, "timer": timer, "micMuted": self.mic_muted})
     }
 }
 
@@ -146,10 +148,11 @@ mod tests {
         let idle = NotchLive::default().to_json();
         assert_eq!(
             idle,
-            json!({"working": false, "timer": null, "micMuted": false})
+            json!({"working": false, "waiting": false, "timer": null, "micMuted": false})
         );
         let busy = NotchLive {
             working: true,
+            waiting: true,
             mic_muted: true,
             timer: Some(TimerLive::Paused {
                 remaining_ms: 5,
@@ -159,5 +162,6 @@ mod tests {
         .to_json();
         assert_eq!(busy["timer"]["paused"], json!(true));
         assert_eq!(busy["timer"]["remainingMs"], json!(5));
+        assert_eq!(busy["waiting"], json!(true));
     }
 }

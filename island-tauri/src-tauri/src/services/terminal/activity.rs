@@ -1,7 +1,7 @@
 //! "Hermes is working" from the terminal title, never from chat content or output timing.
 //!
 //! Hermes' TUI marks its title with `⏳` while a turn runs, `✓` when idle and `⚠` while it
-//! waits on the user (hermes-agent `ui-tui/src/app/useMainApp.ts`, sent as OSC 0/1/2 on every
+//! waits on the user (approval, sudo, secret or clarify prompt) (hermes-agent `ui-tui/src/app/useMainApp.ts`, sent as OSC 0/1/2 on every
 //! change). Only those escape sequences are parsed, incrementally, so a title split across
 //! reads still counts and text in the transcript never does.
 //!
@@ -12,6 +12,8 @@
 pub const MAX_TITLE: usize = 512;
 /// Title marker Hermes uses while a turn is running.
 pub const BUSY_MARKER: char = '⏳';
+/// Title marker Hermes uses while it waits on the user (approval, sudo, secret, clarify).
+pub const WAIT_MARKER: char = '⚠';
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 enum Parse {
@@ -34,6 +36,7 @@ pub struct TitleActivity {
     state: Parse,
     title: Vec<u8>,
     busy: bool,
+    waiting: bool,
 }
 
 impl TitleActivity {
@@ -81,15 +84,21 @@ impl TitleActivity {
     }
 
     fn finish(&mut self) {
-        self.busy = String::from_utf8_lossy(&self.title)
-            .trim_start()
-            .starts_with(BUSY_MARKER);
+        let title = String::from_utf8_lossy(&self.title);
+        let title = title.trim_start();
+        self.busy = title.starts_with(BUSY_MARKER);
+        self.waiting = title.starts_with(WAIT_MARKER);
         self.title.clear();
     }
 
     /// True while the most recent title says a turn is running.
     pub fn working(&self) -> bool {
         self.busy
+    }
+
+    /// True while the most recent title says Hermes is waiting for the user's answer.
+    pub fn waiting(&self) -> bool {
+        self.waiting
     }
 
     /// A new session starts idle.
@@ -117,6 +126,22 @@ mod tests {
         assert!(feed(&["\x1b]1;⏳ chat\x07".as_bytes()]).working());
         assert!(!feed(&["\x1b]0;⏳ a\x07\x1b]0;✓ a\x07".as_bytes()]).working());
         assert!(!feed(&["\x1b]0;⚠ waiting\x07".as_bytes()]).working());
+    }
+
+    #[test]
+    fn waiting_title_is_its_own_state_and_clears_on_the_next_title() {
+        let mut t = feed(&["\x1b]0;⏳ chat\x07\x1b]2;⚠ chat · opus\x1b\\".as_bytes()]);
+        assert!(t.waiting() && !t.working());
+        t.output("\x1b]0;⏳ chat\x07".as_bytes());
+        assert!(!t.waiting() && t.working());
+        t.output("\x1b]0;⚠ again\x07\x1b]0;✓ chat\x07".as_bytes());
+        assert!(!t.waiting() && !t.working());
+        // A warning sign in the transcript is not a title.
+        t.output("⚠ approval needed".as_bytes());
+        assert!(!t.waiting());
+        t.output("\x1b]0;⚠ x\x07".as_bytes());
+        t.reset();
+        assert!(!t.waiting());
     }
 
     #[test]

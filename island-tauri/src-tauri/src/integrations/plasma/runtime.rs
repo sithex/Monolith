@@ -92,10 +92,15 @@ fn legacy_mode_name(mode: IslandMode) -> &'static str {
 /// contribute nothing; this never blocks on a worker.
 fn live_state(app: &tauri::AppHandle) -> super::notch_live::NotchLive {
     use super::notch_live::{timer_live, NotchLive};
+    let services = app.try_state::<Services>();
+    // Waiting is sent only when something shows it, so a muted state costs no Plasma push.
+    let shows_waiting = services
+        .as_ref()
+        .and_then(|s| s.settings.get().ok())
+        .is_some_and(|s| s.notch_waiting_pulse || (s.companion_enabled && s.companion_reactive));
     let mut live = NotchLive {
-        working: app
-            .try_state::<Services>()
-            .is_some_and(|s| s.terminal.working()),
+        working: services.as_ref().is_some_and(|s| s.terminal.working()),
+        waiting: shows_waiting && services.as_ref().is_some_and(|s| s.terminal.waiting()),
         ..Default::default()
     };
     if let Some(system) =
@@ -180,6 +185,8 @@ fn snapshot(
         "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
         "companion":settings.companion_enabled,
         "companionCharacter":settings.companion_character,
+        "companionReactive":settings.companion_reactive,"companionMonitor":settings.companion_monitor,
+        "waitingPulse":settings.notch_waiting_pulse,"hoverPeek":settings.notch_hover_peek,"hoverDelay":settings.hover_delay,
         "notchBorder":{"enabled":settings.notch_border_enabled,"color":border_color,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width},
         "background":background,"text":palette.as_ref().map(|p|&p.text),"dim":palette.as_ref().map(|p|&p.dim),
         "live":live.to_json()}),
@@ -254,6 +261,36 @@ fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
     Ok(json!({"x":target.x,"y":target.y,"width":target.width,"height":target.height}))
 }
 
+/// Logical origins of the outputs that may get an added notch (`None` = every monitor).
+/// Plasma's script API knows screens only by index, so they are matched by origin, the same
+/// way `anchor` pairs panels with outputs. A listed name that isn't connected matches nothing.
+fn notch_screen_origins(outputs: &Value, names: &[String]) -> Option<Vec<[f64; 2]>> {
+    if names.is_empty() {
+        return None;
+    }
+    Some(
+        outputs["outputs"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|o| o["connected"] == true && o["enabled"] != false)
+            .filter(|o| {
+                o["name"]
+                    .as_str()
+                    .is_some_and(|n| names.iter().any(|w| w == n))
+            })
+            .filter_map(|o| Some([o["pos"]["x"].as_f64()?, o["pos"]["y"].as_f64()?]))
+            .collect(),
+    )
+}
+
+fn monitor_script(enabled: bool, style: &Value, origins: Option<&[[f64; 2]]>) -> String {
+    include_str!("monitor-notches.js")
+        .replace("__ENABLED__", if enabled { "true" } else { "false" })
+        .replace("__STYLE__", &style.to_string())
+        .replace("__ORIGINS__", &json!(origins).to_string())
+}
+
 fn panel_style_payload(raw: &Value) -> Value {
     let keys = [
         "background",
@@ -266,6 +303,11 @@ fn panel_style_payload(raw: &Value) -> Value {
         "notchWidth",
         "companion",
         "companionCharacter",
+        "companionReactive",
+        "companionMonitor",
+        "waitingPulse",
+        "hoverPeek",
+        "hoverDelay",
         "live",
     ];
     Value::Object(
@@ -305,6 +347,33 @@ mod notch_tests {
         assert!(!script.contains("p.remove()"));
         assert!(script.contains("report.notches.push"));
         assert!(script.contains("__ENABLED__") && script.contains("__STYLE__"));
+        assert!(script.contains("__ORIGINS__"));
+        let filled = monitor_script(true, &json!({"a":1}), Some(&[[0.0, 0.0], [-1920.0, 0.0]]));
+        assert!(filled.contains("(true, {\"a\":1}, [[0.0,0.0],[-1920.0,0.0]])"));
+        assert!(monitor_script(true, &json!({}), None).contains(", null)"));
+    }
+    #[test]
+    fn notch_monitor_filter_matches_connected_outputs_by_name() {
+        let outputs = json!({"outputs":[
+            {"name":"DP-1","connected":true,"enabled":true,"pos":{"x":0,"y":0}},
+            {"name":"DP-2","connected":true,"enabled":true,"pos":{"x":-1920,"y":120}},
+            {"name":"HDMI-A-1","connected":true,"enabled":false,"pos":{"x":2560,"y":0}},
+            {"name":"DP-3","connected":false,"pos":{"x":9000,"y":0}}]});
+        assert_eq!(
+            notch_screen_origins(&outputs, &[]),
+            None,
+            "empty = every monitor"
+        );
+        let names = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            notch_screen_origins(&outputs, &names(&["DP-2"])),
+            Some(vec![[-1920.0, 120.0]])
+        );
+        // Disabled, unplugged and unknown outputs match nothing (no screen qualifies).
+        assert_eq!(
+            notch_screen_origins(&outputs, &names(&["HDMI-A-1", "DP-3", "nope"])),
+            Some(vec![])
+        );
     }
 }
 
@@ -414,7 +483,8 @@ impl NativeHost {
                 let mut last_write = Instant::now();
                 let mut last_panel_style = Value::Null;
                 let mut anchor = anchor;
-                let mut last_enabled: Option<bool> = None;
+                // Reconciled when "every monitor" or its monitor list changes (or notch width).
+                let mut last_monitors: Option<(bool, Vec<String>)> = None;
                 let mut last_companion: Option<bool> = None;
                 let mut anchors = Vec::<Anchor>::new();
                 let mut anchors_read: Option<Instant> = None;
@@ -462,15 +532,24 @@ impl NativeHost {
                             }
                         }
                         let live = live_state(&handle).stabilised(Some(&last_live));
-                        // Plasma is reconciled only at startup and when the setting (or notch
-                        // width) changes: never periodically, never on a click, never retried.
-                        if allow_panel_push && last_enabled != Some(enabled) {
-                            last_enabled = Some(enabled);
+                        // Plasma is reconciled only at startup and when the setting, its monitor
+                        // list (or notch width) changes: never periodically, never on a click,
+                        // never retried.
+                        let monitors = (enabled, settings.notch_monitors.clone());
+                        if allow_panel_push && last_monitors.as_ref() != Some(&monitors) {
+                            last_monitors = Some(monitors);
                             let result = (|| -> Result<()> {
                                 let style = panel_style_payload(&snapshot(&handle, &anchor, &bounds, &live)?);
-                                let script = include_str!("monitor-notches.js")
-                                    .replace("__ENABLED__", if enabled { "true" } else { "false" })
-                                    .replace("__STYLE__", &style.to_string());
+                                // Only a chosen subset needs the output names (one kscreen read).
+                                let origins = if enabled && !settings.notch_monitors.is_empty() {
+                                    let [outputs, _] = super::anchor::discovery_commands();
+                                    let out = crate::services::process::run_bounded(outputs, Duration::from_secs(3), 1024 * 1024, false)?;
+                                    let outputs: Value = serde_json::from_slice(&out).context("Invalid outputs")?;
+                                    notch_screen_origins(&outputs, &settings.notch_monitors)
+                                } else {
+                                    None
+                                };
+                                let script = monitor_script(enabled, &style, origins.as_deref());
                                 let reconcile = || -> Result<Value> {
                                     let mut command = std::process::Command::new("/usr/bin/qdbus6");
                                     command.args(["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", &script]);
@@ -636,7 +715,7 @@ impl NativeHost {
                                             && last_panel_style.get("notchWidth") != style.get("notchWidth");
                                         last_panel_style = style;
                                         // A new width moves the notches: re-discover once (a setting change, not a loop).
-                                        if width_changed { last_enabled = None; }
+                                        if width_changed { last_monitors = None; }
                                     }
                                     Err(error) => tracing::debug!(%error, "Native notch appearance push unavailable"),
                                 }

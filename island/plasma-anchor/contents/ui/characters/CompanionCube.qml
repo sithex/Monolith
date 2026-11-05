@@ -7,7 +7,8 @@ import QtQuick
 // is a whole pixel, so a pointer move that doesn't change the facing draws nothing.
 //
 // Hover: the heart lights up and a little heart floats above it. Idle habit: a
-// heartbeat, thump-thump, and a tiny heart drifts up. Dozing dims the heart.
+// heartbeat, thump-thump, and a tiny heart drifts up. Dozing dims the heart; while Hermes
+// waits for you the heart turns amber.
 HabitCharacter {
     id: art
     gazeScale: 1
@@ -24,7 +25,9 @@ HabitCharacter {
     readonly property var faceColors: ({ "O": "#2c2d33", "W": "#e6e6ea", "w": "#b9bac1", "g": "#8a8c95", "d": "#6b6d76", "R": "#5a5c66", "D": "#f3f1f3", "p": art.happy ? "#ff9cc8" : art.asleep ? "#9a6f86" : "#e58cb6" })
     readonly property var sideColors: ({ "O": "#24252a", "W": "#a4a5ad", "w": "#86878f", "d": "#55565e", "p": "#a85a80" })
     readonly property var topColors: ({ "O": "#3a3b42", "W": "#f7f7fa", "w": "#d3d4d9", "d": "#8e9098", "p": "#f2a6c8" })
-    readonly property var heartColors: art.happy ? ({ "H": "#ff5fa8", "L": "#ffd3e6" })
+    // No eyes to widen, so waiting shows in the heart: amber until you answer.
+    readonly property var heartColors: art.mood === "waiting" && !art.happy ? ({ "H": String(art.face.alertColor), "L": "#ffd89a" })
+        : art.happy ? ({ "H": "#ff5fa8", "L": "#ffd3e6" })
         : art.asleep ? ({ "H": "#a35f80", "L": "#c08aa4" })
         : ({ "H": "#ec6aa6", "L": "#ffb5d6" })
 

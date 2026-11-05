@@ -185,15 +185,15 @@ Item {
 
     // Choppy pixel-style flow: the streams' bands step down `flowSteps` frames per cycle
     // at 8 ticks a second, both streams on the same tick (one panel redraw per tick).
-    // Only on the monitor the pointer is on; stops while cheered up, dozing or with
-    // animations off.
+    // Only on the monitor the pointer is on; stops while cheered up, dozing, settled (no
+    // pointer move for a minute: the streams hold a still frame) or with animations off.
     readonly property int flowSteps: 8
     property int flowFrame: 0
     Timer {
         id: flowTick
         interval: 125
         repeat: true
-        running: art.flowing && art.face && art.face.attended && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
+        running: art.flowing && art.face && art.face.attended && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy && !art.face.settled
         onTriggered: art.flowFrame = (art.flowFrame + 1) % art.flowSteps
     }
     // Flow and drip are alternatives; flow is on.

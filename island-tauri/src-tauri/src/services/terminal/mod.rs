@@ -286,6 +286,14 @@ impl Terminal {
         self.shared.activity().working()
     }
 
+    /// True while Hermes waits for the user's answer (approval/clarify title marker).
+    pub fn waiting(&self) -> bool {
+        if !lock(&self.shared).running {
+            return false;
+        }
+        self.shared.activity().waiting()
+    }
+
     pub fn snapshot(&self) -> TerminalSnapshot {
         lock(&self.shared).snapshot()
     }

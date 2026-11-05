@@ -1,5 +1,5 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'framer-motion';
 import { dispatch, subscribeCue, useIslandState } from '../ipc/island-state';
 import { useSettings, usePalette, useAppearance, runtimeStore } from '../stores';
 import { IslandSurface } from './IslandSurface';
@@ -11,7 +11,7 @@ import { SideControls } from './SideControls';
 import { VoiceControls } from './VoiceControls';
 import { ColorPickerPanel } from './components/ColorField';
 import { AppsView as AppsViewInner } from '../views/AppsView';
-import { configureAppTopics, useLauncher } from '../stores/apps';
+import { configureAppTopics, useLauncher, useMedia } from '../stores/apps';
 import type { IslandView } from '../ipc/client';
 import { SettingsView as SettingsViewInner } from '../views/SettingsView';
 import { MonitorView as MonitorViewInner } from '../views/MonitorView';
@@ -34,11 +34,18 @@ import './polish.css';
 import { schemePalette } from './tokens/schemes';
 import { useHermesThemeSync, themePayload } from './hermes-theme';
 import { notchSchemeSet } from '../ipc/client';
+import { useAlbumScheme } from './album-scheme';
+import { ALBUM_FADE_MS } from './tokens/album';
+import { scaled, setMotionSpeed } from './motion-profile';
 
 const playClick = createClickSound();
+/** framer's default (tween .3 s) at the chosen speed; undefined at 100 % keeps framer's own defaults. */
+const motionSpeedDefault = (percent: number | undefined) => !percent || percent === 100 ? undefined : { duration: 0.3 * 100 / Math.min(200, Math.max(50, percent)) };
 export function Island() {
   const state = useIslandState(), settings = useSettings(), palette = usePalette(), appearance = useAppearance();
-  const launcher = useLauncher();
+  const launcher = useLauncher(), media = useMedia();
+  // Settings → Motion: set before any child builds a spring this render (motion-profile).
+  setMotionSpeed(settings.animationSpeed ?? 100);
   const [error, setError] = useState('');
   const fail = useCallback((error: unknown) => setError(error instanceof Error ? error.message : String(error)), []);
   // An error is news, not state: it used to stay on screen until the island reloaded.
@@ -49,7 +56,10 @@ export function Island() {
   }, [error]);
   useEffect(() => { void configureAppTopics(settings).catch(fail); }, [settings.moduleRegistry]);
   // Scheme presets replace every palette role (island CSS + xterm); explicit overrides still win.
-  const scheme = useMemo(() => schemePalette(appearance, settings), [appearance, settings.customAccent, settings.customBackground, settings.customText]);
+  // Album (Nov 5): accent + tint from the playing artwork; null (no artwork) follows the skin.
+  const album = useAlbumScheme(appearance === 'album', media?.nowPlaying?.artUrl ?? null, state.view === 'settings');
+  const scheme = useMemo(() => appearance === 'album' ? album : schemePalette(appearance, settings),
+    [appearance, album, settings.customAccent, settings.customBackground, settings.customText]);
   const effective = useMemo(() => { const base = { ...palette, ...(scheme ?? {}) };
     return { ...base, background: settings.background || base.background, accent: settings.accent || base.accent }; }, [palette, scheme, settings.background, settings.accent]);
   useHermesThemeSync(settings.hermesThemeSync === true, scheme === null ? null : effective, fail);
@@ -59,6 +69,7 @@ export function Island() {
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = appearance;
+    root.dataset.reduceMotion = String(settings.reduceMotion === true);
     root.dataset.font = settings.uiFont;
     root.dataset.glass = String(settings.translucent !== false);
     // 0..100 → the body's see-through fraction (55 = the default look).
@@ -67,7 +78,15 @@ export function Island() {
     root.style.setProperty('--notch-text', (scheme ?? palette).text);
     root.dataset.panelAnchor = String(runtimeStore.getSnapshot().panelAnchor);
     root.style.setProperty('--ui-font', settings.uiFont === 'system' ? '"Noto Sans", system-ui, sans-serif' : '"OpenRunde", "Noto Sans", system-ui, sans-serif');
-    for (const [role, value] of Object.entries(effective)) if (role !== 'name') root.style.setProperty(`--skin-${role}`, value);
+    // Album crossfades: its roles go through registered `--album-*` colours that transition
+    // (polish.css); every other scheme sets `--skin-*` directly, as before. `--album-*` always
+    // tracks the live palette so choosing Album fades from the previous scheme, not from grey.
+    const fade = appearance === 'album';
+    for (const [role, value] of Object.entries(effective)) if (role !== 'name') {
+      root.style.setProperty(`--album-${role}`, value);
+      root.style.setProperty(`--skin-${role}`, fade ? `var(--album-${role})` : value);
+    }
+    root.style.setProperty('--album-fade', `${settings.reduceMotion ? 0 : ALBUM_FADE_MS}ms`);
     root.style.setProperty('--island-border', settings.borderEnabled ? settings.borderColor || 'var(--ui-border)' : 'transparent');
   }, [effective, settings, appearance, palette.text, scheme]);
   useLayoutEffect(() => subscribeCue(() => playClick(settings.clickSounds)), [settings.clickSounds]);
@@ -87,12 +106,14 @@ export function Island() {
     if (target === 'terminal') history.current = [];
     goingBack.current = true; navigate(target);
   };
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotion() === true || settings.reduceMotion === true;
   // Reveal: content holds while the shell grows, then fades/scales in from the top. No blur:
   // a filter over the whole page (xterm included) was costly and lingered as blur(0px) at rest.
   const shown = { opacity: [0, 0, 1], scale: [0.86, 0.86, 1] };
-  const showTransition = { duration: 0.45, times: [0, 0.35, 1], ease: [0.22, 1, 0.36, 1] as const };
-  const reveal = reduced ? { initial: false as const } : { initial: { opacity: 0, scale: 0.86 }, animate: shown, transition: showTransition };
+  const showTransition = { duration: scaled(0.45), times: [0, 0.35, 1], ease: [0.22, 1, 0.36, 1] as const };
+  // Reduced motion: no scale/hold, only a short opacity fade.
+  const fadeOnly = { duration: 0.12, ease: 'easeOut' as const };
+  const reveal = reduced ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: fadeOnly } : { initial: { opacity: 0, scale: 0.86 }, animate: shown, transition: showTransition };
   // The departing page keeps its last layout while it fades; the shell contracts only
   // after the side controls have withdrawn. The terminal is never remounted.
   const wrap = useRef<HTMLDivElement>(null), wasActive = useRef(active);
@@ -103,17 +124,19 @@ export function Island() {
     if (!active && wasActive.current && wrap.current && !reduced) {
       const e = wrap.current;
       setClosing({ position: 'absolute', left: e.offsetLeft, top: e.offsetTop, width: e.offsetWidth, height: e.offsetHeight, flex: 'none', pointerEvents: 'none' });
-      timer = setTimeout(() => setClosing(null), 750);
+      timer = setTimeout(() => setClosing(null), scaled(750));
     } else if (active) setClosing(null);
     wasActive.current = active;
     return () => { if (timer) clearTimeout(timer); };
   }, [active, reduced]);
   // The open content is never remounted (xterm/PTY identity); it is re-revealed in place.
-  const openMotion = reduced ? { initial: false as const } : { initial: false as const,
+  const openMotion = reduced ? { initial: false as const, animate: { opacity: active ? 1 : 0, scale: 1 }, transition: fadeOnly } : { initial: false as const,
     animate: active ? shown : { opacity: 0, scale: 1 },
-    transition: active ? showTransition : { duration: 0.16, ease: 'easeIn' as const } };
+    transition: active ? showTransition : { duration: scaled(0.16), ease: 'easeIn' as const } };
   const views = [...new Set(launcher.items.filter(i => i.enabled && i.known && i.view && i.view !== 'controls').map(i => i.view as IslandView))];
-  return <main onClickCapture={event => {
+  // One place for framer-wide motion: Reduce motion = 'always' (transforms/layout snap, opacity
+  // still fades); otherwise the OS preference. Default transitions follow the speed setting.
+  return <MotionConfig reducedMotion={settings.reduceMotion ? 'always' : 'user'} transition={motionSpeedDefault(settings.animationSpeed)}><main onClickCapture={event => {
     if ((event.target as HTMLElement).closest('button:not(:disabled)')) playClick(settings.clickSounds);
   }}><IslandSurface fail={fail}>
     <Topline fail={fail} />
@@ -127,7 +150,9 @@ export function Island() {
           <div className="view-pane" data-pane={view}>
             <div className="app-pane" hidden={view !== 'launcher'}>{view === 'launcher' && <Launcher navigate={navigate} fail={fail} />}</div>
             <motion.div className="app-pane terminal-pane" hidden={view !== 'terminal'} initial={false} animate={{ opacity: view === 'terminal' ? 1 : 0 }}>
-              {state.terminalStarted && <Suspense fallback={null}><TerminalView active={active && view === 'terminal'} palette={effective} fontSize={settings.terminalFontSize} fail={fail} /></Suspense>}
+              {state.terminalStarted && <Suspense fallback={null}><TerminalView active={active && view === 'terminal'} palette={effective} fontSize={settings.terminalFontSize}
+                fontFamily={settings.terminalFontFamily ?? ''} scrollback={settings.terminalScrollback ?? 5000}
+                cursorStyle={settings.terminalCursorStyle ?? 'block'} cursorBlink={settings.terminalCursorBlink !== false} fail={fail} /></Suspense>}
             </motion.div>
             <motion.div className="app-pane" hidden={view !== 'monitor'} initial={false} animate={{ opacity: view === 'monitor' ? 1 : 0 }}><MonitorView active={active && view === 'monitor'} /></motion.div>
             <motion.div className="app-pane" hidden={view !== 'ai'} initial={false} animate={{ opacity: view === 'ai' ? 1 : 0 }}><AiStatsView active={active && view === 'ai'} /></motion.div>
@@ -143,5 +168,5 @@ export function Island() {
       initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: 10, transition: { duration: 0.16, ease: 'easeIn' } }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}>{error}</motion.div>}</AnimatePresence>
-  </IslandSurface><SideControls navigate={navigate} fail={fail} view={view} back={{ view: previous, label: viewLabels[previous], go: goBack }} /><ColorPickerPanel /><Toast previews={false} /></main>;
+  </IslandSurface><SideControls navigate={navigate} fail={fail} view={view} back={{ view: previous, label: viewLabels[previous], go: goBack }} /><ColorPickerPanel /><Toast previews={false} /></main></MotionConfig>;
 }

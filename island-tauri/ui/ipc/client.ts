@@ -105,6 +105,10 @@ export const settingsGet = (): Promise<Settings> => unwrap(commands.settingsGet(
 export const settingsPatch = (patch: SettingsPatch): Promise<Settings> =>
   unwrap(commands.settingsPatch(patch));
 export const paletteGet = (): Promise<Palette> => unwrap(commands.paletteGet());
+/** Nov 5: `Settings::default()` from the schema table (per-card Reset in Settings). */
+export const settingsDefaults = (): Promise<Settings> => unwrap(commands.settingsDefaults());
+/** Nov 5: connected, enabled KScreen output names (notch monitor checklist); [] if unknown. */
+export const displayOutputs = (): Promise<string[]> => unwrap(commands.displayOutputs());
 /** Nov 2: write the island scheme as the Hermes skin (palette) or restore the previous skin (null). */
 export const hermesThemeSync = (palette: Palette | null): Promise<string> => unwrap(commands.hermesThemeSync(palette));
 /** Nov 2: the active scheme's roles for the native notch (null = follow the Hermes skin). */

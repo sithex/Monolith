@@ -18,6 +18,8 @@ const COMMANDS: &[&str] = &[
     "palette_get",
     "hermes_theme_sync",
     "notch_scheme_set",
+    "settings_defaults",
+    "display_outputs",
     "terminal_attach",
     "terminal_input",
     "terminal_copy",

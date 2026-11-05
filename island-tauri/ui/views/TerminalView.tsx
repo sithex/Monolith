@@ -7,16 +7,18 @@ import { createTerminalFlow } from './terminal-flow';
 import { keepIslandColours } from './terminal-colours';
 import { terminalShortcut, keepTerminalClipboard, trackAppSelection } from './terminal-shortcuts';
 import { createAutoRestart } from './terminal-respawn';
+import { applyTerminalOptions, terminalOptions, type TerminalLook } from './terminal-options';
 import '@xterm/xterm/css/xterm.css';
-export function TerminalView({ active, palette, fontSize, fail }: { active: boolean; palette: Palette; fontSize: number; fail(error: unknown): void }) {
+export function TerminalView({ active, palette, fontSize, fail, fontFamily = '', scrollback = 5000, cursorStyle = 'block', cursorBlink = true }:
+  { active: boolean; palette: Palette; fontSize: number; fail(error: unknown): void } & Partial<TerminalLook>) {
   const host = useRef<HTMLDivElement>(null), term = useRef<Terminal | null>(null);
   const visible = useRef(active), resize = useRef(() => {});
   visible.current = active;
   // Deliberately independent of mode/view: collapse and view changes NEVER recreate xterm/PTY.
   useEffect(() => {
     if (!host.current) return;
-    const terminal = new Terminal({ cursorBlink: true, fontFamily: '"DejaVu Sans Mono", monospace', fontSize,
-      scrollback: 5000, theme: theme(palette), allowProposedApi: false, allowTransparency: true });
+    const terminal = new Terminal({ ...terminalOptions({ fontFamily, scrollback, cursorStyle, cursorBlink }), fontSize,
+      theme: theme(palette), allowProposedApi: false, allowTransparency: true });
     const fitter = new FitAddon(); terminal.loadAddon(fitter); terminal.open(host.current); term.current = terminal;
     const appSelection = trackAppSelection(terminal, host.current);
     terminal.attachCustomKeyEventHandler(event => terminalShortcut(event, data => terminal.input(data, true),
@@ -84,6 +86,10 @@ export function TerminalView({ active, palette, fontSize, fail }: { active: bool
     // The first palette/font are supplied by bootstrap; subsequent changes update options below.
   }, []);
   useEffect(() => { if (term.current) { term.current.options.fontSize = fontSize; term.current.options.theme = theme(palette); resize.current(); } }, [palette, fontSize]);
+  // Nov 5: font family / scrollback / cursor apply to the live instance (never recreated).
+  useEffect(() => {
+    if (term.current && applyTerminalOptions(term.current.options as unknown as Record<string, unknown>, { fontFamily, scrollback, cursorStyle, cursorBlink })) resize.current();
+  }, [fontFamily, scrollback, cursorStyle, cursorBlink]);
   useEffect(() => { if (active) resize.current(); }, [active]);
   return <div className="terminal" ref={host} aria-label="Hermes interactive terminal" />;
 }

@@ -1,21 +1,57 @@
-import { useLayoutEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { SettingsPatch } from '../ipc/client';
+import { displayOutputs, settingsDefaults, terminalCopy, type Appearance, type Settings, type SettingsPatch } from '../ipc/client';
 import { saveSettings, saveAppearance, useSettings, useAppearance, usePalette } from '../stores';
 import { NotchControls } from '../island/NotchControls';
 import { LayoutEditor } from '../island/LayoutEditor';
 import { SchemePicker } from '../island/SchemePicker';
 import { DraftRange } from '../island/components/AppPrimitives';
 import { TerminalCommandSettings } from '../island/TerminalCommandSettings';
+import { uiSpring } from '../island/motion-profile';
+import { SCHEMES } from '../island/tokens/schemes';
+import { DEFAULT_APPEARANCE, cardSpec, exportSettings, fontFamilyError, normalize, parseImport, resetPatch, rowSpec, searchRows, shortcutError, shownRows, type Tab } from './settings-model';
 
-
-type Tab = 'general' | 'appearance' | 'layout';
+const message = (e: unknown) => e instanceof Error ? e.message : String(e);
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return <div className="settings-row"><span className="label">{label}{hint && <small>{hint}</small>}</span>{children}</div>;
 }
 export function Card({ title, children }: { title?: string; children: ReactNode }) {
   return <section className="settings-card">{title && <h3>{title}</h3>}{children}</section>;
+}
+/**
+ * Card title with an inline two-tap Reset ("Reset" → "Reset? Confirm"), no modal. The armed
+ * state disarms itself after 4 s or when the pointer leaves the card header.
+ */
+export function ResetHeader({ title, onReset }: { title: string; onReset?(): Promise<void> }) {
+  const [armed, setArmed] = useState(false), [busy, setBusy] = useState(false);
+  useEffect(() => { if (!armed) return; const t = setTimeout(() => setArmed(false), 4000); return () => clearTimeout(t); }, [armed]);
+  return <header><h3>{title}</h3>
+    {onReset && (armed
+      ? <><small>Reset?</small><button type="button" className="link" data-armed="true" aria-label={`Confirm reset ${title}`} disabled={busy}
+          onClick={() => { setBusy(true); void onReset().finally(() => { setBusy(false); setArmed(false); }); }}>Confirm</button></>
+      : <button type="button" className="link" aria-label={`Reset ${title}`} onClick={() => setArmed(true)}>Reset</button>)}
+  </header>;
+}
+/** Text setting saved on Enter/blur; validated locally first, Rust's error shown on rejection. */
+function TextSetting({ label, value, placeholder, validate, onSave, maxLength }: {
+  label: string; value: string; placeholder?: string; maxLength: number;
+  validate(value: string): string | null; onSave(value: string): Promise<void>;
+}) {
+  const [draft, setDraft] = useState(value), [error, setError] = useState<string | null>(null), previous = useRef(value);
+  useEffect(() => { if (draft === previous.current) setDraft(value); previous.current = value; }, [value]);
+  const local = validate(draft), shown = error ?? local;
+  const commit = () => {
+    if (local || draft.trim() === value) return;
+    setError(null);
+    onSave(draft.trim()).catch(e => setError(message(e)));
+  };
+  return <div className="settings-text-field">
+    <input type="text" aria-label={label} value={draft} placeholder={placeholder} maxLength={maxLength} spellCheck={false} autoComplete="off"
+      aria-invalid={shown ? true : undefined} onChange={e => { setDraft(e.target.value); setError(null); }} onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape' && draft !== value) { e.preventDefault(); e.stopPropagation(); setDraft(value); setError(null); } }} />
+    {shown && <p className="settings-field-error" role="alert">{shown}</p>}
+  </div>;
 }
 function DeniedApps({ value, onSave }: { value: string; onSave(apps: string[]): void }) {
   const [open, setOpen] = useState(false), [draft, setDraft] = useState(value);
@@ -28,6 +64,40 @@ function DeniedApps({ value, onSave }: { value: string; onSave(apps: string[]): 
       <div className="app-footer"><span className="muted">Exact names, one per line</span><span className="title-spacer" />
         <button className="pill-button primary" onClick={() => { onSave(draft === '' ? [] : draft.split('\n').filter(l => l !== '')); setOpen(false); }}>Save</button></div>
     </div>}
+  </>;
+}
+/**
+ * Export = JSON to the clipboard (Rust GTK clipboard; no dialog plugin is bundled).
+ * Import = paste box → one atomic `settings_patch` (Rust validates every key or none).
+ */
+function Backup({ settings, appearance, show }: { settings: Settings; appearance: Appearance; show(id: string): boolean }) {
+  const [open, setOpen] = useState(false), [draft, setDraft] = useState(''), [status, setStatus] = useState(''), [error, setError] = useState('');
+  const copy = async () => {
+    setError(''); setStatus('');
+    try { await terminalCopy(exportSettings(settings, appearance)); setStatus('Copied settings JSON to the clipboard'); }
+    catch (e) { setError(message(e)); }
+  };
+  const apply = async () => {
+    setError(''); setStatus('');
+    try {
+      const { patch, appearance: scheme } = parseImport(draft, SCHEMES.map(s => s.id));
+      await saveSettings(patch);
+      if (scheme && scheme !== appearance) await saveAppearance(scheme);
+      setStatus(`Imported ${Object.keys(patch).length} settings`); setOpen(false); setDraft('');
+    } catch (e) { setError(message(e)); }
+  };
+  return <>
+    {show('exportSettings') && <Row label="Export settings" hint={status || 'Copies your settings as JSON to the clipboard'}>
+      <button className="link" type="button" onClick={() => { void copy(); }}>Copy JSON</button></Row>}
+    {show('importSettings') && <Row label="Import settings" hint="Paste exported JSON; applied all at once or not at all">
+      <button className="link" type="button" onClick={() => { setOpen(!open); setError(''); }}>{open ? 'Close' : 'Paste…'}</button></Row>}
+    {open && show('importSettings') && <div className="settings-import">
+      <textarea aria-label="Settings JSON to import" rows={6} spellCheck={false} value={draft} placeholder='{"format":"monolith-settings","settings":{…}}'
+        onChange={e => { setDraft(e.target.value); setError(''); }} />
+      <div className="app-footer"><span className="muted">Replaces the listed settings; apps and their layout are kept</span><span className="title-spacer" />
+        <button className="pill-button primary" type="button" disabled={!draft.trim()} onClick={() => { void apply(); }}>Import</button></div>
+    </div>}
+    {error && <p className="settings-field-error" role="alert">{error}</p>}
   </>;
 }
 /**
@@ -51,15 +121,44 @@ function OffsetGhost({ preview, current }: { preview: { x: number; y: number } |
     initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, transition: { duration: 0.25, delay: 0.12 } }} transition={{ duration: 0.14 }}>
     <span>Release to move · {preview.x > 0 ? '+' : ''}{preview.x}, {preview.y > 0 ? '+' : ''}{preview.y}</span></motion.div>}</AnimatePresence>, document.body);
 }
+type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 export function SettingsView() {
   const settings = useSettings(), appearance = useAppearance(), palette = usePalette();
-  const [error, setError] = useState(''), [tab, setTab] = useState<Tab>('general');
+  const [error, setError] = useState(''), [tab, setTab] = useState<Tab>('general'), [query, setQuery] = useState('');
   const [offsetPreview, setOffsetPreview] = useState<{ x: number; y: number } | null>(null);
+  const [outputs, setOutputs] = useState<string[] | null>(null);
   // Never disable controls while a save is in flight (that froze sliders mid-drag);
   // saves are serialized in the store and the newest value wins.
   const patch = (p: SettingsPatch) => { setError(''); void saveSettings(p).catch(e => setError(String(e))); };
-  const toggle = (key: 'showDate' | 'hardwareMonitor' | 'stealth' | 'clickSounds' | 'dnd' | 'swipeNavigation' | 'translucent' | 'borderEnabled' | 'notificationsEnabled' | 'systemNotificationMirror' | 'redactBodies' | 'hermesThemeSync', labelText: string, hint?: string, off = false) =>
-    <Row label={labelText} hint={hint}><input className="switch" type="checkbox" aria-label={labelText} checked={off ? settings[key] === true : settings[key] !== false} onChange={e => patch({ [key]: e.target.checked })} /></Row>;
+  const searching = normalize(query) !== '';
+  const visible = shownRows(tab, query, settings), show = (id: string) => visible.has(id);
+  const shows = (cardId: string) => cardSpec(cardId).rows.some(row => visible.has(row.id));
+  // Monitor names only matter for the per-monitor checklist; asked once when it is shown.
+  const wantOutputs = settings.showNotchOnEveryMonitor === true || (settings.companionEnabled !== false && shows('notch'));
+  useEffect(() => {
+    if (!wantOutputs || outputs !== null) return;
+    let live = true;
+    displayOutputs().then(names => { if (live) setOutputs(names); }, () => { if (live) setOutputs([]); });
+    return () => { live = false; };
+  }, [wantOutputs]);
+  const reset = (cardId: string) => async () => {
+    setError('');
+    try {
+      const defaults = await settingsDefaults();
+      await saveSettings(resetPatch(cardId, defaults));
+      if (cardSpec(cardId).resetsAppearance && appearance !== DEFAULT_APPEARANCE) await saveAppearance(DEFAULT_APPEARANCE);
+    } catch (e) { setError(message(e)); }
+  };
+  const header = (cardId: string) => {
+    const card = cardSpec(cardId);
+    return <ResetHeader title={card.title} onReset={card.reset === false ? undefined : reset(cardId)} />;
+  };
+  const section = (cardId: string, children: ReactNode) => shows(cardId) &&
+    <section className="settings-card" aria-label={cardSpec(cardId).title}>{header(cardId)}{children}</section>;
+  const toggle = (key: BoolKey, id: string, off = false) => {
+    const row = rowSpec(id);
+    return show(id) && <Row label={row.label} hint={row.hint}><input className="switch" type="checkbox" aria-label={row.label} checked={off ? settings[key] === true : settings[key] !== false} onChange={e => patch({ [key]: e.target.checked })} /></Row>;
+  };
   const range = (key: 'terminalFontSize' | 'hoverDelay' | 'offsetX' | 'offsetY', labelText: string, min: number, max: number, unit: string, step = 1, hint?: string) =>
     <Row label={labelText} hint={hint}><DraftRange aria-label={labelText} min={min} max={max} step={step} value={settings[key]} onCommit={(v, final) => { if (final || !isOffset(key)) patch({ [key]: v }); }}
       {...(isOffset(key) ? { live: false, onDraft: (v: number | null) => setOffsetPreview(v === null ? null : { x: key === 'offsetX' ? v : settings.offsetX, y: key === 'offsetY' ? v : settings.offsetY }) } : {})} />
@@ -70,67 +169,92 @@ export function SettingsView() {
   // The display-server choice only exists on Linux; the running one is stamped by Rust.
   const isLinux = typeof navigator !== 'undefined' && /Linux/i.test(navigator.userAgent) && !/Android/i.test(navigator.userAgent);
   const runningBackend = document.documentElement.dataset.displayBackend === 'wayland' ? 'wayland' : 'x11';
+  const hits = searching ? searchRows(query, settings).length : 1;
   return <div className="settings-panel app-stack" aria-label="Island settings" data-own-privacy="">
-    <div className="settings-tabs" role="tablist" aria-label="Settings sections">{tabs.map(([id, name]) =>
+    <div className="settings-search" role="search">
+      <input type="search" aria-label="Search settings" placeholder="Search settings" value={query} spellCheck={false} autoComplete="off"
+        onChange={e => setQuery(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Escape' && query) { e.preventDefault(); e.stopPropagation(); setQuery(''); } }} />
+      {query && <button type="button" aria-label="Clear search" onClick={() => setQuery('')}>✕</button>}
+    </div>
+    {!searching && <div className="settings-tabs" role="tablist" aria-label="Settings sections">{tabs.map(([id, name]) =>
       <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
-        {tab === id && <motion.span layoutId="settings-tab" className="tab-bg" transition={{ type: 'spring', visualDuration: 0.3, bounce: 0.15 }} />}{name}</button>)}</div>
+        {tab === id && <motion.span layoutId="settings-tab" className="tab-bg" transition={uiSpring(0.3, 0.15)} />}{name}</button>)}</div>}
     {error && <p role="alert">{error}</p>}
-    {tab === 'general' && <>
-      <Card title="Behavior">
-        {toggle('swipeNavigation', 'Swipe between views', 'Horizontal drag or two-finger swipe changes app')}
-        {toggle('stealth', 'Auto-hide when idle')}
-        {toggle('clickSounds', 'Click sounds')}
-      </Card>
-      <TerminalCommandSettings value={settings.terminalCommand ?? ''} onSave={command => saveSettings({ terminalCommand: command })} />
-      <Card title="Notifications">
-        {toggle('notificationsEnabled', 'Hermes notifications', 'Agent and system alerts on the island')}
-        {toggle('dnd', 'Do Not Disturb', 'Keep arrivals quietly, no toast')}
-        {toggle('systemNotificationMirror', 'Mirror desktop notifications', 'Show other apps\' notifications too')}
-        {toggle('redactBodies', 'Hide message text', 'Only titles are kept')}
-        <DeniedApps value={denied} onSave={apps => patch({ notificationDeniedApps: apps })} />
-      </Card>
-      <Card title="Clock">{toggle('showDate', 'Show date under time')}</Card>
-      {isLinux && <Card title="Display">
-        <Row label="Display server" hint={`Running on ${runningBackend === 'wayland' ? 'native Wayland' : 'X11 (XWayland)'}${(settings.displayBackend ?? 'wayland') !== runningBackend ? ' · applies when the island restarts' : ''}`}>
-          <div className="segmented" role="group" aria-label="Display server">
-            <button aria-pressed={(settings.displayBackend ?? 'wayland') === 'wayland'} onClick={() => patch({ displayBackend: 'wayland' })}>Wayland</button>
-            <button aria-pressed={settings.displayBackend === 'x11'} onClick={() => patch({ displayBackend: 'x11' })}>X11</button></div></Row>
-      </Card>}
-      <Card title="Apps">
-        {toggle('hardwareMonitor', 'Hardware monitor')}
-        <Row label="Arrange or hide apps" hint="Hold any app in Apps, then drag it"><span className="muted">In Apps</span></Row>
-      </Card>
-    </>}
-    {tab === 'appearance' && <>
-      <Card title="Colour scheme">
-        <SchemePicker value={appearance} settings={settings} patch={patch} onPick={id => { void saveAppearance(id).catch(e => setError(String(e))); }} />
-        {toggle('hermesThemeSync', 'Use for Hermes too', 'Applies this scheme as your Hermes skin; off restores your previous skin', true)}
-        <Row label="Colour overrides" hint="Accent and background come from the scheme unless overridden"><button className="link" onClick={() => patch({ accent: '', background: '', borderColor: '', panelClockColor: '' })}>Clear overrides</button></Row>
-      </Card>
-      <Card title="Surface">
-        {toggle('translucent', 'Translucent background', 'Frosted glass over the desktop (KWin blur)')}
-        {settings.translucent !== false && <Row label="Glass strength" hint="How much of the desktop shows through">
-          <DraftRange aria-label="Glass strength" min={0} max={100} step={1} value={settings.glassStrength ?? 55} throttleMs={60}
-            onDraft={v => { if (v !== null) document.documentElement.style.setProperty('--glass-strength', String(v / 100)); }}
-            onCommit={(v, final) => { if (final) patch({ glassStrength: v }); }} />
-          <output>{settings.glassStrength ?? 55}%</output></Row>}
-        {toggle('borderEnabled', 'Outline')}
-      </Card>
-      <NotchControls settings={settings} background={settings.background || palette.surface} accent={settings.accent || palette.accent} patch={patch} />
-      <Card title="Text">
-        <Row label="UI font"><div className="segmented" role="group" aria-label="UI font">
-          <button aria-pressed={settings.uiFont === 'system'} onClick={() => patch({ uiFont: 'system' })}>System</button>
-          <button aria-pressed={settings.uiFont === 'openrunde'} onClick={() => patch({ uiFont: 'openrunde' })}>OpenRunde</button></div></Row>
-        {range('terminalFontSize', 'Terminal font size', 8, 24, 'px')}
-      </Card>
-    </>}
-    {tab === 'layout' && <>
-      <LayoutEditor />
-      <Card title="Position">
-        {range('offsetX', 'Horizontal offset', -400, 400, 'px')}
-        {range('offsetY', 'Vertical offset', -200, 200, 'px')}
-      </Card>
-      <OffsetGhost preview={offsetPreview} current={{ x: settings.offsetX, y: settings.offsetY }} />
-    </>}
+    {searching && hits === 0 && <p className="settings-empty" role="status">No settings match “{query.trim()}”</p>}
+    {section('behavior', <>
+      {toggle('swipeNavigation', 'swipeNavigation')}
+      {toggle('stealth', 'stealth')}
+      {toggle('clickSounds', 'clickSounds')}
+      {toggle('gameModeAuto', 'gameModeAuto')}
+      {toggle('gameMode', 'gameMode', true)}
+      {show('openShortcut') && <Row label="Open shortcut" hint={rowSpec('openShortcut').hint}>
+        <TextSetting label="Open shortcut" value={settings.openShortcut ?? ''} placeholder="Meta+`" maxLength={64} validate={shortcutError}
+          onSave={value => saveSettings({ openShortcut: value })} /></Row>}
+    </>)}
+    {show('terminalCommand') && <TerminalCommandSettings value={settings.terminalCommand ?? ''} onSave={command => saveSettings({ terminalCommand: command })} />}
+    {section('notifications', <>
+      {toggle('notificationsEnabled', 'notificationsEnabled')}
+      {toggle('dnd', 'dnd')}
+      {toggle('systemNotificationMirror', 'systemNotificationMirror')}
+      {toggle('redactBodies', 'redactBodies')}
+      {show('deniedApps') && <DeniedApps value={denied} onSave={apps => patch({ notificationDeniedApps: apps })} />}
+    </>)}
+    {section('clock', toggle('showDate', 'showDate'))}
+    {isLinux && section('display', show('displayBackend') && <Row label="Display server" hint={`Running on ${runningBackend === 'wayland' ? 'native Wayland' : 'X11 (XWayland)'}${(settings.displayBackend ?? 'wayland') !== runningBackend ? ' · applies when the island restarts' : ''}`}>
+      <div className="segmented" role="group" aria-label="Display server">
+        <button aria-pressed={(settings.displayBackend ?? 'wayland') === 'wayland'} onClick={() => patch({ displayBackend: 'wayland' })}>Wayland</button>
+        <button aria-pressed={settings.displayBackend === 'x11'} onClick={() => patch({ displayBackend: 'x11' })}>X11</button></div></Row>)}
+    {section('apps', <>
+      {toggle('hardwareMonitor', 'hardwareMonitor')}
+      {show('arrangeApps') && <Row label="Arrange or hide apps" hint="Hold any app in Apps, then drag it"><span className="muted">In Apps</span></Row>}
+    </>)}
+    {section('backup', <Backup settings={settings} appearance={appearance} show={show} />)}
+    {section('scheme', <>
+      {show('scheme') && <SchemePicker value={appearance} settings={settings} patch={patch} onPick={id => { void saveAppearance(id).catch(e => setError(String(e))); }} />}
+      {toggle('hermesThemeSync', 'hermesThemeSync', true)}
+      {show('overrides') && <Row label="Colour overrides" hint="Accent and background come from the scheme unless overridden"><button className="link" onClick={() => patch({ accent: '', background: '', borderColor: '', panelClockColor: '' })}>Clear overrides</button></Row>}
+    </>)}
+    {section('surface', <>
+      {toggle('translucent', 'translucent')}
+      {show('glassStrength') && <Row label="Glass strength" hint="How much of the desktop shows through">
+        <DraftRange aria-label="Glass strength" min={0} max={100} step={1} value={settings.glassStrength ?? 55} throttleMs={60}
+          onDraft={v => { if (v !== null) document.documentElement.style.setProperty('--glass-strength', String(v / 100)); }}
+          onCommit={(v, final) => { if (final) patch({ glassStrength: v }); }} />
+        <output>{settings.glassStrength ?? 55}%</output></Row>}
+      {toggle('borderEnabled', 'borderEnabled')}
+    </>)}
+    {section('motion', <>
+      {toggle('reduceMotion', 'reduceMotion', true)}
+      {show('animationSpeed') && <Row label="Animation speed" hint={rowSpec('animationSpeed').hint}>
+        <DraftRange aria-label="Animation speed" min={50} max={200} step={5} value={settings.animationSpeed ?? 100}
+          onCommit={(v, final) => { if (final) patch({ animationSpeed: v }); }} />
+        <output>{settings.animationSpeed ?? 100}%</output></Row>}
+    </>)}
+    {shows('notch') && <NotchControls settings={settings} background={settings.background || palette.surface} accent={settings.accent || palette.accent} patch={patch}
+      outputs={outputs} show={show} header={header('notch')} />}
+    {section('text', <>
+      {show('uiFont') && <Row label="UI font"><div className="segmented" role="group" aria-label="UI font">
+        <button aria-pressed={settings.uiFont === 'system'} onClick={() => patch({ uiFont: 'system' })}>System</button>
+        <button aria-pressed={settings.uiFont === 'openrunde'} onClick={() => patch({ uiFont: 'openrunde' })}>OpenRunde</button></div></Row>}
+      {show('terminalFontSize') && range('terminalFontSize', 'Terminal font size', 8, 24, 'px')}
+      {show('terminalFontFamily') && <Row label="Terminal font" hint="Font family list; empty = DejaVu Sans Mono">
+        <TextSetting label="Terminal font" value={settings.terminalFontFamily ?? ''} placeholder="DejaVu Sans Mono" maxLength={128} validate={fontFamilyError}
+          onSave={value => saveSettings({ terminalFontFamily: value })} /></Row>}
+      {show('terminalScrollback') && <Row label="Terminal scrollback" hint="Lines kept above the screen">
+        <DraftRange aria-label="Terminal scrollback" min={500} max={100000} step={500} value={settings.terminalScrollback ?? 5000}
+          onCommit={(v, final) => { if (final) patch({ terminalScrollback: v }); }} />
+        <output>{Math.round((settings.terminalScrollback ?? 5000) / 100) / 10}k</output></Row>}
+      {show('terminalCursorStyle') && <Row label="Terminal cursor"><div className="segmented" role="group" aria-label="Terminal cursor">
+        {(['block', 'bar', 'underline'] as const).map(style => <button key={style} aria-pressed={(settings.terminalCursorStyle ?? 'block') === style}
+          onClick={() => patch({ terminalCursorStyle: style })}>{style[0]!.toUpperCase() + style.slice(1)}</button>)}</div></Row>}
+      {toggle('terminalCursorBlink', 'terminalCursorBlink')}
+    </>)}
+    {(show('sideButtons') || show('islandSize')) && <LayoutEditor />}
+    {section('position', <>
+      {show('offsetX') && range('offsetX', 'Horizontal offset', -400, 400, 'px')}
+      {show('offsetY') && range('offsetY', 'Vertical offset', -200, 200, 'px')}
+    </>)}
+    {(tab === 'layout' || searching) && <OffsetGhost preview={offsetPreview} current={{ x: settings.offsetX, y: settings.offsetY }} />}
   </div>;
 }

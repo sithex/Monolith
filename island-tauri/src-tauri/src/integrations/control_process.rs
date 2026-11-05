@@ -151,14 +151,21 @@ impl Runner {
                 .env("HERMES_ISLAND_CONTROL_FIXTURE", root);
         }
         command.env("LC_ALL", "C");
-        // SAFETY: setsid is async-signal-safe; this hook does not allocate or access shared state.
+        let parent = std::process::id() as libc::pid_t;
+        // SAFETY: setsid, prctl and getppid are async-signal-safe; the hook does not allocate or
+        // access shared state. PDEATHSIG ends subscriptions (`pactl subscribe`) if the island dies
+        // without a clean shutdown (a crash, SIGKILL); they used to outlive it indefinitely.
         unsafe {
-            command.pre_exec(|| {
-                if libc::setsid() < 0 {
-                    Err(std::io::Error::last_os_error())
-                } else {
-                    Ok(())
+            command.pre_exec(move || {
+                if libc::setsid() < 0
+                    || libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) < 0
+                {
+                    return Err(std::io::Error::last_os_error());
                 }
+                if libc::getppid() != parent {
+                    return Err(std::io::Error::from_raw_os_error(libc::ESRCH));
+                }
+                Ok(())
             });
         }
         let child = command
@@ -280,4 +287,44 @@ pub fn join(task: Option<tauri::async_runtime::JoinHandle<()>>) -> Result<(), Is
         .map_err(|_| IslandError::internal("Controls joiner panicked"))??;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn a_subscription_dies_with_the_thread_that_started_it() {
+        let root = std::env::temp_dir().join(format!("controls-pdeathsig-{}", std::process::id()));
+        let bin = root.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let fake = bin.join("pactl");
+        std::fs::write(&fake, "#!/bin/sh\nexec /usr/bin/sleep 30\n").unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let runner = Runner::for_instance(true, Some(root.clone()));
+        // Stand-in for an owner that vanishes without cleanup: no Drop, no finish().
+        let pid = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            rt.block_on(async {
+                let child = runner.spawn(&argv(&["pactl", "subscribe"])).unwrap();
+                let pid = child.child.id().unwrap();
+                std::mem::forget(child);
+                pid
+            })
+        })
+        .join()
+        .unwrap();
+        let gone = (0..100).any(|_| {
+            std::thread::sleep(Duration::from_millis(20));
+            exited_without_reaping(pid).unwrap_or(true)
+        });
+        // SAFETY: reap our own child either way so the test leaves no zombie or sleeper.
+        unsafe {
+            libc::kill(pid as i32, libc::SIGKILL);
+            libc::waitpid(pid as i32, std::ptr::null_mut(), 0);
+        }
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(gone, "an orphaned subscription must not outlive its owner");
+    }
 }

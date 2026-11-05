@@ -36,7 +36,8 @@ Item {
         send.arguments = [on];
         send.call();
     }
-    function focus(w) {
+    // Not `focus`: that name is QQuickItem's focus property, so `root.focus(w)` threw.
+    function track(w) {
         if (w && ignored(w)) return;
         root.watched = (w && !w.desktopWindow) ? w : null;
         // Re-sent on every real focus change: focusing the game again closes an island
@@ -46,7 +47,7 @@ Item {
 
     Connections {
         target: Workspace
-        function onWindowActivated(w) { root.focus(w); }
+        function onWindowActivated(w) { root.track(w); }
     }
     Connections {
         target: root.watched
@@ -54,5 +55,5 @@ Item {
         function onFullScreenChanged() { root.report(!!(root.watched && root.watched.fullScreen)); }
         function onClosed() { root.watched = null; root.report(false); }
     }
-    Component.onCompleted: root.focus(Workspace.activeWindow)
+    Component.onCompleted: root.track(Workspace.activeWindow)
 }

@@ -278,7 +278,10 @@ async fn unload_script(conn: &Connection) -> Result<()> {
 
 /// (Re)loads and starts the focus script. A copy left by a crashed island is replaced.
 async fn load_script(conn: &Connection, dir: &Path) -> Result<()> {
-    let path = write_script(dir)?;
+    // Own subdirectory: KWin's QML loader caches directory listings, so a file added to a
+    // directory it already listed (the companion script's) fails with "File name case
+    // mismatch". This directory is only ever seen by KWin with the script already in it.
+    let path = write_script(&dir.join("gamemode"))?;
     let path = path
         .to_str()
         .context("Game mode script path must be UTF-8")?;

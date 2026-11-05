@@ -1,9 +1,9 @@
 // Side-button actions (Nov 2): every app page plus one-tap quick actions.
 // Quick actions reuse existing typed commands only; nothing runs a shell.
 import { appApi, mediaControl, type IslandView, type LayoutAction } from '../ipc/client';
-import { dispatch } from '../ipc/island-state';
+import { currentIslandState, dispatch } from '../ipc/island-state';
 import { appStores } from '../stores/apps';
-import { settingsStore } from '../stores';
+import { saveSettings, settingsStore } from '../stores';
 import { viewIcons, viewLabels } from './Launcher';
 import { isQuickAction, layoutActionView, type QuickAction } from './geometry';
 import type { IconName } from './models';
@@ -16,7 +16,7 @@ const QUICK: { type: QuickAction; label: string; icon: IconName }[] = [
   { type: 'playPause', label: 'Play / pause', icon: 'play' }, { type: 'nextTrack', label: 'Next track', icon: 'next' }, { type: 'previousTrack', label: 'Previous track', icon: 'prev' },
   { type: 'toggleDnd', label: 'Do Not Disturb', icon: 'moon' }, { type: 'micMute', label: 'Mute microphone', icon: 'mic' }, { type: 'cyclePowerProfile', label: 'Cycle power profile', icon: 'power' },
   { type: 'keepAwake', label: 'Keep awake', icon: 'coffee' }, { type: 'screenshot', label: 'Screenshot', icon: 'camera' }, { type: 'pickColour', label: 'Colour picker', icon: 'picker' },
-  { type: 'collapse', label: 'Minimize island', icon: 'minimize' },
+  { type: 'toggleGameMode', label: 'Game mode', icon: 'gamepad' }, { type: 'collapse', label: 'Minimize island', icon: 'minimize' },
 ];
 export const ACTION_OPTIONS: ActionOption[] = [
   ...PAGES.map(view => ({ key: view === 'launcher' ? 'appGrid' : `open:${view}`, action: pageAction(view), label: viewLabels[view], icon: viewIcons[view] ?? 'grid', group: 'Apps' as const })),
@@ -44,10 +44,12 @@ export async function runSideAction(action: LayoutAction, navigate: (view: Islan
     case 'keepAwake': { const k = appStores.tiles.getSnapshot()?.keepAwake; appStores.tiles.apply(await appApi.tilesCommand({ type: 'keepAwake', on: !k?.on, durationMs: null })); return; }
     case 'screenshot': await dispatch({ type: 'collapse' }); appStores.tiles.apply(await appApi.tilesCommand({ type: 'screenshot' })); return;
     case 'pickColour': await dispatch({ type: 'collapse' }); appStores.tiles.apply(await appApi.tilesCommand({ type: 'pickColour' })); return;
+    // Manual game mode follows the effective state the island shows (gameMode || auto fullscreen).
+    case 'toggleGameMode': return saveSettings({ gameMode: !currentIslandState().gameMode });
     case 'collapse': return dispatch({ type: 'collapse' });
   }
 }
 /** Live on/off state for toggle-like quick actions (drawn as a lit button). */
-export function quickActive(action: LayoutAction, s: { dnd: boolean; micMuted: boolean | null | undefined; awake: boolean | null | undefined; playing: boolean }) {
-  return action.type === 'toggleDnd' ? s.dnd : action.type === 'micMute' ? !!s.micMuted : action.type === 'keepAwake' ? !!s.awake : action.type === 'playPause' ? s.playing : false;
+export function quickActive(action: LayoutAction, s: { dnd: boolean; micMuted: boolean | null | undefined; awake: boolean | null | undefined; playing: boolean; gameMode?: boolean }) {
+  return action.type === 'toggleDnd' ? s.dnd : action.type === 'toggleGameMode' ? !!s.gameMode : action.type === 'micMute' ? !!s.micMuted : action.type === 'keepAwake' ? !!s.awake : action.type === 'playPause' ? s.playing : false;
 }

@@ -427,6 +427,7 @@ fn check_shortcut(value: &String) -> Result<String, IslandError> {
         || value
             .chars()
             .any(|c| c.is_control() || c == ',' || c == '\t')
+        || crate::keyseq::parse(value).is_err()
     {
         return Err(IslandError::invalid("Invalid openShortcut"));
     }
@@ -591,6 +592,19 @@ mod tests {
     /// The way the command receives it.
     fn patch(value: Value) -> Result<SettingsPatch, serde_json::Error> {
         serde_json::from_value::<ObjectOnly<SettingsPatch>>(value).map(|p| p.0)
+    }
+
+    #[test]
+    fn open_shortcut_must_be_a_bindable_single_chord() {
+        for ok in ["Meta+`", "Ctrl+Alt+H", "", " F9 "] {
+            let p = patch(serde_json::json!({ "openShortcut": ok })).unwrap();
+            let s = p.apply(&Settings::default()).unwrap();
+            assert_eq!(s.open_shortcut, ok.trim());
+        }
+        for bad in ["Meta+", "Hyper+X", "Ctrl+K, Ctrl+C", "Meta+Foo"] {
+            let p = patch(serde_json::json!({ "openShortcut": bad })).unwrap();
+            assert!(p.apply(&Settings::default()).is_err(), "{bad}");
+        }
     }
 
     #[test]

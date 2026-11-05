@@ -56,6 +56,9 @@ pub struct IslandState {
     pub dnd: bool,
     pub unread: u32,
     pub terminal_started: bool,
+    /// Effective game mode: `settings.gameMode || (settings.gameModeAuto && fullscreen focus)`.
+    /// While on, the island never previews, toasts or auto-expands; explicit opens still work.
+    pub game_mode: bool,
 }
 
 #[derive(Deserialize, Clone, Debug, specta::Type)]
@@ -194,6 +197,7 @@ mod tests {
             dnd: true,
             unread: 0,
             terminal_started: true,
+            game_mode: false,
         };
         let snapshot = BootstrapSnapshot {
             apps: super::super::apps::AppsSnapshot::default(),

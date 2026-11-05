@@ -63,7 +63,7 @@ function SideBubble({ button, diameter, gap, progress, interactive, navigate, li
 export function SideControls({ navigate, fail, view, back }: { navigate(view: IslandView): void; fail(error: unknown): void; view?: IslandView; back?: SideBack | null }) {
   const layout = useLayout(), state = useIslandState(), launcher = useLauncher(), reduced = useReducedMotion();
   const settings = useSettings(), toggles = useApp('toggles'), tiles = useApp('tiles'), media = useMedia();
-  const live = { dnd: settings.dnd, micMuted: toggles?.micMuted, awake: tiles?.keepAwake.on, playing: !!media?.nowPlaying?.playing };
+  const live = { dnd: settings.dnd, micMuted: toggles?.micMuted, awake: tiles?.keepAwake.on, playing: !!media?.nowPlaying?.playing, gameMode: state.gameMode };
   const model = visibleLayout(layout.layout, launcher.items.filter(i => i.enabled && i.known && i.view).map(i => i.view!));
   const progress = useMotionValue(0), generation = useRef(0);
   const [ready, setReady] = useState(false);

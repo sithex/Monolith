@@ -3,6 +3,8 @@ pub mod anchor;
 #[cfg(target_os = "linux")]
 pub mod companion;
 #[cfg(target_os = "linux")]
+pub mod gamemode;
+#[cfg(target_os = "linux")]
 pub mod notch_live;
 #[cfg(target_os = "linux")]
 pub mod panel_socket;

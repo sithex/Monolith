@@ -51,6 +51,10 @@ pub enum Intent {
     UpsertActivity(Activity),
     RemoveActivity(String),
     ExpireActivities,
+    /// KWin reported whether the focused (non-island, non-panel) window is fullscreen.
+    Fullscreen(bool),
+    /// `gameMode` / `gameModeAuto` changed; the effective game mode is recomputed.
+    SyncGameMode,
 }
 impl From<UiIntent> for Intent {
     fn from(intent: UiIntent) -> Self {
@@ -105,6 +109,12 @@ pub struct Machine {
     activities: BTreeMap<String, Activity>,
     presentation: Presentation,
     seen_notifications: std::collections::VecDeque<String>,
+    /// Last fullscreen report from the KWin focus script (false when unknown/unavailable).
+    fullscreen: bool,
+}
+/// Effective game mode: manual, or automatic while a fullscreen window has focus.
+pub fn game_mode_active(settings: &Settings, fullscreen: bool) -> bool {
+    settings.game_mode || (settings.game_mode_auto && fullscreen)
 }
 impl Machine {
     pub fn new(settings: &Settings) -> Self {
@@ -117,6 +127,7 @@ impl Machine {
                 dnd: settings.dnd,
                 unread: 0,
                 terminal_started: false,
+                game_mode: game_mode_active(settings, false),
             },
             timers: BTreeMap::new(),
             generation: 0,
@@ -126,7 +137,11 @@ impl Machine {
             activities: BTreeMap::new(),
             presentation: Presentation::default(),
             seen_notifications: Default::default(),
+            fullscreen: false,
         }
+    }
+    pub fn fullscreen(&self) -> bool {
+        self.fullscreen
     }
     pub fn pointer_inside(&self) -> bool {
         self.pointer_inside
@@ -168,7 +183,7 @@ impl Machine {
         self.state.mode = IslandMode::Still;
         self.state.hover_cause = None;
     }
-    fn presentation_at(&self, now: u64) -> Presentation {
+    fn presentation_at(&self, now: u64, game: bool) -> Presentation {
         let mut live: Vec<_> = self
             .activities
             .values()
@@ -187,7 +202,10 @@ impl Machine {
                 .take(2)
                 .map(|a| a.id.clone())
                 .collect(),
-            expanded: live.iter().find(|a| a.expanded).map(|a| a.id.clone()),
+            // Game mode: activities stay compact, nothing expands over the game.
+            expanded: (!game)
+                .then(|| live.iter().find(|a| a.expanded).map(|a| a.id.clone()))
+                .flatten(),
         }
     }
     /// All timer callbacks must carry their scheduled generation. Canceled/early
@@ -216,6 +234,29 @@ impl Machine {
         let before = self.state.clone();
         let previous = self.presentation.clone();
         let mut effects = Vec::new();
+        // Game mode is decided before the intent so every suppression below sees it.
+        let fullscreen_focus = matches!(intent, Intent::Fullscreen(true));
+        if let Intent::Fullscreen(on) = &intent {
+            let on = *on;
+            self.fullscreen = on;
+        }
+        let game = game_mode_active(settings, self.fullscreen);
+        if game && !self.state.game_mode {
+            // Entering: drop a pending or showing preview/toast. An island the user opened
+            // explicitly stays open (e.g. the side-control toggle itself).
+            self.timers.remove(&Timer::HoverDelay);
+            self.pending_hover = None;
+            if self.state.mode == IslandMode::Hover {
+                self.cancel_all();
+                self.still();
+            }
+        }
+        if game && fullscreen_focus && self.state.mode != IslandMode::Still {
+            // A fullscreen window (a game) just took focus: get out of its way.
+            self.cancel_all();
+            self.still();
+        }
+        self.state.game_mode = game;
         match intent {
             Intent::PointerEnter | Intent::PanelEnter => {
                 let panel = matches!(intent, Intent::PanelEnter);
@@ -227,7 +268,7 @@ impl Machine {
                 // Any enter during the grace period cancels it.
                 self.timers.remove(&Timer::LeaveGrace);
                 if self.state.mode == IslandMode::Still {
-                    if settings.hover_delay > 0. {
+                    if settings.hover_delay > 0. && !game {
                         self.pending_hover = Some(if panel {
                             HoverCause::PanelPill
                         } else {
@@ -271,7 +312,7 @@ impl Machine {
                 {
                     self.timers.remove(&timer);
                     match timer {
-                        Timer::HoverDelay if self.state.mode == IslandMode::Still => {
+                        Timer::HoverDelay if self.state.mode == IslandMode::Still && !game => {
                             self.state.mode = IslandMode::Hover;
                             self.state.hover_cause = self.pending_hover.take();
                             self.schedule(Timer::ToastTtl, 6000, now);
@@ -346,8 +387,10 @@ impl Machine {
                 }
                 self.seen_notifications.push_back(id.clone());
                 self.state.unread = self.state.unread.saturating_add(1);
+                // Game mode keeps it quietly, like DnD: stored and counted, never toasted.
                 if self.state.mode == IslandMode::Still
                     && !self.state.dnd
+                    && !game
                     && settings.notifications_enabled
                 {
                     self.cancel_all();
@@ -362,11 +405,11 @@ impl Machine {
             Intent::RemoveActivity(id) => {
                 self.activities.remove(&id);
             }
-            Intent::ExpireActivities => {}
+            Intent::ExpireActivities | Intent::Fullscreen(_) | Intent::SyncGameMode => {}
         }
         self.activities
             .retain(|_, a| a.expires_ms.is_none_or(|expiry| expiry > now));
-        self.presentation = self.presentation_at(now);
+        self.presentation = self.presentation_at(now, game);
         if self.state != before || self.presentation != previous {
             self.state.rev = self.state.rev.wrapping_add(1);
             effects.push(Effect::EmitState);
@@ -820,5 +863,117 @@ mod tests {
         let rev = m.state.rev;
         step(&mut m, Intent::SetDnd(true), &s, 1);
         assert_eq!(m.state.rev, rev);
+    }
+
+    #[test]
+    fn game_mode_is_manual_or_auto_fullscreen_and_suppresses_previews_and_toasts() {
+        let mut s = Settings::default();
+        assert!(s.game_mode_auto && !s.game_mode);
+        let mut m = Machine::new(&s);
+        assert!(!m.state.game_mode);
+        // Auto: a fullscreen focus turns it on, any other focus turns it off.
+        step(&mut m, Intent::Fullscreen(true), &s, 0);
+        assert!(m.state.game_mode && m.fullscreen());
+        // No hover preview from the pointer or the panel pill, not even after the delay.
+        step(&mut m, Intent::PointerEnter, &s, 1);
+        step(&mut m, Intent::PanelEnter, &s, 2);
+        m.tick(&s, &Fake(10_000)).unwrap();
+        assert_eq!(m.state.mode, IslandMode::Still);
+        assert!(!m.timers.contains_key(&Timer::HoverDelay));
+        step(&mut m, Intent::PointerLeave, &s, 10_001);
+        step(&mut m, Intent::PanelLeave, &s, 10_002);
+        // A notification is kept quietly: counted, never toasted.
+        let unread = m.state.unread;
+        step(
+            &mut m,
+            Intent::NotificationArrived("n-1".into()),
+            &s,
+            10_003,
+        );
+        assert_eq!(m.state.unread, unread + 1);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        assert!(m.state.hover_cause.is_none());
+        // Activities stay compact; nothing auto-expands.
+        step(
+            &mut m,
+            Intent::UpsertActivity(activity("timer", 5, 0, None)),
+            &s,
+            10_004,
+        );
+        assert_eq!(m.presentation().compact, vec!["timer".to_owned()]);
+        assert_eq!(m.presentation().expanded, None);
+        // Explicit opens still work: a notch click (or the shortcut) toggles the island.
+        let effects = step(&mut m, Intent::PanelPin, &s, 10_005);
+        assert_eq!(m.state.mode, IslandMode::Large);
+        assert!(effects.contains(&Effect::RequestFocus));
+        step(&mut m, Intent::PanelPin, &s, 10_006);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        // Leaving fullscreen ends auto game mode; previews and expansion come back.
+        step(&mut m, Intent::Fullscreen(false), &s, 10_007);
+        assert!(!m.state.game_mode);
+        assert_eq!(m.presentation().expanded, Some("timer".to_owned()));
+        step(
+            &mut m,
+            Intent::NotificationArrived("n-2".into()),
+            &s,
+            10_008,
+        );
+        assert_eq!(m.state.mode, IslandMode::Hover);
+        // Auto off: fullscreen is ignored. Manual on: active regardless of focus.
+        step(&mut m, Intent::Collapse, &s, 10_009);
+        s.game_mode_auto = false;
+        step(&mut m, Intent::SyncGameMode, &s, 10_010);
+        step(&mut m, Intent::Fullscreen(true), &s, 10_011);
+        assert!(!m.state.game_mode);
+        s.game_mode = true;
+        let rev = m.state.rev;
+        let effects = step(&mut m, Intent::SyncGameMode, &s, 10_012);
+        assert!(m.state.game_mode);
+        assert!(
+            effects.contains(&Effect::EmitState),
+            "the UI must learn the new state"
+        );
+        assert_ne!(m.state.rev, rev);
+    }
+
+    #[test]
+    fn entering_game_mode_drops_previews_but_keeps_an_explicitly_opened_island() {
+        let mut s = Settings::default();
+        let mut m = Machine::new(&s);
+        // A pending hover delay is cancelled.
+        step(&mut m, Intent::PointerEnter, &s, 0);
+        step(&mut m, Intent::Fullscreen(true), &s, 1);
+        m.tick(&s, &Fake(5_000)).unwrap();
+        assert_eq!(m.state.mode, IslandMode::Still);
+        step(&mut m, Intent::PointerLeave, &s, 5_001);
+        step(&mut m, Intent::Fullscreen(false), &s, 5_002);
+        // A showing toast/preview is dismissed.
+        step(&mut m, Intent::NotificationArrived("n".into()), &s, 5_003);
+        assert_eq!(m.state.mode, IslandMode::Hover);
+        step(&mut m, Intent::Fullscreen(true), &s, 5_004);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        assert!(m.timers.is_empty());
+        // Manual toggle from the open island (side control) keeps it open.
+        step(&mut m, Intent::Fullscreen(false), &s, 5_005);
+        step(&mut m, Intent::Pin, &s, 5_006);
+        s.game_mode = true;
+        step(&mut m, Intent::SyncGameMode, &s, 5_007);
+        assert!(m.state.game_mode);
+        assert_eq!(m.state.mode, IslandMode::Large);
+        // ...but a fullscreen window taking focus closes it again.
+        step(&mut m, Intent::Fullscreen(true), &s, 5_008);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        // Re-opening over the game is allowed and stays until the game is focused again.
+        step(&mut m, Intent::PanelPin, &s, 5_009);
+        assert_eq!(m.state.mode, IslandMode::Large);
+        step(&mut m, Intent::Fullscreen(true), &s, 5_010);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        // Without game mode a fullscreen focus never closes the island.
+        s.game_mode = false;
+        s.game_mode_auto = false;
+        step(&mut m, Intent::SyncGameMode, &s, 5_011);
+        step(&mut m, Intent::Pin, &s, 5_012);
+        step(&mut m, Intent::Fullscreen(true), &s, 5_013);
+        assert_eq!(m.state.mode, IslandMode::Large);
     }
 }

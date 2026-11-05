@@ -17,6 +17,7 @@ const paths: Record<IconName, string> = {
   spark: 'm12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3z', monitor: 'M2 3h20v14H2zM8 21h8m-4-4v4M5 11l4-4 4 6 6-5',
   back: 'm14 5-7 7 7 7', more: 'M4 12h.01M12 12h.01M20 12h.01', mic: 'M9 3a3 3 0 0 1 6 0v8a3 3 0 0 1-6 0zM5 9v2a7 7 0 0 0 14 0V9M12 18v4m-4 0h8',
   moon: 'M21 14A9 9 0 0 1 10 3a9 9 0 1 0 11 11', power: 'M12 2v10M6 5a9 9 0 1 0 12 0', coffee: 'M3 7h13v9a5 5 0 0 1-10 0V7m13 1h2a3 3 0 0 1 0 6h-2M5 22h13M7 2v2m5-2v2',
+  gamepad: 'M7 7h10a5 5 0 0 1 4.9 6l-.8 4a2.5 2.5 0 0 1-4.3 1.2L14.5 16h-5l-2.3 2.2A2.5 2.5 0 0 1 2.9 17l-.8-4A5 5 0 0 1 7 7M8 10v4m-2-2h4M15.5 11h.01M17.5 13h.01',
   play: 'M7 4v16l6-4V8zM16 5v14m4-14v14', next: 'M5 5v14l9-7zM18 5v14', prev: 'M19 5v14l-9-7zM6 5v14',
   minimize: 'M5 12h14', resize: 'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7',
   compact: 'M12 3v6m-3-3 3 3 3-3M12 21v-6m-3 3 3-3 3 3M4 12h16', spacious: 'M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M9 12h6', bigger: 'M3 7V3h4M17 3h4v4M21 17v4h-4M7 21H3v-4M7 7h10v10H7z',

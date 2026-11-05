@@ -535,6 +535,11 @@ export type IslandState = {
 	dnd: boolean,
 	unread: number,
 	terminalStarted: boolean,
+	/**
+	 *  Effective game mode: `settings.gameMode || (settings.gameModeAuto && fullscreen focus)`.
+	 *  While on, the island never previews, toasts or auto-expands; explicit opens still work.
+	 */
+	gameMode: boolean,
 };
 
 /**  SPEC §4.5: the state actor is the ONLY emitter. Latest-value: consumers drop older `rev`s. */
@@ -573,7 +578,7 @@ export type LauncherItem = {
 
 export type LauncherOp = { type: "begin" } | { type: "move"; id: string; to: number } | { type: "disable"; id: string } | { type: "enable"; id: string } | { type: "cancel" } | { type: "commit" };
 
-export type LayoutAction = { type: "openApp"; view: IslandView } | { type: "appGrid" } | { type: "settings" } | { type: "volume" } | { type: "nowPlaying" } | { type: "timer" } | { type: "playPause" } | { type: "nextTrack" } | { type: "previousTrack" } | { type: "toggleDnd" } | { type: "micMute" } | { type: "cyclePowerProfile" } | { type: "screenshot" } | { type: "pickColour" } | { type: "keepAwake" } | { type: "collapse" };
+export type LayoutAction = { type: "openApp"; view: IslandView } | { type: "appGrid" } | { type: "settings" } | { type: "volume" } | { type: "nowPlaying" } | { type: "timer" } | { type: "playPause" } | { type: "nextTrack" } | { type: "previousTrack" } | { type: "toggleDnd" } | { type: "micMute" } | { type: "cyclePowerProfile" } | { type: "screenshot" } | { type: "pickColour" } | { type: "keepAwake" } | { type: "collapse" } | { type: "toggleGameMode" };
 
 export type LayoutButton = {
 	id: string,

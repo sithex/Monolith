@@ -473,6 +473,7 @@ fn core_action(action: LayoutAction) -> Result<ButtonAction, IslandError> {
         LayoutAction::PickColour {} => ButtonAction::PickColour,
         LayoutAction::KeepAwake {} => ButtonAction::KeepAwake,
         LayoutAction::Collapse {} => ButtonAction::Collapse,
+        LayoutAction::ToggleGameMode {} => ButtonAction::ToggleGameMode,
     })
 }
 fn project_action(action: &ButtonAction) -> Result<LayoutAction, IslandError> {
@@ -496,6 +497,7 @@ fn project_action(action: &ButtonAction) -> Result<LayoutAction, IslandError> {
         ButtonAction::PickColour => LayoutAction::PickColour {},
         ButtonAction::KeepAwake => LayoutAction::KeepAwake {},
         ButtonAction::Collapse => LayoutAction::Collapse {},
+        ButtonAction::ToggleGameMode => LayoutAction::ToggleGameMode {},
         ButtonAction::Command { .. } => {
             return Err(IslandError::invalid(
                 "Generic layout commands are not permitted",

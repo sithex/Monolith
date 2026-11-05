@@ -327,6 +327,33 @@ mod linux_tooltip {
     }
 }
 
+const GAME_MODE_ID: &str = "game-mode";
+
+/// The manual game-mode setting a tray/side-control click asks for: on unless it is on now.
+pub fn game_mode_request(state: &IslandState) -> bool {
+    !state.game_mode
+}
+
+/// Persists `gameMode` through the normal settings path; the check mark always ends up
+/// showing the effective state (GTK flips it on click before we know the outcome).
+fn toggle_game_mode(app: &tauri::AppHandle, actor: &Handle, item: CheckMenuItem<tauri::Wry>) {
+    let on = game_mode_request(&actor.state());
+    let app = app.clone();
+    let actor = actor.clone();
+    tauri::async_runtime::spawn(async move {
+        let patch = crate::contract::settings::SettingsPatch {
+            game_mode: Some(on),
+            ..Default::default()
+        };
+        if let Err(error) = crate::commands::settings::patch_from_host(&app, patch).await {
+            tracing::warn!(%error, "Tray game mode change failed");
+        }
+        if let Err(error) = item.set_checked(actor.state().game_mode) {
+            tracing::warn!(%error, "Tray game mode update failed");
+        }
+    });
+}
+
 pub struct Tray {
     _icon: TrayIcon,
     task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
@@ -345,6 +372,14 @@ impl Tray {
                 "Do Not Disturb",
                 true,
                 initial.dnd,
+                None::<&str>,
+            )?;
+            let game = CheckMenuItem::with_id(
+                app,
+                GAME_MODE_ID,
+                "Game mode",
+                true,
+                initial.game_mode,
                 None::<&str>,
             )?;
             let restart_app =
@@ -386,6 +421,7 @@ impl Tray {
                 &[
                     &toggle,
                     &dnd,
+                    &game,
                     &PredefinedMenuItem::separator(app)?,
                     &restart_app,
                     &restart,
@@ -401,13 +437,16 @@ impl Tray {
             )?;
             let router = actor.clone();
             let autostart_item = autostart.clone();
+            let game_item = game.clone();
             let icon = TrayIconBuilder::with_id("hermes-island")
                 .icon(tauri::image::Image::from_bytes(ICON)?)
                 .menu(&menu)
                 .tooltip(format!("Monolith — {} unread", initial.unread))
-                .on_menu_event(move |_, event| {
+                .on_menu_event(move |app, event| {
                     let id = event.id.as_ref();
-                    if let Some(system) = system_action(id) {
+                    if id == GAME_MODE_ID {
+                        toggle_game_mode(app, &router, game_item.clone());
+                    } else if let Some(system) = system_action(id) {
                         if let Err(error) = run_system(system, &router) {
                             tracing::warn!(%error, ?system, "Tray system action failed");
                         }
@@ -428,9 +467,9 @@ impl Tray {
                     }
                 })
                 .build(app)?;
-            Ok((icon, dnd))
+            Ok((icon, dnd, game))
         };
-        let (icon, dnd) =
+        let (icon, dnd, game) =
             build().map_err(|_| IslandError::unavailable("Cannot create system tray"))?;
         #[cfg(target_os = "linux")]
         let tooltip = linux_tooltip::Tooltip::new(&icon)?;
@@ -440,6 +479,9 @@ impl Tray {
                 let next = state.borrow_and_update().clone();
                 if let Err(error) = dnd.set_checked(next.dnd) {
                     tracing::warn!(%error, "Tray DND update failed");
+                }
+                if let Err(error) = game.set_checked(next.game_mode) {
+                    tracing::warn!(%error, "Tray game mode update failed");
                 }
                 let text = format!("Monolith — {} unread", next.unread);
                 #[cfg(target_os = "linux")]

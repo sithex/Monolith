@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { dispatch, subscribeCue, useIslandState } from '../ipc/island-state';
 import { useSettings, usePalette, useAppearance, runtimeStore } from '../stores';
@@ -10,14 +10,23 @@ import { Launcher, viewLabels } from './Launcher';
 import { SideControls } from './SideControls';
 import { VoiceControls } from './VoiceControls';
 import { ColorPickerPanel } from './components/ColorField';
-import { AppsView } from '../views/AppsView';
+import { AppsView as AppsViewInner } from '../views/AppsView';
 import { configureAppTopics, useLauncher } from '../stores/apps';
 import type { IslandView } from '../ipc/client';
-import { TerminalView } from '../views/TerminalView';
-import { SettingsView } from '../views/SettingsView';
-import { MonitorView } from '../views/MonitorView';
-import { AiStatsView } from '../views/AiStatsView';
+import { SettingsView as SettingsViewInner } from '../views/SettingsView';
+import { MonitorView as MonitorViewInner } from '../views/MonitorView';
+import { AiStatsView as AiStatsViewInner } from '../views/AiStatsView';
 import { Toast } from '../widgets/Toast';
+// xterm is about half the island's JavaScript. It loads in its own chunk, fetched as soon as
+// the first frame has painted; once loaded the component never suspends again, so the
+// terminal (and its PTY) is still created exactly once.
+const loadTerminal = () => import('../views/TerminalView');
+const TerminalView = lazy(() => loadTerminal().then(m => ({ default: memo(m.TerminalView) })));
+// Every island state change (hover, rev, view) re-renders this root. The panes read their own
+// stores, so they re-render only when their props (or their stores) actually change.
+const AppsView = memo(AppsViewInner), SettingsView = memo(SettingsViewInner);
+const MonitorView = memo(MonitorViewInner), AiStatsView = memo(AiStatsViewInner);
+if (typeof window !== 'undefined') window.setTimeout(() => { void loadTerminal(); }, 0);
 import { PreviewNotice } from './PreviewNotice';
 import { createClickSound } from './click-sound';
 import './island.css';
@@ -31,7 +40,13 @@ export function Island() {
   const state = useIslandState(), settings = useSettings(), palette = usePalette(), appearance = useAppearance();
   const launcher = useLauncher();
   const [error, setError] = useState('');
-  const fail = (error: unknown) => setError(error instanceof Error ? error.message : String(error));
+  const fail = useCallback((error: unknown) => setError(error instanceof Error ? error.message : String(error)), []);
+  // An error is news, not state: it used to stay on screen until the island reloaded.
+  useEffect(() => {
+    if (!error) return;
+    const clear = window.setTimeout(() => setError(''), 8000);
+    return () => window.clearTimeout(clear);
+  }, [error]);
   useEffect(() => { void configureAppTopics(settings).catch(fail); }, [settings.moduleRegistry]);
   // Scheme presets replace every palette role (island CSS + xterm); explicit overrides still win.
   const scheme = useMemo(() => schemePalette(appearance, settings), [appearance, settings.customAccent, settings.customBackground, settings.customText]);
@@ -111,7 +126,7 @@ export function Island() {
           <div className="view-pane" data-pane={view}>
             <div className="app-pane" hidden={view !== 'launcher'}>{view === 'launcher' && <Launcher navigate={navigate} fail={fail} />}</div>
             <motion.div className="app-pane terminal-pane" hidden={view !== 'terminal'} initial={false} animate={{ opacity: view === 'terminal' ? 1 : 0 }}>
-              {state.terminalStarted && <TerminalView active={active && view === 'terminal'} palette={effective} fontSize={settings.terminalFontSize} fail={fail} />}
+              {state.terminalStarted && <Suspense fallback={null}><TerminalView active={active && view === 'terminal'} palette={effective} fontSize={settings.terminalFontSize} fail={fail} /></Suspense>}
             </motion.div>
             <motion.div className="app-pane" hidden={view !== 'monitor'} initial={false} animate={{ opacity: view === 'monitor' ? 1 : 0 }}><MonitorView active={active && view === 'monitor'} /></motion.div>
             <motion.div className="app-pane" hidden={view !== 'ai'} initial={false} animate={{ opacity: view === 'ai' ? 1 : 0 }}><AiStatsView active={active && view === 'ai'} /></motion.div>

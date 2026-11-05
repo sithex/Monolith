@@ -37,6 +37,14 @@ const HEARTBEAT: Duration = Duration::from_secs(2);
 /// readers that treat a status older than 8 s as offline (`anchor-client.py online()`).
 const STATUS_REFRESH: Duration = Duration::from_millis(3500);
 const MIN_WRITE_INTERVAL: Duration = Duration::from_millis(100);
+/// Notch positions read from Plasma (kscreen-doctor plus a plasmashell script) are reused for
+/// this long after a click. A click on a widget the cache doesn't know, or a "moved" report,
+/// re-reads immediately, so this only bounds drift Plasma never announces.
+const ANCHOR_TTL: Duration = Duration::from_secs(60);
+
+fn anchors_stale(read: Option<Instant>) -> bool {
+    read.is_none_or(|t| t.elapsed() >= ANCHOR_TTL)
+}
 
 /// `home_widget` value meaning "routing off: every notch click is a plain toggle".
 const ROUTE_OFF: u32 = u32::MAX;
@@ -409,6 +417,7 @@ impl NativeHost {
                 let mut last_enabled: Option<bool> = None;
                 let mut last_companion: Option<bool> = None;
                 let mut anchors = Vec::<Anchor>::new();
+                let mut anchors_read: Option<Instant> = None;
                 let mut primary: Option<Anchor> = None;
                 let mut monitor_report = Value::Null;
                 let mut monitor_error: Option<String> = None;
@@ -482,8 +491,10 @@ impl NativeHost {
                                     let (found, missing) = super::anchor::discover_all()?;
                                     anchors = found;
                                     unavailable = missing;
+                                    anchors_read = Some(Instant::now());
                                 } else {
                                     anchors.clear();
+                                    anchors_read = None;
                                     unavailable.clear();
                                     // Turning the option off brings the island home to the primary notch.
                                     if let Some(home) = primary.clone().filter(|p| anchor.as_ref().is_some_and(|a| a.output != p.output)) {
@@ -496,9 +507,22 @@ impl NativeHost {
                             monitor_error = result.err().map(|e| e.to_string());
                             if let Some(error) = &monitor_error { tracing::warn!(%error, "Monitor notch routing unavailable"); }
                         }
-                        // Clicks use the cached anchors only (no Plasma or kscreen calls here).
+                        // Clicks use the cached anchors (no Plasma or kscreen calls before the
+                        // click is served). Only a widget the cache doesn't know (Plasma restarted,
+                        // a monitor was plugged in) costs one re-read first.
                         let mut click_handled = false;
                         if clicked.is_some() && enabled {
+                            let known = clicked.is_some_and(|w| anchors.iter().any(|a| a.widget == w));
+                            if !known {
+                                match super::anchor::discover_all() {
+                                    Ok((found, missing)) => {
+                                        anchors = found;
+                                        unavailable = missing;
+                                        anchors_read = Some(Instant::now());
+                                    }
+                                    Err(error) => tracing::debug!(%error, "Notch position refresh unavailable"),
+                                }
+                            }
                             match select_monitor_anchor(&anchors, primary.as_ref(), anchor.as_ref(), clicked, enabled) {
                                 Ok(Some(target)) => {
                                     let changed_output = anchor.as_ref().is_none_or(|a| a.output != target.output);
@@ -510,13 +534,16 @@ impl NativeHost {
                                     let intent = if changed_output { Intent::Pin } else { Intent::PanelPin };
                                     tauri::async_runtime::block_on(handle.state::<IslandActor>().handle.dispatch(intent))?;
                                     click_handled = true;
-                                    // After the click is served, re-read positions once: Plasma may have
-                                    // moved the notches since startup (restart, reorder). One bounded
-                                    // read per click, never a loop; it can only correct the placement.
-                                    match super::anchor::discover_all() {
-                                        Ok((found, missing)) => {
+                                    // After the click is served, re-read positions when the cache is
+                                    // old: Plasma may have moved the notches without telling us. Rapid
+                                    // clicks reuse the fresh read instead of queueing behind new ones.
+                                    let refresh = if anchors_stale(anchors_read) { Some(super::anchor::discover_all()) } else { None };
+                                    match refresh {
+                                        None => {}
+                                        Some(Ok((found, missing))) => {
                                             anchors = found;
                                             unavailable = missing;
+                                            anchors_read = Some(Instant::now());
                                             let output = anchor.as_ref().map(|a| a.output.clone());
                                             if let Some(fresh) = anchors.iter().find(|a| Some(&a.output) == output.as_ref()).cloned() {
                                                 if anchor.as_ref() != Some(&fresh) {
@@ -525,7 +552,7 @@ impl NativeHost {
                                                 }
                                             }
                                         }
-                                        Err(error) => tracing::debug!(%error, "Notch position refresh unavailable"),
+                                        Some(Err(error)) => tracing::debug!(%error, "Notch position refresh unavailable"),
                                     }
                                 }
                                 Ok(None) => {}
@@ -542,6 +569,7 @@ impl NativeHost {
                                     Ok((found, missing)) => {
                                         anchors = found;
                                         unavailable = missing;
+                                        anchors_read = Some(Instant::now());
                                         let output = anchor.as_ref().map(|a| a.output.clone());
                                         anchors.iter().find(|a| Some(&a.output) == output.as_ref()).cloned()
                                     }
@@ -712,6 +740,13 @@ mod monitor_tests {
     fn anchor(name: &str, x: i32, id: u32) -> Anchor {
         super::super::anchor::anchor_from_data(&json!({"outputs":[{"name":name,"connected":true,"enabled":true,"priority":1,"pos":{"x":x,"y":0},"size":{"width":1920,"height":1080}}]}),
         &json!([{"id":id,"x":x,"y":0,"height":32,"location":"top","widgets":[{"id":id,"type":"local.hermes.island.notch3","x":800,"width":144}]}])).unwrap()
+    }
+    #[test]
+    fn notch_positions_are_reused_after_a_click_until_they_age_out() {
+        assert!(anchors_stale(None), "never read: read before trusting");
+        assert!(!anchors_stale(Some(Instant::now())), "a fresh read serves rapid clicks");
+        let old = Instant::now().checked_sub(ANCHOR_TTL + Duration::from_secs(1));
+        assert!(old.is_none_or(|t| anchors_stale(Some(t))));
     }
     #[test]
     fn clicked_source_wins_primary_and_unplug_replug_setting_off_are_safe() {

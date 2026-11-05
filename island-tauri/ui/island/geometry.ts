@@ -172,8 +172,9 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
     outer.style.setProperty('--popup-x', `${translation.x}px`); outer.style.setProperty('--popup-y', `${translation.y}px`);
     const moved = outer.getBoundingClientRect();
     // Update the real circles in the same flush as the shell. No stale side report during a spring.
+    const buttons = model ? Array.from(outer.ownerDocument?.querySelectorAll<HTMLElement>('[data-side-button]') ?? []) : [];
     if (model) for (const b of sideRects(model, moved)) {
-      const element = Array.from(outer.ownerDocument?.querySelectorAll<HTMLElement>('[data-side-button]') ?? []).find(e => e.dataset.sideButton === b.id);
+      const element = buttons.find(e => e.dataset.sideButton === b.id);
       if (element) Object.assign(element.style, { left: `${b.rect.x}px`, top: `${b.rect.y}px`, width: `${b.rect.width}px`, height: `${b.rect.height}px`, borderRadius: `${b.rect.width / 2}px` });
     }
     const report = geometryReport(outer, state, settled || (still && !blurHeld && nativePill() !== null), devicePixelRatio);

@@ -180,6 +180,9 @@ export function parseClipboardStatus(raw: unknown): ClipboardStatus {
   const r = record(raw);
   return { available: bool(r.available), enabled: bool(r.enabled), paused: bool(r.paused), detail: text(r.detail), watcherRunning: bool(r.watcherRunning), connectionsOpen: uint(r.connectionsOpen), connectionAttempts: uint(r.connectionAttempts), dropped: uint(r.dropped), captured: uint(r.captured), sensitiveSkipped: uint(r.sensitiveSkipped), denied: uint(r.denied), echoes: uint(r.echoes) };
 }
+// Artwork is a data URL of up to 1.4 MB that arrives again with every play/pause or volume
+// change; re-validating the same picture each time is the costliest part of parsing.
+let validArt: string | null = null;
 export function parseMedia(raw: unknown): MediaChanged {
   const r = record(raw), rev = uint(r.rev);
   if (r.nowPlaying === null) return { rev, nowPlaying: null };
@@ -187,8 +190,11 @@ export function parseMedia(raw: unknown): MediaChanged {
   if (!/^org\.mpris\.MediaPlayer2\.[A-Za-z0-9_.-]+$/.test(busName)) return bad();
   const trackId = nullable(t.trackId, x => text(x, 4096));
   if (trackId !== null && !/^\/(?:[A-Za-z0-9_]+(?:\/[A-Za-z0-9_]+)*)?$/.test(trackId)) return bad();
-  const artUrl = nullable(t.artUrl, x => str(x, 1400000));
-  if (artUrl !== null && !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(artUrl)) return bad();
+  const artUrl = t.artUrl !== null && t.artUrl === validArt ? validArt : nullable(t.artUrl, x => str(x, 1400000));
+  if (artUrl !== null && artUrl !== validArt) {
+    if (!/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(artUrl)) return bad();
+    validArt = artUrl;
+  }
   return { rev, nowPlaying: { player: text(t.player, 4096), title: str(t.title, 16384), artist: str(t.artist, 16384), album: str(t.album, 16384), playing: bool(t.playing), positionMs: nullable(t.positionMs, nonnegative), durationMs: nullable(t.durationMs, nonnegative), artUrl, canControl: bool(t.canControl), busName, status: choice(t.status, ['playing','paused','stopped']), rate: num(t.rate, -1000, 1000), sampledAtMs: num(t.sampledAtMs), trackId, canSeek: bool(t.canSeek), canGoNext: bool(t.canGoNext), canGoPrevious: bool(t.canGoPrevious), volumePercent: t.volumePercent === undefined ? null : nullable(t.volumePercent, nonnegative), volumeWritable: t.volumeWritable === undefined ? false : bool(t.volumeWritable), pid: t.pid === undefined ? null : nullable(t.pid, uint) } };
 }
 export function parseLyrics(raw: unknown): LyricsChanged {

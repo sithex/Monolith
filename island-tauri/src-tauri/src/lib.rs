@@ -8,6 +8,7 @@ pub mod contract;
 pub mod error;
 pub mod identity;
 pub mod integrations;
+pub mod keyseq;
 pub mod paths;
 pub mod services;
 pub mod singleton;
@@ -274,6 +275,8 @@ fn run_app(cli: cli::Cli) -> anyhow::Result<()> {
                 .map_err(|_| error::IslandError::internal("test hooks slot is poisoned"))? =
                 hooks.map(Arc::new);
             app.manage(integrations::plasma::runtime::NativeHost::start(app.handle(), instance, anchor)?);
+            // Game mode fullscreen detection + the global toggle shortcut (product island only).
+            integrations::plasma::gamemode::start_for_app(app.handle());
             for signal in [libc::SIGTERM, libc::SIGINT] {
                 let handle = app.handle().clone();
                 glib::source::unix_signal_add_local(signal, move || {
@@ -314,6 +317,7 @@ fn run_app(cli: cli::Cli) -> anyhow::Result<()> {
                     tracing::error!(%error, "Notification shutdown failed");
                 }
             }
+            integrations::plasma::gamemode::shutdown_for_app(handle);
             // Stop the authority first so no new effect reaches a half-torn-down host.
             if let Some(actor) = tauri::Manager::try_state::<state::host::IslandActor>(handle) {
                 if let Err(error) = actor.shutdown() {

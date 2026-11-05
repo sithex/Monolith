@@ -26,6 +26,7 @@ mod bluetooth_service;
 mod brightness6b2;
 mod carried6b2;
 mod equalizer_service;
+mod gamemode_service;
 mod lyrics_service;
 mod media_service;
 mod mixer6b2;

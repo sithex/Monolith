@@ -61,6 +61,23 @@ pub async fn settings_patch(
     Ok(next)
 }
 
+/// Host-side settings change (tray): the exact `settings_patch` path, side effects included.
+pub async fn patch_from_host(
+    app: &tauri::AppHandle,
+    patch: SettingsPatch,
+) -> Result<Settings, IslandError> {
+    settings_patch(
+        ObjectOnly(patch),
+        app.clone(),
+        app.state::<Services>(),
+        app.state::<IslandActor>(),
+        app.state::<crate::integrations::notifications::hub::Notifications>(),
+        app.state::<Arc<crate::integrations::clipboard::Clipboard>>(),
+        app.state::<Arc<crate::integrations::system_services::SystemServices>>(),
+    )
+    .await
+}
+
 /// Last known palette; computed (bounded) only when nothing is cached yet.
 #[tauri::command]
 #[specta::specta]

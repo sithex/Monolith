@@ -27,6 +27,9 @@ export function useIslandState(): IslandState {
   return store.requireSnapshot();
 }
 
+/** The actor's current state outside React (side actions); throws before the seed. */
+export const currentIslandState = (): IslandState => store.requireSnapshot();
+
 /** Send a typed intent to the actor. Rejects with the backend error (route it to `fail`). */
 export const dispatch = (intent: UiIntent): Promise<void> => store.dispatch(intent);
 

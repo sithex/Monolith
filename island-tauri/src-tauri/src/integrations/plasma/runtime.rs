@@ -178,6 +178,7 @@ fn snapshot(
         "mode":legacy_mode_name(state.mode),"view":serde_json::to_value(state.view)?,"stateRev":state.rev,
         "anchor":anchor,"bounds":bounds,"windowId":xid,"rectangles":rectangles,"pty":services.terminal.pid().unwrap_or(0),
         "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
+        "gameMode":state.game_mode,
         "companion":settings.companion_enabled,
         "companionCharacter":settings.companion_character,
         "notchBorder":{"enabled":settings.notch_border_enabled,"color":border_color,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width},

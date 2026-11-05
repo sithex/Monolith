@@ -187,8 +187,10 @@ pub fn spawn(
                         // Only a CHANGED settings.dnd drives the state; an unrelated patch must not
                         // overwrite a dnd that a typed `SetDnd` intent changed in the meantime.
                         let dnd_changed = next.dnd != settings.dnd;
+                        let game_changed = next.game_mode != settings.game_mode || next.game_mode_auto != settings.game_mode_auto;
                         settings=next;
                         if dnd_changed { effects.extend(machine.reduce(Intent::SetDnd(settings.dnd),&settings,&now)?); }
+                        if game_changed { effects.extend(machine.reduce(Intent::SyncGameMode,&settings,&now)?); }
                     }
                     let result=match request.intent {Some(intent)=>machine.reduce(intent,&settings,&now),None=>Ok(Vec::new())};
                     match result {

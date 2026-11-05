@@ -65,6 +65,8 @@ pub enum LayoutAction {
     PickColour {},
     KeepAwake {},
     Collapse {},
+    // Manual game mode on/off (`settings.gameMode`).
+    ToggleGameMode {},
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, specta::Type)]

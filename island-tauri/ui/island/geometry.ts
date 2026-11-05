@@ -3,7 +3,7 @@ import type { GeometryReport, IslandState, LayoutModel, LayoutAction, IslandView
 export type Rect = { x: number; y: number; width: number; height: number };
 
 /** Quick actions (Nov 2) do something in place instead of opening a page. */
-export const QUICK_ACTIONS = ['playPause', 'nextTrack', 'previousTrack', 'toggleDnd', 'micMute', 'cyclePowerProfile', 'screenshot', 'pickColour', 'keepAwake', 'collapse'] as const;
+export const QUICK_ACTIONS = ['playPause', 'nextTrack', 'previousTrack', 'toggleDnd', 'micMute', 'cyclePowerProfile', 'screenshot', 'pickColour', 'keepAwake', 'toggleGameMode', 'collapse'] as const;
 export type QuickAction = typeof QUICK_ACTIONS[number];
 export const isQuickAction = (type: string): type is QuickAction => (QUICK_ACTIONS as readonly string[]).includes(type);
 /** The page a navigation action opens; quick actions map to the app that owns them (used only for visibility). */

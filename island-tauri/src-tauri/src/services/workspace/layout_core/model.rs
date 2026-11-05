@@ -89,6 +89,7 @@ pub enum ButtonAction {
     PickColour,
     KeepAwake,
     Collapse,
+    ToggleGameMode,
     Command { id: String },
 }
 

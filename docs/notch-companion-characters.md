@@ -67,8 +67,17 @@ at 16–20 px) are drawn as **crisp pixel sprites** instead:
 - `face.size`: side of the square in logical px.
 - `face.shownX`, `face.shownY`: eye offset in logical px, already on a quarter-pixel grid.
   Move the eyes by exactly this; lean the head by a fraction (`face.quarter(shownX * .25)`).
-- `face.blink` (1 open, ~0 shut, 1.25 wide-eyed on waking) and `face.lid` (1, or .42
-  dozing). Multiply the eye height by both.
+- `face.blink` (1 open, ~0 shut, 1.25 wide-eyed on waking) and `face.lid` (1, .42
+  dozing, 1.15 wide while Hermes waits). Multiply the eye height by both.
+- `face.mood`: `idle | working | waiting | sleeping` (Settings → companionReactive; off =
+  always `idle`). Waiting wins over working; both wake it. The brain already shows each
+  mood on every character, so a new character works without code: eyes on the user and
+  quicker blinks plus an amber `!` (`moodMark`) while waiting, the thinking glance while
+  working, half lids plus `z` while dozing (ten minutes with no pointer move and no turn).
+  A character may add a static look (the Cube's heart turns amber); `HabitCharacter`
+  already holds habits while waiting. Never a new timer or animation for a mood.
+- `face.settled`: the pointer hasn't moved for a minute. Constant animation must stop on
+  it (Isaac's flow holds a frame); habits still run on the slower idle blinks.
 - `face.happy` (pointer on the notch), `face.sleepy`, `face.thinking`, `face.motion`
   (false when the desktop turns animations off), `face.attended` (the pointer is on this
   notch's monitor).
@@ -103,14 +112,18 @@ while the mouse moved. The same look now costs about 1%.
    - shared: one timer drives both sides, so it's one redraw per tick;
    - gated: `running: face.attended && face.visible && face.motion && !face.happy &&
      !face.sleepy`.
-6. **Only the attended monitor moves.** The user runs a notch on each of three monitors.
+6. **Rest when the pointer is parked.** Gate constant animation on `!face.settled` too:
+   reading with the mouse parked is the common state, and a tick that runs for hours
+   there is the steady cost. Measured offscreen (3 notches, pointer parked on one):
+   Isaac 10–15 frames/s on the attended notch, ~1.4 frames/s once settled.
+7. **Only the attended monitor moves.** The user runs a notch on each of three monitors.
    The brain already freezes everything on monitors the pointer isn't on; any timer or
    animation a character adds must also check `face.attended`. Ungated, every notch
    redraws its own panel and the cost triples.
-7. **Don't bind `Shape` paths to moving values.** Shapes re-tessellate on every change.
+8. **Don't bind `Shape` paths to moving values.** Shapes re-tessellate on every change.
    Use plain `Rectangle`s for moving parts; keep Shapes static, or bound only to things
    that change rarely (the hover smile), and `visible: false` when hidden.
-8. **Nothing animates while hidden** (`visible`), on hover where it doesn't make sense,
+9. **Nothing animates while hidden** (`visible`), on hover where it doesn't make sense,
    or with animations off (`face.motion`).
 
 ## Look and fidelity rules

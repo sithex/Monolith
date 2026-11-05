@@ -210,6 +210,187 @@ TestCase {
         tryCompare(mic, "opacity", 0);
         compare(notch.width, 144); compare(notch.height, 26);
     }
+    function test_waiting_pulse_is_amber_slower_and_wins_over_working() {
+        const notch = createTemporaryObject(factory, testCase);
+        const outline = findChild(notch, "notchOutline");
+        const stepper = findChild(notch, "notchStepper");
+        const idleStroke = outline.strokeColor;
+        notch.working = true;
+        compare(notch.pulseColor, notch.accent);
+        notch.waiting = true;
+        compare(notch.pulseColor, notch.alertColor, "waiting takes precedence");
+        verify(stepper.running, "same stepped clock, no new timer");
+        verify(/waiting for you/.test(notch.Accessible.description));
+        tryVerify(function() { return notch.workPulse > .3; }, 3000);
+        // Amber stroke: red > green > blue, whatever the accent.
+        const c = outline.strokeColor;
+        verify(c.r > c.g && c.g > c.b, String(c));
+        // Slower breath: half the working rate, one step per two ticks (odd ticks draw nothing).
+        notch.frame = 18;
+        compare(notch.workPulse, 1);
+        let changes = 0;
+        const count = function() { changes++; };
+        notch.workPulseChanged.connect(count);
+        notch.frame = 19;
+        notch.workPulseChanged.disconnect(count);
+        compare(changes, 0);
+        notch.frame = 9;
+        notch.waiting = false;
+        compare(notch.workPulse, 1, "working peaks at step 9");
+        // Pulse switched off in settings: waiting falls back to plain working.
+        notch.waitingPulse = false; notch.waiting = true;
+        compare(notch.pulseColor, notch.accent);
+        notch.working = false;
+        compare(notch.pulsing, false);
+        compare(outline.strokeColor, idleStroke);
+        compare(stepper.running, false);
+    }
+    function test_companion_moods_react_to_hermes_and_doze() {
+        const notch = createTemporaryObject(factory, testCase);
+        notch.companion = true;
+        const face = findChild(notch, "notchCompanion");
+        face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
+        const mark = findChild(face, "moodMark");
+        const drowsy = findChild(face, "companionDrowsy");
+        tryCompare(face, "opacity", 1);
+        compare(face.mood, "idle");
+        verify(!mark.visible);
+        compare(drowsy.interval, 600000, "dozes after ten minutes");
+        verify(drowsy.running);
+        notch.working = true;
+        compare(face.mood, "working");
+        verify(!drowsy.running, "never dozes during a turn");
+        notch.waiting = true;
+        compare(face.mood, "waiting", "waiting wins over working");
+        verify(mark.visible); compare(mark.text, "!");
+        // Waiting looks straight at you: pointer moves don't redraw the eyes.
+        const centre = face.mapToGlobal(face.width / 2, face.height / 2);
+        notch.pointerX = centre.x + 3000; notch.pointerAt = Date.now();
+        wait(250);
+        let moved = 0;
+        const count = function() { moved++; };
+        face.shownXChanged.connect(count); face.shownYChanged.connect(count);
+        notch.pointerX = centre.x - 3000; notch.pointerAt = Date.now() + 1;
+        wait(200);
+        face.shownXChanged.disconnect(count); face.shownYChanged.disconnect(count);
+        compare(moved, 0);
+        notch.waiting = false; notch.working = false;
+        verify(drowsy.running);
+        face.sleepy = true;
+        compare(face.mood, "sleeping");
+        compare(mark.text, "z");
+        // Any pointer move wakes every notch, even one the pointer isn't on.
+        notch.pointerX = 150000; notch.pointerAt = Date.now() + 2;
+        verify(!face.attended);
+        compare(face.sleepy, false);
+        // Hermes asking also wakes it.
+        face.sleepy = true; notch.waiting = true;
+        compare(face.sleepy, false);
+        notch.waiting = false;
+        // Reactive off: no moods, no doze, just the gaze.
+        notch.companionReactive = false;
+        notch.working = true; notch.waiting = true;
+        compare(face.mood, "idle");
+        verify(!mark.visible);
+        verify(!drowsy.running);
+    }
+    function test_every_character_shows_the_moods_without_new_timers() {
+        const notch = createTemporaryObject(factory, testCase);
+        notch.companion = true;
+        const face = findChild(notch, "notchCompanion");
+        face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
+        tryCompare(face, "opacity", 1);
+        for (const name of ["blob", "isaac", "notchmimic", "companioncube", "nurgling", "hollowknight", "frog"]) {
+            notch.companionCharacter = name;
+            compare(face.shownCharacter, name);
+            notch.waiting = true;
+            verify(findChild(face, "moodMark").visible, name);
+            if (face.art.habitRunning !== undefined)
+                compare(face.art.allowed, false, name + " holds still while Hermes waits");
+            if (name === "companioncube")
+                compare(face.art.heartColors.H, String(notch.alertColor));
+            notch.waiting = false;
+            face.sleepy = true;
+            compare(findChild(face, "moodMark").text, "z", name);
+            face.sleepy = false;
+        }
+    }
+    function test_settled_pointer_rests_the_constant_flow() {
+        const notch = createTemporaryObject(factory, testCase);
+        notch.companion = true;
+        notch.companionCharacter = "isaac";
+        const face = findChild(notch, "notchCompanion");
+        face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
+        const settle = findChild(face, "companionSettle");
+        const centre = face.mapToGlobal(face.width / 2, face.height / 2);
+        notch.pointerX = centre.x; notch.pointerY = centre.y + 40; notch.pointerAt = Date.now();
+        verify(settle.running); compare(settle.interval, 60000);
+        const art = face.art;
+        tryVerify(function() { return art.flowFrame > 0; }, 1000);
+        face.settled = true;
+        const frame = art.flowFrame;
+        wait(400);
+        compare(art.flowFrame, frame, "no ticks with the pointer parked");
+        notch.pointerY = centre.y + 44; notch.pointerAt = Date.now() + 1;
+        compare(face.settled, false);
+        tryVerify(function() { return art.flowFrame !== frame; }, 1000);
+    }
+    function test_hover_peek_shows_track_or_timer_after_the_hover_delay() {
+        const notch = createTemporaryObject(factory, testCase);
+        const peek = findChild(notch, "notchPeek");
+        const clock = findChild(notch, "panelClock");
+        notch.hoverDelay = 250;
+        notch.playing = true;
+        notch.peekTrack = "A Very Long Song Title That Cannot Fit — Some Artist";
+        mouseMove(notch, 72, 13);
+        tryCompare(notch, "hovered", true);
+        compare(notch.peeking, false, "waits for the hover delay");
+        tryCompare(notch, "peeking", true, 1000);
+        tryCompare(peek, "opacity", 1);
+        compare(peek.text, notch.peekTrack);
+        compare(peek.elide, Text.ElideRight);
+        verify(peek.truncated, "ellipsized, never a marquee");
+        verify(peek.x >= 0 && peek.x + peek.width <= findChild(notch, "notchMusicIndicator").x);
+        tryVerify(function() { return clock.parent.opacity === 0; }, 1000);
+        mouseMove(testCase, 5, 5);
+        tryCompare(notch, "peeking", false);
+        tryCompare(peek, "opacity", 0);
+        // A timer when nothing plays.
+        notch.playing = false;
+        notch.timerEndsAt = Date.now() + 65500;
+        mouseMove(notch, 72, 13);
+        tryCompare(notch, "peeking", true, 1000);
+        verify(/^Timer 1:0[56] left$/.test(peek.text), peek.text);
+        mouseMove(testCase, 5, 5);
+        // Nothing to say: no peek, the clock stays.
+        notch.timerEndsAt = 0;
+        mouseMove(notch, 72, 13);
+        wait(400);
+        compare(notch.peeking, false);
+        compare(clock.parent.opacity, 1);
+        mouseMove(testCase, 5, 5);
+        // Setting off.
+        notch.hoverPeek = false; notch.playing = true;
+        mouseMove(notch, 72, 13);
+        wait(400);
+        compare(notch.peeking, false);
+        mouseMove(testCase, 5, 5);
+    }
+    function test_companion_shows_only_on_the_chosen_monitor() {
+        const notch = createTemporaryObject(factory, testCase);
+        notch.companion = true;
+        notch.screenName = "DP-1";
+        const face = findChild(notch, "notchCompanion");
+        tryCompare(face, "opacity", 1);
+        notch.companionMonitor = "DP-2";
+        compare(notch.companionShown, false);
+        tryCompare(face, "opacity", 0);
+        verify(!face.visible);
+        notch.companionMonitor = "DP-1";
+        tryCompare(face, "opacity", 1);
+        notch.companionMonitor = "";
+        compare(notch.companionShown, true);
+    }
     function test_motion_is_stepped_and_only_where_the_pointer_is() {
         const notch = createTemporaryObject(factory, testCase);
         const stepper = findChild(notch, "notchStepper");

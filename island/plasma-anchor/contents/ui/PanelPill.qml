@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
+import QtQuick.Window
 import org.kde.kirigami as Kirigami
 
 // Native, panel-contained notch. Hover never opens a webview or changes actor mode.
@@ -20,15 +21,33 @@ Item {
     property real borderWidth: 0.8
     // Live states (Dynamic-Island style). All default to "nothing to show".
     property bool working: false
+    property bool waiting: false        // Hermes waits for an approval/answer
+    property bool waitingPulse: true    // Settings → notchWaitingPulse
     property bool micMuted: false
+    // Waiting has no palette colour of its own (the scheme has only an error red), so it is a
+    // fixed amber that reads against any accent; it takes precedence over the working pulse.
+    readonly property color alertColor: "#f5a623"
+    readonly property bool waitingShown: waiting && waitingPulse
+    readonly property bool pulsing: waitingShown || working
+    readonly property color pulseColor: waitingShown ? alertColor : accent
     // Notch companion: a small face at the left whose eyes follow the global pointer.
     property bool companion: false
     property string companionCharacter: "blob"
+    property bool companionReactive: true
+    // Output name that shows the companion ("" = every notch). Screen.name is the KScreen
+    // output name (DP-1, …) on Wayland; tests override `screenName`.
+    property string companionMonitor: ""
+    property string screenName: Screen.name
+    readonly property bool companionHere: companionMonitor === "" || companionMonitor === screenName
+    // Hover peek (Settings → notchHoverPeek): "Title — Artist" from main.qml's MPRIS model.
+    property bool hoverPeek: true
+    property real hoverDelay: 180
+    property string peekTrack: ""
     property real pointerX: 0
     property real pointerY: 0
     property real pointerAt: 0
     // On a narrow notch the mic mark needs the companion's room.
-    readonly property bool companionShown: companion && !(micMuted && width < 140)
+    readonly property bool companionShown: companion && companionHere && !(micMuted && width < 140)
     property real timerEndsAt: 0       // Unix ms while a timer runs, else 0
     property real timerPausedMs: -1    // remaining ms while paused, else -1
     property real nowMs: Date.now()
@@ -52,11 +71,14 @@ Item {
         objectName: "notchStepper"
         interval: 125
         repeat: true
-        running: (pill.working || pill.playing) && pill.visible && pill.motion && pill.animateHere
+        running: (pill.pulsing || pill.playing) && pill.visible && pill.motion && pill.animateHere
         onTriggered: pill.frame = (pill.frame + 1) % 7560
     }
-    // 0..1 accent breath, a 2.25 s cycle in 18 steps; steady at .6 when not animating.
-    readonly property real workPulse: !working ? 0 : stepper.running ? (1 - Math.cos(frame * Math.PI / 9)) / 2 : .6
+    // 0..1 breath on the same clock: working 2.25 s in 18 steps; waiting a slower 4.5 s in
+    // the same 18 steps, one per two ticks, so every other tick changes nothing and draws
+    // nothing. Steady at .6 when not animating.
+    readonly property real workPulse: !pulsing ? 0 : !stepper.running ? .6
+        : (1 - Math.cos((waitingShown ? Math.floor(frame / 2) : frame) * Math.PI / 9)) / 2
     readonly property bool hovered: pointer.containsMouse
     property real hoverProgress: hovered || activeFocus ? 1 : 0
     signal activated()
@@ -66,7 +88,7 @@ Item {
     Accessible.role: Accessible.Button
     Accessible.name: "Hermes Island"
     Accessible.description: "Click to open or minimize Hermes Island"
-        + (working ? ". Hermes is working" : "")
+        + (waitingShown ? ". Hermes is waiting for you" : working ? ". Hermes is working" : "")
         + (timerShown ? ". Timer " + timerText + (timerEndsAt > 0 ? "" : ", paused") : "")
         + (micMuted ? ". Microphone muted" : "")
     Accessible.onPressAction: activated()
@@ -93,11 +115,13 @@ Item {
         ShapePath {
             id: outline
             objectName: "notchOutline"
-            strokeWidth: pill.working ? Math.max(1, pill.borderEnabled ? Math.min(4, pill.borderWidth) : 0) : pill.borderEnabled ? Math.max(0, Math.min(4, pill.borderWidth)) : 0
-            strokeColor: pill.working
-                ? Qt.rgba(pill.accent.r, pill.accent.g, pill.accent.b, .25 + .55 * pill.workPulse)
+            strokeWidth: pill.pulsing ? Math.max(1, pill.borderEnabled ? Math.min(4, pill.borderWidth) : 0) : pill.borderEnabled ? Math.max(0, Math.min(4, pill.borderWidth)) : 0
+            strokeColor: pill.pulsing
+                ? Qt.rgba(pill.pulseColor.r, pill.pulseColor.g, pill.pulseColor.b, (pill.waitingShown ? .35 : .25) + .55 * pill.workPulse)
                 : Qt.rgba(pill.borderColor.r, pill.borderColor.g, pill.borderColor.b, Math.max(0, Math.min(1, pill.borderOpacity)))
-            fillColor: Qt.tint(pill.background, Qt.rgba(pill.accent.r, pill.accent.g, pill.accent.b, Math.max(.09 * pill.hoverProgress, pill.working ? .05 + .09 * pill.workPulse : 0)))
+            fillColor: pill.pulsing && .05 + .09 * pill.workPulse > .09 * pill.hoverProgress
+                ? Qt.tint(pill.background, Qt.rgba(pill.pulseColor.r, pill.pulseColor.g, pill.pulseColor.b, .05 + .09 * pill.workPulse))
+                : Qt.tint(pill.background, Qt.rgba(pill.accent.r, pill.accent.g, pill.accent.b, .09 * pill.hoverProgress))
             // Flat crown, concave shoulders and rounded lower corners: not a capsule.
             PathSvg { path: {
                 const w = surface.width, h = surface.height;
@@ -111,9 +135,45 @@ Item {
             } }
         }
     }
+    // Hover peek. The closed native notch never opens the island's hover preview (its input
+    // region is empty in Still mode and the widget sends no enter/leave), so the two can't
+    // collide; the peek waits the same `hoverDelay` the preview uses (180 ms when that is
+    // 0 = preview off) so a pointer passing over the panel doesn't flash it.
+    readonly property string peekText: !hoverPeek ? ""
+        : playing && peekTrack !== "" ? peekTrack
+        : timerShown ? (timerEndsAt > 0 ? "Timer " + timerText + " left" : "Timer paused, " + timerText) : ""
+    property bool peekReady: false
+    readonly property bool peeking: peekReady && hovered && peekText !== ""
+    onHoveredChanged: { peekReady = false; if (hovered && hoverPeek) peekDelay.restart(); else peekDelay.stop(); }
+    Timer { id: peekDelay; objectName: "peekDelay"; interval: pill.hoverDelay > 0 ? pill.hoverDelay : 180; onTriggered: pill.peekReady = true }
+    Text {
+        id: peekLine
+        objectName: "notchPeek"
+        // Between the companion/mic marks and the music bars; one line, ellipsized.
+        readonly property real from: micMutedMark.opacity > 0 ? micMutedMark.x + micMutedMark.width + 4
+            : pill.companionShown ? companionFace.x + companionFace.width + 4 : 14
+        readonly property real to: pill.playing ? musicIndicator.x - 4 : pill.width - 14
+        x: from
+        width: Math.max(0, to - from)
+        anchors.verticalCenter: parent.verticalCenter
+        text: pill.peekText
+        elide: Text.ElideRight
+        maximumLineCount: 1
+        horizontalAlignment: Text.AlignHCenter
+        color: pill.playing && pill.peekTrack !== "" ? pill.textColor : pill.accent
+        font.pixelSize: 11
+        font.weight: Font.DemiBold
+        font.features: { "tnum": 1 }
+        visible: opacity > 0
+        opacity: pill.peeking ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+    }
     Column {
         anchors.centerIn: parent
         spacing: -1
+        opacity: pill.peeking ? 0 : 1
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
         readonly property bool twoLines: pill.showDate || pill.timerShown
         Text {
             objectName: "panelClock"
@@ -186,7 +246,10 @@ Item {
         pointerY: pill.pointerY
         pointerAt: pill.pointerAt
         happy: pill.hovered
-        working: pill.working
+        reactive: pill.companionReactive
+        working: pill.working && pill.companionReactive
+        waiting: pill.waiting && pill.companionReactive
+        alertColor: pill.alertColor
         motion: pill.motion
         bodyColor: pill.textColor
         eyeColor: pill.background

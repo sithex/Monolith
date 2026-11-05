@@ -15,8 +15,10 @@ Item {
     property real gazeScale: 0.45
     readonly property bool happy: face ? face.happy : false
     readonly property bool asleep: face ? face.sleepy : false
+    // idle | working | waiting | sleeping (Companion.mood); a still face while Hermes waits.
+    readonly property string mood: face ? face.mood : "idle"
     readonly property color edge: face && face.bodyColor.hslLightness < 0.5 ? "#52545b" : "#85858b"
-    readonly property bool allowed: !!face && visible && face.visible && face.attended && face.motion && !face.happy && !face.sleepy && !face.thinking
+    readonly property bool allowed: !!face && visible && face.visible && face.attended && face.motion && !face.happy && !face.sleepy && !face.thinking && mood !== "waiting"
     property int habitFrames: 6
     property int habitInterval: 125
     property int habitCooldown: 12000

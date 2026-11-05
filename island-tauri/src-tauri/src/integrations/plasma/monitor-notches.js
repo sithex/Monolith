@@ -4,12 +4,19 @@
 // Safety rules (see the ripple-island plasma-multimonitor pitfalls):
 //  * It NEVER creates panels. A screen without an existing top panel is reported, not "fixed".
 //  * It only adds/removes notch widgets it marked itself; user widgets are never touched.
+//  * `origins` (Settings → notchMonitors, as output origins; null = every monitor) only
+//    filters which screens get one of OUR notches; an excluded screen loses only ours.
 //  * It prints a JSON report read back from Plasma, so the caller can see where each notch
 //    actually landed instead of trusting the request.
-(function(enabled, style) {
+(function(enabled, style, origins) {
     var kind = "local.hermes.island.notch3", owner = "monolith-monitor-v2";
     var kinds = [kind, "local.hermes.island.notch2", "local.hermes.island.notch"];
     function isNotch(w) { return kinds.indexOf(w.type) >= 0; }
+    function allowed(screen) {
+        if (!origins) return true;
+        var g = screenGeometry(screen);
+        return origins.some(function(o) { return o[0] === g.x && o[1] === g.y; });
+    }
     function owned(w) { w.currentConfigGroup = ["General"]; return w.readConfig("monolithMonitorOwner", "") === owner; }
     var report = {enabled: enabled, added: [], removed: [], skipped: [], ordered: [], notches: []};
     var ps = panels();
@@ -22,6 +29,16 @@
         });
     } else {
         for (var screen = 0; screen < screenCount; screen++) {
+            if (!allowed(screen)) {
+                ps.filter(function(p) { return p.screen === screen; }).forEach(function(p) {
+                    p.widgets().filter(function(w) { return isNotch(w) && owned(w); }).forEach(function(w) {
+                        report.removed.push({panel: p.id, widget: w.id, screen: screen});
+                        w.remove();
+                    });
+                });
+                report.skipped.push({screen: screen, why: "not selected"});
+                continue;
+            }
             var top = ps.filter(function(p) { return p.screen === screen && p.location === "top"; });
             if (top.length === 0) { report.skipped.push({screen: screen, why: "no top panel"}); continue; }
             if (top.some(function(p) { return p.widgets().some(isNotch); })) continue;
@@ -63,4 +80,4 @@
         });
     });
     print(JSON.stringify(report));
-})(__ENABLED__, __STYLE__);
+})(__ENABLED__, __STYLE__, __ORIGINS__);

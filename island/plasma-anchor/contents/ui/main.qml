@@ -96,9 +96,16 @@ PlasmoidItem {
         borderOpacity: (root.appearance.notchBorder || {}).opacity ?? 0.1
         borderWidth: (root.appearance.notchBorder || {}).width ?? 0.8
         working: root.live.working === true
+        waiting: root.live.waiting === true
+        waitingPulse: root.appearance.waitingPulse !== false
+        hoverPeek: root.appearance.hoverPeek !== false
+        hoverDelay: Number(root.appearance.hoverDelay ?? 180)
+        peekTrack: mediaPlayers.currentPlayer ? [mediaPlayers.currentPlayer.track, mediaPlayers.currentPlayer.artist].filter(s => !!s).join(" — ") : ""
         micMuted: root.live.micMuted === true
         companion: root.companion
         companionCharacter: String(root.appearance.companionCharacter || "blob")
+        companionReactive: root.appearance.companionReactive !== false
+        companionMonitor: String(root.appearance.companionMonitor || "")
         pointerX: root.pointerX
         pointerY: root.pointerY
         pointerAt: root.pointerAt

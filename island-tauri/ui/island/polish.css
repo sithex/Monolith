@@ -189,8 +189,10 @@ html[data-theme='album'][data-reduce-motion='true'] { transition-duration: 0s; }
 .settings-card > header .link:hover, .settings-card > header .link[data-armed='true'] { color: var(--ui-accent); }
 .settings-card > header small { color: var(--v-dim); }
 .settings-empty { padding: 24px 12px; text-align: center; color: var(--v-dim); font-size: var(--fs-md); }
-.settings-text-field { flex: 0 1 220px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; padding: 6px 0; }
+.settings-text-field { flex: 0 1 180px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; padding: 4px 0; }
 .settings-text-field .settings-field-error { margin: 4px 0 0; }
+/* The row rule's `flex: 0 1 220px` is a HEIGHT inside this column wrapper: keep inputs one line. */
+.settings-row .settings-text-field input[type='text'] { flex: none; width: 100%; height: 30px; padding: 4px 10px; font-size: var(--fs-md); }
 .settings-row input[type='text'] { flex: 0 1 220px; min-width: 0; box-sizing: border-box; padding: 6px 10px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); background: rgb(0 0 0 / .25); color: var(--ui-text); font: var(--fs-md)/1.4 var(--ui-mono); }
 .settings-row input[type='text'][aria-invalid='true'] { border-color: var(--ui-error); }
 .settings-row input[type='text']:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }

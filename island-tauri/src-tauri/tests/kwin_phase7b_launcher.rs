@@ -183,6 +183,7 @@ fn capture(s: &Stack, c: &RustConnection, w: u32, name: &str) {
     fs::write(evidence.path(&format!("{name}.json")),serde_json::to_vec(&eval(s,"[document.querySelector('.island'),...document.querySelectorAll('[data-side-button]')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})")).unwrap()).unwrap();
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     let _guard = lock();
     let mut s = Stack::new("phase7b-launcher");

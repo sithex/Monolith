@@ -106,6 +106,7 @@ fn source_sized(s: &Stack, mode: &str, text: &str, bytes: Option<usize>) -> Owne
             .env("WAYLAND_DISPLAY", "hi-gui-wayland")
             .env("HERMES_ISLAND_SCRATCH", &s.root)
             .env("HERMES_ISLAND_CLIPBOARD_FIXTURE", "1")
+            .env("TMPDIR", std::env::temp_dir())
             .env("HI_CLIPBOARD_MODE", mode)
             .env("HI_CLIPBOARD_TEXT", text)
             .env("HI_CLIPBOARD_BYTES", bytes.unwrap_or(0).to_string())
@@ -167,6 +168,7 @@ fn finish(s: Stack, app: Owned) {
 }
 
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_default_off_has_no_watcher_thread_or_connection() {
     let _guard = lock();
     let s = Stack::new("c-off");
@@ -184,6 +186,7 @@ fn clipboard_default_off_has_no_watcher_thread_or_connection() {
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_real_watcher_reads_text_png_and_uri_list() {
     use base64::Engine;
     let _guard = lock();
@@ -242,6 +245,7 @@ fn clipboard_real_watcher_reads_text_png_and_uri_list() {
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_disable_joins_watcher_and_closes_its_connection() {
     let _guard = lock();
     let s = Stack::new("c-stop");
@@ -262,6 +266,7 @@ fn clipboard_disable_joins_watcher_and_closes_its_connection() {
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_pause_discards_real_offers_and_resume_captures_only_future_changes() {
     let _guard = lock();
     let s = Stack::new("c-pause");
@@ -287,6 +292,7 @@ fn clipboard_pause_discards_real_offers_and_resume_captures_only_future_changes(
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_sensitive_hint_and_validated_deny_patterns_skip_real_offers() {
     let _guard = lock();
     let s = Stack::new("c-hide");
@@ -312,6 +318,7 @@ fn clipboard_sensitive_hint_and_validated_deny_patterns_skip_real_offers() {
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_concealed_and_transient_offers_are_skipped_and_counted_as_sensitive() {
     let _guard = lock();
     let s = Stack::new("c-conceal");
@@ -365,6 +372,7 @@ fn clipboard_concealed_and_transient_offers_are_skipped_and_counted_as_sensitive
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_read_caps_drop_oversize_offers_and_a_following_offer_is_still_captured() {
     let _guard = lock();
     let s = Stack::new("c-caps");
@@ -404,6 +412,7 @@ fn clipboard_read_caps_drop_oversize_offers_and_a_following_offer_is_still_captu
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_copy_echo_reorders_only_with_stable_id_and_pin() {
     let _guard = lock();
     let s = Stack::new("c-echo");
@@ -429,6 +438,7 @@ fn clipboard_copy_echo_reorders_only_with_stable_id_and_pin() {
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_pinned_survive_clear_and_persistence_is_private_pinned_only() {
     let _guard = lock();
     let s = Stack::new("c-save");
@@ -456,6 +466,7 @@ fn clipboard_pinned_survive_clear_and_persistence_is_private_pinned_only() {
     finish(s, app);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn clipboard_x11_only_environment_reports_unavailable_without_wayland_connection() {
     let _guard = lock();
     let s = Stack::new("c-x11");
@@ -496,7 +507,8 @@ fn tray_probe(s: &Stack, action: &str) -> Value {
 }
 
 #[test]
-fn clipboard_tray_pause_intent_and_push_update_the_actual_sibling_ui() {
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
+fn clipboard_in_app_pause_and_push_update_the_actual_sibling_ui() {
     let _guard = lock();
     let s = Stack::new("c-tray");
     let log = fs::File::create(s.root.join("tray.log")).unwrap();
@@ -524,39 +536,31 @@ fn clipboard_tray_pause_intent_and_push_update_the_actual_sibling_ui() {
     );
     let snapshot = tray_probe(&s, "snapshot");
     assert_eq!(snapshot["ownerPid"], app.0.id());
-    let row = snapshot["rows"]
+    // Clipboard actions moved out of the tray and into the app. Keep checking
+    // the actual exported menu, then exercise the real mounted pause control.
+    assert!(snapshot["rows"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|r| r["label"] == "Clipboard paused")
-        .unwrap();
-    assert_eq!(row["properties"]["enabled"], false);
+        .all(|r| !r["label"].as_str().unwrap_or("").starts_with("Clipboard")));
+    invoke(
+        &s,
+        "island_dispatch",
+        json!({"intent":{"type":"selectView","view":"clipboard"}}),
+    );
+    until(&s,"clipboard pause is disabled while history is off",6,"Array.from(document.querySelectorAll('[data-testid=clipboard-surface] button')).some(b=>b.textContent==='Pause clipboard'&&b.disabled)");
     enable(&s);
-    tray_probe(&s, "Clipboard history");
     until(&s,"clipboard sibling mounts inside the existing shape",6,"document.querySelector('[data-testid=clipboard-surface]')?.textContent.includes('Capturing clipboard changes')");
-    tray_probe(&s, "Clipboard paused");
+    assert_eq!(eval(&s,"(()=>{const b=Array.from(document.querySelectorAll('[data-testid=clipboard-surface] button')).find(b=>b.textContent==='Pause clipboard');if(!b||b.disabled)return false;b.click();return true})()"), true);
     until(
         &s,
-        "tray pause pushes to actual sibling root",
+        "in-app pause pushes to actual sibling root",
         6,
         "document.querySelector('[data-testid=clipboard-status]')?.textContent==='Paused'",
     );
     assert_eq!(report(&s)["paused"], true);
     invoke(&s, "clipboard_set_paused", json!({"paused":false}));
-    wait_for(
-        "actor pause effect refreshes native check property",
-        Duration::from_secs(6),
-        || {
-            let snapshot = tray_probe(&s, "snapshot");
-            snapshot["rows"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|r| r["label"] == "Clipboard paused")
-                .filter(|r| r["properties"]["toggle-state"] == 0)
-                .map(|_| ())
-        },
-    );
+    until(&s,"external resume refreshes the mounted pause button",6,"Array.from(document.querySelectorAll('[data-testid=clipboard-surface] button')).some(b=>b.textContent==='Pause clipboard'&&!b.disabled)");
     until(&s,"resume pushes to actual sibling root",6,"document.querySelector('[data-testid=clipboard-status]')?.textContent==='Capturing clipboard changes'");
     drop(watcher);
     finish(s, app);

@@ -59,6 +59,7 @@ fn wait_status_view(s: &Stack, view: &str, rev: u64) {
 }
 
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn actor_owns_hover_tabs_focus_cues_and_geometry() {
     let _guard = lock();
     let mut s = Stack::new("phase3-actor");

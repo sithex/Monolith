@@ -335,10 +335,12 @@ fn scenario(overlay: bool) {
     assert!(!scratch.exists(), "GUI scratch leaked");
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn kwin_gui_preview() {
     scenario(false);
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn kwin_gui_overlay() {
     scenario(true);
 }

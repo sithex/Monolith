@@ -82,6 +82,7 @@ fn real_process_refuses(s: &Stack, dir: &Path, reason: &str) {
 }
 
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn native_anchor_client_pin_coexistence_and_sigterm_cleanup() {
     let _guard = lock();
     let mut s = Stack::new("phase3-host");

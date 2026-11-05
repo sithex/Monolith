@@ -80,6 +80,7 @@ fn screenshot(s: &Stack, conn: &x11rb::rust_connection::RustConnection, window: 
         .unwrap();
 }
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     let _guard = lock();
     let mut s = Stack::new("phase4-toast");

@@ -197,6 +197,7 @@ fn screenshot(s: &Stack, conn: &RustConnection, window: u32, name: &str) {
 }
 
 #[test]
+#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     let _guard = lock();
     let mut s = Stack::new("phase7a");

@@ -19,8 +19,15 @@ fn serve_checked() -> Result<(), Box<dyn std::error::Error>> {
         return Err("clipboard fixture opt-in missing".into());
     }
     let root = PathBuf::from(env::var("HERMES_ISLAND_SCRATCH")?).canonicalize()?;
-    if root == Path::new("/") || !root.starts_with("/home/nick/.hermes/cache/scratch") {
-        return Err("fixture root is not in Hermes scratch".into());
+    // The parent passes its temp directory explicitly because env_clear removes
+    // TMPDIR. Accept only a direct, named GUI sandbox child, on any developer PC.
+    let temporary = env::temp_dir().canonicalize()?;
+    if root.parent() != Some(temporary.as_path())
+        || !root
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().starts_with("hi-gui-"))
+    {
+        return Err("fixture root is not a private GUI scratch directory".into());
     }
     for key in [
         "HOME",

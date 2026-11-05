@@ -13,9 +13,9 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .island { --bw: 1px; }
 .island[data-notching='true'] { --bw: 0px; }
 .island[data-state='still'] .topline { justify-content: center; padding: 0; }
-.topline { position: relative; display: flex; align-items: center; height: 42px; min-height: 42px; gap: 14px; padding: 0 18px; font-size: 12px; }
+.topline { position: relative; display: flex; align-items: center; height: 42px; min-height: 42px; gap: 14px; padding: 0 18px; font-size: var(--fs-md); }
 .clock { padding: 2px 0; display: flex; flex-direction: column; align-items: center; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.clock small { color: var(--ui-dim); font-size: 10px; }
+.clock small { color: var(--ui-dim); font-size: var(--fs-xs); }
 .topline[data-notch-clock='false'] .clock { order: -1; }
 .topline[data-notch-clock='true'] .clock { position: absolute; top: calc(-1 * var(--bw) - 2px); left: 50%; width: var(--native-pill-width); height: var(--native-pill-height);
   margin-left: calc(var(--native-pill-width) / -2); padding: 0; justify-content: center; gap: 0; border-radius: 0 0 10px 10px;
@@ -26,16 +26,16 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .island .topline[data-notch-clock='true'] .clock:active:not(:disabled) { transform: none; opacity: 1; }
 /* Closing: the native notch's own text colour (the Hermes skin), so the hand-off is exact. */
 .island[data-state='still'] .topline[data-notch-clock='true'] .clock { color: var(--notch-text, var(--ui-text)); }
-.collapse { margin-left: auto; font-size: 24px; width: 32px; padding: 0; }
+.collapse { margin-left: auto; font-size: var(--fs-xl); width: 32px; padding: 0; }
 .preview { padding: 20px 24px; flex: 1; }
-.preview h2 { font-size: 21px; font-weight: 500; }
+.preview h2 { font-size: var(--fs-xl); font-weight: 500; }
 .preview button { margin-top: 20px; width: 100%; }
 .terminal-wrap { display: flex; flex: 1; min-height: 0; padding: 0 16px 18px; }
 
 .island[data-morphing='true'] > .terminal-wrap { will-change: transform, opacity, filter; }
 .island[data-state='large'][data-morphing='true'] > .terminal-wrap { position: absolute; top: 42px; left: 50%; margin-left: calc(var(--open-content-width) / -2); width: var(--open-content-width); height: var(--open-content-height); flex: none; }
 .view-stage { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; }
-.view-tabs { display: flex; min-height: 36px; align-items: center; gap: 5px; border-bottom: 1px solid var(--ui-border); font-size: 12px; }
+.view-tabs { display: flex; min-height: 36px; align-items: center; gap: 5px; border-bottom: 1px solid var(--ui-border); font-size: var(--fs-md); }
 .view-tabs button[aria-current='page'] { color: var(--ui-accent); background: var(--ui-surface); }
 .island-shell { border: 0; box-shadow: none; flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .shell-content { flex: 1; min-height: 0; padding: 0; display: flex; }
@@ -55,11 +55,11 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .setting-row input[type='range'] { width: 180px; margin-left: auto; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 legend { margin: 8px 0; font-weight: 600; }
-.gauge h3 strong { margin-left: auto; font-size: 21px; font-variant-numeric: tabular-nums; }
+.gauge h3 strong { margin-left: auto; font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
 .gauge progress { --tone: var(--ui-accent); }
-.dashboard .card p, .monitor .card p { font-size: 12px; }
+.dashboard .card p, .monitor .card p { font-size: var(--fs-md); }
 .island-error { position: absolute; left: 50%; bottom: 14px; translate: -50% 0; z-index: 40; box-sizing: border-box; max-width: calc(100% - 48px);
-  padding: 8px 14px; border-radius: 14px; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; cursor: pointer; user-select: text;
+  padding: 8px 14px; border-radius: var(--radius-2xl); font-size: var(--fs-md); line-height: 1.35; overflow-wrap: anywhere; cursor: pointer; user-select: text;
   color: var(--ui-text); background: color-mix(in srgb, var(--ui-error) 14%, var(--ui-raised));
   border: 1px solid color-mix(in srgb, var(--ui-error) 45%, transparent); box-shadow: 0 8px 24px #0007; }
 .island-error::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--ui-error); }

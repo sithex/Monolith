@@ -28,6 +28,25 @@
   --ui-radius: 24px;
   --ui-card-radius: 18px;
   --ui-tile-radius: 17px;
+  /* Type and corner scales: use these instead of raw px. */
+  --fs-2xs: 9px;
+  --fs-xs: 10px;
+  --fs-sm: 11px;
+  --fs-md: 12px;
+  --fs-body: 13px;
+  --fs-base: 14px;
+  --fs-title: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 14px;
+  --radius-3xl: 16px;
+  --radius-4xl: 20px;
   --ui-focus: var(--ui-accent);
 }
 [data-theme='neutral'] {

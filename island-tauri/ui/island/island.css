@@ -58,5 +58,9 @@ legend { margin: 8px 0; font-weight: 600; }
 .gauge h3 strong { margin-left: auto; font-size: 21px; font-variant-numeric: tabular-nums; }
 .gauge progress { --tone: var(--ui-accent); }
 .dashboard .card p, .monitor .card p { font-size: 12px; }
-main > [role='alert'] { color: var(--ui-error); }
+.island-error { position: absolute; left: 50%; bottom: 14px; translate: -50% 0; z-index: 40; box-sizing: border-box; max-width: calc(100% - 48px);
+  padding: 8px 14px; border-radius: 14px; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; cursor: pointer; user-select: text;
+  color: var(--ui-text); background: color-mix(in srgb, var(--ui-error) 14%, var(--ui-raised));
+  border: 1px solid color-mix(in srgb, var(--ui-error) 45%, transparent); box-shadow: 0 8px 24px #0007; }
+.island-error::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--ui-error); }
 .live-side-button { z-index: 5; box-shadow: var(--ui-shadow); color: var(--ui-text); background: var(--ui-background); border: 1px solid var(--island-border, var(--ui-border)); }

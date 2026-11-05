@@ -88,10 +88,11 @@ export function Island() {
     goingBack.current = true; navigate(target);
   };
   const reduced = useReducedMotion();
-  // Reveal: content holds while the shell grows, then blurs/scales in from the top.
-  const shown = { opacity: [0, 0, 1], scale: [0.86, 0.86, 1], filter: ['blur(12px)', 'blur(6px)', 'blur(0px)'] };
+  // Reveal: content holds while the shell grows, then fades/scales in from the top. No blur:
+  // a filter over the whole page (xterm included) was costly and lingered as blur(0px) at rest.
+  const shown = { opacity: [0, 0, 1], scale: [0.86, 0.86, 1] };
   const showTransition = { duration: 0.45, times: [0, 0.35, 1], ease: [0.22, 1, 0.36, 1] as const };
-  const reveal = reduced ? { initial: false as const } : { initial: { opacity: 0, scale: 0.86, filter: 'blur(12px)' }, animate: shown, transition: showTransition };
+  const reveal = reduced ? { initial: false as const } : { initial: { opacity: 0, scale: 0.86 }, animate: shown, transition: showTransition };
   // The departing page keeps its last layout while it fades; the shell contracts only
   // after the side controls have withdrawn. The terminal is never remounted.
   const wrap = useRef<HTMLDivElement>(null), wasActive = useRef(active);
@@ -109,7 +110,7 @@ export function Island() {
   }, [active, reduced]);
   // The open content is never remounted (xterm/PTY identity); it is re-revealed in place.
   const openMotion = reduced ? { initial: false as const } : { initial: false as const,
-    animate: active ? shown : { opacity: 0, scale: 1, filter: 'blur(0px)' },
+    animate: active ? shown : { opacity: 0, scale: 1 },
     transition: active ? showTransition : { duration: 0.16, ease: 'easeIn' as const } };
   const views = [...new Set(launcher.items.filter(i => i.enabled && i.known && i.view && i.view !== 'controls').map(i => i.view as IslandView))];
   return <main onClickCapture={event => {
@@ -136,5 +137,11 @@ export function Island() {
         </IslandShell>
       </ViewPager>
     </motion.div>
-  </IslandSurface><SideControls navigate={navigate} fail={fail} view={view} back={{ view: previous, label: viewLabels[previous], go: goBack }} /><ColorPickerPanel /><Toast previews={false} />{error && <p role="alert">{error}</p>}</main>;
+    {/* Errors are a short message inside the open island (under its blur, clickable to
+        dismiss), not loose text on the desktop below it. */}
+    <AnimatePresence>{error && active && <motion.div key="error" className="island-error" role="alert" title="Dismiss" onClick={() => setError('')}
+      initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+      exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: 10, transition: { duration: 0.16, ease: 'easeIn' } }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}>{error}</motion.div>}</AnimatePresence>
+  </IslandSurface><SideControls navigate={navigate} fail={fail} view={view} back={{ view: previous, label: viewLabels[previous], go: goBack }} /><ColorPickerPanel /><Toast previews={false} /></main>;
 }

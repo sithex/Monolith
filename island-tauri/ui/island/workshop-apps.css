@@ -44,8 +44,6 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .file-row, .bluetooth-row { display: flex; align-items: center; gap: 12px; }
 .file-row .kind-icon { color: var(--ui-green); }
 .kind-icon { color: var(--ui-accent); display: grid; place-items: center; flex-shrink: 0; }
-.stream-row { border-top: 1px solid var(--ui-border); padding-top: 12px; }
-.mixer-channel .slider-row { margin-top: 5px; }
 .notification-card .app-toolbar { align-items: start; }
 .notification-card .app-toolbar strong { padding-top: 6px; overflow-wrap: anywhere; }
 .notification-icon { width: 28px; height: 28px; margin-top: 3px; border-radius: 7px; }
@@ -71,11 +69,6 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .weather-reading strong { font-size: 28px; font-weight: 400; letter-spacing: -.5px; }
 .bluetooth-row { padding: 8px 0; font-size: 11px; }
 .bluetooth-row>svg { color: var(--ui-blue); }
-.module-toggle { display: flex; align-items: center; }
-.module-toggle input { width: 20px; height: 20px; }
-.module-row .app-footer { margin: 8px 0 4px; }
-.fixture-picker { display: flex; justify-content: flex-end; margin-bottom: 12px; }
-.fixture-picker select { padding: 6px 9px; }
 /* Add round-2 solo routes without changing round-1 selectors. */
 .gallery[data-solo='calendar'] #calendar, .gallery[data-solo='scratchpad'] #scratchpad,
 .gallery[data-solo='downloads'] #downloads, .gallery[data-solo='mixer'] #mixer,

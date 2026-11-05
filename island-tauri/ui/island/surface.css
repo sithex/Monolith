@@ -62,7 +62,7 @@ html[data-glass='true'] .island {
 }
 html[data-glass='true'] .island[data-state='still'] { background: var(--ui-background); }
 /* Inner layers must not repaint an opaque fill over the frosted body. */
-.island .island-shell, .island .shell-content, .island .view-pane, .island .app-pane, .island .terminal-pane, .island .terminal-wrap { background: transparent !important; border: 0; box-shadow: none; }
+.island .island-shell, .island .shell-content, .island .view-pane, .island .app-pane, .island .terminal-pane, .island .terminal-wrap { background: transparent; border: 0; box-shadow: none; }
 html[data-glass='true'] .island .card, html[data-glass='true'] .island .settings-card, html[data-glass='true'] .island .app-tile { background: rgb(255 255 255 / .06); border-color: rgb(255 255 255 / .08); }
 html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(--ui-background) calc(100% - var(--glass-strength) * 100%), transparent); }
 .island-content { display: flex; flex-direction: column; flex: 1; min-height: 0; transform-origin: 50% 0; }
@@ -76,7 +76,6 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .island .primary { background: var(--ui-accent); color: var(--ui-on-accent); }
 .island .primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-accent) 88%, white); }
 .island select { background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: 10px; }
-.island .popover { background: color-mix(in srgb, var(--ui-background) 96%, white 4%); border: .5px solid var(--v-stroke-hi); border-radius: 12px; }
 .title-row { height: 36px; padding: 0 4px 0 0; }
 .title-row h2 { font-size: 16px; font-weight: 600; }
 .icon-button { width: 28px; height: 28px; border-radius: 9px; color: var(--v-dim); }
@@ -95,7 +94,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
    no knob, white .92 fill from the left (DraftRange sets --fill), track white .14.
    Programmatic changes ease .22 s; while dragging the fill follows the pointer. */
 @property --fill { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
-.island input[type='range'], .capsule-range { appearance: none; -webkit-appearance: none; height: 24px; border-radius: 12px; cursor: ew-resize; outline: none; overflow: hidden;
+.island input[type='range'] { appearance: none; -webkit-appearance: none; height: 24px; border-radius: 12px; cursor: ew-resize; outline: none; overflow: hidden;
   background: linear-gradient(to right, rgb(255 255 255 / .92) 0 var(--fill), var(--v-track) var(--fill) 100%);
   transition: --fill .22s cubic-bezier(.33, 1, .68, 1), opacity .18s ease, box-shadow .18s ease; }
 .island input[type='range'][data-dragging='true'] { transition: opacity .18s ease, box-shadow .18s ease; }
@@ -106,7 +105,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .island input[type='range']:disabled { opacity: .4; cursor: default; }
 
 /* ---- Side buttons (44 pt circles, centred glyph) ------------------------ */
-.live-side-button, .round-button { padding: 0 !important; display: grid; place-items: center; line-height: 0; }
+.live-side-button, .round-button { padding: 0; display: grid; place-items: center; line-height: 0; }
 .live-side-button { background: var(--ui-background); border: .75px solid var(--v-stroke-hi); color: rgb(255 255 255 / .9); box-shadow: 0 0 12px rgb(0 0 0 / .25), 0 5px 16px rgb(0 0 0 / .35); }
 .live-side-button svg, .round-button svg { width: 46%; height: 46%; max-width: 20px; max-height: 20px; display: block; }
 
@@ -123,13 +122,13 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .app-tile { width: 100%; height: auto; aspect-ratio: 92 / 86; min-height: 0; padding: 10px 4px 8px; gap: 8px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: var(--v-fill-soft); border: 1px solid rgb(255 255 255 / .04); font-size: 11px; font-weight: 500; line-height: 1.2; color: var(--ui-text); }
 .app-tile svg { width: 28px; height: 28px; flex: none; color: var(--tone, rgb(255 255 255 / .85)); }
-.app-tile { font-size: 12px !important; }
+.app-tile { font-size: 12px; }
 .app-tile span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; min-height: 26px; }
 .app-tile:hover:not(:disabled) { background: var(--v-fill-hi) !important; border-color: rgb(255 255 255 / .12); }
 .app-grid[data-editing='true'] .app-tile { padding-bottom: 8px; cursor: grab; }
 .tile-wrap[data-dragging='true'] .app-tile { cursor: grabbing; background: var(--v-fill-hi); box-shadow: 0 12px 30px rgb(0 0 0 / .45); }
 .tile-wrap[data-disabled='true'] .app-tile { opacity: .45; }
-.tile-badge { position: absolute; top: -6px; left: -6px; width: 22px; height: 22px; border-radius: 50%; padding: 0 !important; display: grid; place-items: center;
+.tile-badge { position: absolute; top: -6px; left: -6px; width: 22px; height: 22px; border-radius: 50%; padding: 0; display: grid; place-items: center;
   font-size: 16px; line-height: 1; font-weight: 600; z-index: 3; box-shadow: 0 0 0 2px var(--ui-background); }
 .tile-badge.remove { background: rgb(120 120 128 / .9); color: #fff; }
 .tile-badge.add { background: #30d158; color: #fff; }
@@ -144,9 +143,9 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 
 /* ---- Timer: ruler wheel ------------------------------------------------- */
 .timer-app { --tone: var(--v-orange); display: flex; flex-direction: column; gap: 12px; }
-.timer-tabs button { font-size: 12px; font-weight: 500; height: 24px; padding: 0; color: rgb(255 255 255 / .5); border-bottom: 2px solid transparent; border-radius: 0; background: none !important; }
+.timer-tabs button { font-size: 12px; font-weight: 500; height: 24px; padding: 0; color: rgb(255 255 255 / .5); border-bottom: 2px solid transparent; border-radius: 0; background: none; }
 .timer-tabs button[aria-selected='true'] { color: var(--ui-text); border-color: var(--tone); }
-.timer-start { border-radius: 14px; height: 28px; padding: 0 16px; font-size: 12px; font-weight: 600; color: var(--tone); background: color-mix(in srgb, var(--tone) 18%, transparent) !important; }
+.timer-start { border-radius: 14px; height: 28px; padding: 0 16px; font-size: 12px; font-weight: 600; color: var(--tone); background: color-mix(in srgb, var(--tone) 18%, transparent); }
 .wheel { position: relative; height: 82px; overflow: hidden; cursor: grab; touch-action: none; outline: none;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12%, #000 88%, transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 12%, #000 88%, transparent 100%); }
 .wheel:active { cursor: grabbing; }
@@ -160,7 +159,6 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .countdown { text-align: center; font-size: clamp(40px, 11cqi, 62px); font-weight: 200; font-family: var(--ui-font); letter-spacing: -1px; color: var(--tone); padding: 2px 0; }
 .countdown .digit { display: inline-block; }
 .timer-footer button { background: var(--v-fill); border-radius: 14px; padding: 4px 12px; }
-.timer-round { width: 52px; height: 52px; border-radius: 50%; padding: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--tone) 28%, transparent) !important; color: var(--tone); font-size: 20px; font-weight: 600; margin: 0 auto; }
 
 /* ---- Mixer: vertical faders --------------------------------------------- */
 .mixer { display: flex; flex-direction: column; gap: 12px; }
@@ -178,7 +176,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .fader:focus-visible .fader-track { box-shadow: 0 0 0 2px var(--ui-focus); }
 .fader-glyph { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; color: rgb(0 0 0 / .55); pointer-events: none; mix-blend-mode: normal; }
 .fader-pct { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; height: 20px; }
-.fader-mute { width: 32px; height: 32px; padding: 0 !important; display: grid; place-items: center; border-radius: 10px; color: var(--v-dim); }
+.fader-mute { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; border-radius: 10px; color: var(--v-dim); }
 .fader-mute[aria-pressed='true'] { color: var(--v-red); }
 .fader-mute svg { width: 15px; height: 15px; }
 .mixer select { flex: 1; }
@@ -187,7 +185,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-panel { gap: 12px; }
 /* Opaque mix instead of backdrop-filter: a sticky blur re-rendered on every scroll/morph frame. */
 .settings-tabs { display: flex; gap: 2px; padding: 3px; background: color-mix(in srgb, var(--ui-background) 94%, white); box-shadow: 0 -6px 0 color-mix(in srgb, var(--ui-background) 94%, white); border-radius: 11px; position: sticky; top: 0; z-index: 4; }
-.settings-tabs button { flex: 1; padding: 6px 8px; font-size: 12px; font-weight: 500; border-radius: 8px; position: relative; color: var(--v-dim); background: none !important; }
+.settings-tabs button { flex: 1; padding: 6px 8px; font-size: 12px; font-weight: 500; border-radius: 8px; position: relative; color: var(--v-dim); background: none; }
 .settings-tabs button[aria-selected='true'] { color: var(--ui-text); }
 .settings-tabs .tab-bg { position: absolute; inset: 0; border-radius: 8px; background: var(--v-fill-hi); z-index: -1; }
 .settings-card { background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: 16px; padding: 4px 14px; }
@@ -201,19 +199,11 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .segmented { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--v-fill); gap: 2px; }
 .segmented button { padding: 4px 10px; font-size: 12px; border-radius: 7px; color: var(--v-dim); }
 .segmented button[aria-pressed='true'] { background: var(--v-fill-hi); color: var(--ui-text); }
-.settings-row .link { color: var(--ui-accent); padding: 4px 0; background: none !important; }
+.settings-row .link { color: var(--ui-accent); padding: 4px 0; background: none; }
 
 .denied-editor { padding: 0 0 12px; display: flex; flex-direction: column; gap: 8px; }
 .denied-editor textarea { width: 100%; resize: vertical; background: rgb(0 0 0 / .25); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: 10px; padding: 8px 10px; font: 12px/1.4 var(--ui-font); }
 .settings-card .pill-button { border-radius: 14px; padding: 4px 14px; font-size: 12px; font-weight: 600; }
-/* Layout editor */
-.layout-preview { background: var(--v-fill-soft); border-radius: 16px; }
-.geometry-island { background: color-mix(in srgb, var(--ui-background) 85%, white 3%); border: .5px solid var(--v-stroke-hi); }
-.geometry-button .round-button { background: var(--ui-background); border: .75px solid var(--v-stroke-hi); }
-.geometry-button[data-selected='true'] .round-button { border-color: var(--ui-accent); color: var(--ui-accent); }
-.empty-slot { border: 1.5px dashed color-mix(in srgb, var(--ui-accent) 70%, transparent); background: transparent; }
-.empty-slot[data-over='true'] { background: color-mix(in srgb, var(--ui-accent) 25%, transparent); }
-.preset-row button { background: var(--v-fill); border: .5px solid var(--v-stroke); }
 
 /* Apps that size with the island */
 .app-pane { container-type: inline-size; }
@@ -225,7 +215,6 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
   .month-day { min-height: 54px; }
   .track-header .artwork { width: 64px; height: 64px; }
 }
-
 
 /* ---- Side buttons: hover lift + press feedback (scale is Framer, colour here) ---- */
 .live-side-button { cursor: pointer; transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .25s var(--v-ease); will-change: transform; }
@@ -298,7 +287,7 @@ html[data-glide='in'] .island { transition: transform .3s cubic-bezier(.5, 0, .8
 .calendar-sub-form input:focus { border-color: color-mix(in srgb, var(--ui-accent) 70%, transparent); }
 .calendar-sub-form button { border-radius: 10px; padding: 6px 14px; font-size: 12px; font-weight: 600; background: var(--v-fill); }
 .calendar-sub-form button.primary { background: var(--ui-accent); color: var(--ui-on-accent); }
-.calendar-sub-error { color: var(--ui-error) !important; font-size: 12px; margin: 0; flex-basis: 100%; }
+.calendar-sub-error { color: var(--ui-error); font-size: 12px; margin: 0; flex-basis: 100%; }
 .calendar-sub.connected { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: 14px; }
 .calendar-sub-dot { width: 8px; height: 8px; border-radius: 50%; background: #30d158; box-shadow: 0 0 8px #30d158; flex: none; }
 .calendar-sub-text { display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; }

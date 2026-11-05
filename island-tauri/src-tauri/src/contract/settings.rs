@@ -109,199 +109,373 @@ pub const HOVER_DELAY_RANGE: (f64, f64) = (0.0, 1200.0);
 pub const OFFSET_X_RANGE: (f64, f64) = (-400.0, 400.0);
 pub const OFFSET_Y_RANGE: (f64, f64) = (-200.0, 200.0);
 pub const TERMINAL_FONT_SIZE_RANGE: (f64, f64) = (8.0, 24.0);
+pub const NOTCH_WIDTH_RANGE: (f64, f64) = (110.0, 320.0);
+pub const ANIMATION_SPEED_RANGE: (f64, f64) = (50.0, 200.0);
+pub const TERMINAL_SCROLLBACK_RANGE: (f64, f64) = (500.0, 100_000.0);
 /// Exact, case-sensitive app names, matching the notification store's policy.
 pub const MAX_NOTIFICATION_DENIED_APPS: usize = 128;
 pub const MAX_NOTIFICATION_APP_BYTES: usize = 256;
+pub const MAX_NOTCH_MONITORS: usize = 16;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Settings {
-    /// Phase 6b1: additive module settings. Secret subscription URLs are never config.
-    #[serde(default)]
-    pub module_registry: super::modules::Registry,
-    pub autostart: bool,
-    pub show_in_taskbar: bool,
-    pub stealth: bool,
-    pub click_sounds: bool,
-    /// 0..=1200 ms; 0 disables hover preview.
-    pub hover_delay: f64,
-    pub offset_x: f64,
-    pub offset_y: f64,
-    pub accent: String,
-    pub background: String,
-    pub border_enabled: bool,
-    pub border_color: String,
-    /// Pill BACKGROUND, not digits.
-    pub panel_clock_color: String,
-    #[serde(default = "default_true")]
-    pub notch_border_enabled: bool,
-    #[serde(default)]
-    pub notch_border_color: String,
-    #[serde(default = "default_notch_border_opacity")]
-    pub notch_border_opacity: f64,
-    #[serde(default = "default_notch_border_width")]
-    pub notch_border_width: f64,
-    pub ui_font: UiFont,
-    pub show_date: bool,
-    pub hardware_monitor: bool,
-    pub terminal_font_size: f64,
-    /// Direct executable and quoted arguments; empty retains the original Hermes launch.
-    #[serde(default)]
-    pub terminal_command: String,
-    pub notifications_enabled: bool,
-    pub system_notification_mirror: bool,
-    /// Additive privacy setting; old files default to an empty deny list.
-    #[serde(default)]
-    pub notification_denied_apps: Vec<String>,
-    pub toast_ttl_ms: f64,
-    pub redact_bodies: bool,
-    pub dnd: bool,
-    pub clipboard_history: bool,
-    pub clipboard_history_size: f64,
-    pub clipboard_persist: bool,
-    #[serde(default)]
-    pub clipboard_deny_patterns: Vec<String>,
-    pub battery_alerts: bool,
-    pub battery_low_percent: f64,
-    pub battery_critical_percent: f64,
-    pub weather_enabled: bool,
-    pub weather_location: Option<GeoPlace>,
-    pub weather_unit: TempUnit,
-    pub hour_format: HourFormat,
-    pub display_id: Option<String>,
-    /// Phase 6m (additive): fetch synced lyrics from LRCLIB for the playing track. A network
-    /// call that sends title/artist/album/duration, so it is opt-in (default off).
-    #[serde(default)]
-    pub lyrics_enabled: bool,
-    /// Phase 6m (additive): live equalizer from a monitor capture of the playing stream.
-    /// Audio capture is privacy-sensitive, so it is opt-in (default off).
-    #[serde(default)]
-    pub equalizer_enabled: bool,
-    /// Phase 6m (additive): number of equalizer bands, 8..=32 (module-registry range).
-    #[serde(default = "default_equalizer_bands")]
-    pub equalizer_bands: f64,
-    /// Additive (post-9b): horizontal swipe / trackpad gesture switches between views.
-    #[serde(default = "default_true")]
-    pub swipe_navigation: bool,
-    /// Additive (post-9b): Translucent island body over KWin blur-behind.
-    #[serde(default = "default_true")]
-    pub translucent: bool,
-    /// Additive (Nov 2): how see-through the translucent body is, 0 (opaque) ..= 100.
-    #[serde(default = "default_glass_strength")]
-    pub glass_strength: f64,
-    /// Additive (Nov 2): mirror the island colour scheme into the Hermes skin
-    /// (`skins/ripple-island.yaml` + `hermes skin use`); off restores the previous skin.
-    #[serde(default)]
-    pub hermes_theme_sync: bool,
-    /// Additive (Nov 2): the Custom colour scheme's seed colours (empty = scheme default).
-    #[serde(default)]
-    pub custom_accent: String,
-    #[serde(default)]
-    pub custom_background: String,
-    #[serde(default)]
-    pub custom_text: String,
-    /// Additive (Nov 2c): Linux display server, applied at the next launch by `run.sh`.
-    #[serde(default = "default_display_backend")]
-    pub display_backend: DisplayBackend,
-    /// Additive (Nov 2c): native notch width in logical px (144 = the original slot).
-    #[serde(default = "default_notch_width")]
-    pub notch_width: f64,
-    #[serde(default)]
-    pub show_notch_on_every_monitor: bool,
-    /// Additive (Nov 3): the small companion face in the notch whose eyes follow the pointer.
-    #[serde(default = "default_true")]
-    pub companion_enabled: bool,
-    #[serde(default)]
-    pub companion_character: CompanionCharacter,
+/// Embedded terminal cursor shape (xterm.js `cursorStyle`).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum TerminalCursorStyle {
+    #[default]
+    Block,
+    Bar,
+    Underline,
 }
 
-fn default_display_backend() -> DisplayBackend {
-    DisplayBackend::Wayland
-}
-pub const NOTCH_WIDTH_RANGE: (f64, f64) = (110.0, 320.0);
-fn default_notch_width() -> f64 {
-    144.0
-}
-
-fn default_glass_strength() -> f64 {
-    55.0
-}
-
-fn default_notch_border_opacity() -> f64 {
-    0.1
-}
-fn default_notch_border_width() -> f64 {
-    0.8
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn default_equalizer_bands() -> f64 {
-    16.0
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            module_registry: super::modules::Registry::defaults(),
-            autostart: false,
-            show_in_taskbar: false,
-            stealth: false,
-            click_sounds: false,
-            hover_delay: 180.0,
-            offset_x: 0.0,
-            offset_y: 0.0,
-            accent: String::new(),
-            background: String::new(),
-            border_enabled: true,
-            border_color: String::new(),
-            panel_clock_color: String::new(),
-            notch_border_enabled: true,
-            notch_border_color: String::new(),
-            notch_border_opacity: default_notch_border_opacity(),
-            notch_border_width: default_notch_border_width(),
-            ui_font: UiFont::System,
-            show_date: true,
-            hardware_monitor: true,
-            terminal_font_size: 13.0,
-            terminal_command: String::new(),
-            notifications_enabled: true,
-            system_notification_mirror: false,
-            notification_denied_apps: Vec::new(),
-            toast_ttl_ms: 6000.0,
-            redact_bodies: false,
-            dnd: false,
-            clipboard_history: false,
-            clipboard_history_size: 100.0,
-            clipboard_persist: false,
-            clipboard_deny_patterns: Vec::new(),
-            battery_alerts: true,
-            battery_low_percent: 20.0,
-            battery_critical_percent: 10.0,
-            weather_enabled: false,
-            weather_location: None,
-            weather_unit: TempUnit::Fahrenheit,
-            hour_format: HourFormat::H12,
-            display_id: None,
-            lyrics_enabled: false,
-            equalizer_enabled: false,
-            equalizer_bands: 16.0,
-            swipe_navigation: true,
-            translucent: true,
-            glass_strength: default_glass_strength(),
-            hermes_theme_sync: false,
-            custom_accent: String::new(),
-            custom_background: String::new(),
-            custom_text: String::new(),
-            display_backend: default_display_backend(),
-            notch_width: default_notch_width(),
-            show_notch_on_every_monitor: false,
-            companion_enabled: true,
-            companion_character: CompanionCharacter::Blob,
+/// Generates, from ONE table, everything a setting needs: the `Settings` field and its
+/// default, the `settings.json` encoding, the `SettingsPatch` field (with its TS type) and the
+/// validation in [`SettingsPatch::apply`]. Adding a setting = adding one row below.
+///
+/// Row: `field: Type = default, "fileKey", rule;` where rule is
+/// * `plain` — any value of the type is valid;
+/// * `num(RANGE)` — finite, clamped into RANGE; `round(RANGE)` also rounds to a whole number;
+/// * `color` — `""` (follow the skin) or `#rrggbb`;
+/// * `with(fn)` — `fn(&T) -> Result<T, IslandError>` validates/normalizes the value.
+///
+/// Keys missing from an older `settings.json` keep their default (container `serde(default)`);
+/// `Option<T>` settings accept `null` in a patch to clear them.
+macro_rules! settings_schema {
+    ($( $(#[$meta:meta])* $field:ident : $ty:ty = $default:expr, $key:literal, $rule:ident $(($arg:expr))? ;)*) => {
+        /// Every field is always present on the wire (no `?` in TypeScript); deserializing
+        /// starts from the defaults (see the `Deserialize` impl below).
+        #[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Settings {
+            $( $(#[$meta])* pub $field: $ty, )*
         }
+
+        impl Default for Settings {
+            fn default() -> Self {
+                Self { $( $field: $default, )* }
+            }
+        }
+
+        /// Every `settings.json` key, in table order.
+        pub const SETTINGS_KEYS: &[&str] = &[$($key),*];
+
+        impl Settings {
+            /// The JSON written to `settings.json`: sorted keys, whole numbers as integers.
+            pub fn to_file_map(&self) -> BTreeMap<&'static str, Value> {
+                BTreeMap::from([$( ($key, FileValue::file_value(&self.$field)), )*])
+            }
+        }
+
+        /// Partial update. Unknown keys and wrong types are rejected by serde; range/pattern
+        /// checks and clamping happen in [`SettingsPatch::apply`].
+        /// Deserialize it through [`ObjectOnly`] at the IPC boundary (arrays are otherwise
+        /// accepted by serde's derived struct impl).
+        #[derive(Deserialize, Default, Clone, Debug, PartialEq, specta::Type)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        pub struct SettingsPatch {
+            $(
+                #[serde(default, deserialize_with = "present")]
+                #[specta(optional, type = $ty)]
+                pub $field: Option<$ty>,
+            )*
+        }
+
+        impl SettingsPatch {
+            pub fn is_empty(&self) -> bool {
+                *self == SettingsPatch::default()
+            }
+
+            /// Validate the whole patch against `base`; any invalid key rejects everything.
+            pub fn apply(&self, base: &Settings) -> Result<Settings, IslandError> {
+                let mut next = base.clone();
+                $(
+                    if let Some(v) = &self.$field {
+                        next.$field = settings_rule!($rule $(($arg))?, $key, v);
+                    }
+                )*
+                Ok(next)
+            }
+        }
+    };
+}
+
+macro_rules! settings_rule {
+    (plain, $key:literal, $v:ident) => {
+        $v.clone()
+    };
+    (num($range:expr), $key:literal, $v:ident) => {
+        number($key, *$v, $range)?
+    };
+    (round($range:expr), $key:literal, $v:ident) => {
+        number($key, *$v, $range)?.round()
+    };
+    (color, $key:literal, $v:ident) => {
+        color($key, $v)?
+    };
+    (with($check:expr), $key:literal, $v:ident) => {
+        ($check)($v)?
+    };
+}
+
+settings_schema! {
+    /// Phase 6b1: additive module settings. Secret subscription URLs are never config.
+    module_registry: super::modules::Registry = super::modules::Registry::defaults(), "moduleRegistry", with(check_registry);
+    autostart: bool = false, "autostart", plain;
+    show_in_taskbar: bool = false, "showInTaskbar", plain;
+    stealth: bool = false, "stealth", plain;
+    click_sounds: bool = false, "clickSounds", plain;
+    /// 0..=1200 ms; 0 disables hover preview.
+    hover_delay: f64 = 180.0, "hoverDelay", num(HOVER_DELAY_RANGE);
+    offset_x: f64 = 0.0, "offsetX", num(OFFSET_X_RANGE);
+    offset_y: f64 = 0.0, "offsetY", num(OFFSET_Y_RANGE);
+    accent: String = String::new(), "accent", color;
+    background: String = String::new(), "background", color;
+    border_enabled: bool = true, "borderEnabled", plain;
+    border_color: String = String::new(), "borderColor", color;
+    /// Pill BACKGROUND, not digits.
+    panel_clock_color: String = String::new(), "panelClockColor", color;
+    notch_border_enabled: bool = true, "notchBorderEnabled", plain;
+    notch_border_color: String = String::new(), "notchBorderColor", color;
+    notch_border_opacity: f64 = 0.1, "notchBorderOpacity", num((0.0, 1.0));
+    notch_border_width: f64 = 0.8, "notchBorderWidth", num((0.0, 4.0));
+    ui_font: UiFont = UiFont::System, "uiFont", plain;
+    show_date: bool = true, "showDate", plain;
+    hardware_monitor: bool = true, "hardwareMonitor", plain;
+    terminal_font_size: f64 = 13.0, "terminalFontSize", num(TERMINAL_FONT_SIZE_RANGE);
+    /// Direct executable and quoted arguments; empty retains the original Hermes launch.
+    terminal_command: String = String::new(), "terminalCommand", with(check_terminal_command);
+    notifications_enabled: bool = true, "notificationsEnabled", plain;
+    system_notification_mirror: bool = false, "systemNotificationMirror", plain;
+    /// Exact app names that never notify (file order kept, never normalized).
+    notification_denied_apps: Vec<String> = Vec::new(), "notificationDeniedApps", with(check_denied_apps);
+    toast_ttl_ms: f64 = 6000.0, "toastTtlMs", num((1500.0, 20000.0));
+    redact_bodies: bool = false, "redactBodies", plain;
+    dnd: bool = false, "dnd", plain;
+    clipboard_history: bool = false, "clipboardHistory", plain;
+    clipboard_history_size: f64 = 100.0, "clipboardHistorySize", num((10.0, 500.0));
+    clipboard_persist: bool = false, "clipboardPersist", plain;
+    clipboard_deny_patterns: Vec<String> = Vec::new(), "clipboardDenyPatterns", with(check_clipboard_patterns);
+    battery_alerts: bool = true, "batteryAlerts", plain;
+    battery_low_percent: f64 = 20.0, "batteryLowPercent", num((5.0, 50.0));
+    battery_critical_percent: f64 = 10.0, "batteryCriticalPercent", num((1.0, 30.0));
+    weather_enabled: bool = false, "weatherEnabled", plain;
+    weather_location: Option<GeoPlace> = None, "weatherLocation", with(check_place);
+    weather_unit: TempUnit = TempUnit::Fahrenheit, "weatherUnit", plain;
+    hour_format: HourFormat = HourFormat::H12, "hourFormat", plain;
+    display_id: Option<String> = None, "displayId", with(check_display_id);
+    /// Fetch synced lyrics from LRCLIB for the playing track. A network call that sends
+    /// title/artist/album/duration, so it is opt-in (default off).
+    lyrics_enabled: bool = false, "lyricsEnabled", plain;
+    /// Live equalizer from a monitor capture of the playing stream (privacy: opt-in).
+    equalizer_enabled: bool = false, "equalizerEnabled", plain;
+    /// Whole bands only: a fractional count would be silently truncated downstream.
+    equalizer_bands: f64 = 16.0, "equalizerBands", round((8.0, 32.0));
+    /// Horizontal swipe / trackpad gesture switches between views.
+    swipe_navigation: bool = true, "swipeNavigation", plain;
+    /// Translucent island body over KWin blur-behind.
+    translucent: bool = true, "translucent", plain;
+    /// How see-through the translucent body is, 0 (opaque) ..= 100.
+    glass_strength: f64 = 55.0, "glassStrength", round((0.0, 100.0));
+    /// Mirror the island colour scheme into the Hermes skin; off restores the previous skin.
+    hermes_theme_sync: bool = false, "hermesThemeSync", plain;
+    /// The Custom colour scheme's seed colours (empty = scheme default).
+    custom_accent: String = String::new(), "customAccent", color;
+    custom_background: String = String::new(), "customBackground", color;
+    custom_text: String = String::new(), "customText", color;
+    /// Linux display server, applied at the next launch by `run.sh`.
+    display_backend: DisplayBackend = DisplayBackend::Wayland, "displayBackend", plain;
+    /// Native notch width in logical px (144 = the original slot).
+    notch_width: f64 = 144.0, "notchWidth", round(NOTCH_WIDTH_RANGE);
+    show_notch_on_every_monitor: bool = false, "showNotchOnEveryMonitor", plain;
+    /// The small companion face in the notch whose eyes follow the pointer.
+    companion_enabled: bool = true, "companionEnabled", plain;
+    companion_character: CompanionCharacter = CompanionCharacter::Blob, "companionCharacter", plain;
+    // ---- Nov 5 additions ----
+    /// Game mode switches on by itself while the active window is fullscreen.
+    game_mode_auto: bool = true, "gameModeAuto", plain;
+    /// Manual game mode (side button / tray): no previews, toasts or pop-ups over games.
+    game_mode: bool = false, "gameMode", plain;
+    /// KDE global shortcut that toggles the island (KGlobalAccel syntax, `""` = none).
+    open_shortcut: String = "Meta+`".to_owned(), "openShortcut", with(check_shortcut);
+    /// Amber pulse on the closed notch while Hermes waits for you (approval/question).
+    notch_waiting_pulse: bool = true, "notchWaitingPulse", plain;
+    /// The companion looks busy while Hermes works, alert while it waits, dozes when idle.
+    companion_reactive: bool = true, "companionReactive", plain;
+    /// Hovering the closed notch peeks the playing track / running timer.
+    notch_hover_peek: bool = true, "notchHoverPeek", plain;
+    /// Output names that get a notch with `showNotchOnEveryMonitor` (empty = every monitor).
+    notch_monitors: Vec<String> = Vec::new(), "notchMonitors", with(check_output_list);
+    /// Output that shows the companion (`""` = every notch).
+    companion_monitor: String = String::new(), "companionMonitor", with(check_output_or_empty);
+    /// Replace springs/morphs with short fades.
+    reduce_motion: bool = false, "reduceMotion", plain;
+    /// Animation speed in percent (100 = designed timing, 200 = twice as fast).
+    animation_speed: f64 = 100.0, "animationSpeed", round(ANIMATION_SPEED_RANGE);
+    /// Embedded terminal font family (`""` = DejaVu Sans Mono).
+    terminal_font_family: String = String::new(), "terminalFontFamily", with(check_font_family);
+    terminal_scrollback: f64 = 5000.0, "terminalScrollback", round(TERMINAL_SCROLLBACK_RANGE);
+    terminal_cursor_style: TerminalCursorStyle = TerminalCursorStyle::Block, "terminalCursorStyle", plain;
+    terminal_cursor_blink: bool = true, "terminalCursorBlink", plain;
+}
+
+/// Strict per present key (wrong type = error, values validated/clamped like a patch); keys
+/// missing from an older file keep their default and unknown keys are ignored.
+impl<'de> Deserialize<'de> for Settings {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        let mut map = serde_json::Map::<String, Value>::deserialize(deserializer)?;
+        map.retain(|key, _| SETTINGS_KEYS.contains(&key.as_str()));
+        let patch = serde_json::from_value::<SettingsPatch>(Value::Object(map))
+            .map_err(D::Error::custom)?;
+        patch
+            .apply(&Settings::default())
+            .map_err(|e| D::Error::custom(format!("{e:?}")))
     }
+}
+
+/// How a setting is written to `settings.json`.
+trait FileValue {
+    fn file_value(&self) -> Value;
+}
+impl FileValue for f64 {
+    fn file_value(&self) -> Value {
+        json_number(*self)
+    }
+}
+macro_rules! file_value_as_json {
+    ($($t:ty),*) => { $(impl FileValue for $t { fn file_value(&self) -> Value { json!(self) } })* };
+}
+file_value_as_json!(
+    bool,
+    String,
+    Vec<String>,
+    Option<String>,
+    Option<GeoPlace>,
+    UiFont,
+    TempUnit,
+    HourFormat,
+    DisplayBackend,
+    CompanionCharacter,
+    TerminalCursorStyle,
+    super::modules::Registry
+);
+
+fn check_registry(
+    registry: &super::modules::Registry,
+) -> Result<super::modules::Registry, IslandError> {
+    registry
+        .export_json()
+        .map_err(|_| IslandError::invalid("Invalid module registry"))?;
+    Ok(registry.clone())
+}
+
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_terminal_command(command: &String) -> Result<String, IslandError> {
+    parse_terminal_command(command)?;
+    Ok(command.clone())
+}
+
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_denied_apps(apps: &Vec<String>) -> Result<Vec<String>, IslandError> {
+    let mut seen = BTreeSet::new();
+    if apps.len() > MAX_NOTIFICATION_DENIED_APPS
+        || apps.iter().any(|app| {
+            app.is_empty()
+                || app.len() > MAX_NOTIFICATION_APP_BYTES
+                || app.trim() != app
+                || app.chars().any(char::is_control)
+                || !seen.insert(app)
+        })
+    {
+        return Err(IslandError::invalid("Invalid notificationDeniedApps"));
+    }
+    // Do not trim, fold case or sort: matching is exact and file order is retained.
+    Ok(apps.clone())
+}
+
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_clipboard_patterns(patterns: &Vec<String>) -> Result<Vec<String>, IslandError> {
+    crate::integrations::clipboard::history::HistoryConfig {
+        deny_patterns: patterns.clone(),
+        ..Default::default()
+    }
+    .validated()
+    .map_err(|_| IslandError::invalid("Invalid clipboardDenyPatterns"))?;
+    Ok(patterns.clone())
+}
+
+fn check_place(place: &Option<GeoPlace>) -> Result<Option<GeoPlace>, IslandError> {
+    if let Some(place) = place {
+        place.validate()?;
+    }
+    Ok(place.clone())
+}
+
+fn check_display_id(id: &Option<String>) -> Result<Option<String>, IslandError> {
+    if id
+        .as_ref()
+        .is_some_and(|id| id.is_empty() || id.len() > 256 || id.chars().any(char::is_control))
+    {
+        return Err(IslandError::invalid("Invalid displayId"));
+    }
+    Ok(id.clone())
+}
+
+/// KGlobalAccel key sequence such as `Meta+\``, `Ctrl+Alt+Space`; `""` disables it.
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_shortcut(value: &String) -> Result<String, IslandError> {
+    if value.len() > 64
+        || value
+            .chars()
+            .any(|c| c.is_control() || c == ',' || c == '\t')
+    {
+        return Err(IslandError::invalid("Invalid openShortcut"));
+    }
+    Ok(value.trim().to_owned())
+}
+
+/// A KScreen output name (`DP-1`, `HDMI-A-1`, `eDP-1`).
+pub fn is_output_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+}
+
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_output_list(names: &Vec<String>) -> Result<Vec<String>, IslandError> {
+    let mut seen = BTreeSet::new();
+    if names.len() > MAX_NOTCH_MONITORS
+        || names
+            .iter()
+            .any(|name| !is_output_name(name) || !seen.insert(name))
+    {
+        return Err(IslandError::invalid("Invalid notchMonitors"));
+    }
+    Ok(names.clone())
+}
+
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_output_or_empty(name: &String) -> Result<String, IslandError> {
+    if name.is_empty() || is_output_name(name) {
+        Ok(name.clone())
+    } else {
+        Err(IslandError::invalid("Invalid companionMonitor"))
+    }
+}
+
+/// A CSS/xterm font family list; quotes and CSS syntax characters are refused so the value
+/// can never escape the `font-family` declaration.
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_font_family(value: &String) -> Result<String, IslandError> {
+    if value.len() > 128
+        || value
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '"' | '\'' | ';' | '{' | '}' | '<' | '>' | '\\'))
+    {
+        return Err(IslandError::invalid("Invalid terminalFontFamily"));
+    }
+    Ok(value.trim().to_owned())
 }
 
 /// Parse argv only: no shell evaluation, variable expansion, or case normalization.
@@ -347,82 +521,6 @@ fn json_number(value: f64) -> Value {
 }
 
 impl Settings {
-    /// The JSON written to `settings.json`: sorted keys, whole numbers as integers.
-    pub fn to_file_map(&self) -> BTreeMap<&'static str, Value> {
-        BTreeMap::from([
-            ("moduleRegistry", json!(self.module_registry)),
-            ("autostart", json!(self.autostart)),
-            ("showInTaskbar", json!(self.show_in_taskbar)),
-            ("stealth", json!(self.stealth)),
-            ("clickSounds", json!(self.click_sounds)),
-            ("hoverDelay", json_number(self.hover_delay)),
-            ("offsetX", json_number(self.offset_x)),
-            ("offsetY", json_number(self.offset_y)),
-            ("accent", json!(self.accent)),
-            ("background", json!(self.background)),
-            ("borderEnabled", json!(self.border_enabled)),
-            ("borderColor", json!(self.border_color)),
-            ("panelClockColor", json!(self.panel_clock_color)),
-            ("notchBorderEnabled", json!(self.notch_border_enabled)),
-            ("notchBorderColor", json!(self.notch_border_color)),
-            ("notchBorderOpacity", json_number(self.notch_border_opacity)),
-            ("notchBorderWidth", json_number(self.notch_border_width)),
-            ("uiFont", json!(self.ui_font.as_str())),
-            ("showDate", json!(self.show_date)),
-            ("hardwareMonitor", json!(self.hardware_monitor)),
-            ("terminalFontSize", json_number(self.terminal_font_size)),
-            ("terminalCommand", json!(self.terminal_command)),
-            ("notificationsEnabled", json!(self.notifications_enabled)),
-            (
-                "systemNotificationMirror",
-                json!(self.system_notification_mirror),
-            ),
-            (
-                "notificationDeniedApps",
-                json!(self.notification_denied_apps),
-            ),
-            ("toastTtlMs", json_number(self.toast_ttl_ms)),
-            ("redactBodies", json!(self.redact_bodies)),
-            ("dnd", json!(self.dnd)),
-            ("clipboardHistory", json!(self.clipboard_history)),
-            (
-                "clipboardHistorySize",
-                json_number(self.clipboard_history_size),
-            ),
-            ("clipboardPersist", json!(self.clipboard_persist)),
-            ("clipboardDenyPatterns", json!(self.clipboard_deny_patterns)),
-            ("batteryAlerts", json!(self.battery_alerts)),
-            ("batteryLowPercent", json_number(self.battery_low_percent)),
-            (
-                "batteryCriticalPercent",
-                json_number(self.battery_critical_percent),
-            ),
-            ("weatherEnabled", json!(self.weather_enabled)),
-            ("weatherLocation", json!(self.weather_location)),
-            ("weatherUnit", json!(self.weather_unit)),
-            ("hourFormat", json!(self.hour_format)),
-            ("displayId", json!(self.display_id)),
-            ("lyricsEnabled", json!(self.lyrics_enabled)),
-            ("equalizerEnabled", json!(self.equalizer_enabled)),
-            ("equalizerBands", json_number(self.equalizer_bands)),
-            ("swipeNavigation", json!(self.swipe_navigation)),
-            ("translucent", json!(self.translucent)),
-            ("glassStrength", json_number(self.glass_strength)),
-            ("hermesThemeSync", json!(self.hermes_theme_sync)),
-            ("customAccent", json!(self.custom_accent)),
-            ("customBackground", json!(self.custom_background)),
-            ("customText", json!(self.custom_text)),
-            ("displayBackend", json!(self.display_backend)),
-            ("notchWidth", json_number(self.notch_width)),
-            (
-                "showNotchOnEveryMonitor",
-                json!(self.show_notch_on_every_monitor),
-            ),
-            ("companionEnabled", json!(self.companion_enabled)),
-            ("companionCharacter", json!(self.companion_character)),
-        ])
-    }
-
     /// Lenient loader (island-rust semantics): unknown keys are ignored and individually invalid
     /// values keep their default; a non-object file yields the defaults.
     pub fn from_file_value(raw: &Value) -> Settings {
@@ -446,195 +544,13 @@ impl Settings {
 }
 
 /// Accept a present value but reject JSON `null` (the legacy validator rejected it too).
+/// For an `Option<T>` setting, `null` deserializes as `Some(None)` = explicitly clear it.
 fn present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
 {
     T::deserialize(deserializer).map(Some)
-}
-
-/// Outer `None` means omitted; `Some(None)` means explicitly clear a nullable setting.
-fn nullable<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
-}
-
-/// Partial update. Unknown keys and wrong types are rejected by serde; range/pattern checks and
-/// clamping happen in [`SettingsPatch::apply`].
-/// Deserialize it through [`ObjectOnly`] at the IPC boundary (arrays are otherwise accepted by
-/// serde's derived struct impl).
-#[derive(Deserialize, Default, Clone, Debug, PartialEq, specta::Type)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SettingsPatch {
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = super::modules::Registry)]
-    pub module_registry: Option<super::modules::Registry>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub autostart: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub show_in_taskbar: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub stealth: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub click_sounds: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub hover_delay: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub offset_x: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub offset_y: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub accent: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub background: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub border_enabled: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub border_color: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub panel_clock_color: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub notch_border_enabled: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub notch_border_color: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub notch_border_opacity: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub notch_border_width: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = UiFont)]
-    pub ui_font: Option<UiFont>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub show_date: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub hardware_monitor: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub terminal_font_size: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub terminal_command: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub notifications_enabled: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub system_notification_mirror: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = Vec<String>)]
-    pub notification_denied_apps: Option<Vec<String>>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub toast_ttl_ms: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub redact_bodies: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub dnd: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub clipboard_history: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub clipboard_history_size: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub clipboard_persist: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = Vec<String>)]
-    pub clipboard_deny_patterns: Option<Vec<String>>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub battery_alerts: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub battery_low_percent: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub battery_critical_percent: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub weather_enabled: Option<bool>,
-    #[serde(default, deserialize_with = "nullable")]
-    #[specta(optional, type = Option<GeoPlace>)]
-    pub weather_location: Option<Option<GeoPlace>>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = TempUnit)]
-    pub weather_unit: Option<TempUnit>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = HourFormat)]
-    pub hour_format: Option<HourFormat>,
-    #[serde(default, deserialize_with = "nullable")]
-    #[specta(optional, type = Option<String>)]
-    pub display_id: Option<Option<String>>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub lyrics_enabled: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub equalizer_enabled: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub equalizer_bands: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub swipe_navigation: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub translucent: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub glass_strength: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub hermes_theme_sync: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub custom_accent: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub custom_background: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = String)]
-    pub custom_text: Option<String>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = DisplayBackend)]
-    pub display_backend: Option<DisplayBackend>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = f64)]
-    pub notch_width: Option<f64>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub show_notch_on_every_monitor: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = bool)]
-    pub companion_enabled: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
-    #[specta(optional, type = CompanionCharacter)]
-    pub companion_character: Option<CompanionCharacter>,
 }
 
 /// Wire wrapper that accepts ONLY a JSON object. A derived struct `Deserialize` would also
@@ -665,215 +581,6 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for ObjectOnly<T> {
 impl<T: specta::Type> specta::Type for ObjectOnly<T> {
     fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
         T::definition(types)
-    }
-}
-
-impl SettingsPatch {
-    pub fn is_empty(&self) -> bool {
-        *self == SettingsPatch::default()
-    }
-
-    /// Validate the whole patch against `base`; any invalid key rejects everything.
-    pub fn apply(&self, base: &Settings) -> Result<Settings, IslandError> {
-        let mut next = base.clone();
-        if let Some(command) = &self.terminal_command {
-            parse_terminal_command(command)?;
-            next.terminal_command = command.clone();
-        }
-        if let Some(registry) = &self.module_registry {
-            registry
-                .export_json()
-                .map_err(|_| IslandError::invalid("Invalid module registry"))?;
-            next.module_registry = registry.clone();
-        }
-        if let Some(v) = self.autostart {
-            next.autostart = v;
-        }
-        if let Some(v) = self.show_in_taskbar {
-            next.show_in_taskbar = v;
-        }
-        if let Some(v) = self.stealth {
-            next.stealth = v;
-        }
-        if let Some(v) = self.click_sounds {
-            next.click_sounds = v;
-        }
-        if let Some(v) = self.hover_delay {
-            next.hover_delay = number("hoverDelay", v, HOVER_DELAY_RANGE)?;
-        }
-        if let Some(v) = self.offset_x {
-            next.offset_x = number("offsetX", v, OFFSET_X_RANGE)?;
-        }
-        if let Some(v) = self.offset_y {
-            next.offset_y = number("offsetY", v, OFFSET_Y_RANGE)?;
-        }
-        if let Some(v) = &self.accent {
-            next.accent = color("accent", v)?;
-        }
-        if let Some(v) = &self.background {
-            next.background = color("background", v)?;
-        }
-        if let Some(v) = self.border_enabled {
-            next.border_enabled = v;
-        }
-        if let Some(v) = &self.border_color {
-            next.border_color = color("borderColor", v)?;
-        }
-        if let Some(v) = &self.panel_clock_color {
-            next.panel_clock_color = color("panelClockColor", v)?;
-        }
-        if let Some(v) = self.notch_border_enabled {
-            next.notch_border_enabled = v;
-        }
-        if let Some(v) = &self.notch_border_color {
-            next.notch_border_color = color("notchBorderColor", v)?;
-        }
-        if let Some(v) = self.notch_border_opacity {
-            next.notch_border_opacity = number("notchBorderOpacity", v, (0.0, 1.0))?;
-        }
-        if let Some(v) = self.notch_border_width {
-            next.notch_border_width = number("notchBorderWidth", v, (0.0, 4.0))?;
-        }
-        if let Some(v) = self.ui_font {
-            next.ui_font = v;
-        }
-        if let Some(v) = self.show_date {
-            next.show_date = v;
-        }
-        if let Some(v) = self.hardware_monitor {
-            next.hardware_monitor = v;
-        }
-        if let Some(v) = self.terminal_font_size {
-            next.terminal_font_size = number("terminalFontSize", v, TERMINAL_FONT_SIZE_RANGE)?;
-        }
-        if let Some(v) = self.notifications_enabled {
-            next.notifications_enabled = v;
-        }
-        if let Some(v) = self.system_notification_mirror {
-            next.system_notification_mirror = v;
-        }
-        if let Some(apps) = &self.notification_denied_apps {
-            let mut seen = BTreeSet::new();
-            if apps.len() > MAX_NOTIFICATION_DENIED_APPS
-                || apps.iter().any(|app| {
-                    app.is_empty()
-                        || app.len() > MAX_NOTIFICATION_APP_BYTES
-                        || app.trim() != app
-                        || app.chars().any(char::is_control)
-                        || !seen.insert(app)
-                })
-            {
-                return Err(IslandError::invalid("Invalid notificationDeniedApps"));
-            }
-            // Do not trim, fold case or sort: matching is exact and file order is retained.
-            next.notification_denied_apps = apps.clone();
-        }
-        if let Some(v) = self.toast_ttl_ms {
-            next.toast_ttl_ms = number("toastTtlMs", v, (1500.0, 20000.0))?;
-        }
-        if let Some(v) = self.redact_bodies {
-            next.redact_bodies = v;
-        }
-        if let Some(v) = self.dnd {
-            next.dnd = v;
-        }
-        if let Some(v) = self.clipboard_history {
-            next.clipboard_history = v;
-        }
-        if let Some(v) = self.clipboard_history_size {
-            next.clipboard_history_size = number("clipboardHistorySize", v, (10.0, 500.0))?;
-        }
-        if let Some(v) = self.clipboard_persist {
-            next.clipboard_persist = v;
-        }
-        if let Some(patterns) = &self.clipboard_deny_patterns {
-            crate::integrations::clipboard::history::HistoryConfig {
-                deny_patterns: patterns.clone(),
-                ..Default::default()
-            }
-            .validated()
-            .map_err(|_| IslandError::invalid("Invalid clipboardDenyPatterns"))?;
-            next.clipboard_deny_patterns = patterns.clone();
-        }
-        if let Some(v) = self.battery_alerts {
-            next.battery_alerts = v;
-        }
-        if let Some(v) = self.battery_low_percent {
-            next.battery_low_percent = number("batteryLowPercent", v, (5.0, 50.0))?;
-        }
-        if let Some(v) = self.battery_critical_percent {
-            next.battery_critical_percent = number("batteryCriticalPercent", v, (1.0, 30.0))?;
-        }
-        if let Some(v) = self.weather_enabled {
-            next.weather_enabled = v;
-        }
-        if let Some(v) = &self.weather_location {
-            if let Some(place) = v {
-                place.validate()?;
-            }
-            next.weather_location = v.clone();
-        }
-        if let Some(v) = self.weather_unit {
-            next.weather_unit = v;
-        }
-        if let Some(v) = self.hour_format {
-            next.hour_format = v;
-        }
-        if let Some(v) = &self.display_id {
-            if v.as_ref().is_some_and(|id| {
-                id.is_empty() || id.len() > 256 || id.chars().any(char::is_control)
-            }) {
-                return Err(IslandError::invalid("Invalid displayId"));
-            }
-            next.display_id = v.clone();
-        }
-        if let Some(v) = self.lyrics_enabled {
-            next.lyrics_enabled = v;
-        }
-        if let Some(v) = self.equalizer_enabled {
-            next.equalizer_enabled = v;
-        }
-        if let Some(v) = self.equalizer_bands {
-            // Whole bands only: a fractional count would be silently truncated downstream.
-            next.equalizer_bands = number("equalizerBands", v, (8.0, 32.0))?.round();
-        }
-        if let Some(v) = self.swipe_navigation {
-            next.swipe_navigation = v;
-        }
-        if let Some(v) = self.translucent {
-            next.translucent = v;
-        }
-        if let Some(v) = self.glass_strength {
-            next.glass_strength = number("glassStrength", v, (0.0, 100.0))?.round();
-        }
-        if let Some(v) = self.hermes_theme_sync {
-            next.hermes_theme_sync = v;
-        }
-        if let Some(v) = &self.custom_accent {
-            next.custom_accent = color("customAccent", v)?;
-        }
-        if let Some(v) = &self.custom_background {
-            next.custom_background = color("customBackground", v)?;
-        }
-        if let Some(v) = &self.custom_text {
-            next.custom_text = color("customText", v)?;
-        }
-        if let Some(v) = self.display_backend {
-            next.display_backend = v;
-        }
-        if let Some(v) = self.show_notch_on_every_monitor {
-            next.show_notch_on_every_monitor = v;
-        }
-        if let Some(v) = self.companion_enabled {
-            next.companion_enabled = v;
-        }
-        if let Some(v) = self.companion_character {
-            next.companion_character = v;
-        }
-        if let Some(v) = self.notch_width {
-            next.notch_width = number("notchWidth", v, NOTCH_WIDTH_RANGE)?.round();
-        }
-        Ok(next)
     }
 }
 
@@ -1138,10 +845,13 @@ mod tests {
             .map(|k| k.to_string())
             .collect();
         expected.sort();
-        // 40 existing keys + four independent notch border settings + glass strength,
-        // Hermes theme sync, three Custom scheme seed colours, backend/notch width, terminal command,
-        // notch on every monitor and the notch companion with its character.
-        assert_eq!(keys.len(), 55);
+        // 55 keys up to Nov 3 + 14 on Nov 5 (game mode, shortcut, notch states, monitors,
+        // motion, terminal options). Every key comes from the one `settings_schema!` table.
+        assert_eq!(keys.len(), 69);
+        assert_eq!(SETTINGS_KEYS.len(), 69);
+        let mut table: Vec<_> = SETTINGS_KEYS.iter().map(|k| k.to_string()).collect();
+        table.sort();
+        assert_eq!(table, keys, "file keys must equal the serde (IPC) keys");
         assert_eq!(keys, expected);
         assert_eq!(settings.hover_delay, 180.0);
         assert_eq!(settings.ui_font, UiFont::System);

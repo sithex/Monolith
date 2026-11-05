@@ -322,7 +322,7 @@ mod tests {
                 .as_object()
                 .unwrap()
                 .len(),
-            55 // Includes the opt-in multi-monitor notch setting and the notch companion.
+            crate::contract::settings::SETTINGS_KEYS.len()
         );
         assert_eq!(defaults.hover_delay, 180.0);
         assert_eq!(defaults.ui_font, UiFont::System);

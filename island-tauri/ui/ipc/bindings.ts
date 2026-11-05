@@ -252,7 +252,9 @@ export type Appearance = "skin" | "neutral" | "ocean" | "dune" | "dusk" | "silk"
 /**  Fixed snapshot of the Necron-green Hermes look (Nov 2). */
 "green" | 
 /**  Palette derived from `customAccent`/`customBackground`/`customText` (Nov 2). */
-"custom";
+"custom" | 
+/**  Accent and tint taken from the playing track's artwork (Nov 5); falls back to Skin. */
+"album";
 
 export type AppsSnapshot = {
 	timer: TimerChanged | null,
@@ -949,9 +951,13 @@ export type ServiceStatus = {
 	connects: number,
 };
 
+/**
+ *  Every field is always present on the wire (no `?` in TypeScript); deserializing
+ *  starts from the defaults (see the `Deserialize` impl below).
+ */
 export type Settings = {
 	/**  Phase 6b1: additive module settings. Secret subscription URLs are never config. */
-	moduleRegistry?: Registry,
+	moduleRegistry: Registry,
 	autostart: boolean,
 	showInTaskbar: boolean,
 	stealth: boolean,
@@ -966,27 +972,27 @@ export type Settings = {
 	borderColor: string,
 	/**  Pill BACKGROUND, not digits. */
 	panelClockColor: string,
-	notchBorderEnabled?: boolean,
-	notchBorderColor?: string,
-	notchBorderOpacity?: number,
-	notchBorderWidth?: number,
+	notchBorderEnabled: boolean,
+	notchBorderColor: string,
+	notchBorderOpacity: number,
+	notchBorderWidth: number,
 	uiFont: UiFont,
 	showDate: boolean,
 	hardwareMonitor: boolean,
 	terminalFontSize: number,
 	/**  Direct executable and quoted arguments; empty retains the original Hermes launch. */
-	terminalCommand?: string,
+	terminalCommand: string,
 	notificationsEnabled: boolean,
 	systemNotificationMirror: boolean,
-	/**  Additive privacy setting; old files default to an empty deny list. */
-	notificationDeniedApps?: string[],
+	/**  Exact app names that never notify (file order kept, never normalized). */
+	notificationDeniedApps: string[],
 	toastTtlMs: number,
 	redactBodies: boolean,
 	dnd: boolean,
 	clipboardHistory: boolean,
 	clipboardHistorySize: number,
 	clipboardPersist: boolean,
-	clipboardDenyPatterns?: string[],
+	clipboardDenyPatterns: string[],
 	batteryAlerts: boolean,
 	batteryLowPercent: number,
 	batteryCriticalPercent: number,
@@ -996,49 +1002,68 @@ export type Settings = {
 	hourFormat: HourFormat,
 	displayId: string | null,
 	/**
-	 *  Phase 6m (additive): fetch synced lyrics from LRCLIB for the playing track. A network
-	 *  call that sends title/artist/album/duration, so it is opt-in (default off).
+	 *  Fetch synced lyrics from LRCLIB for the playing track. A network call that sends
+	 *  title/artist/album/duration, so it is opt-in (default off).
 	 */
-	lyricsEnabled?: boolean,
-	/**
-	 *  Phase 6m (additive): live equalizer from a monitor capture of the playing stream.
-	 *  Audio capture is privacy-sensitive, so it is opt-in (default off).
-	 */
-	equalizerEnabled?: boolean,
-	/**  Phase 6m (additive): number of equalizer bands, 8..=32 (module-registry range). */
-	equalizerBands?: number,
-	/**  Additive (post-9b): horizontal swipe / trackpad gesture switches between views. */
-	swipeNavigation?: boolean,
-	/**  Additive (post-9b): Translucent island body over KWin blur-behind. */
-	translucent?: boolean,
-	/**  Additive (Nov 2): how see-through the translucent body is, 0 (opaque) ..= 100. */
-	glassStrength?: number,
-	/**
-	 *  Additive (Nov 2): mirror the island colour scheme into the Hermes skin
-	 *  (`skins/ripple-island.yaml` + `hermes skin use`); off restores the previous skin.
-	 */
-	hermesThemeSync?: boolean,
-	/**  Additive (Nov 2): the Custom colour scheme's seed colours (empty = scheme default). */
-	customAccent?: string,
-	customBackground?: string,
-	customText?: string,
-	/**  Additive (Nov 2c): Linux display server, applied at the next launch by `run.sh`. */
-	displayBackend?: DisplayBackend,
-	/**  Additive (Nov 2c): native notch width in logical px (144 = the original slot). */
-	notchWidth?: number,
-	showNotchOnEveryMonitor?: boolean,
-	/**  Additive (Nov 3): the small companion face in the notch whose eyes follow the pointer. */
-	companionEnabled?: boolean,
-	companionCharacter?: CompanionCharacter,
+	lyricsEnabled: boolean,
+	/**  Live equalizer from a monitor capture of the playing stream (privacy: opt-in). */
+	equalizerEnabled: boolean,
+	/**  Whole bands only: a fractional count would be silently truncated downstream. */
+	equalizerBands: number,
+	/**  Horizontal swipe / trackpad gesture switches between views. */
+	swipeNavigation: boolean,
+	/**  Translucent island body over KWin blur-behind. */
+	translucent: boolean,
+	/**  How see-through the translucent body is, 0 (opaque) ..= 100. */
+	glassStrength: number,
+	/**  Mirror the island colour scheme into the Hermes skin; off restores the previous skin. */
+	hermesThemeSync: boolean,
+	/**  The Custom colour scheme's seed colours (empty = scheme default). */
+	customAccent: string,
+	customBackground: string,
+	customText: string,
+	/**  Linux display server, applied at the next launch by `run.sh`. */
+	displayBackend: DisplayBackend,
+	/**  Native notch width in logical px (144 = the original slot). */
+	notchWidth: number,
+	showNotchOnEveryMonitor: boolean,
+	/**  The small companion face in the notch whose eyes follow the pointer. */
+	companionEnabled: boolean,
+	companionCharacter: CompanionCharacter,
+	/**  Game mode switches on by itself while the active window is fullscreen. */
+	gameModeAuto: boolean,
+	/**  Manual game mode (side button / tray): no previews, toasts or pop-ups over games. */
+	gameMode: boolean,
+	/**  KDE global shortcut that toggles the island (KGlobalAccel syntax, `""` = none). */
+	openShortcut: string,
+	/**  Amber pulse on the closed notch while Hermes waits for you (approval/question). */
+	notchWaitingPulse: boolean,
+	/**  The companion looks busy while Hermes works, alert while it waits, dozes when idle. */
+	companionReactive: boolean,
+	/**  Hovering the closed notch peeks the playing track / running timer. */
+	notchHoverPeek: boolean,
+	/**  Output names that get a notch with `showNotchOnEveryMonitor` (empty = every monitor). */
+	notchMonitors: string[],
+	/**  Output that shows the companion (`""` = every notch). */
+	companionMonitor: string,
+	/**  Replace springs/morphs with short fades. */
+	reduceMotion: boolean,
+	/**  Animation speed in percent (100 = designed timing, 200 = twice as fast). */
+	animationSpeed: number,
+	/**  Embedded terminal font family (`""` = DejaVu Sans Mono). */
+	terminalFontFamily: string,
+	terminalScrollback: number,
+	terminalCursorStyle: TerminalCursorStyle,
+	terminalCursorBlink: boolean,
 };
 
 export type SettingsChanged = Settings;
 
 /**
- *  Partial update. Unknown keys and wrong types are rejected by serde; range/pattern checks and
- *  clamping happen in [`SettingsPatch::apply`].
- *  Deserialize it through [`ObjectOnly`] at the IPC boundary (arrays are otherwise accepted by
- *  serde's derived struct impl).
+ *  Partial update. Unknown keys and wrong types are rejected by serde; range/pattern
+ *  checks and clamping happen in [`SettingsPatch::apply`].
+ *  Deserialize it through [`ObjectOnly`] at the IPC boundary (arrays are otherwise
+ *  accepted by serde's derived struct impl).
  */
 export type SettingsPatch = {
 	moduleRegistry?: Registry,
@@ -1096,6 +1121,20 @@ export type SettingsPatch = {
 	showNotchOnEveryMonitor?: boolean,
 	companionEnabled?: boolean,
 	companionCharacter?: CompanionCharacter,
+	gameModeAuto?: boolean,
+	gameMode?: boolean,
+	openShortcut?: string,
+	notchWaitingPulse?: boolean,
+	companionReactive?: boolean,
+	notchHoverPeek?: boolean,
+	notchMonitors?: string[],
+	companionMonitor?: string,
+	reduceMotion?: boolean,
+	animationSpeed?: number,
+	terminalFontFamily?: string,
+	terminalScrollback?: number,
+	terminalCursorStyle?: TerminalCursorStyle,
+	terminalCursorBlink?: boolean,
 };
 
 export type SystemStats = {
@@ -1130,6 +1169,9 @@ export type TailscaleTile = {
 };
 
 export type TempUnit = "fahrenheit" | "celsius";
+
+/**  Embedded terminal cursor shape (xterm.js `cursorStyle`). */
+export type TerminalCursorStyle = "block" | "bar" | "underline";
 
 /**
  *  Output stream of one attached webview. `Data` chunks are ≤ 64 KiB and must be acknowledged

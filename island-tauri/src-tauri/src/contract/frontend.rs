@@ -20,6 +20,8 @@ pub enum Appearance {
     Green,
     /// Palette derived from `customAccent`/`customBackground`/`customText` (Nov 2).
     Custom,
+    /// Accent and tint taken from the playing track's artwork (Nov 5); falls back to Skin.
+    Album,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, specta::Type, tauri_specta::Event)]

@@ -302,10 +302,16 @@ mod anchor_link_tests {
         }
         let link = base.join("state/monolith/anchor-client.py");
         assert!(publish_anchor_client(&link, &a).unwrap());
-        assert_eq!(std::fs::read_link(&link).unwrap(), a.join("island/anchor-client.py"));
+        assert_eq!(
+            std::fs::read_link(&link).unwrap(),
+            a.join("island/anchor-client.py")
+        );
         assert!(publish_anchor_client(&link, &a).unwrap());
         assert!(publish_anchor_client(&link, &b).unwrap());
-        assert_eq!(std::fs::read_link(&link).unwrap(), b.join("island/anchor-client.py"));
+        assert_eq!(
+            std::fs::read_link(&link).unwrap(),
+            b.join("island/anchor-client.py")
+        );
         // Missing client in the checkout: leave things alone.
         assert!(!publish_anchor_client(&link, &base.join("nowhere")).unwrap());
         // A real file the user put there is never replaced.

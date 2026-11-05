@@ -5,9 +5,9 @@ use hermes_island_lib::integrations::weather::policy::{
 use serde_json::{json, Value};
 
 // Hand-written documentation-derived fixtures; see fixtures/README.md.
-const FORECAST: &[u8] = include_bytes!("fixtures/weather/forecast.json");
-const GEOCODE: &[u8] = include_bytes!("fixtures/weather/geocode.json");
-const API_ERROR: &[u8] = include_bytes!("fixtures/weather/error.json");
+const FORECAST: &[u8] = include_bytes!("../fixtures/weather/forecast.json");
+const GEOCODE: &[u8] = include_bytes!("../fixtures/weather/geocode.json");
+const API_ERROR: &[u8] = include_bytes!("../fixtures/weather/error.json");
 
 fn place() -> GeoPlace {
     GeoPlace {

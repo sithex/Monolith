@@ -204,19 +204,23 @@ impl PaletteWatcher {
         let skins = profile.join("skins");
         let config = profile.join("config.yaml");
         let (filter_profile, filter_skins) = (profile.clone(), skins.clone());
-        let mut watcher = match notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            // Drop unrelated events here, before they reach the worker: the profile directory
-            // also holds Hermes' busy database and logs.
-            if let Ok(event) = &event {
-                if !palette_path_changed(&filter_profile, event) && !event.paths.contains(&filter_skins) {
-                    return;
+        let mut watcher = match notify::recommended_watcher(
+            move |event: notify::Result<notify::Event>| {
+                // Drop unrelated events here, before they reach the worker: the profile directory
+                // also holds Hermes' busy database and logs.
+                if let Ok(event) = &event {
+                    if !palette_path_changed(&filter_profile, event)
+                        && !event.paths.contains(&filter_skins)
+                    {
+                        return;
+                    }
                 }
-            }
-            // A send error only means the worker already stopped.
-            if event_tx.send(Message::Fs(event)).is_err() {
-                tracing::trace!("palette watcher event after shutdown");
-            }
-        }) {
+                // A send error only means the worker already stopped.
+                if event_tx.send(Message::Fs(event)).is_err() {
+                    tracing::trace!("palette watcher event after shutdown");
+                }
+            },
+        ) {
             Ok(watcher) => Some(watcher),
             Err(error) => {
                 tracing::warn!(%error, "palette file watcher unavailable; using the serial fallback only");
@@ -230,15 +234,25 @@ impl PaletteWatcher {
         let mut config_watched = false;
         if let Some(watcher) = watcher.as_mut() {
             use notify::Watcher;
-            config_watched = watcher.watch(&config, notify::RecursiveMode::NonRecursive).is_ok();
-            let dirs: &[&PathBuf] = if config_watched { &[&skins] } else { &[&profile, &skins] };
+            config_watched = watcher
+                .watch(&config, notify::RecursiveMode::NonRecursive)
+                .is_ok();
+            let dirs: &[&PathBuf] = if config_watched {
+                &[&skins]
+            } else {
+                &[&profile, &skins]
+            };
             for dir in dirs {
                 if let Err(error) = watcher.watch(dir, notify::RecursiveMode::NonRecursive) {
                     tracing::warn!(%error, dir = %dir.display(), "cannot watch palette directory");
                 }
             }
         }
-        let fallback = if watcher.is_some() { fallback } else { fallback.min(UNWATCHED_FALLBACK) };
+        let fallback = if watcher.is_some() {
+            fallback
+        } else {
+            fallback.min(UNWATCHED_FALLBACK)
+        };
         let worker = std::thread::spawn(move || {
             use notify::Watcher;
             let publish = |service: &PaletteService| {
@@ -289,10 +303,14 @@ impl PaletteWatcher {
                             if let Err(error) = watcher.unwatch(&config) {
                                 tracing::trace!(%error, "config unwatch");
                             }
-                            if let Err(error) = watcher.watch(&config, notify::RecursiveMode::NonRecursive) {
+                            if let Err(error) =
+                                watcher.watch(&config, notify::RecursiveMode::NonRecursive)
+                            {
                                 tracing::debug!(%error, "config re-watch failed; watching the profile directory");
                                 config_watched = false;
-                                if let Err(error) = watcher.watch(&profile, notify::RecursiveMode::NonRecursive) {
+                                if let Err(error) =
+                                    watcher.watch(&profile, notify::RecursiveMode::NonRecursive)
+                                {
                                     tracing::warn!(%error, "cannot watch palette directory");
                                 }
                             }
@@ -545,15 +563,24 @@ mod tests {
         let (sink, events) = collector();
         let mut watcher =
             PaletteWatcher::start(service, profile.clone(), Duration::from_secs(3600), sink);
-        assert_eq!(events.recv_timeout(Duration::from_secs(5)).unwrap().accent, "#a1a1a1");
+        assert_eq!(
+            events.recv_timeout(Duration::from_secs(5)).unwrap().accent,
+            "#a1a1a1"
+        );
         // Each replace swaps the inode; the watch must be re-armed every time.
         for accent in ["#b2b2b2", "#c3c3c3", "#d4d4d4"] {
             atomic_replace(&profile.join("config.yaml"), accent);
-            assert_eq!(events.recv_timeout(Duration::from_secs(5)).unwrap().accent, accent);
+            assert_eq!(
+                events.recv_timeout(Duration::from_secs(5)).unwrap().accent,
+                accent
+            );
         }
         // In-place edits are seen too.
         fs::write(profile.join("config.yaml"), "#e5e5e5").unwrap();
-        assert_eq!(events.recv_timeout(Duration::from_secs(5)).unwrap().accent, "#e5e5e5");
+        assert_eq!(
+            events.recv_timeout(Duration::from_secs(5)).unwrap().accent,
+            "#e5e5e5"
+        );
         // Database churn in the profile directory publishes nothing.
         for _ in 0..20 {
             fs::write(profile.join("state.db-wal"), "x").unwrap();

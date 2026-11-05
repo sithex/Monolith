@@ -1,6 +1,6 @@
 //! Process ownership for the 6b2 mock; only our own group is signalled and reaped.
 #![allow(dead_code, clippy::unwrap_used)]
-use crate::private_bus::PrivateBus;
+use super::private_bus::PrivateBus;
 use serde_json::Value;
 use std::{
     fs,

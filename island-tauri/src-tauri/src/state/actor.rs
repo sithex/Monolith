@@ -304,7 +304,10 @@ mod tests {
         );
         assert!(handle.dispatch(Intent::Pin).await.is_err());
         // A failed effect is reported, but the actor keeps serving.
-        assert_eq!(handle.dispatch(Intent::Collapse).await.unwrap().state.mode, IslandMode::Still);
+        assert_eq!(
+            handle.dispatch(Intent::Collapse).await.unwrap().state.mode,
+            IslandMode::Still
+        );
         handle.shutdown();
         task.await.unwrap().unwrap();
     }

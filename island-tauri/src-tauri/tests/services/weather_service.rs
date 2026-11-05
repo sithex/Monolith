@@ -3,10 +3,8 @@
 //! `#[ignore]`d and never part of the gate.
 #![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "helpers/http_fixture.rs"]
-mod http_fixture;
-#[path = "helpers/private_bus.rs"]
-mod private_bus;
+use crate::http_fixture;
+use crate::private_bus;
 
 use hermes_island_lib::{
     contract::{

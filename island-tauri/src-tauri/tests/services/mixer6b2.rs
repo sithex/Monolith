@@ -1,7 +1,6 @@
 #![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used)]
-#[path = "helpers/control_fakes.rs"]
-mod control_fakes;
+use crate::control_fakes;
 use control_fakes::Fakes;
 use hermes_island_lib::{
     contract::controls::{MixerChanged, MixerOp},

@@ -1,11 +1,8 @@
 #![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used)]
-#[path = "helpers/control_fakes.rs"]
-mod control_fakes;
-#[path = "helpers/extra_controls_fixture.rs"]
-mod extra_controls_fixture;
-#[path = "helpers/private_bus.rs"]
-mod private_bus;
+use crate::control_fakes;
+use crate::extra_controls_fixture;
+use crate::private_bus;
 use control_fakes::Fakes;
 use extra_controls_fixture::ExtraMock;
 use hermes_island_lib::{

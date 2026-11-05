@@ -1,6 +1,8 @@
 //! Phase 6b2 carried items: calendar userinfo rejection, downloads model-membership check and
 //! calendar time zones (system tz database, fixed zone fixtures; the host zone is never implied).
 #![allow(clippy::unwrap_used)]
+use crate::calendar_fixture;
+use calendar_fixture::CalendarFixture;
 use hermes_island_lib::{
     contract::apps::*,
     error::IslandError,
@@ -20,10 +22,6 @@ use std::{
     },
     time::{Duration, Instant},
 };
-#[allow(dead_code)]
-#[path = "helpers/calendar_fixture.rs"]
-mod calendar_fixture;
-use calendar_fixture::CalendarFixture;
 
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 const ZONEINFO: &str = "/usr/share/zoneinfo";
@@ -385,7 +383,7 @@ async fn calendar_default_config_uses_the_system_zone_from_tz_env_in_a_child() {
     let out = std::process::Command::new(std::env::current_exe().unwrap())
         .args([
             "--exact",
-            "calendar_default_config_uses_the_system_zone_from_tz_env_in_a_child",
+            "carried6b2::calendar_default_config_uses_the_system_zone_from_tz_env_in_a_child",
             "--nocapture",
         ])
         .env("HERMES_6B2_TZ_CHILD", "1")

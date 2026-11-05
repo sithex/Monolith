@@ -971,7 +971,11 @@ fn empty_command_uses_private_wrapper_only_when_present_else_plain_hermes() {
     let c = default_hermes_command(&home, &home, Some(&path)).unwrap();
     assert_eq!(
         c.get_argv(),
-        &vec![hermes.clone().into_os_string(), "chat".into(), "--tui".into()]
+        &vec![
+            hermes.clone().into_os_string(),
+            "chat".into(),
+            "--tui".into()
+        ]
     );
     // Neither the wrapper nor hermes on PATH: a clear, actionable error.
     let empty = home.join("empty");
@@ -986,7 +990,10 @@ fn empty_command_uses_private_wrapper_only_when_present_else_plain_hermes() {
     fs::write(&script, "# fixture only; never executed\n").unwrap();
     fs::write(&launcher, "#!/bin/sh\nexec /usr/bin/python3\n").unwrap();
     let c = default_hermes_command(&home, &home, Some(&path)).unwrap();
-    assert_eq!(c.get_argv()[0], std::ffi::OsString::from("/usr/bin/python3"));
+    assert_eq!(
+        c.get_argv()[0],
+        std::ffi::OsString::from("/usr/bin/python3")
+    );
     assert_eq!(c.get_argv()[2], script.into_os_string());
     fs::remove_dir_all(home).unwrap();
 }

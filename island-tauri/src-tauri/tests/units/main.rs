@@ -1,0 +1,62 @@
+//! Pure model, parser and fuzz tests: no D-Bus, no display, no helper processes.
+//!
+//! One test binary instead of one per file: every integration test binary links the whole
+//! app, so 57 separate binaries cost 57 links and gigabytes of target/. Run one
+//! file's tests with `cargo test --test units <file_name>::`.
+mod agents6b2;
+mod agents_core_agent_tracker_tests;
+mod agents_core_fuzz_tests;
+mod agents_hub6b2;
+mod bluetooth_core_fuzz_tests;
+mod bluetooth_core_model_tests;
+mod brightness_core_brightness_tests;
+mod brightness_core_fuzz_tests;
+mod calendar_core_fuzz_tests;
+mod calendar_core_ics_rules;
+mod clipboard_core_history;
+mod clipboard_settings;
+mod downloads_core_fuzz_tests;
+mod downloads_core_model_tests;
+mod lrc_core_parse;
+mod lrclib_core_cache_key;
+mod lrclib_core_fuzz;
+mod lrclib_core_get_path;
+mod lrclib_core_parse_response;
+mod mixer_core_fuzz_tests;
+mod mixer_core_mixer_tests;
+mod mpris_core_fuzz;
+mod mpris_core_parse;
+mod mpris_core_players;
+mod notification_actor;
+mod notification_core_dbus;
+mod notification_core_edges;
+mod notification_core_ingest;
+mod notification_core_store;
+mod phase3_wakeup;
+mod phase7a_agents;
+mod phase7a_visual;
+mod phase7b_geometry;
+mod phase7b_timer;
+mod phase7b_workspace;
+mod power_core_alerts;
+mod power_core_fuzz;
+mod power_core_model;
+mod power_core_parse_state;
+mod scratchpad_core_fuzz_tests;
+mod scratchpad_core_scratchpad_tests;
+mod spectrum_core;
+mod tiles_core_fuzz_tests;
+mod tiles_core_system_tiles_tests;
+mod timer_actor6b1;
+mod timer_core_countdown;
+mod timer_core_fuzz;
+mod timer_core_pomodoro;
+mod timer_core_snapshot;
+mod timer_core_stopwatch;
+mod toggles_core_fuzz_tests;
+mod toggles_core_mic_tests;
+mod toggles_core_power_tests;
+mod toggles_core_toggle_tests;
+mod updates_core_fuzz_tests;
+mod updates_core_updates_tests;
+mod weather_core;

@@ -1,6 +1,6 @@
 //! Owned private Controls daemon; JSON stdin is test control, not production transport.
 #![allow(dead_code, clippy::unwrap_used)]
-use crate::private_bus::PrivateBus;
+use super::private_bus::PrivateBus;
 use serde_json::Value;
 use std::{
     fs,

@@ -8,10 +8,8 @@
 //! Nothing here touches the user's PipeWire, microphone, volume or routing.
 #![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "helpers/pipewire_fixture.rs"]
-mod pipewire_fixture;
-#[path = "helpers/private_bus.rs"]
-mod private_bus;
+use crate::pipewire_fixture;
+use crate::private_bus;
 
 use hermes_island_lib::integrations::media::{
     equalizer::{ChildEnv, EqConfig, EqualizerService, Tools},

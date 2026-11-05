@@ -351,7 +351,9 @@ fn max_diameter_gap_editor_fits_every_slot_and_preserves_short_island_gap_after_
             .iter()
             .chain(g.empty_slots.iter())
             .collect::<Vec<_>>();
-        assert_eq!(all.len(), 11);
+        // Only slots that fit this 100x20 island are offered (one per side column, one bottom),
+        // plus the occupied defaults; the editor no longer lists every slot regardless of size.
+        assert_eq!(all.len(), 5);
         for b in &all {
             assert!(
                 b.rect.x >= 0.0

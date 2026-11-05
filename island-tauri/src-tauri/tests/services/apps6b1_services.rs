@@ -1,4 +1,6 @@
 #![allow(clippy::unwrap_used)]
+use crate::calendar_fixture;
+use calendar_fixture::{CalendarFixture, Reply};
 use hermes_island_lib::{
     contract::apps::*,
     error::IslandError,
@@ -19,9 +21,6 @@ use std::{
     },
     time::{Duration, Instant},
 };
-#[path = "helpers/calendar_fixture.rs"]
-mod calendar_fixture;
-use calendar_fixture::{CalendarFixture, Reply};
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 const BODY_CAP: usize = 1_048_576; // Independent acceptance boundary, not imported production policy.
 

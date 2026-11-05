@@ -254,7 +254,9 @@ mod linux {
             // SAFETY: geteuid has no preconditions.
             match reclaim_stale_ingest(data, unsafe { libc::geteuid() })? {
                 IngestReclaim::Removed => tracing::info!("Reclaimed stale ingest socket"),
-                IngestReclaim::Kept(why) => tracing::warn!(why, "Leaving existing ingest socket untouched"),
+                IngestReclaim::Kept(why) => {
+                    tracing::warn!(why, "Leaving existing ingest socket untouched")
+                }
                 IngestReclaim::Absent => {}
             }
             // The crash-leftover sweep is allowed only after BOTH locks and successful
@@ -362,7 +364,10 @@ pub(crate) mod tests {
         let euid = unsafe { libc::geteuid() };
         let fixture = Fixture::new();
         let path = fixture.0.join("ingest.sock");
-        assert_eq!(reclaim_stale_ingest(&fixture.0, euid).unwrap(), IngestReclaim::Absent);
+        assert_eq!(
+            reclaim_stale_ingest(&fixture.0, euid).unwrap(),
+            IngestReclaim::Absent
+        );
         // Live listener: untouched.
         let live = UnixListener::bind(&path).unwrap();
         assert_eq!(

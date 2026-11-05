@@ -22,7 +22,11 @@ const REUSE_ROWS: Duration = Duration::from_secs(300);
 /// Size and modification time of the database and its WAL: if neither moved, the rows did not.
 type Fingerprint = [Option<(u64, SystemTime)>; 2];
 fn fingerprint(path: &std::path::Path) -> Fingerprint {
-    let stamp = |p: &std::path::Path| std::fs::metadata(p).ok().and_then(|m| Some((m.len(), m.modified().ok()?)));
+    let stamp = |p: &std::path::Path| {
+        std::fs::metadata(p)
+            .ok()
+            .and_then(|m| Some((m.len(), m.modified().ok()?)))
+    };
     let mut wal = path.as_os_str().to_owned();
     wal.push("-wal");
     [stamp(path), stamp(std::path::Path::new(&wal))]

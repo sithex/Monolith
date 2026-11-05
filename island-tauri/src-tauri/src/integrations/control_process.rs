@@ -157,9 +157,7 @@ impl Runner {
         // without a clean shutdown (a crash, SIGKILL); they used to outlive it indefinitely.
         unsafe {
             command.pre_exec(move || {
-                if libc::setsid() < 0
-                    || libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) < 0
-                {
+                if libc::setsid() < 0 || libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) < 0 {
                     return Err(std::io::Error::last_os_error());
                 }
                 if libc::getppid() != parent {
@@ -305,7 +303,10 @@ mod tests {
         let runner = Runner::for_instance(true, Some(root.clone()));
         // Stand-in for an owner that vanishes without cleanup: no Drop, no finish().
         let pid = std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
             rt.block_on(async {
                 let child = runner.spawn(&argv(&["pactl", "subscribe"])).unwrap();
                 let pid = child.child.id().unwrap();

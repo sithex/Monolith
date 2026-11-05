@@ -2,8 +2,7 @@
 //! Read only; nothing here (or in the service) connects, pairs or powers a device.
 #![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "helpers/private_bus.rs"]
-mod private_bus;
+use crate::private_bus;
 
 use hermes_island_lib::{contract::system::BtDevice, integrations::bluetooth::BluetoothService};
 use private_bus::{wait_until, Mock, PrivateBus};

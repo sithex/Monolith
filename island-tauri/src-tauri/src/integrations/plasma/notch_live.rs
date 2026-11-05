@@ -59,9 +59,10 @@ impl NotchLive {
         if let (
             Some(TimerLive::Running { ends_at_ms, .. }),
             Some(NotchLive {
-                timer: Some(TimerLive::Running {
-                    ends_at_ms: before, ..
-                }),
+                timer:
+                    Some(TimerLive::Running {
+                        ends_at_ms: before, ..
+                    }),
                 ..
             }),
         ) = (self.timer.as_mut(), previous)

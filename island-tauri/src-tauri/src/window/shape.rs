@@ -217,7 +217,10 @@ pub fn logical_rects(rows: &[ShapeRow], scale: i32) -> Vec<(i32, i32, i32, i32)>
             let (x, y) = (i32::from(r.x), i32::from(r.y));
             let (right, bottom) = (x + i32::from(r.width), y + i32::from(r.height));
             let (lx, ly) = (x.div_euclid(s), y.div_euclid(s));
-            let (lr, lb) = ((right + s - 1).div_euclid(s), (bottom + s - 1).div_euclid(s));
+            let (lr, lb) = (
+                (right + s - 1).div_euclid(s),
+                (bottom + s - 1).div_euclid(s),
+            );
             (lx, ly, lr - lx, lb - ly)
         })
         .collect()
@@ -428,14 +431,35 @@ mod tests {
 
     #[test]
     fn band_rows_preserves_coverage_and_collapses_straight_runs() {
-        let pill = RoundedRect { x: 10., y: 4., width: 220., height: 120., radius: 24. };
+        let pill = RoundedRect {
+            x: 10.,
+            y: 4.,
+            width: 220.,
+            height: 120.,
+            radius: 24.,
+        };
         let rows = region_rows(&[pill], IslandMode::Large, 1.0, false).unwrap();
         let bands = band_rows(&rows);
         assert_eq!(normalize_rows(&bands), normalize_rows(&rows));
-        assert!(bands.len() * 2 < rows.len(), "{} vs {}", bands.len(), rows.len());
+        assert!(
+            bands.len() * 2 < rows.len(),
+            "{} vs {}",
+            bands.len(),
+            rows.len()
+        );
         // Two separate shapes side by side keep their own bands.
-        let a = ShapeRow { x: 0, y: 0, width: 5, height: 3 };
-        let b = ShapeRow { x: 10, y: 1, width: 5, height: 3 };
+        let a = ShapeRow {
+            x: 0,
+            y: 0,
+            width: 5,
+            height: 3,
+        };
+        let b = ShapeRow {
+            x: 10,
+            y: 1,
+            width: 5,
+            height: 3,
+        };
         let got = band_rows(&[a, b]);
         assert_eq!(got, vec![a, b]);
         assert!(band_rows(&[]).is_empty());
@@ -443,12 +467,23 @@ mod tests {
 
     #[test]
     fn hidpi_rows_become_logical_rects_rounded_outward() {
-        let row = |x, y, width, height| ShapeRow { x, y, width, height };
+        let row = |x, y, width, height| ShapeRow {
+            x,
+            y,
+            width,
+            height,
+        };
         // Scale 1 is the identity: today's single-scale desktops are unchanged.
-        assert_eq!(logical_rects(&[row(515, 8, 150, 42)], 1), vec![(515, 8, 150, 42)]);
+        assert_eq!(
+            logical_rects(&[row(515, 8, 150, 42)], 1),
+            vec![(515, 8, 150, 42)]
+        );
         // Scale 2: the still pill at physical 1030,16 300×84 is logical 515,8 150×42,
         // not the doubled 2060,32 that made the island unclickable.
-        assert_eq!(logical_rects(&[row(1030, 16, 300, 84)], 2), vec![(515, 8, 150, 42)]);
+        assert_eq!(
+            logical_rects(&[row(1030, 16, 300, 84)], 2),
+            vec![(515, 8, 150, 42)]
+        );
         // Odd edges expand outward so no physical pixel of the panel is lost.
         assert_eq!(logical_rects(&[row(3, 5, 4, 1)], 2), vec![(1, 2, 3, 1)]);
         assert_eq!(logical_rects(&[row(1, 1, 1, 1)], 0), vec![(1, 1, 1, 1)]);

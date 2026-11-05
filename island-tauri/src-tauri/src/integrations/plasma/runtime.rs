@@ -744,7 +744,10 @@ mod monitor_tests {
     #[test]
     fn notch_positions_are_reused_after_a_click_until_they_age_out() {
         assert!(anchors_stale(None), "never read: read before trusting");
-        assert!(!anchors_stale(Some(Instant::now())), "a fresh read serves rapid clicks");
+        assert!(
+            !anchors_stale(Some(Instant::now())),
+            "a fresh read serves rapid clicks"
+        );
         let old = Instant::now().checked_sub(ANCHOR_TTL + Duration::from_secs(1));
         assert!(old.is_none_or(|t| anchors_stale(Some(t))));
     }

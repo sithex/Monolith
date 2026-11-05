@@ -2,8 +2,7 @@
 //! Never touches the machine's real system or session bus.
 #![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "helpers/private_bus.rs"]
-mod private_bus;
+use crate::private_bus;
 
 use hermes_island_lib::integrations::power::{model::AlertKind, AlertSettings, PowerService};
 use private_bus::{wait_until, Mock, PrivateBus};

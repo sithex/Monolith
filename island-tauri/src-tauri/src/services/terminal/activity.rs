@@ -46,7 +46,9 @@ impl TitleActivity {
                 (Parse::Esc, b']') => Parse::Param(0),
                 (Parse::Esc, 0x1b) => Parse::Esc,
                 (Parse::Esc, _) => Parse::Ground,
-                (Parse::Param(n), b'0'..=b'9') if n < 1000 => Parse::Param(n * 10 + u16::from(b - b'0')),
+                (Parse::Param(n), b'0'..=b'9') if n < 1000 => {
+                    Parse::Param(n * 10 + u16::from(b - b'0'))
+                }
                 (Parse::Param(n), b';') if n <= 2 => {
                     self.title.clear();
                     Parse::Title
@@ -79,7 +81,9 @@ impl TitleActivity {
     }
 
     fn finish(&mut self) {
-        self.busy = String::from_utf8_lossy(&self.title).trim_start().starts_with(BUSY_MARKER);
+        self.busy = String::from_utf8_lossy(&self.title)
+            .trim_start()
+            .starts_with(BUSY_MARKER);
         self.title.clear();
     }
 

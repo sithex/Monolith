@@ -3,10 +3,8 @@
 //! `real_lrclib_smoke` (`#[ignore]`, never part of the gate).
 #![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "helpers/lrclib_fixture.rs"]
-mod lrclib_fixture;
-#[path = "helpers/private_bus.rs"]
-mod private_bus;
+use crate::lrclib_fixture;
+use crate::private_bus;
 
 use hermes_island_lib::{
     contract::system::{LyricsChanged, LyricsStatus},

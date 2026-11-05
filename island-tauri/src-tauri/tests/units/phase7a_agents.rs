@@ -46,7 +46,7 @@ fn agents_missing_database_is_unavailable_and_reader_never_creates_it() {
         .args([
             "-I",
             "-c",
-            include_str!("../src/integrations/agents/reader.py"),
+            include_str!("../../src/integrations/agents/reader.py"),
         ])
         .arg(&path)
         .arg("1000")

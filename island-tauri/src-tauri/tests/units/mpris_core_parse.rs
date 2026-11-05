@@ -113,11 +113,12 @@ fn metadata_strings_trimmed_and_capped_multibyte_safe() {
         "mpris:artUrl": long,
     })))
     .unwrap();
+    // Art is exempt: cutting a data: URL would corrupt the image, so it is bounded by size.
+    assert_eq!(t.art_url.as_deref(), Some(long.as_str()));
     for s in [
         &t.title,
         t.track_id.as_ref().unwrap(),
         t.album.as_ref().unwrap(),
-        t.art_url.as_ref().unwrap(),
     ] {
         assert_eq!(s.chars().count(), 512);
         assert!(s.chars().all(|c| c == 'é'));

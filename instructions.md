@@ -193,8 +193,11 @@ Rust checks, run from `island-tauri/src-tauri`:
 ```sh
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked
+cargo test --locked --lib --test units --test services
 ```
+
+The `kwin_*`, `xvfb_shape` and `notification_monitor` tests drive a real nested KWin or Xvfb session.
+They're slower and need those installed; `cargo test --locked` runs everything.
 
 If you change anything under `src-tauri/src/contract/` or the commands, regenerate the TypeScript bindings:
 
@@ -205,5 +208,6 @@ cargo test export_bindings -- --ignored
 Tauri embeds the built UI into the binary at compile time. After a UI change, a release build needs
 `npm run build:ui` before cargo. `build.sh` does that for you.
 
-`cargo test` builds a large debug tree in `src-tauri/target/debug` (each file in `src-tauri/tests/` becomes
-its own binary). It's safe to delete; it all rebuilds. Most Rust work only needs `cargo test --lib`.
+`cargo test` builds a large debug tree in `src-tauri/target/debug`. It's safe to delete; it all rebuilds.
+Pure tests live in `tests/units/`, service tests in `tests/services/` (one binary each); run one file's
+tests with, for example, `cargo test --test units timer_core_pomodoro::`.

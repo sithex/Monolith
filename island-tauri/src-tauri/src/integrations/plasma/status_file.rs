@@ -249,7 +249,9 @@ mod tests {
         fs::remove_file(writer.path()).unwrap();
         let foreign = json!({"pid":std::process::id(),"foreign":true}).to_string();
         fs::write(writer.path(), &foreign).unwrap();
-        let error = writer.update(&json!({"pid":std::process::id()})).unwrap_err();
+        let error = writer
+            .update(&json!({"pid":std::process::id()}))
+            .unwrap_err();
         assert!(error.downcast_ref::<OwnershipLost>().is_some(), "{error}");
         writer.shutdown().unwrap();
         assert_eq!(fs::read_to_string(writer.path()).unwrap(), foreign);

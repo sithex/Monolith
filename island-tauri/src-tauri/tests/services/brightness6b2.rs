@@ -1,8 +1,6 @@
 #![allow(clippy::unwrap_used)]
-#[path = "helpers/controls_fixture.rs"]
-mod controls_fixture;
-#[path = "helpers/private_bus.rs"]
-mod private_bus;
+use crate::controls_fixture;
+use crate::private_bus;
 use controls_fixture::ControlsMock;
 use hermes_island_lib::{
     contract::controls::{BrightnessOp, BrightnessStep},

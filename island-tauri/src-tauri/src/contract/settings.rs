@@ -127,6 +127,30 @@ pub enum TerminalCursorStyle {
     Underline,
 }
 
+/// Per-app override of a notification's urgency (`App` = keep what the app sent).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum RuleUrgency {
+    #[default]
+    App,
+    Low,
+    Normal,
+    Critical,
+}
+
+/// One app's notification rule, matched on the exact app name.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, specta::Type)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NotificationAppRule {
+    pub app: String,
+    /// Show a popup card (false = history only).
+    pub popup: bool,
+    /// Play the notification sound.
+    pub sound: bool,
+    pub urgency: RuleUrgency,
+}
+pub const MAX_NOTIFICATION_APP_RULES: usize = 128;
+
 /// Generates, from ONE table, everything a setting needs: the `Settings` field and its
 /// default, the `settings.json` encoding, the `SettingsPatch` field (with its TS type) and the
 /// validation in [`SettingsPatch::apply`]. Adding a setting = adding one row below.
@@ -295,7 +319,7 @@ settings_schema! {
     /// Manual game mode (side button / tray): no previews, toasts or pop-ups over games.
     game_mode: bool = false, "gameMode", plain;
     /// KDE global shortcut that toggles the island (KGlobalAccel syntax, `""` = none).
-    open_shortcut: String = "Meta+`".to_owned(), "openShortcut", with(check_shortcut);
+    open_shortcut: String = String::new(), "openShortcut", with(check_shortcut);
     /// Amber pulse on the closed notch while Hermes waits for you (approval/question).
     notch_waiting_pulse: bool = true, "notchWaitingPulse", plain;
     /// The companion looks busy while Hermes works, alert while it waits, dozes when idle.
@@ -315,6 +339,22 @@ settings_schema! {
     terminal_scrollback: f64 = 5000.0, "terminalScrollback", round(TERMINAL_SCROLLBACK_RANGE);
     terminal_cursor_style: TerminalCursorStyle = TerminalCursorStyle::Block, "terminalCursorStyle", plain;
     terminal_cursor_blink: bool = true, "terminalCursorBlink", plain;
+    // ---- Nov 6 additions ----
+    /// Silence KDE's own notification popups (KDE keeps history and the bell); the island
+    /// shows the popups instead. Off restores KDE's popups.
+    silence_kde_popups: bool = false, "silenceKdePopups", plain;
+    /// The island plays a sound for new notifications (per-app rules can mute).
+    notification_sound: bool = true, "notificationSound", plain;
+    /// Per-app popup/sound/urgency overrides (exact app names, file order kept).
+    notification_app_rules: Vec<NotificationAppRule> = Vec::new(), "notificationAppRules", with(check_app_rules);
+    /// Hermes approval requests show Approve/Deny in the notch hover notice.
+    approvals_in_notch: bool = true, "approvalsInNotch", plain;
+    /// While game mode is on: island DND, frozen notch companion, paused background pollers.
+    game_mode_dnd: bool = true, "gameModeDnd", plain;
+    game_mode_freeze_companion: bool = true, "gameModeFreezeCompanion", plain;
+    game_mode_pause_pollers: bool = true, "gameModePausePollers", plain;
+    /// KDE global shortcut that opens the command palette (`""` = none).
+    palette_shortcut: String = String::new(), "paletteShortcut", with(check_shortcut);
 }
 
 /// Strict per present key (wrong type = error, values validated/clamped like a patch); keys
@@ -356,8 +396,27 @@ file_value_as_json!(
     DisplayBackend,
     CompanionCharacter,
     TerminalCursorStyle,
+    Vec<NotificationAppRule>,
     super::modules::Registry
 );
+
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_app_rules(rules: &Vec<NotificationAppRule>) -> Result<Vec<NotificationAppRule>, IslandError> {
+    let mut seen = BTreeSet::new();
+    if rules.len() > MAX_NOTIFICATION_APP_RULES
+        || rules.iter().any(|rule| {
+            let app = &rule.app;
+            app.is_empty()
+                || app.len() > MAX_NOTIFICATION_APP_BYTES
+                || app.trim() != app
+                || app.chars().any(char::is_control)
+                || !seen.insert(app)
+        })
+    {
+        return Err(IslandError::invalid("Invalid notificationAppRules"));
+    }
+    Ok(rules.clone())
+}
 
 fn check_registry(
     registry: &super::modules::Registry,
@@ -429,7 +488,7 @@ fn check_shortcut(value: &String) -> Result<String, IslandError> {
             .any(|c| c.is_control() || c == ',' || c == '\t')
         || crate::keyseq::parse(value).is_err()
     {
-        return Err(IslandError::invalid("Invalid openShortcut"));
+        return Err(IslandError::invalid("Invalid shortcut"));
     }
     Ok(value.trim().to_owned())
 }
@@ -605,6 +664,34 @@ mod tests {
             let p = patch(serde_json::json!({ "openShortcut": bad })).unwrap();
             assert!(p.apply(&Settings::default()).is_err(), "{bad}");
         }
+        // Unbound by default (Nick: keep the option, never bind it for him).
+        assert_eq!(Settings::default().open_shortcut, "");
+        assert_eq!(Settings::default().palette_shortcut, "");
+        let p = patch(serde_json::json!({ "paletteShortcut": "Meta+Foo" })).unwrap();
+        assert!(p.apply(&Settings::default()).is_err());
+    }
+
+    #[test]
+    fn notification_app_rules_are_exact_unique_and_bounded() {
+        let ok = json!([{"app": "Discord", "popup": false, "sound": true, "urgency": "low"},
+                        {"app": "discord", "popup": true, "sound": false, "urgency": "app"}]);
+        let s = patch(json!({"notificationAppRules": ok})).unwrap().apply(&Settings::default()).unwrap();
+        assert_eq!(s.notification_app_rules.len(), 2);
+        assert_eq!(s.notification_app_rules[0].urgency, RuleUrgency::Low);
+        for bad in [
+            json!([{"app": "A", "popup": true, "sound": true, "urgency": "app"},
+                   {"app": "A", "popup": false, "sound": true, "urgency": "app"}]),
+            json!([{"app": " A", "popup": true, "sound": true, "urgency": "app"}]),
+            json!([{"app": "", "popup": true, "sound": true, "urgency": "app"}]),
+        ] {
+            assert!(patch(json!({"notificationAppRules": bad})).unwrap().apply(&Settings::default()).is_err());
+        }
+        assert!(patch(json!({"notificationAppRules": [{"app": "A", "popup": true, "sound": true, "urgency": "loud"}]})).is_err());
+        assert!(patch(json!({"notificationAppRules": [{"app": "A", "popup": true, "sound": true, "urgency": "app", "x": 1}]})).is_err());
+        let many: Vec<_> = (0..=MAX_NOTIFICATION_APP_RULES)
+            .map(|i| json!({"app": format!("a{i}"), "popup": true, "sound": true, "urgency": "app"}))
+            .collect();
+        assert!(patch(json!({"notificationAppRules": many})).unwrap().apply(&Settings::default()).is_err());
     }
 
     #[test]
@@ -860,9 +947,10 @@ mod tests {
             .collect();
         expected.sort();
         // 55 keys up to Nov 3 + 14 on Nov 5 (game mode, shortcut, notch states, monitors,
-        // motion, terminal options). Every key comes from the one `settings_schema!` table.
-        assert_eq!(keys.len(), 69);
-        assert_eq!(SETTINGS_KEYS.len(), 69);
+        // motion, terminal options) + 8 on Nov 6 (KDE popups, sound, app rules, approvals,
+        // game-mode extras, palette shortcut). Every key comes from the one `settings_schema!` table.
+        assert_eq!(keys.len(), 77);
+        assert_eq!(SETTINGS_KEYS.len(), 77);
         let mut table: Vec<_> = SETTINGS_KEYS.iter().map(|k| k.to_string()).collect();
         table.sort();
         assert_eq!(table, keys, "file keys must equal the serde (IPC) keys");

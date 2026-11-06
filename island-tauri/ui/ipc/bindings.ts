@@ -758,6 +758,16 @@ export type NotificationAction = {
 	label: string,
 };
 
+/**  One app's notification rule, matched on the exact app name. */
+export type NotificationAppRule = {
+	app: string,
+	/**  Show a popup card (false = history only). */
+	popup: boolean,
+	/**  Play the notification sound. */
+	sound: boolean,
+	urgency: RuleUrgency,
+};
+
 export type NotificationClosed = {
 	rev: number,
 	id: string,
@@ -899,6 +909,9 @@ export type RoundedRect = {
 	height: number,
 	radius: number,
 };
+
+/**  Per-app override of a notification's urgency (`App` = keep what the app sent). */
+export type RuleUrgency = "app" | "low" | "normal" | "critical";
 
 export type RuntimeInfo = {
 	overlay: boolean,
@@ -1067,6 +1080,23 @@ export type Settings = {
 	terminalScrollback: number,
 	terminalCursorStyle: TerminalCursorStyle,
 	terminalCursorBlink: boolean,
+	/**
+	 *  Silence KDE's own notification popups (KDE keeps history and the bell); the island
+	 *  shows the popups instead. Off restores KDE's popups.
+	 */
+	silenceKdePopups: boolean,
+	/**  The island plays a sound for new notifications (per-app rules can mute). */
+	notificationSound: boolean,
+	/**  Per-app popup/sound/urgency overrides (exact app names, file order kept). */
+	notificationAppRules: NotificationAppRule[],
+	/**  Hermes approval requests show Approve/Deny in the notch hover notice. */
+	approvalsInNotch: boolean,
+	/**  While game mode is on: island DND, frozen notch companion, paused background pollers. */
+	gameModeDnd: boolean,
+	gameModeFreezeCompanion: boolean,
+	gameModePausePollers: boolean,
+	/**  KDE global shortcut that opens the command palette (`""` = none). */
+	paletteShortcut: string,
 };
 
 export type SettingsChanged = Settings;
@@ -1147,6 +1177,14 @@ export type SettingsPatch = {
 	terminalScrollback?: number,
 	terminalCursorStyle?: TerminalCursorStyle,
 	terminalCursorBlink?: boolean,
+	silenceKdePopups?: boolean,
+	notificationSound?: boolean,
+	notificationAppRules?: NotificationAppRule[],
+	approvalsInNotch?: boolean,
+	gameModeDnd?: boolean,
+	gameModeFreezeCompanion?: boolean,
+	gameModePausePollers?: boolean,
+	paletteShortcut?: string,
 };
 
 export type SystemStats = {

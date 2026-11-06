@@ -37,7 +37,12 @@ fn passive_notify_monitor_correlates_notify_return_closed_and_actions() {
 
     notify(&s, "Private caller", "Monitored arrival");
     until(&s, "notify-send reaches store and actual toast", 8, "window.__TAURI_INTERNALS__.invoke('notifications_list').then(ns=>ns.some(n=>n.title==='Monitored arrival'&&n.body==='Private body'&&!n.canInvokeActions)&&document.querySelector('[data-testid=notification-toast]')?.textContent.includes('Monitored arrival'))");
-    assert_eq!(host::actor_state(&s)["hoverCause"]["type"], "notification");
+    assert_eq!(
+        host::actor_state(&s)["hoverCause"],
+        serde_json::Value::Null,
+        "notifications are popup cards, never a sticky hover preview"
+    );
+    assert_eq!(popups(&s)[0]["notification"]["id"], "d-1");
     assert_eq!(list(&s)[0]["id"], "d-1");
     server.send("action 1");
     wait_for("observed ActionInvoked", Duration::from_secs(5), || {
@@ -107,20 +112,28 @@ fn loop_guard_and_policy_are_enforced_on_private_bus() {
     wait_for("private item", Duration::from_secs(5), || {
         (list(&s)[0]["body"] == "Private body").then_some(())
     });
-    eval(&s, "window.island.setSettings({redactBodies:true})");
+    until(
+        &s,
+        "private body visible on the card before the scrub",
+        5,
+        "document.querySelector('[data-testid=notification-toast]')?.textContent.includes('Private body')===true",
+    );
+    set_settings(&s, "{redactBodies:true}");
     wait_for(
         "retroactive scrub delivered to actual UI store",
         Duration::from_secs(5),
         || {
-            (list(&s)[0]["body"] == "Hidden" && eval(&s,"document.querySelector('[data-testid=notification-toast]')?.textContent.includes('Hidden')") == true).then_some(())
+            (list(&s)[0]["body"] == "Hidden" && eval(&s,"(()=>{const t=document.querySelector('[data-testid=notification-toast]')?.textContent;return !!t && t.includes('Existing private body') && !t.includes('Private body')})()") == true).then_some(())
         },
     );
-    eval(&s, "window.island.setSettings({redactBodies:false})");
-    assert_eq!(list(&s)[0]["body"], "Hidden", "scrub must be irreversible");
-    eval(
-        &s,
-        "window.island.setSettings({notificationDeniedApps:['Private app']})",
+    assert_eq!(
+        popups(&s)[0]["notification"]["body"],
+        serde_json::Value::Null,
+        "the popup queue must drop the body too, not just hide it in the card"
     );
+    set_settings(&s, "{redactBodies:false}");
+    assert_eq!(list(&s)[0]["body"], "Hidden", "scrub must be irreversible");
+    set_settings(&s, "{notificationDeniedApps:['Private app']}");
     wait_for(
         "retroactive deny removes UI toast",
         Duration::from_secs(5),
@@ -186,14 +199,11 @@ fn privacy_scrub_at_capacity_repairs_renderer_after_delivery_overflow() {
         "window.__TAURI_INTERNALS__.invoke('island_dispatch',{intent:{type:'collapse'}})",
     );
     send(200);
-    until(&s, "newest resident toast", 5, "document.querySelector('[data-testid=notification-toast]')?.textContent.includes('Ring 200')");
-    eval(&s, "window.island.setSettings({redactBodies:true})");
+    until(&s, "newest resident toast", 5, "(()=>{const t=document.querySelector('[data-testid=notification-toast]')?.textContent;return !!t&&t.includes('Ring 200')&&t.includes('Must be scrubbed')})()");
+    set_settings(&s, "{redactBodies:true}");
     until(&s, "full-ring scrub repairs newest toast lost from delta queue", 5,
-        "window.__TAURI_INTERNALS__.invoke('notifications_list').then(ns=>ns.length===200&&ns.every(n=>n.body==='Hidden')&&document.querySelector('[data-testid=notification-toast]')?.textContent.includes('Hidden'))");
-    eval(
-        &s,
-        "window.island.setSettings({notificationDeniedApps:['Overflow fixture']})",
-    );
+        "window.__TAURI_INTERNALS__.invoke('notifications_list').then(ns=>ns.length===200&&ns.every(n=>n.body==='Hidden')&&(()=>{const t=document.querySelector('[data-testid=notification-toast]')?.textContent;return !!t&&t.includes('Ring 200')&&!t.includes('Must be scrubbed')})())");
+    set_settings(&s, "{notificationDeniedApps:['Overflow fixture']}");
     until(&s, "full-ring deny repairs missing close deltas", 5,
         "window.__TAURI_INTERNALS__.invoke('notifications_list').then(ns=>ns.length===0&&!document.querySelector('[data-testid=notification-toast]'))");
     drop(app);

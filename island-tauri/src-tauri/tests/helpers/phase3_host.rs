@@ -34,13 +34,18 @@ impl Drop for Owned {
 }
 
 pub fn command(s: &Stack, data: &Path) -> Command {
+    command_ui(s, data, "legacy")
+}
+
+/// Same private instance, but with the chosen renderer (`legacy` | `island`).
+pub fn command_ui(s: &Stack, data: &Path, ui: &str) -> Command {
     let mut app = Command::new(env!("CARGO_BIN_EXE_hermes-island"));
     app.args([
         "--test-instance",
         "--overlay",
         "--fixture-pty",
         "--ui",
-        "legacy",
+        ui,
         "--data-dir",
     ])
     .arg(data)
@@ -167,9 +172,13 @@ pub fn prepare(s: &Stack) {
 }
 
 pub fn launch(s: &Stack) -> Owned {
+    launch_ui(s, "legacy")
+}
+
+pub fn launch_ui(s: &Stack, ui: &str) -> Owned {
     let log = fs::File::create(s.root.join("app.log")).unwrap();
     Owned(
-        command(s, &s.root.join("inst"))
+        command_ui(s, &s.root.join("inst"), ui)
             .stdout(log.try_clone().unwrap())
             .stderr(log)
             .spawn()

@@ -101,6 +101,12 @@ pub fn notify(s: &Stack, app: &str, title: &str) {
 pub fn list(s: &Stack) -> Value {
     host::eval(s, "window.__TAURI_INTERNALS__.invoke('notifications_list')")
 }
+pub fn popups(s: &Stack) -> Value {
+    host::eval(
+        s,
+        "window.__TAURI_INTERNALS__.invoke('notification_popup',{op:{type:'list'}}).then(p=>p.items)",
+    )
+}
 pub fn report(s: &Stack) -> Value {
     host::eval(s,"window.__TAURI_INTERNALS__.invoke('island_bootstrap').then(b=>b.capabilities.notificationMonitor)")
 }
@@ -117,15 +123,24 @@ pub fn app(s: &Stack) -> host::Owned {
         r#"{"uiFont":"openrunde","systemNotificationMirror":true,"toastTtlMs":20000}"#,
     )
     .unwrap();
-    let app = host::launch(s);
+    let app = host::launch_ui(s, "island");
     wait_for("test control", Duration::from_secs(30), || {
         s.root.join("inst/test-control.sock").exists().then_some(())
     });
+    // Notifications are popup cards in the Island renderer (NotificationCards.tsx), not
+    // the legacy hover-preview toast.
     host::until(
         s,
-        "legacy bootstrap",
+        "island bootstrap",
         20,
-        "!!document.querySelector('[data-state]')",
+        "!!document.querySelector('.island')",
     );
     app
+}
+/// Patch settings through the production command (the legacy `window.island` shim is absent).
+pub fn set_settings(s: &Stack, patch: &str) {
+    host::eval(
+        s,
+        &format!("window.__TAURI_INTERNALS__.invoke('settings_patch',{{patch:{patch}}})"),
+    );
 }

@@ -360,6 +360,15 @@ impl InputRegionBackend for PlatformBackend {
         input: &[ShapeRow],
         paint: Option<&[ShapeRow]>,
     ) -> Result<(), IslandError> {
+        // X11 only: shrink the input shape BEFORE the release unmap/map. Remapping under a
+        // pointer that still sits inside the old (large) shape delivers a fresh Enter and the
+        // island pops back to hover right after a collapse.
+        if self.wayland.is_none() && crate::window::focus::current(generation) {
+            self.apply(input)?;
+            if let Some(paint) = paint {
+                self.paint(paint)?;
+            }
+        }
         self.focus_restore(action, generation, input, paint)?;
         if self.wayland.is_none() && crate::window::focus::current(generation) {
             self.apply(input)?;

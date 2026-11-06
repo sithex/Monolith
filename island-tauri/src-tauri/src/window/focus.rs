@@ -114,7 +114,12 @@ pub(super) fn platform(
         gtk.present_with_time(gtk::current_event_time());
         activate_x11(window)?;
     } else if action == FocusPlan::Release && gtk.has_toplevel_focus() {
+        // Unmap/map hands the window back to the WM's placement policy, which drops it
+        // somewhere else on screen (observed: +166 px in the nested KWin). Re-assert the
+        // position we had so a collapse never moves the overlay.
+        let (x, y) = gtk.position();
         gtk.hide();
+        gtk.move_(x, y);
         gtk.show();
     }
     Ok(())

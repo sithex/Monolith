@@ -10,7 +10,7 @@ export const viewLabels: Record<IslandView,string> = { terminal:'Hermes',monitor
 export const viewIcons: Partial<Record<IslandView,IconName>> = { terminal:'terminal',monitor:'monitor',ai:'spark',settings:'settings',notifications:'bell',clipboard:'clipboard',music:'music',timer:'timer',calendar:'calendar',scratchpad:'note',downloads:'download',controls:'controls',mixer:'volume',brightness:'sun',agents:'spark',updates:'download',quickInfo:'weather',launcher:'grid' };
 // Tile tints: music pink, calendar red, timer orange, everything else white .85.
 const tint: Partial<Record<IslandView,string>> = { music:'var(--v-pink)', calendar:'var(--v-red)', timer:'var(--v-orange)', terminal:'var(--ui-accent)' };
-const tone = (view: IslandView | null | undefined) => (view && tint[view]) || 'rgb(255 255 255 / .85)';
+const tone = (view: IslandView | null | undefined) => (view && tint[view]) || 'var(--tile-ink, rgb(255 255 255 / .85))';
 const TILE_SPRING = { type: 'spring' as const, stiffness: 520, damping: 40, mass: 0.9 };
 const LONG_PRESS_MS = 450;
 

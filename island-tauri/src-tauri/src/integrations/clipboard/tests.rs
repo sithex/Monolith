@@ -23,6 +23,34 @@ fn clipboard_default_off_construct_configure_pause_open_no_connection_or_watcher
     assert!(service.list(None, 500).unwrap().is_empty());
     service.shutdown().unwrap();
 }
+#[cfg(target_os = "linux")]
+#[test]
+fn clipboard_pause_and_resume_wake_an_idle_watcher_so_the_epoch_fence_precedes_the_next_copy() {
+    use std::io::Read;
+    let service = service().unwrap();
+    let (ours, mut watcher_side) = std::os::unix::net::UnixStream::pair().unwrap();
+    watcher_side.set_nonblocking(true).unwrap();
+    *lock(&service.shared.watcher_wake).unwrap() = Some(ours);
+    let woken = |rx: &mut std::os::unix::net::UnixStream| {
+        let mut b = [0u8; 8];
+        matches!(rx.read(&mut b), Ok(n) if n > 0)
+    };
+    assert!(
+        !woken(&mut watcher_side),
+        "nothing wakes the watcher before a pause"
+    );
+    service.set_paused(true).unwrap();
+    assert!(
+        woken(&mut watcher_side),
+        "pausing must wake the poll loop to fence the new epoch"
+    );
+    service.set_paused(false).unwrap();
+    assert!(woken(&mut watcher_side), "resuming must wake it too, or the first copy after resume is dropped as queued-while-paused");
+    // A watcher that already exited (peer gone) must not turn a pause into an error.
+    drop(watcher_side);
+    service.set_paused(true).unwrap();
+    service.shutdown().unwrap();
+}
 #[test]
 fn clipboard_pause_needs_no_history_lock_and_invalidates_inflight_epoch() {
     let service = service().unwrap();

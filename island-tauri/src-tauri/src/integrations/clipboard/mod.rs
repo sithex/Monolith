@@ -49,6 +49,11 @@ pub(super) struct Shared {
     status: watch::Sender<wire::ClipboardStatus>,
     wake: Notify,
     file: PathBuf,
+    /// Non-blocking nudge for the running watcher's poll loop (a clone of its wake socket).
+    /// Pause/resume must wake it so the epoch fence is posted BEFORE the next selection event;
+    /// otherwise the first copy after a resume is discarded as "queued while paused".
+    #[cfg(target_os = "linux")]
+    watcher_wake: Mutex<Option<std::os::unix::net::UnixStream>>,
 }
 pub struct Clipboard {
     shared: Arc<Shared>,
@@ -94,6 +99,8 @@ impl Clipboard {
                 .0,
                 wake: Notify::new(),
                 file: data.join("clipboard.json"),
+                #[cfg(target_os = "linux")]
+                watcher_wake: Mutex::new(None),
             }),
             worker: Mutex::new(None),
             events: Mutex::new(None),
@@ -230,7 +237,12 @@ impl Clipboard {
         self.shared.epoch.fetch_add(1, Ordering::AcqRel);
         self.shared.status.send_modify(|s| s.paused = paused);
         // In-flight captures are dropped by the epoch check on the loop's next event. No worker-slot lock,
-        // IO, thread join or history serialization is performed by this actor effect.
+        // thread join or history serialization is performed by this actor effect; the only IO is a
+        // one-byte non-blocking write that wakes an idle watcher so it fences the new epoch now.
+        #[cfg(target_os = "linux")]
+        if let Some(wake) = lock(&self.shared.watcher_wake)?.as_ref() {
+            platform::wake(wake)?;
+        }
         Ok(())
     }
     pub fn start_events(self: &Arc<Self>, app: tauri::AppHandle) -> Result<(), IslandError> {

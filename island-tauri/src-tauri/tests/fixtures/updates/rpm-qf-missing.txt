@@ -1,0 +1,4 @@
+xxd.x86_64	2:9.2.1129-1.fc45
+package not-a-package.x86_64 is not installed
+glibc.i686	2.44-1.fc45
+package kernel-core.x86_64 is not installed

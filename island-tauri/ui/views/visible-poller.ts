@@ -9,7 +9,13 @@ export function createVisiblePoller<T>(read: () => Promise<T>, accept: (value: T
     busy = true; const epoch = generation, rev = ++requests;
     try { const value = await read(); if (visible && epoch === generation) accept(value, rev); }
     catch (error) { if (visible && epoch === generation) fail(error); }
-    finally { busy = false; if (visible) timer = schedule(() => { void poll(); }); }
+    finally {
+      busy = false;
+      // A resume during an old in-flight read must refresh immediately after it drains,
+      // rather than accepting its stale result or waiting a full polling interval.
+      if (visible && epoch !== generation) void poll();
+      else if (visible) timer = schedule(() => { void poll(); });
+    }
   }
   return {
     setVisible(on: boolean) {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { voicePanel, type VoicePanel, type VoicePanelOp } from '../ipc/client';
 import { createVisiblePoller } from '../views/visible-poller';
+import { useGamePollingActive } from '../views/game-polling';
 import { Dropdown } from './components/AppPrimitives';
 import { Icon } from './components/Icon';
 
@@ -12,6 +13,7 @@ import { Icon } from './components/Icon';
  */
 // Stays mounted on every page (keeps its last state) but only draws on the Hermes page.
 export function VoiceControls({ shown, active, fail }: { shown: boolean; active: boolean; fail(error: unknown): void }) {
+  active = useGamePollingActive(active);
   const [panel, setPanel] = useState<VoicePanel | null>(null), [busy, setBusy] = useState(false);
   // A refresh that started before a click must not overwrite the click's result.
   const epoch = useRef(0);

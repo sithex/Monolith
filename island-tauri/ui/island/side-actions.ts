@@ -16,6 +16,7 @@ const QUICK: { type: QuickAction; label: string; icon: IconName }[] = [
   { type: 'playPause', label: 'Play / pause', icon: 'play' }, { type: 'nextTrack', label: 'Next track', icon: 'next' }, { type: 'previousTrack', label: 'Previous track', icon: 'prev' },
   { type: 'toggleDnd', label: 'Do Not Disturb', icon: 'moon' }, { type: 'micMute', label: 'Mute microphone', icon: 'mic' }, { type: 'cyclePowerProfile', label: 'Cycle power profile', icon: 'power' },
   { type: 'keepAwake', label: 'Keep awake', icon: 'coffee' }, { type: 'screenshot', label: 'Screenshot', icon: 'camera' }, { type: 'pickColour', label: 'Colour picker', icon: 'picker' },
+  { type: 'commandPalette', label: 'Command palette', icon: 'spark' },
   { type: 'toggleGameMode', label: 'Game mode', icon: 'gamepad' }, { type: 'collapse', label: 'Minimize island', icon: 'minimize' },
 ];
 export const ACTION_OPTIONS: ActionOption[] = [
@@ -46,6 +47,7 @@ export async function runSideAction(action: LayoutAction, navigate: (view: Islan
     case 'pickColour': await dispatch({ type: 'collapse' }); appStores.tiles.apply(await appApi.tilesCommand({ type: 'pickColour' })); return;
     // Manual game mode follows the effective state the island shows (gameMode || auto fullscreen).
     case 'toggleGameMode': return saveSettings({ gameMode: !currentIslandState().gameMode });
+    case 'commandPalette': window.dispatchEvent(new Event('island-command-palette')); return;
     case 'collapse': return dispatch({ type: 'collapse' });
   }
 }

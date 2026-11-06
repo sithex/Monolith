@@ -90,6 +90,7 @@ pub enum ButtonAction {
     KeepAwake,
     Collapse,
     ToggleGameMode,
+    CommandPalette,
     Command { id: String },
 }
 

@@ -578,7 +578,7 @@ export type LauncherItem = {
 
 export type LauncherOp = { type: "begin" } | { type: "move"; id: string; to: number } | { type: "disable"; id: string } | { type: "enable"; id: string } | { type: "cancel" } | { type: "commit" };
 
-export type LayoutAction = { type: "openApp"; view: IslandView } | { type: "appGrid" } | { type: "settings" } | { type: "volume" } | { type: "nowPlaying" } | { type: "timer" } | { type: "playPause" } | { type: "nextTrack" } | { type: "previousTrack" } | { type: "toggleDnd" } | { type: "micMute" } | { type: "cyclePowerProfile" } | { type: "screenshot" } | { type: "pickColour" } | { type: "keepAwake" } | { type: "collapse" } | { type: "toggleGameMode" };
+export type LayoutAction = { type: "openApp"; view: IslandView } | { type: "appGrid" } | { type: "settings" } | { type: "volume" } | { type: "nowPlaying" } | { type: "timer" } | { type: "playPause" } | { type: "nextTrack" } | { type: "previousTrack" } | { type: "toggleDnd" } | { type: "micMute" } | { type: "cyclePowerProfile" } | { type: "screenshot" } | { type: "pickColour" } | { type: "keepAwake" } | { type: "collapse" } | { type: "toggleGameMode" } | { type: "commandPalette" };
 
 export type LayoutButton = {
 	id: string,

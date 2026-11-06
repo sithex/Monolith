@@ -10,11 +10,12 @@ import { DraftRange } from '../island/components/AppPrimitives';
 import { TerminalCommandSettings } from '../island/TerminalCommandSettings';
 import { uiSpring } from '../island/motion-profile';
 import { SCHEMES } from '../island/tokens/schemes';
-import { DEFAULT_APPEARANCE, cardSpec, exportSettings, fontFamilyError, normalize, parseImport, resetPatch, rowSpec, searchRows, shortcutError, shownRows, type Tab } from './settings-model';
+import { DEFAULT_APPEARANCE, SETTINGS_CARDS, cardSpec, exportSettings, fontFamilyError, normalize, parseImport, resetPatch, rowSpec, searchRows, shortcutError, shownRows, type Tab } from './settings-model';
 
+const SETTINGS_JUMP_ROWS = new Map(SETTINGS_CARDS.flatMap(card => card.rows.map(row => [row.id, row] as const)));
 const message = (e: unknown) => e instanceof Error ? e.message : String(e);
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return <div className="settings-row"><span className="label">{label}{hint && <small>{hint}</small>}</span>{children}</div>;
+  return <div className="settings-row" data-setting-label={label}><span className="label">{label}{hint && <small>{hint}</small>}</span>{children}</div>;
 }
 export function Card({ title, children }: { title?: string; children: ReactNode }) {
   return <section className="settings-card">{title && <h3>{title}</h3>}{children}</section>;
@@ -127,6 +128,24 @@ export function SettingsView() {
   const [error, setError] = useState(''), [tab, setTab] = useState<Tab>('general'), [query, setQuery] = useState('');
   const [offsetPreview, setOffsetPreview] = useState<{ x: number; y: number } | null>(null);
   const [outputs, setOutputs] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let frame = 0;
+    const jump = (event: Event) => {
+      const id = (event as CustomEvent<unknown>).detail;
+      if (typeof id !== 'string') return;
+      const row = SETTINGS_JUMP_ROWS.get(id);
+      if (!row) return;
+      setQuery(row.label);
+      frame = requestAnimationFrame(() => {
+        const container = Array.from(document.querySelectorAll<HTMLElement>('.settings-panel [data-setting-label]')).find(e => e.dataset.settingLabel === row.label);
+        const control = container?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled), textarea, select') ?? document.querySelector<HTMLElement>('.settings-panel [aria-label="Search settings"]');
+        container?.scrollIntoView({ block: 'center' }); control?.focus();
+      });
+    };
+    window.addEventListener('island-setting-jump', jump);
+    return () => { window.removeEventListener('island-setting-jump', jump); cancelAnimationFrame(frame); };
+  }, []);
   // Never disable controls while a save is in flight (that froze sliders mid-drag);
   // saves are serialized in the store and the newest value wins.
   const patch = (p: SettingsPatch) => { setError(''); void saveSettings(p).catch(e => setError(String(e))); };

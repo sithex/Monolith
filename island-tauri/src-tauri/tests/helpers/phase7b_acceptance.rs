@@ -5,7 +5,7 @@ fn connected(s: &Stack, app: &Owned) -> (RustConnection, u32, Wheel, (i32, i32))
     let c = s.connect();
     let root = c.setup().roots[0].root;
     let w = wait_for("7b acceptance window", Duration::from_secs(30), || {
-        find_island_window(&c, root, app.0.id())
+        find_window_sized(&c, root, app.0.id(), host::overlay_size())
     });
     wait_for(
         "7b acceptance private control",
@@ -71,14 +71,8 @@ fn grid(s: &Stack, c: &RustConnection, w: u32, e: &mut Wheel, o: (i32, i32)) {
     settled(s, c, w, IslandMode::Large);
 }
 pub(super) fn begin_edit(s: &Stack, e: &mut Wheel, o: (i32, i32)) {
-    click(s, e, o, "[aria-label='Launcher options']");
-    until(
-        s,
-        "7b launcher edit menu",
-        5,
-        "!!document.querySelector('.popover button')",
-    );
-    click(s, e, o, ".popover button");
+    // The toolbar's direct "Edit" button (Launcher.tsx); the old options popover is gone.
+    click(s, e, o, ".launcher-toolbar [aria-label='Edit apps']");
     until(
         s,
         "7b server entered edit",
@@ -94,7 +88,10 @@ fn order(s: &Stack) -> Value {
 }
 fn drag(s: &Stack, e: &mut Wheel, o: (i32, i32)) {
     let a = point(s, o, "[data-tile=timer] .app-tile");
-    let b = point(s, o, "[data-tile=scratchpad] .app-tile");
+    let mut b = point(s, o, "[data-tile=scratchpad] .app-tile");
+    // Dropping on a tile's right half inserts after it (Launcher.tsx `tileUnder`); the exact
+    // centre counts as the left half, which would leave Timer in front of Scratchpad.
+    b.0 += 20;
     e.move_to(a.0, a.1);
     e.send("down");
     for n in 1..=12 {
@@ -167,7 +164,8 @@ fn launcher_real_disable_badge_hides_unlocked_module() {
         &s,
         "7b badge hides timer",
         8,
-        "!document.querySelector('[data-tile=timer]')",
+        // In edit mode a hidden tile lives in the Hidden grid, so look only at the shown grid.
+        "!document.querySelector('.app-grid:not(.hidden-grid) [data-tile=timer]')",
     );
     click(&s, &mut e, o, ".launcher-toolbar .primary");
     until(
@@ -185,13 +183,17 @@ fn launcher_real_disable_badge_hides_unlocked_module() {
 }
 #[test]
 #[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
-fn launcher_home_and_settings_are_not_movable_or_disableable() {
+fn launcher_home_is_fixed_and_settings_cannot_be_hidden() {
     let _guard = lock();
     let (s, app, c, w, mut e, o) = start("7b-locked");
     grid(&s, &c, w, &mut e, o);
     begin_edit(&s, &mut e, o);
-    for id in ["terminal", "settings"] {
-        assert_eq!(eval(&s,&format!("(()=>{{const e=document.querySelector('[data-tile={id}]');return e.querySelector('.app-tile').dataset.locked==='true'&&!e.querySelector('.disable-badge')&&!e.querySelector('.move-controls')}})()")),true);
+    // Locked tiles get no hide badge (.tile-badge); only Hermes home (`fixed`) also gets no
+    // keyboard move buttons, because Settings floats (Launcher.tsx). Prove the selectors are
+    // live by checking an unlocked tile has both.
+    until(&s,"7b unlocked tile shows edit affordances",5,"(()=>{const e=document.querySelector('[data-tile=timer]');return !!e.querySelector('.tile-badge')&&!!e.querySelector('.sr-only button')})()");
+    for (id, movable) in [("terminal", false), ("settings", true)] {
+        assert_eq!(eval(&s,&format!("(()=>{{const e=document.querySelector('[data-tile={id}]');return [e.querySelector('.app-tile').dataset.locked==='true',!!e.querySelector('.tile-badge'),!!e.querySelector('.sr-only button')]}})()")),json!([true,false,movable]),"{id}: [locked, hide badge, move buttons]");
     }
     finish(s, app, e);
 }
@@ -344,11 +346,13 @@ fn media_capture_stops_on_real_navigation_and_collapse() {
             Duration::from_secs(12),
             || captures(&s).last().copied(),
         );
+        // The visualiser bars were dropped from Now Playing (lyrics stage rewrite); the backend
+        // status is the contract: a visible music view with a player means `capturing`.
         until(
             &s,
             "7b private equalizer active",
             8,
-            "document.querySelector('.equalizer')!==null",
+            "window.__TAURI_INTERNALS__.invoke('island_bootstrap').then(b=>b.capabilities.equalizerStatus.detail==='capturing')",
         );
         let pid = *captures(&s).last().unwrap();
         assert!(std::path::Path::new(&format!("/proc/{pid}")).exists());

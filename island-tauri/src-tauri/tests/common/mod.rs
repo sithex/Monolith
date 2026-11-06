@@ -158,13 +158,24 @@ pub fn prop_u32(conn: &RustConnection, win: u32, name: &str, ty: AtomEnum) -> Op
     Some(u32::from_ne_bytes(bytes.get(..4)?.try_into().ok()?))
 }
 
+/// The mapped `pid` window with the 1180x820 preview/below-panel size (Legacy/Harness pages).
 pub fn find_island_window(conn: &RustConnection, root: u32, pid: u32) -> Option<u32> {
+    find_window_sized(conn, root, pid, (WIN_W, WIN_H))
+}
+
+/// The mapped `pid` window with exactly `size` (the Island page uses the overlap viewport).
+pub fn find_window_sized(
+    conn: &RustConnection,
+    root: u32,
+    pid: u32,
+    (width, height): (u16, u16),
+) -> Option<u32> {
     let mut stack = vec![root];
     while let Some(window) = stack.pop() {
         if prop_u32(conn, window, "_NET_WM_PID", AtomEnum::CARDINAL) == Some(pid) {
             let attrs = conn.get_window_attributes(window).ok()?.reply().ok()?;
             let geo = conn.get_geometry(window).ok()?.reply().ok()?;
-            if attrs.map_state == MapState::VIEWABLE && geo.width == WIN_W && geo.height == WIN_H {
+            if attrs.map_state == MapState::VIEWABLE && geo.width == width && geo.height == height {
                 return Some(window);
             }
         }

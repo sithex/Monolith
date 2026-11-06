@@ -82,9 +82,9 @@ fn valid_id(id: &str) -> bool {
 
 fn approval_label(choice: &str) -> (&'static str, ChoiceStyle) {
     match choice {
-        "once" => ("Approve once", ChoiceStyle::Once),
-        "session" => ("Approve for this session", ChoiceStyle::Session),
-        "always" => ("Always approve", ChoiceStyle::Always),
+        "once" => ("Approve", ChoiceStyle::Once),
+        "session" => ("Session", ChoiceStyle::Session),
+        "always" => ("Always", ChoiceStyle::Always),
         _ => ("Deny", ChoiceStyle::Deny),
     }
 }
@@ -240,7 +240,10 @@ pub fn parse(frame: &str) -> Option<Incoming> {
         return None;
     }
     // The TUI mirrors every event; skip the JSON parse unless the frame can be one of ours.
-    if !(frame.contains("approval.") || frame.contains("clarify.") || frame.contains("request.cancel")) {
+    if !(frame.contains("approval.")
+        || frame.contains("clarify.")
+        || frame.contains("request.cancel"))
+    {
         return None;
     }
     let value: Value = serde_json::from_str(frame).ok()?;
@@ -256,7 +259,9 @@ pub fn parse(frame: &str) -> Option<Incoming> {
             let prompt_id = payload.get("prompt_id").and_then(Value::as_str)?;
             let session_id = params.get("session_id").and_then(Value::as_str)?;
             // The TUI ignores a prompt without a numeric generation or session; so do we.
-            payload.get("execution_generation").and_then(Value::as_f64)?;
+            payload
+                .get("execution_generation")
+                .and_then(Value::as_f64)?;
             if !valid_id(prompt_id) || !valid_id(session_id) {
                 return None;
             }
@@ -311,7 +316,10 @@ mod tests {
     fn approval_digits_follow_the_tui_order_for_every_choice_set() {
         let all = approval(json!({}));
         assert_eq!(ids(&all), ["once", "session", "always", "deny"]);
-        assert_eq!(all.choices.iter().map(|c| c.digit).collect::<Vec<_>>(), [1, 2, 3, 4]);
+        assert_eq!(
+            all.choices.iter().map(|c| c.digit).collect::<Vec<_>>(),
+            [1, 2, 3, 4]
+        );
         // The gateway's list filters; the order stays fixed whatever order it lists them in.
         let listed = approval(json!({"choices":["deny","once","session","always"]}));
         assert_eq!(ids(&listed), ["once", "session", "always", "deny"]);
@@ -324,7 +332,9 @@ mod tests {
         assert_eq!(ids(&no_always), ["once", "session", "deny"]);
         assert_eq!(no_always.choices[2].digit, 3);
         // `choices` wins over the flags; unknown names are dropped like the TUI's filter.
-        let wins = approval(json!({"choices":["once","bogus","deny"],"smart_denied":false,"allow_permanent":false}));
+        let wins = approval(
+            json!({"choices":["once","bogus","deny"],"smart_denied":false,"allow_permanent":false}),
+        );
         assert_eq!(ids(&wins), ["once", "deny"]);
         assert!(all.read_only.is_none());
     }
@@ -343,7 +353,9 @@ mod tests {
 
     #[test]
     fn text_is_sanitized_but_keeps_newlines_and_tabs() {
-        let r = approval(json!({"command":"echo a\n\tb\u{1b}[31mred\u{7}\u{202E}evil","description":"x\u{0}y"}));
+        let r = approval(
+            json!({"command":"echo a\n\tb\u{1b}[31mred\u{7}\u{202E}evil","description":"x\u{0}y"}),
+        );
         assert_eq!(r.text, "echo a\n\tb\u{FFFD}[31mred\u{FFFD}\u{FFFD}evil");
         assert_eq!(r.description, "x\u{FFFD}y");
     }
@@ -402,7 +414,10 @@ mod tests {
             let r = clarify(payload.clone()).unwrap();
             assert!(r.read_only.is_some(), "{payload}");
         }
-        let nine = clarify(json!({"question":"q","choices":(0..9).map(|i| i.to_string()).collect::<Vec<_>>()})).unwrap();
+        let nine = clarify(
+            json!({"question":"q","choices":(0..9).map(|i| i.to_string()).collect::<Vec<_>>()}),
+        )
+        .unwrap();
         assert!(nine.read_only.is_none());
         assert_eq!(nine.choices.len(), 9);
     }
@@ -410,15 +425,25 @@ mod tests {
     #[test]
     fn settled_and_cancel_carry_ids() {
         assert_eq!(
-            parse(&event("approval.settled", json!({"prompt_id":"p1","execution_generation":3}))),
-            Some(Incoming::Settled { prompt_id: "p1".into() })
+            parse(&event(
+                "approval.settled",
+                json!({"prompt_id":"p1","execution_generation":3})
+            )),
+            Some(Incoming::Settled {
+                prompt_id: "p1".into()
+            })
         );
         assert_eq!(
             parse(&event("clarify.settled", json!({"prompt_id":"c1"}))),
-            Some(Incoming::Settled { prompt_id: "c1".into() })
+            Some(Incoming::Settled {
+                prompt_id: "c1".into()
+            })
         );
         assert_eq!(
-            parse(&event("request.cancel", json!({"id":"p1","method":"approval"}))),
+            parse(&event(
+                "request.cancel",
+                json!({"id":"p1","method":"approval"})
+            )),
             Some(Incoming::Cancel { id: "p1".into() })
         );
         assert!(parse(&event("request.cancel", json!({}))).is_none());
@@ -441,7 +466,10 @@ mod tests {
         ] {
             assert!(parse(&text).is_none(), "{text}");
         }
-        let huge = event("approval.request", json!({"prompt_id":"p","execution_generation":1,"command":"x".repeat(MAX_FRAME_BYTES)}));
+        let huge = event(
+            "approval.request",
+            json!({"prompt_id":"p","execution_generation":1,"command":"x".repeat(MAX_FRAME_BYTES)}),
+        );
         assert!(parse(&huge).is_none());
     }
 }

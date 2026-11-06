@@ -125,7 +125,12 @@ impl Rig {
 
 #[test]
 fn approval_is_answerable_and_types_the_choices_own_digit() {
-    for (choice, digit) in [("once", "1"), ("session", "2"), ("always", "3"), ("deny", "4")] {
+    for (choice, digit) in [
+        ("once", "1"),
+        ("session", "2"),
+        ("always", "3"),
+        ("deny", "4"),
+    ] {
         let r = rig();
         r.show(&approval_frame("p1", json!({})), 0);
         let p = r.prompt(100);
@@ -143,13 +148,19 @@ fn approval_is_answerable_and_types_the_choices_own_digit() {
 #[test]
 fn digits_follow_the_choices_the_gateway_offered() {
     let r = rig();
-    r.show(&approval_frame("p1", json!({"choices": ["once", "deny"]})), 0);
+    r.show(
+        &approval_frame("p1", json!({"choices": ["once", "deny"]})),
+        0,
+    );
     let p = r.prompt(100);
     r.answer(&p.id, "deny", 100).unwrap();
     assert_eq!(r.keys.sent(), ["2"]);
     // "always" was not offered, so it cannot be pressed at all.
     let r = rig();
-    r.show(&approval_frame("p1", json!({"choices": ["once", "deny"]})), 0);
+    r.show(
+        &approval_frame("p1", json!({"choices": ["once", "deny"]})),
+        0,
+    );
     let p = r.prompt(100);
     assert!(r.answer(&p.id, "always", 100).is_err());
     assert!(r.keys.sent().is_empty());
@@ -179,7 +190,10 @@ fn a_stale_prompt_id_never_answers_a_newer_prompt() {
         r.at(200),
     );
     r.svc.title_at(r.run, false, r.at(210));
-    r.show(&approval_frame("p2", json!({"command": "sudo make install"})), 300);
+    r.show(
+        &approval_frame("p2", json!({"command": "sudo make install"})),
+        300,
+    );
     let new = r.prompt(400);
     assert_ne!(old, new.id);
     assert_eq!(new.text, "sudo make install");
@@ -202,7 +216,8 @@ fn island_prompt_ids_are_unique_across_runs() {
     let token = ticket.url.split("token=").nth(1).unwrap().to_owned();
     r.svc.run_started(ticket.id, Some(4243));
     r.svc.connection_open(&token);
-    r.svc.ingest_at(ticket.id, &approval_frame("p1", json!({})), r.at(200));
+    r.svc
+        .ingest_at(ticket.id, &approval_frame("p1", json!({})), r.at(200));
     r.svc.title_at(ticket.id, true, r.at(250));
     let second = r.svc.snapshot_at(r.at(300)).prompt.unwrap().id;
     assert_ne!(first, second);
@@ -215,7 +230,8 @@ fn a_republished_prompt_keeps_its_island_id() {
     let r = rig();
     r.show(&approval_frame("p1", json!({})), 0);
     let id = r.prompt(100).id;
-    r.svc.ingest_at(r.run, &approval_frame("p1", json!({})), r.at(150));
+    r.svc
+        .ingest_at(r.run, &approval_frame("p1", json!({})), r.at(150));
     assert_eq!(r.prompt(200).id, id);
 }
 
@@ -258,7 +274,8 @@ fn unknown_choice_is_rejected_without_typing() {
 #[test]
 fn without_the_warning_title_nothing_is_answerable() {
     let r = rig();
-    r.svc.ingest_at(r.run, &approval_frame("p1", json!({})), r.at(0));
+    r.svc
+        .ingest_at(r.run, &approval_frame("p1", json!({})), r.at(0));
     let p = r.prompt(100);
     assert!(!p.answerable);
     assert!(p.note.is_some());
@@ -271,7 +288,8 @@ fn a_title_that_predates_the_request_does_not_bind_it() {
     // A sudo/secret box turned the title earlier; a request then arrives from somewhere else.
     let r = rig();
     r.svc.title_at(r.run, true, r.at(0));
-    r.svc.ingest_at(r.run, &approval_frame("p1", json!({})), r.at(5_000));
+    r.svc
+        .ingest_at(r.run, &approval_frame("p1", json!({})), r.at(5_000));
     let p = r.prompt(5_100);
     assert!(!p.answerable);
     assert!(r.answer(&p.id, "once", 5_100).is_err());
@@ -282,7 +300,8 @@ fn a_title_that_predates_the_request_does_not_bind_it() {
 fn a_title_just_before_the_request_still_binds_it() {
     let r = rig();
     r.svc.title_at(r.run, true, r.at(0));
-    r.svc.ingest_at(r.run, &approval_frame("p1", json!({})), r.at(100));
+    r.svc
+        .ingest_at(r.run, &approval_frame("p1", json!({})), r.at(100));
     let p = r.prompt(150);
     assert!(p.answerable, "{:?}", p.note);
 }
@@ -290,7 +309,8 @@ fn a_title_just_before_the_request_still_binds_it() {
 #[test]
 fn a_title_long_after_the_request_does_not_bind_it() {
     let r = rig();
-    r.svc.ingest_at(r.run, &approval_frame("p1", json!({})), r.at(0));
+    r.svc
+        .ingest_at(r.run, &approval_frame("p1", json!({})), r.at(0));
     r.svc.title_at(r.run, true, r.at(10_000));
     let p = r.prompt(10_100);
     assert!(!p.answerable);
@@ -360,7 +380,8 @@ fn a_second_mirroring_tui_makes_everything_read_only() {
 fn two_pending_requests_are_ambiguous() {
     let r = rig();
     r.show(&approval_frame("p1", json!({})), 0);
-    r.svc.ingest_at(r.run, &approval_frame("p2", json!({})), r.at(100));
+    r.svc
+        .ingest_at(r.run, &approval_frame("p2", json!({})), r.at(100));
     let p = r.prompt(200);
     assert_eq!(p.more, 1);
     assert!(!p.answerable);
@@ -372,10 +393,18 @@ fn two_pending_requests_are_ambiguous() {
 fn clarify_is_refused_after_the_user_typed() {
     let r = rig();
     r.svc.title_at(r.run, true, r.at(0));
-    r.svc.ingest_at(r.run, &clarify_frame("c1", json!(["a", "b"])), r.at(10));
+    r.svc
+        .ingest_at(r.run, &clarify_frame("c1", json!(["a", "b"])), r.at(10));
     assert!(r.prompt(20).answerable);
     // Mouse reports, focus events and terminal replies are not typing.
-    for noise in ["\x1b[<0;10;5M", "\x1b[I", "\x1b[O", "\x1b[12;40R", "\x1b[?62;c", "\x1b]11;rgb:0/0/0\x07"] {
+    for noise in [
+        "\x1b[<0;10;5M",
+        "\x1b[I",
+        "\x1b[O",
+        "\x1b[12;40R",
+        "\x1b[?62;c",
+        "\x1b]11;rgb:0/0/0\x07",
+    ] {
         r.svc.user_input(r.run, noise);
     }
     assert!(r.prompt(30).answerable);
@@ -419,7 +448,8 @@ fn expired_requests_disappear_and_cannot_be_answered() {
 #[test]
 fn a_request_the_terminal_never_showed_is_dropped() {
     let r = rig();
-    r.svc.ingest_at(r.run, &approval_frame("p1", json!({})), r.at(0));
+    r.svc
+        .ingest_at(r.run, &approval_frame("p1", json!({})), r.at(0));
     assert!(r.svc.snapshot_at(r.at(1_000)).prompt.is_some());
     assert!(r.svc.snapshot_at(r.at(61_000)).prompt.is_none());
 }
@@ -441,7 +471,11 @@ fn read_only_prompts_stay_visible_but_never_answer() {
         let p = r2.prompt(100);
         assert!(!p.answerable, "{frame:.80}");
         assert!(p.note.is_some());
-        let first = p.choices.first().map(|c| c.id.clone()).unwrap_or_else(|| "1".into());
+        let first = p
+            .choices
+            .first()
+            .map(|c| c.id.clone())
+            .unwrap_or_else(|| "1".into());
         assert!(r2.answer(&p.id, &first, 100).is_err());
         assert!(r2.keys.sent().is_empty());
     }
@@ -458,7 +492,8 @@ fn a_new_run_forgets_the_old_one() {
     assert!(r.svc.snapshot_at(r.at(200)).prompt.is_none());
     assert!(r.answer(&id, "once", 200).is_err());
     // Frames from the old run's socket are ignored.
-    r.svc.ingest_at(r.run, &approval_frame("p9", json!({})), r.at(300));
+    r.svc
+        .ingest_at(r.run, &approval_frame("p9", json!({})), r.at(300));
     assert!(r.svc.snapshot_at(r.at(400)).prompt.is_none());
     assert!(!r.svc.run_is_current(r.run));
 }
@@ -478,9 +513,17 @@ fn ending_the_run_clears_and_ignores_late_frames() {
 fn settled_and_cancel_frames_remove_only_their_prompt() {
     let r = rig();
     r.show(&clarify_frame("c1", json!(["a", "b"])), 0);
-    r.svc.ingest_at(r.run, &event("request.cancel", json!({"id": "other"})), r.at(100));
+    r.svc.ingest_at(
+        r.run,
+        &event("request.cancel", json!({"id": "other"})),
+        r.at(100),
+    );
     assert!(r.svc.snapshot_at(r.at(110)).prompt.is_some());
-    r.svc.ingest_at(r.run, &event("request.cancel", json!({"id": "c1"})), r.at(120));
+    r.svc.ingest_at(
+        r.run,
+        &event("request.cancel", json!({"id": "c1"})),
+        r.at(120),
+    );
     assert!(r.svc.snapshot_at(r.at(130)).prompt.is_none());
 }
 
@@ -506,11 +549,31 @@ fn the_sink_hears_arrival_change_and_clear() {
     let r = rig();
     r.show(&approval_frame("p1", json!({})), 0);
     let id = r.prompt(100).id;
-    assert_eq!(*r.log.arrived.lock().unwrap(), [id.clone()]);
-    assert!(r.log.changes.lock().unwrap().last().unwrap().prompt.is_some());
-    r.svc.ingest_at(r.run, &event("approval.settled", json!({"prompt_id": "p1"})), r.at(200));
+    assert_eq!(*r.log.arrived.lock().unwrap(), std::slice::from_ref(&id));
+    assert!(r
+        .log
+        .changes
+        .lock()
+        .unwrap()
+        .last()
+        .unwrap()
+        .prompt
+        .is_some());
+    r.svc.ingest_at(
+        r.run,
+        &event("approval.settled", json!({"prompt_id": "p1"})),
+        r.at(200),
+    );
     assert_eq!(*r.log.cleared.lock().unwrap(), [id]);
-    assert!(r.log.changes.lock().unwrap().last().unwrap().prompt.is_none());
+    assert!(r
+        .log
+        .changes
+        .lock()
+        .unwrap()
+        .last()
+        .unwrap()
+        .prompt
+        .is_none());
 }
 
 #[test]
@@ -528,7 +591,11 @@ fn rev_only_moves_when_the_view_changes() {
     let before = r.svc.snapshot_at(r.at(100)).rev;
     assert_eq!(r.svc.snapshot_at(r.at(110)).rev, before);
     r.svc.user_input(r.run, "x");
-    assert_eq!(r.svc.snapshot_at(r.at(120)).rev, before, "approval prompts ignore typing");
+    assert_eq!(
+        r.svc.snapshot_at(r.at(120)).rev,
+        before,
+        "approval prompts ignore typing"
+    );
 }
 
 #[test]
@@ -543,10 +610,22 @@ fn only_the_current_runs_token_connects() {
 
 #[test]
 fn keystroke_classifier() {
-    for typed in ["a", "1", "\r", "\x1b", "\x1b[A", "\x03", "hello", "\x7f", "é"] {
+    for typed in [
+        "a", "1", "\r", "\x1b", "\x1b[A", "\x03", "hello", "\x7f", "é",
+    ] {
         assert!(is_user_keystroke(typed), "{typed:?}");
     }
-    for machine in ["", "\x1b[<0;1;1M", "\x1b[M !!", "\x1b[I", "\x1b[O", "\x1b[1;1R", "\x1b[?1;2c", "\x1b]10;?\x07", "\x1bP>|x\x1b\\"] {
+    for machine in [
+        "",
+        "\x1b[<0;1;1M",
+        "\x1b[M !!",
+        "\x1b[I",
+        "\x1b[O",
+        "\x1b[1;1R",
+        "\x1b[?1;2c",
+        "\x1b]10;?\x07",
+        "\x1bP>|x\x1b\\",
+    ] {
         assert!(!is_user_keystroke(machine), "{machine:?}");
     }
 }
@@ -559,7 +638,12 @@ fn control_characters_in_the_command_are_neutralised() {
         0,
     );
     let text = r.prompt(100).text;
-    assert!(!text.chars().any(|c| c == '\u{1b}' || c == '\r' || c == '\u{202e}'), "{text:?}");
+    assert!(
+        !text
+            .chars()
+            .any(|c| c == '\u{1b}' || c == '\r' || c == '\u{202e}'),
+        "{text:?}"
+    );
 }
 
 // ---- the real socket --------------------------------------------------------------------
@@ -640,16 +724,28 @@ mod socket {
     #[test]
     fn a_tui_connection_delivers_a_request_end_to_end() {
         let (srv, ticket) = server();
-        let target = ticket.url.split("127.0.0.1:").nth(1).unwrap().split_once('/').unwrap().1;
+        let target = ticket
+            .url
+            .split("127.0.0.1:")
+            .nth(1)
+            .unwrap()
+            .split_once('/')
+            .unwrap()
+            .1;
         let (mut s, reply) = handshake(srv.port, &format!("/{target}"), "");
         assert!(reply.starts_with("HTTP/1.1 101"), "{reply}");
         assert!(reply.contains("s3pPLMBiTxaQ9kYGzzhZRbK+xOo="), "{reply}");
-        s.write_all(&mask(approval_frame("p1", json!({})).as_bytes())).unwrap();
+        s.write_all(&mask(approval_frame("p1", json!({})).as_bytes()))
+            .unwrap();
         assert!(wait_for(&srv.svc, |c| c.prompt.is_some()));
         // Large frames are skipped in-stream without breaking the connection.
         s.write_all(&mask(&vec![b'a'; 200_000])).unwrap();
-        s.write_all(&mask(approval_frame("p2", json!({})).as_bytes())).unwrap();
-        assert!(wait_for(&srv.svc, |c| c.prompt.as_ref().is_some_and(|p| p.more == 1)));
+        s.write_all(&mask(approval_frame("p2", json!({})).as_bytes()))
+            .unwrap();
+        assert!(wait_for(&srv.svc, |c| c
+            .prompt
+            .as_ref()
+            .is_some_and(|p| p.more == 1)));
     }
 
     #[test]
@@ -660,7 +756,10 @@ mod socket {
             ("/sidecar?token=wrongwrongwrongwrong", ""),
             ("/sidecar", ""),
             ("/elsewhere?token=x", ""),
-            (&format!("/sidecar?token={token}"), "Origin: http://evil.example\r\n"),
+            (
+                &format!("/sidecar?token={token}"),
+                "Origin: http://evil.example\r\n",
+            ),
         ];
         for (target, extra) in cases {
             let (_s, reply) = handshake(srv.port, target, extra);
@@ -672,7 +771,14 @@ mod socket {
     #[test]
     fn unmasked_frames_close_the_connection_and_deliver_nothing() {
         let (srv, ticket) = server();
-        let target = ticket.url.split("127.0.0.1:").nth(1).unwrap().split_once('/').unwrap().1;
+        let target = ticket
+            .url
+            .split("127.0.0.1:")
+            .nth(1)
+            .unwrap()
+            .split_once('/')
+            .unwrap()
+            .1;
         let (mut s, reply) = handshake(srv.port, &format!("/{target}"), "");
         assert!(reply.starts_with("HTTP/1.1 101"));
         let body = approval_frame("p1", json!({}));
@@ -686,7 +792,14 @@ mod socket {
     #[test]
     fn closing_the_socket_releases_the_connection_slot() {
         let (srv, ticket) = server();
-        let target = ticket.url.split("127.0.0.1:").nth(1).unwrap().split_once('/').unwrap().1;
+        let target = ticket
+            .url
+            .split("127.0.0.1:")
+            .nth(1)
+            .unwrap()
+            .split_once('/')
+            .unwrap()
+            .1;
         let (s, _) = handshake(srv.port, &format!("/{target}"), "");
         assert!(wait_for_conns(&srv.svc, 1));
         drop(s);

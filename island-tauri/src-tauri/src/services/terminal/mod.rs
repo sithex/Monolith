@@ -691,7 +691,7 @@ impl Terminal {
             // Whatever the child asked can no longer be answered.
             if let Some((run_id, service)) = &approval {
                 service.end_run(*run_id);
-            } 
+            }
             // The child is gone: the credit limit no longer applies, the reader drains what the
             // kernel still holds (bounded by the PTY buffer) and ends.
             flow.close();

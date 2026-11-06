@@ -10,12 +10,12 @@
 //! * client frames must be masked; messages above [`MAX_MESSAGE`] are discarded unread-by-us
 //!   (streamed through, never buffered) and never reach the parser.
 
-use super::{ApprovalService, frame::MAX_FRAME_BYTES};
+use super::{frame::MAX_FRAME_BYTES, ApprovalService};
 use base64::Engine;
 use std::{
     sync::{
-        Arc,
         atomic::{AtomicUsize, Ordering},
+        Arc,
     },
     time::Duration,
 };
@@ -32,7 +32,13 @@ pub const MAX_MESSAGE: usize = MAX_FRAME_BYTES;
 const WS_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 pub fn sha1(data: &[u8]) -> [u8; 20] {
-    let mut h: [u32; 5] = [0x6745_2301, 0xEFCD_AB89, 0x98BA_DCFE, 0x1032_5476, 0xC3D2_E1F0];
+    let mut h: [u32; 5] = [
+        0x6745_2301,
+        0xEFCD_AB89,
+        0x98BA_DCFE,
+        0x1032_5476,
+        0xC3D2_E1F0,
+    ];
     let mut message = data.to_vec();
     message.push(0x80);
     while message.len() % 64 != 56 {
@@ -315,7 +321,7 @@ pub async fn messages<S: AsyncRead + AsyncWrite + Unpin>(
                 }
             }
             0xa => {}
-            0x1 | 0x2 | 0x0 => {
+            0x0..=0x2 => {
                 if opcode != 0 {
                     text_message = opcode == 0x1;
                     assembling.clear();
@@ -354,7 +360,10 @@ mod tests {
     #[test]
     fn sha1_known_vectors() {
         assert_eq!(hex(&sha1(b"")), "da39a3ee5e6b4b0d3255bfef95601890afd80709");
-        assert_eq!(hex(&sha1(b"abc")), "a9993e364706816aba3e25717850c26c9cd0d89d");
+        assert_eq!(
+            hex(&sha1(b"abc")),
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
+        );
         assert_eq!(
             hex(&sha1(&[b'a'; 1000])),
             "291e9a6c66994949b57ba5e650361e98fc36b1ba"
@@ -391,7 +400,11 @@ mod tests {
             ("/sidecar?token=", "", 4000),
             ("/sidecar?token=a%20b", "", 4000),
             ("/sidecar?x=1", "", 4000),
-            ("/sidecar?token=abc", "Origin: http://evil.example\r\n", 4000),
+            (
+                "/sidecar?token=abc",
+                "Origin: http://evil.example\r\n",
+                4000,
+            ),
             ("/sidecar?token=abc", "", 4001),
         ] {
             assert_eq!(
@@ -400,7 +413,8 @@ mod tests {
                 "{path} {extra} {port}"
             );
         }
-        let rebinding = request("/sidecar?token=abc", "").replace("127.0.0.1:4000", "evil.test:4000");
+        let rebinding =
+            request("/sidecar?token=abc", "").replace("127.0.0.1:4000", "evil.test:4000");
         assert_eq!(parse_request(&rebinding, 4000), Err(Reject::Forbidden));
         let no_upgrade = request("/sidecar?token=abc", "").replace("Upgrade: websocket\r\n", "");
         assert_eq!(parse_request(&no_upgrade, 4000), Err(Reject::Malformed));

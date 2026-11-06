@@ -39,7 +39,7 @@ export function noticeHeight(view: NoticeView | null, expanded: boolean): number
   const desc = p.description ? 20 : 0;
   const choices = p.answerable ? (p.kind === 'clarify' ? p.choices.length * 34 : 40) : 0;
   const note = !p.answerable ? 40 : 0;
-  return CHROME + 14 + 24 + textLines * LINE + 22 + expandRow + desc + choices + note + 14;
+  return CHROME + 14 + 24 + textLines * LINE + 12 + expandRow + desc + choices + note + 14;
 }
 
 /** Choices that approve or pick something need a real pointer click; Deny may be keyboarded. */
@@ -60,3 +60,11 @@ export function canPress(args: { style: string; detail: number; armedAt: number;
 }
 
 export const KIND_LABEL: Record<string, string> = { approval: 'Hermes needs approval', clarify: 'Hermes has a question' };
+
+/** Buttons are short; the tooltip says what each one really grants. */
+export const CHOICE_HINT: Record<string, string> = {
+  once: 'Approve this one command',
+  session: 'Approve it for the rest of this session',
+  always: 'Always approve this kind of command',
+  deny: 'Deny it',
+};

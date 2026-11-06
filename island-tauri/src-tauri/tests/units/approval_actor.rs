@@ -12,9 +12,9 @@ impl Clock for Now {
     }
 }
 fn shown(machine: &mut Machine, settings: &Settings, id: &str, at: u64) {
-    machine
-        .reduce(Intent::ApprovalShown(id.into()), settings, &Now(at))
-        .unwrap();
+    if let Err(error) = machine.reduce(Intent::ApprovalShown(id.into()), settings, &Now(at)) {
+        panic!("approval intent rejected: {error:?}");
+    }
 }
 #[test]
 fn an_approval_pops_the_hover_notice_and_leaves_with_its_prompt() {
@@ -28,7 +28,11 @@ fn an_approval_pops_the_hover_notice_and_leaves_with_its_prompt() {
     );
     // Answered anywhere: the notice goes away with the prompt.
     machine
-        .reduce(Intent::ApprovalCleared("ap1-1".into()), &settings, &Now(500))
+        .reduce(
+            Intent::ApprovalCleared("ap1-1".into()),
+            &settings,
+            &Now(500),
+        )
         .unwrap();
     assert_eq!(machine.state.mode, IslandMode::Still);
 }

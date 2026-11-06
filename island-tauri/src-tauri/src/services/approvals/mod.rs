@@ -246,12 +246,13 @@ pub fn is_user_keystroke(data: &str) -> bool {
         return false;
     }
     // CSI replies: `ESC [ row ; col R` (cursor position) and `ESC [ ? … c` (attributes).
-    let csi_reply = data
-        .strip_prefix("\x1b[")
-        .is_some_and(|rest| {
-            (rest.ends_with('R') && rest.bytes().all(|b| b.is_ascii_digit() || b == b';' || b == b'R'))
-                || (rest.starts_with(['?', '>']) && rest.ends_with('c'))
-        });
+    let csi_reply = data.strip_prefix("\x1b[").is_some_and(|rest| {
+        (rest.ends_with('R')
+            && rest
+                .bytes()
+                .all(|b| b.is_ascii_digit() || b == b';' || b == b'R'))
+            || (rest.starts_with(['?', '>']) && rest.ends_with('c'))
+    });
     !csi_reply
 }
 
@@ -509,8 +510,9 @@ impl ApprovalService {
                 // Hermes stopped waiting: whatever it asked has been dealt with (answered in
                 // the terminal, timed out, cancelled).
                 r.wait_since = None;
-                let (gone, keep): (Vec<_>, Vec<_>) =
-                    std::mem::take(&mut r.pending).into_iter().partition(|p| p.bound);
+                let (gone, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut r.pending)
+                    .into_iter()
+                    .partition(|p| p.bound);
                 r.pending = keep;
                 inner.cleared.extend(gone.into_iter().map(|p| p.id));
             }
@@ -543,10 +545,7 @@ impl ApprovalService {
     /// A client finished the handshake with `token`; returns the run it belongs to.
     pub fn connection_open(&self, token: &str) -> Option<u64> {
         self.mutate(Instant::now(), |inner| {
-            let r = inner
-                .run
-                .as_mut()
-                .filter(|r| token_eq(&r.token, token))?;
+            let r = inner.run.as_mut().filter(|r| token_eq(&r.token, token))?;
             r.conns += 1;
             Some(r.id)
         })

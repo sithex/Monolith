@@ -28,13 +28,19 @@ impl ApprovalSink for HostSink {
     }
 
     fn arrived(&self, id: &str) {
-        if let Err(error) = self.actor.try_dispatch(Intent::ApprovalShown(id.to_owned())) {
+        if let Err(error) = self
+            .actor
+            .try_dispatch(Intent::ApprovalShown(id.to_owned()))
+        {
             tracing::debug!(%error, "approval notice intent dropped");
         }
     }
 
     fn cleared(&self, id: &str) {
-        if let Err(error) = self.actor.try_dispatch(Intent::ApprovalCleared(id.to_owned())) {
+        if let Err(error) = self
+            .actor
+            .try_dispatch(Intent::ApprovalCleared(id.to_owned()))
+        {
             tracing::debug!(%error, "approval clear intent dropped");
         }
     }

@@ -1,4 +1,7 @@
 .island .approval-notice { display: flex; flex-direction: column; gap: 8px; padding: 2px 4px 0; min-width: 0; }
+/* island.css gives every `.preview button` a 20px top margin and full width; reset for ours. */
+.island .approval-notice button { margin: 0; width: auto; }
+.island .approval-notice .approval-dismiss { width: 24px; }
 .island .approval-head { display: flex; align-items: center; gap: 8px; min-height: 24px; }
 .island .approval-head strong { flex: 1; min-width: 0; font-size: var(--fs-base); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .island .approval-more { font-size: var(--fs-sm); color: var(--skin-dim, #999); }

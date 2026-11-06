@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactElement } from 
 import './approval-notice.css';
 import { dispatch, useIslandState } from '../ipc/island-state';
 import { answerApproval, useApproval } from '../ipc/approvals';
-import { ARM_DELAY_MS, HOVER_WIDTH, KIND_LABEL, PLAIN_HOVER_HEIGHT, PLAIN_HOVER_WIDTH, canPress, needsExpand, noticeFor, noticeHeight, type NoticeView } from './approval-model';
+import { ARM_DELAY_MS, CHOICE_HINT, HOVER_WIDTH, KIND_LABEL, PLAIN_HOVER_HEIGHT, PLAIN_HOVER_WIDTH, canPress, needsExpand, noticeFor, noticeHeight, type NoticeView } from './approval-model';
 
 // "Show all" is local to the notice, but the hover surface must grow with it, so the flag
 // lives at module level where IslandSurface can read it (useApprovalHover).
@@ -72,7 +72,7 @@ function Prompt({ view, pending, armedAt, setPending, dismiss, openTerminal, fai
     {p.description && <p className="approval-desc">{p.description}</p>}
     {p.answerable
       ? <div className={`approval-actions choices-${p.kind}`} role="group" aria-label="Answer">
-          {p.choices.map(c => <button key={c.id} className={`approval-choice style-${c.style}`} data-testid={`approval-${c.id}`} disabled={pending}
+          {p.choices.map(c => <button key={c.id} className={`approval-choice style-${c.style}`} data-testid={`approval-${c.id}`} title={CHOICE_HINT[c.id] ?? c.label} disabled={pending}
             onClick={e => press(e, c.id, c.style)}>{c.label}</button>)}
         </div>
       : <div className="approval-actions">

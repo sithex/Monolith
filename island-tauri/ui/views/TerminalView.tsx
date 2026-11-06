@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm/lib/xterm.js';
 import { FitAddon } from '@xterm/addon-fit';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { newTerminalChannel, terminalAttach, terminalInput, terminalCopy, terminalResize, terminalAck, terminalRestart, type Palette, type TerminalEvent } from '../ipc/client';
 import { runtimeStore } from '../stores';
 import { createTerminalFlow } from './terminal-flow';
@@ -18,7 +19,11 @@ export function TerminalView({ active, palette, fontSize, fail, fontFamily = '',
   useEffect(() => {
     if (!host.current) return;
     const terminal = new Terminal({ ...terminalOptions({ fontFamily, scrollback, cursorStyle, cursorBlink }), fontSize,
-      theme: theme(palette), allowProposedApi: false, allowTransparency: true });
+      // Proposed API only for `terminal.unicode` (the Unicode 11 width table below).
+      theme: theme(palette), allowProposedApi: true, allowTransparency: true });
+    // xterm defaults to Unicode 6 widths (emoji = 1 cell) while the Hermes TUI (Ink/string-width)
+    // counts them as 2: every emoji line shifted the TUI's cursor math and left ghost columns.
+    terminal.loadAddon(new Unicode11Addon()); terminal.unicode.activeVersion = '11';
     const fitter = new FitAddon(); terminal.loadAddon(fitter); terminal.open(host.current); term.current = terminal;
     const appSelection = trackAppSelection(terminal, host.current);
     terminal.attachCustomKeyEventHandler(event => terminalShortcut(event, data => terminal.input(data, true),

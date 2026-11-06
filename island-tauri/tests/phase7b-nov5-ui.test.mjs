@@ -192,3 +192,11 @@ test('terminal options map settings to xterm and apply to the live instance with
   assert.match(view, /applyTerminalOptions\(term\.current\.options/);
   assert.match(view, /\}, \[fontFamily, scrollback, cursorStyle, cursorBlink\]\);/);
 });
+
+test('terminal measures emoji like the Hermes TUI (Unicode 11 widths, no ghost columns)', async () => {
+  const view = src('ui/views/TerminalView.tsx');
+  assert.match(view, /loadAddon\(new Unicode11Addon\(\)\); terminal\.unicode\.activeVersion = '11';/);
+  assert.match(view, /allowProposedApi: true/);
+  const pkg = JSON.parse(src('package.json'));
+  assert.equal(pkg.dependencies['@xterm/addon-unicode11'], '0.9.0', 'pinned to the xterm 6.0.0 release');
+});

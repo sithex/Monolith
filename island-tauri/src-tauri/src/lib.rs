@@ -63,6 +63,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::ai::ai_connect,
             commands::voice::voice_command,
             commands::voice::voice_panel,
+            commands::approvals::approval_get,
+            commands::approvals::approval_answer,
             commands::notifications::notifications_list,
             commands::notifications::notifications_dismiss,
             commands::notifications::notifications_clear,
@@ -132,6 +134,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             contract::controls::MixerChanged,
             contract::controls::TogglesChanged,
             contract::controls::UpdatesChanged,
+            contract::approvals::ApprovalChanged,
             contract::tiles::TilesChanged,
         ])
         // Revised after Phase 1: one TS type per Rust type (no `_Serialize/_Deserialize`) and
@@ -233,6 +236,10 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
                 app.handle().clone(),
                 services.settings.get()?,
             ));
+            services.approvals.set_sink(Arc::new(services::approvals::host::HostSink::new(
+                app.handle().clone(),
+                app.state::<state::host::IslandActor>().handle.clone(),
+            )));
             let clipboard = integrations::clipboard::Clipboard::new(paths.data_dir.clone(), services.settings.get()?)?;
             clipboard.start_events(app.handle().clone())?;
             app.manage(clipboard);

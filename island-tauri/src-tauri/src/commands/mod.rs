@@ -3,6 +3,7 @@
 //! `permissions/island.toml` in sync (`command_lists_match` fails otherwise).
 
 pub mod ai;
+pub mod approvals;
 pub mod apps;
 pub mod clipboard;
 pub mod controls;

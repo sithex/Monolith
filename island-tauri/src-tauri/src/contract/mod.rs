@@ -2,6 +2,7 @@
 //! deny unknown fields, exactly one TypeScript type per Rust type.
 
 pub mod ai;
+pub mod approvals;
 pub mod apps;
 pub mod clipboard;
 pub mod controls;

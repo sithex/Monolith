@@ -13,6 +13,58 @@ npm run typecheck && npm run test:ui
 cd src-tauri && cargo test --lib
 ```
 
+## Deploying changes
+
+A release island serves its UI from `island-tauri/dist` on disk when that folder verifies, and
+falls back to the copy embedded in the binary otherwise. That makes two deploy paths:
+
+| Change | Command | Restart? |
+|---|---|---|
+| UI only (`ui/**`, CSS, TSX, `*.html`) | `scripts/deploy-ui.sh` | No: the webview reloads in place (a few seconds, no Rust build) |
+| Anything in Rust, or a changed IPC contract (`ui/ipc/bindings.ts`) | `./build.sh`, then restart the island | Yes |
+
+`scripts/deploy-ui.sh` builds the UI into a staging folder (a failed build leaves the working
+`dist/` alone), swaps it in, then sends `reload-ui` on the island's panel socket. The island
+re-verifies `dist/` and reloads only its webview; it is never restarted or signalled. It prints
+`needs ./build.sh` and exits 3 when the UI was written against a different contract than the
+installed binary (the binary would refuse it anyway). `--no-reload` only builds and swaps.
+
+**What "verifies" means** (`src-tauri/src/ui_assets.rs`): `dist/.monolith-manifest.json`, written by
+every `npm run build:ui`, lists each file with its SHA-256 and the hash of `ui/ipc/bindings.ts`.
+The binary serves from disk only if every hash matches, `dist/`, its subfolders and files are real
+(non-symlink) entries owned by the current user and not group/world-writable, the contract hash
+equals the one compiled into the binary, and no HTML page needs compile-time CSP rewriting. The
+verified bytes are held in memory, so editing `dist/` afterwards changes nothing until the next
+verified reload. Otherwise the embedded UI is used and the log (`View log` in the tray) says why:
+`UI: embedded assets (disk UI rejected: …)`. Force the embedded UI with `--embedded-ui` or
+`HERMES_ISLAND_EMBEDDED_UI=1`. Debug builds always use the embedded UI.
+
+`./build.sh` is unchanged: it builds the UI (manifest included), then the binary, so a fresh build
+serves its own `dist/` straight away.
+
+### Automatic rollback
+
+`run.sh --overlay` supervises the island. A binary that stays healthy for ~30 s (it has written a
+`status.json` carrying its own pid) is copied to `target/release/hermes-island.last-good`. If a later
+build exits with an error within ~10 s, or runs 20 s without ever publishing its status, `run.sh` runs
+`hermes-island.last-good` once instead and logs the reason in `.island-data-overlay/monolith.log`.
+It never loops: one attempt per binary. Not supervised: launches with `--test-instance` or
+`--data-dir`, launches while another island is alive, and `HERMES_ISLAND_NO_SUPERVISOR=1`.
+Tests: `tests/run_rollback_test.sh` (fake binaries).
+
+### Before pushing
+
+```sh
+scripts/precheck.sh            # Rust tests + clippy, bindings, tsc, test:ui, QML, launcher tests, secrets
+scripts/precheck.sh --fast     # skips the Rust steps
+scripts/install-pre-push-hook.sh   # optional; installs a pre-push hook that runs it (--remove to undo)
+```
+
+It runs at low CPU/IO priority, prints a PASS/FAIL table and exits non-zero on any failure; the log
+of each failing step is kept (path printed). The nested-compositor GUI suites are not included.
+
+`tests/disk_ui_e2e.py` proves the disk path end to end in an isolated instance (see its docstring).
+
 ## Terminal launch command
 
 **Settings → General → Terminal** sets the command the embedded terminal runs. Left blank, it runs

@@ -87,8 +87,11 @@ forward() { stopping=1; if [[ "$child" -gt 0 ]]; then kill -TERM "$child" 2>/dev
 trap forward TERM INT HUP
 
 mark_last_good() {
+  # Only the file that was launched may become last-good: build.sh can replace $BINARY while
+  # this older island is still up (the device/inode/size/mtime signature then differs).
+  [[ "$(stat -c '%d:%i:%s:%Y' -- "$BINARY" 2>/dev/null)" == "$1" ]] || return 0
   cmp -s -- "$BINARY" "$LASTGOOD" 2>/dev/null && return 0
-  if cp --reflink=auto -- "$BINARY" "$LASTGOOD.new.$$" && chmod 755 -- "$LASTGOOD.new.$$" \
+  if cp -- "$BINARY" "$LASTGOOD.new.$$" && chmod 755 -- "$LASTGOOD.new.$$" \
     && mv -f -- "$LASTGOOD.new.$$" "$LASTGOOD"; then
     log "healthy for ${GOOD_AFTER}s: saved $(basename -- "$LASTGOOD")"
   else
@@ -101,6 +104,7 @@ mark_last_good() {
 watch() {
   local bin="$1" role="$2" start healthy=0 settled=0 reaped=0 rc
   why=""
+  launched_sig=$(stat -c '%d:%i:%s:%Y' -- "$bin" 2>/dev/null || true)
   "$bin" "${ARGS[@]}" &
   child=$!
   start=$SECONDS
@@ -115,7 +119,7 @@ watch() {
     ran=$((SECONDS - start))
     if [[ "$healthy" == 0 && "$(status_pid)" == "$child" ]]; then healthy=1; fi
     if [[ "$healthy" == 1 && "$ran" -ge "$GOOD_AFTER" && "$(status_age)" -le 10 ]]; then
-      mark_last_good
+      mark_last_good "$launched_sig"
       settled=1
     elif [[ "$healthy" == 0 && "$ran" -ge "$GRACE" && "$stopping" == 0 ]]; then
       why="no status.json carrying pid $child after ${GRACE}s"

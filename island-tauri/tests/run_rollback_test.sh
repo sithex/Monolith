@@ -129,5 +129,16 @@ fake "$BIN.last-good" 'echo run >>"$(dirname "$0")/../../../../runs.last-good"'
 HERMES_ISLAND_NO_SUPERVISOR=1 "$REPO/island-tauri/run.sh" --overlay >/dev/null 2>&1; c=$?
 check "test-instance / harness / opt-out keep exec semantics" "$([[ $a == 1 && $b == 1 && $c == 1 && "$(runs last-good)" == 0 ]] && echo 0 || echo 1)"
 
+# 12. build.sh replacing the binary while the old island runs must not promote the new file.
+new_repo
+fake "$BIN" "$HEALTHY"
+"$REPO/island-tauri/run.sh" --overlay >"$REPO/out" 2>"$REPO/err" &
+sup=$!
+sleep 0.7
+fake "$BIN.next" 'echo untested'
+mv -f "$BIN.next" "$BIN"
+wait "$sup"
+check "a replaced binary is not saved as last-good" "$([[ ! -e "$BIN.last-good" ]] && echo 0 || echo 1)"
+
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" == 0 ]]

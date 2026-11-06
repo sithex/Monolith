@@ -24,6 +24,9 @@ Item {
     property bool waiting: false        // Hermes waits for an approval/answer
     property bool waitingPulse: true    // Settings → notchWaitingPulse
     property bool micMuted: false
+    // Game mode (gameModeFreezeCompanion, delivered as `companionFrozen`): nothing in the notch
+    // animates or ticks in the background; every held state stays on screen.
+    property bool companionFrozen: false
     // Waiting has no palette colour of its own (the scheme has only an error red), so it is a
     // fixed amber that reads against any accent; it takes precedence over the working pulse.
     readonly property color alertColor: "#f5a623"
@@ -71,13 +74,13 @@ Item {
         objectName: "notchStepper"
         interval: 125
         repeat: true
-        running: (pill.pulsing || pill.playing) && pill.visible && pill.motion && pill.animateHere
+        running: (pill.pulsing || pill.playing || (pill.companionShown && companionFace.clockWanted)) && pill.visible && pill.motion && pill.animateHere && !pill.companionFrozen
         onTriggered: pill.frame = (pill.frame + 1) % 7560
     }
     // 0..1 breath on the same clock: working 2.25 s in 18 steps; waiting a slower 4.5 s in
     // the same 18 steps, one per two ticks, so every other tick changes nothing and draws
     // nothing. Steady at .6 when not animating.
-    readonly property real workPulse: !pulsing ? 0 : !stepper.running ? .6
+    readonly property real workPulse: !pulsing ? 0 : !(stepper.running || companionFrozen) ? .6
         : (1 - Math.cos((waitingShown ? Math.floor(frame / 2) : frame) * Math.PI / 9)) / 2
     readonly property bool hovered: pointer.containsMouse
     property real hoverProgress: hovered || activeFocus ? 1 : 0
@@ -208,7 +211,7 @@ Item {
         height: 12
         spacing: 2
         opacity: pill.playing ? 1 : 0
-        readonly property bool animating: pill.playing && stepper.running
+        readonly property bool animating: pill.playing && (stepper.running || pill.companionFrozen)
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
         Repeater {
             model: 4
@@ -245,6 +248,8 @@ Item {
         pointerX: pill.pointerX
         pointerY: pill.pointerY
         pointerAt: pill.pointerAt
+        frozen: pill.companionFrozen
+        frame: pill.frame
         happy: pill.hovered
         reactive: pill.companionReactive
         working: pill.working && pill.companionReactive

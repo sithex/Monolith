@@ -43,6 +43,14 @@ Item {
     readonly property string mood: !reactive ? "idle" : waiting ? "waiting" : working ? "working" : sleepy ? "sleeping" : "idle"
     property color alertColor: "#f5a623"
     property bool motion: true      // false when the desktop disables animations
+    // Game mode (Settings → gameModeFreezeCompanion): every animation and timer of the face
+    // stops and its state is kept; nothing is reset or hidden, and it picks up on thaw.
+    property bool frozen: false
+    // The notch's one stepped clock (PanelPill.frame, ~8 ticks a second). A character that
+    // wants steady motion (Isaac's tear flow) advances on it instead of running a timer of
+    // its own, so the clock's repaint and the character's are the same repaint.
+    property int frame: 0
+    readonly property bool clockWanted: !!art && art.clockWanted === true
     property color bodyColor: "#f1ede4"
     property color eyeColor: "#171717"
     readonly property real size: Math.min(width, height)
@@ -54,8 +62,8 @@ Item {
     property real shownX: 0
     property real shownY: 0
     property bool glide: false
-    Behavior on shownX { enabled: face.motion && face.glide; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-    Behavior on shownY { enabled: face.motion && face.glide; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+    Behavior on shownX { enabled: face.motion && face.glide && !face.frozen; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+    Behavior on shownY { enabled: face.motion && face.glide && !face.frozen; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
     property real blink: 1          // vertical eye scale; dips to ~0 for a blink
     property bool sleepy: false
     // The pointer hasn't moved for a minute: constant animation (Isaac's flow) rests and
@@ -65,7 +73,7 @@ Item {
     // How open the eyes are when not blinking: heavy-lidded while dozing.
     property real lid: sleepy ? .42 : waiting && reactive ? 1.15 : 1
     // Eases only where the pointer is; other notches change once, in a single frame.
-    Behavior on lid { enabled: face.motion && face.attended; NumberAnimation { duration: 600; easing.type: Easing.InOutSine } }
+    Behavior on lid { enabled: face.motion && face.attended && !face.frozen; NumberAnimation { duration: 600; easing.type: Easing.InOutSine } }
     property bool thinking: false
     property real glance: 0         // a side look now and then while nothing moves
     // After each idle blink: for characters with a habit of their own (tears, a twitch).
@@ -126,6 +134,7 @@ Item {
     // dozing or thinking looks), so with a notch on every monitor only the one you're
     // on ever redraws. It picks up again the moment the pointer arrives.
     onPointerAtChanged: {
+        if (frozen) return;
         // Any move anywhere is activity: every notch's doze clock restarts and a dozing
         // face wakes (only the one under the pointer animates the wake-up).
         const here = pointerAt > 0 && pointerHere(pointerX, pointerY);
@@ -140,31 +149,55 @@ Item {
         if (working) ponder.restart();
     }
     onWorkingChanged: {
-        if (working) { sleepy = false; if (attended) ponder.restart(); }
-        else { ponder.stop(); if (attended) thinking = false; }
+        if (working) { sleepy = false; if (attended && !frozen) ponder.restart(); }
+        else { ponder.stop(); if (attended && !frozen) thinking = false; }
     }
-    onVisibleChanged: if (visible && attended) updateLook()
+    onVisibleChanged: if (visible && attended && !frozen) updateLook()
+    // Freeze: stop every timer and animation and leave the face as it is (a blink in progress
+    // is closed out to open eyes, a side glance ends). Thaw: pick the pointer up again; the
+    // doze and settle clocks start over, nothing else resets.
+    onFrozenChanged: {
+        if (frozen) {
+            wake.stop(); blinkOnce.stop(); blink = 1;
+            unglance.stop(); glance = 0;
+            ponder.stop(); settle.stop(); blinker.stop();
+        } else if (attended) {
+            settle.restart();
+            updateLook();
+            if (working && !thinking) ponder.restart();
+            if (visible && motion && !sleepy && !happy) blinker.restart();
+        }
+    }
 
     // Dozes off after ten minutes with no pointer move and no Hermes turn, on every notch
     // at once (one still frame each); wakes with a wide-eyed blink. A one-shot, not a loop.
-    Timer { id: drowsy; objectName: "companionDrowsy"; interval: 600000; running: face.visible && face.reactive && !face.working && !face.waiting; onTriggered: face.sleepy = true }
+    Timer { id: drowsy; objectName: "companionDrowsy"; interval: 600000; running: face.visible && !face.frozen && face.reactive && !face.working && !face.waiting; onTriggered: face.sleepy = true }
     Timer { id: settle; objectName: "companionSettle"; interval: 60000; onTriggered: face.settled = true }
     Timer { id: ponder; interval: 1500; onTriggered: face.thinking = face.working && face.attended }
+    // Blinks are stepped, like the pixel art they animate: a tween at frame rate repainted the
+    // panel ~15 times per blink on every blink; three held frames repaint it three times.
     SequentialAnimation {
         id: wake
-        NumberAnimation { target: face; property: "blink"; to: 1.25; duration: 120; easing.type: Easing.OutQuad }
-        NumberAnimation { target: face; property: "blink"; to: 1; duration: 220; easing.type: Easing.InOutQuad }
+        PropertyAction { target: face; property: "blink"; value: 1.25 }
+        PauseAnimation { duration: 130 }
+        PropertyAction { target: face; property: "blink"; value: 1.1 }
+        PauseAnimation { duration: 110 }
+        PropertyAction { target: face; property: "blink"; value: 1 }
     }
     SequentialAnimation {
         id: blinkOnce
-        NumberAnimation { target: face; property: "blink"; to: .08; duration: 70; easing.type: Easing.InQuad }
-        PauseAnimation { duration: 50 }
-        NumberAnimation { target: face; property: "blink"; to: 1; duration: 130; easing.type: Easing.OutQuad }
+        objectName: "companionBlink"
+        PropertyAction { target: face; property: "blink"; value: .08 }
+        PauseAnimation { duration: 100 }
+        PropertyAction { target: face; property: "blink"; value: .5 }
+        PauseAnimation { duration: 60 }
+        PropertyAction { target: face; property: "blink"; value: 1 }
     }
     Timer {
         id: blinker
+        objectName: "companionBlinker"
         interval: 3000
-        running: face.visible && face.attended && face.motion && !face.sleepy && !face.happy
+        running: face.visible && !face.frozen && face.attended && face.motion && !face.sleepy && !face.happy
         onTriggered: {
             blinkOnce.restart();
             const resting = Date.now() - face.pointerAt > 4000;

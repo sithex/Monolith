@@ -187,7 +187,7 @@ pub fn spawn(
                         // Only a CHANGED settings.dnd drives the state; an unrelated patch must not
                         // overwrite a dnd that a typed `SetDnd` intent changed in the meantime.
                         let dnd_changed = next.dnd != settings.dnd;
-                        let game_changed = next.game_mode != settings.game_mode || next.game_mode_auto != settings.game_mode_auto;
+                        let game_changed = next.game_mode != settings.game_mode || next.game_mode_auto != settings.game_mode_auto || next.game_mode_dnd != settings.game_mode_dnd;
                         settings=next;
                         if dnd_changed { effects.extend(machine.reduce(Intent::SetDnd(settings.dnd),&settings,&now)?); }
                         if game_changed { effects.extend(machine.reduce(Intent::SyncGameMode,&settings,&now)?); }
@@ -279,6 +279,45 @@ mod tests {
         handle.shutdown();
         task.await.unwrap().unwrap();
         assert!(handle.snapshot().await.is_err());
+    }
+    #[tokio::test]
+    async fn game_effects_settings_checkbox_reduces_immediately_without_persisting_dnd() {
+        let mut settings = Settings {
+            game_mode: true,
+            game_mode_dnd: false,
+            ..Settings::default()
+        };
+        let (handle, task) = spawn(
+            settings.clone(),
+            Arc::new(Fake(AtomicU64::new(0))),
+            Log(Arc::new(Mutex::new(Vec::new()))),
+        );
+        assert_eq!(
+            handle
+                .dispatch(Intent::NotificationArrived("visible".into()))
+                .await
+                .unwrap()
+                .state
+                .mode,
+            IslandMode::Hover
+        );
+        settings.game_mode_dnd = true;
+        let quiet = handle.settings(settings.clone()).await.unwrap();
+        assert_eq!(quiet.state.mode, IslandMode::Still);
+        assert!(!quiet.state.dnd && !settings.dnd);
+        settings.game_mode_dnd = false;
+        handle.settings(settings).await.unwrap();
+        assert_eq!(
+            handle
+                .dispatch(Intent::NotificationArrived("resumed".into()))
+                .await
+                .unwrap()
+                .state
+                .mode,
+            IslandMode::Hover
+        );
+        handle.shutdown();
+        task.await.unwrap().unwrap();
     }
     #[tokio::test]
     async fn settings_dnd_is_actor_owned_and_effect_failure_is_reported() {

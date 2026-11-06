@@ -241,12 +241,20 @@ impl Machine {
             self.fullscreen = on;
         }
         let game = game_mode_active(settings, self.fullscreen);
+        let game_effects =
+            crate::integrations::plasma::game_effects::GameEffects::plan(game, settings);
         if game && !self.state.game_mode {
             // Entering: drop a pending or showing preview/toast. An island the user opened
             // explicitly stays open (e.g. the side-control toggle itself).
             self.timers.remove(&Timer::HoverDelay);
             self.pending_hover = None;
-            if self.state.mode == IslandMode::Hover {
+            if self.state.mode == IslandMode::Hover
+                && (game_effects.suppress_notifications
+                    || !matches!(
+                        self.state.hover_cause,
+                        Some(HoverCause::Notification { .. })
+                    ))
+            {
                 self.cancel_all();
                 self.still();
             }
@@ -257,6 +265,16 @@ impl Machine {
             self.still();
         }
         self.state.game_mode = game;
+        // The game DND checkbox can change while the game is already active.
+        if game_effects.suppress_notifications
+            && matches!(
+                self.state.hover_cause,
+                Some(HoverCause::Notification { .. })
+            )
+        {
+            self.cancel_all();
+            self.still();
+        }
         match intent {
             Intent::PointerEnter | Intent::PanelEnter => {
                 let panel = matches!(intent, Intent::PanelEnter);
@@ -390,7 +408,7 @@ impl Machine {
                 // Game mode keeps it quietly, like DnD: stored and counted, never toasted.
                 if self.state.mode == IslandMode::Still
                     && !self.state.dnd
-                    && !game
+                    && !game_effects.suppress_notifications
                     && settings.notifications_enabled
                 {
                     self.cancel_all();
@@ -409,7 +427,7 @@ impl Machine {
         }
         self.activities
             .retain(|_, a| a.expires_ms.is_none_or(|expiry| expiry > now));
-        self.presentation = self.presentation_at(now, game);
+        self.presentation = self.presentation_at(now, game_effects.suppress_notifications);
         if self.state != before || self.presentation != previous {
             self.state.rev = self.state.rev.wrapping_add(1);
             effects.push(Effect::EmitState);
@@ -863,6 +881,39 @@ mod tests {
         let rev = m.state.rev;
         step(&mut m, Intent::SetDnd(true), &s, 1);
         assert_eq!(m.state.rev, rev);
+    }
+
+    #[test]
+    fn game_effects_dnd_checkbox_is_effective_only_and_resumes_without_replaying() {
+        let mut s = Settings::default();
+        s.game_mode = true;
+        s.game_mode_dnd = false;
+        let mut m = Machine::new(&s);
+        step(&mut m, Intent::NotificationArrived("allowed".into()), &s, 0);
+        assert_eq!(m.state.mode, IslandMode::Hover);
+        assert!(!m.state.dnd && !s.dnd);
+        s.game_mode_dnd = true;
+        step(&mut m, Intent::SyncGameMode, &s, 1);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        step(&mut m, Intent::NotificationArrived("quiet".into()), &s, 2);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        assert_eq!(m.state.unread, 2);
+        assert!(!m.state.dnd && !s.dnd);
+        s.game_mode = false;
+        step(&mut m, Intent::SyncGameMode, &s, 3);
+        assert_eq!(
+            m.state.mode,
+            IslandMode::Still,
+            "no suppressed toast replay"
+        );
+        step(&mut m, Intent::NotificationArrived("resumed".into()), &s, 4);
+        assert_eq!(m.state.mode, IslandMode::Hover);
+        step(&mut m, Intent::SetDnd(true), &s, 5);
+        s.game_mode = true;
+        step(&mut m, Intent::SyncGameMode, &s, 6);
+        s.game_mode = false;
+        step(&mut m, Intent::SyncGameMode, &s, 7);
+        assert!(m.state.dnd, "manual DND survives game exit");
     }
 
     #[test]

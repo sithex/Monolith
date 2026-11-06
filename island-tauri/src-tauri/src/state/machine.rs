@@ -361,6 +361,8 @@ impl Machine {
                         self.state.terminal_started = true;
                         effects.push(Effect::StartTerminal);
                     }
+                } else {
+                    effects.push(Effect::RequestFocus);
                 }
                 if settings.click_sounds {
                     effects.push(Effect::PlayClick);
@@ -595,7 +597,8 @@ mod tests {
             assert!(e.contains(&Effect::PlayClick));
             assert_eq!(m.state.mode, IslandMode::Large);
             assert!(m.timers.is_empty());
-            assert!(!step(&mut m, Intent::Pin, &s, 201).contains(&Effect::RequestFocus));
+            // An explicit palette request must reclaim focus even when already open.
+            assert!(step(&mut m, Intent::Pin, &s, 201).contains(&Effect::RequestFocus));
             step(&mut m, Intent::PanelPin, &s, 202);
             assert_eq!(m.state.mode, IslandMode::Still);
             assert!(m.state.terminal_started);
@@ -885,9 +888,11 @@ mod tests {
 
     #[test]
     fn game_effects_dnd_checkbox_is_effective_only_and_resumes_without_replaying() {
-        let mut s = Settings::default();
-        s.game_mode = true;
-        s.game_mode_dnd = false;
+        let mut s = Settings {
+            game_mode: true,
+            game_mode_dnd: false,
+            ..Settings::default()
+        };
         let mut m = Machine::new(&s);
         step(&mut m, Intent::NotificationArrived("allowed".into()), &s, 0);
         assert_eq!(m.state.mode, IslandMode::Hover);

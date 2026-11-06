@@ -76,6 +76,38 @@ export function dashboardFromUsage(usage: AiUsage | null, period: AiPeriod = 'to
     }),
   } };
 }
+export interface AiTopSession { title: string; project: string; model: string; family: AiFamily; source: string; subagent: boolean; cost: number | null; prompt: number | null; output: number | null; calls: number | null; duration: number | null; startedAt: number | null }
+export interface AiInsightsData {
+  period: AiPeriod; sessions: number; used: number; empty: number; subagents: number; priced: number; included: number; unpriced: number;
+  cost: number | null; avgCost: number | null; medianCost: number | null; maxCost: number | null; costPerCall: number | null;
+  calls: number | null; messages: number | null; toolCalls: number | null;
+  input: number | null; output: number | null; cacheRead: number | null; cacheWrite: number | null; reasoning: number | null; prompt: number | null; cacheHit: number | null;
+  avgDuration: number | null; totalDuration: number | null;
+  sources: { name: string; sessions: number; cost: number | null }[]; top: AiTopSession[];
+}
+/** Projects `local.insights` (per-session stats, `island/ai-local-usage.py session_insights`). */
+export function insightsFromUsage(usage: AiUsage | null, period: AiPeriod = 'today'): Service<AiInsightsData> {
+  if (!usage) return { available: false, reason: 'AI usage has not been read' };
+  const local = object(usage.local);
+  if (local.available !== true) return { available: false, reason: text(local.unavailableReason) ?? 'Local usage is unavailable' };
+  const insights = object(local.insights);
+  if (insights.periodBasis !== 'session_started_at') return { available: false, reason: 'Session details are unavailable' };
+  const p = object(object(insights.periods)[period]), n = (k: string) => finite(p[k]), count = (k: string) => finite(p[k]) ?? 0;
+  return { available: true, value: {
+    period, sessions: count('sessions'), used: count('usedSessions'), empty: count('emptySessions'), subagents: count('subagentSessions'),
+    priced: count('pricedSessions'), included: count('includedSessions'), unpriced: count('unpricedSessions'),
+    cost: n('costUsd'), avgCost: n('avgCostUsd'), medianCost: n('medianCostUsd'), maxCost: n('maxCostUsd'), costPerCall: n('costPerCallUsd'),
+    calls: n('apiCalls'), messages: n('messages'), toolCalls: n('toolCalls'),
+    input: n('inputTokens'), output: n('outputTokens'), cacheRead: n('cacheReadTokens'), cacheWrite: n('cacheWriteTokens'),
+    reasoning: n('reasoningTokens'), prompt: n('promptTokens'), cacheHit: n('cacheHitRate') === null ? null : Math.min(1, n('cacheHitRate')!),
+    avgDuration: n('avgDurationS'), totalDuration: n('totalDurationS'),
+    sources: list(p.sources).slice(0, 8).map(raw => { const s = object(raw); return { name: text(s.name)?.slice(0, 40) ?? 'unknown', sessions: finite(s.sessions) ?? 0, cost: finite(s.costUsd) }; }),
+    top: list(p.topSessions).slice(0, 6).map(raw => { const s = object(raw); return {
+      title: text(s.title)?.slice(0, 80) ?? 'Untitled session', project: text(s.project) ?? 'Unknown project', model: text(s.model) ?? 'Unknown model',
+      family: family(s.family), source: text(s.source) ?? 'unknown', subagent: s.subagent === true, cost: finite(s.estimatedCostUsd),
+      prompt: finite(s.promptTokens), output: finite(s.outputTokens), calls: finite(s.apiCallCount), duration: finite(s.durationS), startedAt: finite(s.startedAtS) }; }),
+  } };
+}
 // Knownness is a validated projection of the tagged registry config, never gallery metadata.
 const kinds: Record<string, string> = { terminal:'terminal', monitor:'monitor', ai:'ai', settings:'settings', notifications:'notifications', clipboard:'clipboard', music:'music', timer:'timer', scratchpad:'scratchpad', downloads:'downloads', calendar:'calendar', brightness:'brightness', 'agent-tracker':'agentTracker', mixer:'mixer', 'quick-toggles':'quickToggles', 'update-badge':'updateBadge', 'system-tiles':'systemTiles' };
 export function modulesFromRegistry(registry: Registry): ModuleSettingsModel {

@@ -7,7 +7,8 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import * as React from 'react';
 import { load } from './phase7b-loader.mjs';
-const { dashboardFromUsage } = load('ui/views/adapters.ts');
+const { dashboardFromUsage, insightsFromUsage } = load('ui/views/adapters.ts');
+const { AiInsights } = load('ui/island/components/AiInsights.tsx');
 const { AiDashboard } = load('ui/island/components/AiDashboard.tsx');
 const now = Date.parse('2026-11-02T15:00:00Z');
 const summary = { estimatedCostUsd: 12, totalTokens: 1000, cacheReadShare: .91, partialCost: false,
@@ -101,11 +102,12 @@ test('AI runtime polling never fetches hidden, coalesces flights and refreshes e
     if(name==='react/jsx-runtime')return {jsx:React.createElement,jsxs:React.createElement};
     if(name==='../ipc/client')return {aiUsage:()=>new Promise((resolve,reject)=>reads.push({resolve,reject})),aiConnect:async()=>({launched:true})};
     if(name==='../stores')return {useAi:()=>store.getSnapshot(),aiStore:store};
-    if(name==='./adapters')return {dashboardFromUsage};
+    if(name==='./adapters')return {dashboardFromUsage,insightsFromUsage};
     if(name==='./visible-poller')return load('ui/views/visible-poller.ts');
     if(name==='./game-polling')return {useGamePollingActive:active=>load('ui/views/game-polling-policy.ts').gamePollingActive(active,game,true)};
     if(name.endsWith('.css'))return {};
     if(name.endsWith('/AiDashboard'))return {AiDashboard};
+    if(name.endsWith('/AiInsights'))return {AiInsights};
     throw Error(name);
   };
   vm.runInNewContext(`(function(require,module,exports){${js}\n})`,{window:fakeWindow,Date})(require,module,module.exports);
@@ -125,4 +127,28 @@ test('AI runtime polling never fetches hidden, coalesces flights and refreshes e
     const finalPoll=[...timers.values()].find(t=>t.ms===60000).fn;
     for(const slot of slots)slot?.cleanup?.();finalPoll();assert.equal(reads.length,4,'unmounted callback is inert');
   } finally {for(const slot of slots)slot?.cleanup?.();}
+});
+
+const insightPeriod = { sessions: 12, usedSessions: 10, emptySessions: 2, subagentSessions: 3, pricedSessions: 4, includedSessions: 6, unpricedSessions: 0,
+  costUsd: 20, avgCostUsd: 5, medianCostUsd: 4.5, maxCostUsd: 9, costPerCallUsd: 0.05, apiCalls: 400, messages: 900, toolCalls: 500,
+  inputTokens: 1000, outputTokens: 2000, cacheReadTokens: 95000, cacheWriteTokens: 4000, reasoningTokens: 50, promptTokens: 100000, cacheHitRate: 0.95,
+  avgDurationS: 3900, totalDurationS: 39000, sources: [{ name: 'tui', sessions: 7, costUsd: 12 }, { name: 'subagent', sessions: 3, costUsd: null }],
+  topSessions: [{ title: 'Big refactor', project: 'Monolith', model: 'claude-opus-5-5', family: 'claude', source: 'tui', subagent: false,
+    estimatedCostUsd: 9, promptTokens: 80000, outputTokens: 1500, apiCallCount: 120, durationS: 5400, startedAtS: now / 1000 - 6000 }] };
+const withInsights = () => { const d = fixture(); d.local.insights = { periodBasis: 'session_started_at', periods: { today: insightPeriod, week: { ...insightPeriod, avgCostUsd: 7 }, month: insightPeriod } }; return d; };
+test('AI sessions tab shows per-session cost, cache share, workload and priciest sessions', () => {
+  const html = renderToStaticMarkup(createElement(AiInsights, { insights: insightsFromUsage(withInsights(), 'today'), period: 'today' }));
+  for (const t of ['Per session', 'Prompt cache', 'Workload', 'Priciest sessions', 'Where sessions run']) assert.match(html, new RegExp(t));
+  assert.match(html, /\$5\.00/); assert.match(html, /95%/); assert.match(html, /Big refactor/); assert.match(html, /Terminal UI/);
+  assert.match(html, /1h 5m/); assert.match(html, /Subscription included/);
+  assert.equal(insightsFromUsage(withInsights(), 'week').value.avgCost, 7);
+});
+test('AI sessions tab never invents numbers when insights are missing or hostile', () => {
+  assert.equal(insightsFromUsage(null).available, false);
+  assert.equal(insightsFromUsage(fixture()).available, false);
+  const d = withInsights(); d.local.insights.periods.today = { avgCostUsd: -1, cacheHitRate: 7, topSessions: 'x', sources: null };
+  const v = insightsFromUsage(d, 'today').value;
+  assert.equal(v.avgCost, null); assert.equal(v.cacheHit, 1); assert.deepEqual(v.top, []); assert.deepEqual(v.sources, []);
+  const html = renderToStaticMarkup(createElement(AiInsights, { insights: insightsFromUsage(d, 'today'), period: 'today' }));
+  assert.match(html, /No priced sessions/); assert.doesNotMatch(html, /NaN|undefined/);
 });

@@ -42,6 +42,98 @@ def clean_number(value):
     return value if isinstance(value, (int, float)) and math.isfinite(value) and value >= 0 else None
 
 
+def prompt_tokens(row):
+    """Whole prompt = uncached input + cache reads + cache writes; None when any part is unknown."""
+    parts = [row.get('inputTokens'), row.get('cacheReadTokens'), row.get('cacheWriteTokens')]
+    return sum(parts) if all(p is not None for p in parts) else None
+
+
+def median(values):
+    ordered = sorted(values)
+    if not ordered:
+        return None
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def session_insights(conn, now):
+    """Per-session detail for the AI Stats "Sessions" tab: one row per session (not per model),
+    from the sessions table's own cumulative counters. Same session-start cohort basis as the
+    dashboard. Titles are the session title Hermes generated; no prompts or transcripts."""
+    today = datetime.fromtimestamp(now).date()
+    cutoff = datetime.combine(today - timedelta(days=29), datetime.min.time()).timestamp()
+    columns = {r[1] for r in conn.execute('PRAGMA table_info(sessions)')}
+    optional = ', '.join(name if name in columns else f'NULL AS {name}'
+                         for name in ('cwd', 'title', 'last_activity_at', 'ended_at', 'source',
+                                      'parent_session_id', 'message_count', 'tool_call_count', 'cost_status'))
+    sessions = [dict(r) for r in conn.execute(
+        f'SELECT model, billing_provider, started_at, {optional}, {", ".join(METRICS)} '
+        'FROM sessions WHERE started_at >= ? AND started_at <= ?', (cutoff, now))]
+    rows = []
+    for s in sessions:
+        project = ((Path(s['cwd']).name if s.get('cwd') else '') or s.get('title') or 'Unknown project')[:120]
+        # Last activity, not ended_at: idle sessions are often reaped hours later.
+        end = clean_number(s.get('last_activity_at')) or clean_number(s.get('ended_at'))
+        row: dict[str, Any] = {name: clean_number(s.get(field)) for field, name in METRICS.items()}
+        row.update(title=(s.get('title') or project)[:80], project=project, model=s.get('model') or 'Unknown model',
+                   family=family(s.get('billing_provider') or '', s.get('model') or ''),
+                   source=(s.get('source') or 'unknown')[:40], subagent=s.get('parent_session_id') is not None,
+                   messages=clean_number(s.get('message_count')), toolCalls=clean_number(s.get('tool_call_count')),
+                   startedAtS=s['started_at'], date=datetime.fromtimestamp(s['started_at']).date().isoformat(),
+                   durationS=max(0, end - s['started_at']) if end is not None else None)
+        row['promptTokens'] = prompt_tokens(row)
+        row['included'] = s.get('cost_status') == 'included'
+        rows.append(row)
+
+    def total(selected, key):
+        values = [r[key] for r in selected if r[key] is not None]
+        return sum(values) if values else None
+
+    periods = {}
+    for length, key in ((1, 'today'), (7, 'week'), (30, 'month')):
+        first = (today - timedelta(days=length - 1)).isoformat()
+        selected = [r for r in rows if r['date'] >= first]
+        # Sessions that never called a model (opened and closed) would drag every average to 0.
+        used = [r for r in selected if (r['apiCallCount'] or 0) > 0]
+        # Per-session averages use sessions with a real API-value price; subscription-included
+        # (Codex) and unpriced (custom endpoint) sessions are counted separately, never as $0.
+        priced = [r for r in used if (r['estimatedCostUsd'] or 0) > 0]
+        timed = [r['durationS'] for r in used if r['durationS'] is not None]
+        cost = total(priced, 'estimatedCostUsd')
+        priced_calls = total(priced, 'apiCallCount')
+        prompt = total(selected, 'promptTokens')
+        cache_read = total(selected, 'cacheReadTokens')
+        sources = {}
+        for r in used:
+            entry = sources.setdefault(r['source'], dict(name=r['source'], sessions=0, costUsd=None))
+            entry['sessions'] += 1
+            if (r['estimatedCostUsd'] or 0) > 0:
+                entry['costUsd'] = (entry['costUsd'] or 0) + r['estimatedCostUsd']
+        top = sorted(priced, key=lambda r: r['estimatedCostUsd'], reverse=True)[:6]
+        periods[key] = dict(
+            sessions=len(selected), usedSessions=len(used), emptySessions=len(selected) - len(used),
+            subagentSessions=sum(r['subagent'] for r in used), pricedSessions=len(priced),
+            includedSessions=sum(r['included'] for r in used),
+            unpricedSessions=sum(not r['included'] and not (r['estimatedCostUsd'] or 0) > 0 for r in used),
+            costUsd=cost, avgCostUsd=cost / len(priced) if cost is not None and priced else None,
+            medianCostUsd=median([r['estimatedCostUsd'] for r in priced]),
+            maxCostUsd=top[0]['estimatedCostUsd'] if top else None,
+            apiCalls=total(used, 'apiCallCount'), messages=total(used, 'messages'),
+            toolCalls=total(used, 'toolCalls'),
+            costPerCallUsd=cost / priced_calls if cost is not None and priced_calls else None,
+            inputTokens=total(selected, 'inputTokens'), outputTokens=total(selected, 'outputTokens'),
+            cacheReadTokens=cache_read, cacheWriteTokens=total(selected, 'cacheWriteTokens'),
+            reasoningTokens=total(selected, 'reasoningTokens'), promptTokens=prompt,
+            cacheHitRate=min(1, cache_read / prompt) if prompt and cache_read is not None else None,
+            avgDurationS=sum(timed) / len(timed) if timed else None, totalDurationS=sum(timed) if timed else None,
+            sources=sorted(sources.values(), key=lambda e: (e['costUsd'] or 0, e['sessions']), reverse=True)[:8],
+            topSessions=[{k: r[k] for k in ('title', 'project', 'model', 'family', 'source', 'subagent',
+                                            'estimatedCostUsd', 'promptTokens', 'outputTokens', 'apiCallCount',
+                                            'durationS', 'startedAtS')} for r in top])
+    return dict(periodBasis='session_started_at', periods=periods,
+                note='Prompt tokens = uncached input + cache reads + cache writes.')
+
+
 def family(provider, model=''):
     name = (provider + ' ' + model).lower()
     if 'anthropic' in name or 'claude' in name:
@@ -62,9 +154,11 @@ def summarize(rows):
     result['totalTokens'] = (result['inputTokens'] + result['outputTokens']
                              if result['inputTokens'] is not None and result['outputTokens'] is not None else None)
     result['partialCost'] = any(clean_number(r.get('estimatedCostUsd')) is None for r in rows)
-    denominator = result['inputTokens']
-    result['cacheReadShare'] = (min(1, result['cacheReadTokens'] / denominator)
-                               if denominator and result['cacheReadTokens'] is not None else None)
+    # Hermes stores input_tokens WITHOUT the cached part (CanonicalUsage.prompt_tokens =
+    # input + cache_read + cache_write), so the cache share is read / whole prompt.
+    prompt = prompt_tokens(result)
+    result['cacheReadShare'] = (min(1, result['cacheReadTokens'] / prompt)
+                               if prompt and result['cacheReadTokens'] is not None else None)
     result['byProvider'] = {p: summarize_provider(rows, p) for p in ('claude', 'codex', 'other')}
     return result
 
@@ -159,6 +253,7 @@ def read_local_usage():
     with sqlite3.connect((home / 'state.db').as_uri() + '?mode=ro', uri=True, timeout=2) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute('PRAGMA query_only = ON')
+        now = time.time()
         fields = ', '.join(METRICS)
         source = f'SELECT id AS session_id, model, billing_provider, {fields} FROM sessions WHERE started_at >= ?'
         model_source = source
@@ -176,7 +271,8 @@ def read_local_usage():
               )'''
         return dict(available=True, periodDays=30, periodBasis='session_started_at',
                     totals=aggregate(conn, source)[0], models=aggregate(conn, model_source, True),
-                    dashboard=dashboard_usage(conn, time.time()), unavailableReason=None)
+                    dashboard=dashboard_usage(conn, now), insights=session_insights(conn, now),
+                    unavailableReason=None)
 
 def get_local_usage():
     try:

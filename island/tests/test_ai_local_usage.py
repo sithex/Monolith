@@ -61,7 +61,8 @@ class LocalUsageTest(unittest.TestCase):
         self.add()
         p = self.read()['periods']['today']
         self.assertEqual(p['totalTokens'], 120)
-        self.assertEqual(p['cacheReadShare'], .9)
+        # input_tokens excludes the cached part: 90 read / (100 + 90 + 0) prompt tokens.
+        self.assertAlmostEqual(p['cacheReadShare'], 90 / 190)
 
     def test_unknown_cost_remains_null_and_partial(self):
         self.add(cost=None)
@@ -133,6 +134,46 @@ class LocalUsageTest(unittest.TestCase):
         self.assertEqual(result['models'][0]['estimatedCostUsd'], 10)
         self.assertEqual(result['dashboard']['periods']['today']['estimatedCostUsd'], 10)
         self.assertEqual(before, (self.home / 'state.db').read_bytes())
+        self.assertEqual(result['insights']['periods']['today']['costUsd'], 10)
+
+    def insights(self):
+        return usage.session_insights(self.conn, self.now)['periods']
+
+    def test_insights_per_session_cost_ignores_empty_and_included_sessions(self):
+        self.add('a', cost=2)
+        self.add('b', cost=6, title='Big one')
+        self.add('c', cost=4)
+        self.add('empty', cost=0, api_call_count=0)
+        self.add('codex', cost=0)  # used, but no API-value price
+        p = self.insights()['today']
+        self.assertEqual((p['sessions'], p['usedSessions'], p['emptySessions'], p['pricedSessions']), (5, 4, 1, 3))
+        self.assertEqual(p['unpricedSessions'], 1)
+        self.assertEqual(p['avgCostUsd'], 4)
+        self.assertEqual(p['medianCostUsd'], 4)
+        self.assertEqual(p['maxCostUsd'], 6)
+        self.assertEqual(p['topSessions'][0]['title'], 'Big one')
+        self.assertEqual(p['costPerCallUsd'], 4)
+
+    def test_insights_cache_rate_uses_whole_prompt(self):
+        self.add(cache_write_tokens=10)
+        p = self.insights()['today']
+        self.assertEqual(p['promptTokens'], 200)
+        self.assertAlmostEqual(p['cacheHitRate'], 90 / 200)
+
+    def test_insights_duration_uses_last_activity_and_periods_nest(self):
+        self.add('now', last=self.now)
+        self.add('old', age=5, last=self.now - 5 * 86400 + 600)
+        p = self.insights()
+        self.assertEqual(p['today']['sessions'], 1)
+        self.assertEqual(p['week']['sessions'], 2)
+        self.assertEqual(p['week']['totalDurationS'], 600)
+
+    def test_insights_empty_database_has_no_invented_numbers(self):
+        p = self.insights()['month']
+        self.assertEqual(p['sessions'], 0)
+        for key in ('costUsd', 'avgCostUsd', 'medianCostUsd', 'cacheHitRate', 'avgDurationS', 'costPerCallUsd'):
+            self.assertIsNone(p[key], key)
+        self.assertEqual(p['topSessions'], [])
 
     def test_missing_database_is_unavailable_without_creating_it(self):
         missing = self.home / 'missing'

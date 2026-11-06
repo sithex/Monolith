@@ -194,6 +194,93 @@ mod tests {
         assert!(GameEffects::plan(false, &s).effective_dnd(true));
     }
     #[tokio::test]
+    async fn game_effects_agents_pause_resume_and_shutdown_are_interruptible() {
+        use crate::integrations::agents::{core::Event, AgentEvents};
+        use crate::integrations::agents::{AgentConfig, AgentService};
+        struct Sink;
+        impl AgentEvents for Sink {
+            fn deliver(&self, _: &Event) -> Result<(), crate::error::IslandError> {
+                Ok(())
+            }
+            fn clear(&self) -> Result<(), crate::error::IslandError> {
+                Ok(())
+            }
+        }
+        let pause = PollPause::default();
+        pause.set(true);
+        // Test instance with no DB cannot discover or read the user's real Hermes DB.
+        let agents = AgentService::new_gated(
+            AgentConfig::for_instance(true, None, None),
+            Arc::new(Sink),
+            pause.clone(),
+        );
+        let initial = agents.current().unwrap();
+        agents.start().unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(agents.current().unwrap(), initial);
+        pause.set(false);
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while agents.current().unwrap().rev == initial.rev {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        pause.set(true);
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            tokio::task::spawn_blocking(move || agents.shutdown()),
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    }
+    #[tokio::test]
+    async fn game_effects_updates_resume_bypasses_schedule_without_real_commands() {
+        use crate::integrations::{control_process::Runner, updates::UpdatesService};
+        struct Clock(std::sync::atomic::AtomicU64);
+        impl crate::state::machine::Clock for Clock {
+            fn now_ms(&self) -> u64 {
+                self.0.load(Ordering::SeqCst)
+            }
+        }
+        let pause = PollPause::default();
+        pause.set(true);
+        let clock = Arc::new(Clock(std::sync::atomic::AtomicU64::new(100000)));
+        let (_power, power) = watch::channel(None);
+        let updates = UpdatesService::start_gated(
+            Runner::for_instance(true, None),
+            clock.clone(),
+            power,
+            pause.clone(),
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(updates.current().next_check_in_secs, 0.);
+        pause.set(false);
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while updates.current().next_check_in_secs == 0. {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        pause.set(true);
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        let before = updates.current();
+        clock.0.store(101000, Ordering::SeqCst);
+        pause.set(false);
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while updates.current().rev == before.rev {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        updates.shutdown_async().await.unwrap();
+    }
+    #[tokio::test]
     async fn game_effects_resume_wakes_immediately_and_repeated_settings_do_not_wake() {
         let pause = PollPause::default();
         let mut changes = pause.subscribe();

@@ -184,6 +184,7 @@ fn snapshot(
         "anchor":anchor,"bounds":bounds,"windowId":xid,"rectangles":rectangles,"pty":services.terminal.pid().unwrap_or(0),
         "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
         "gameMode":state.game_mode,
+        "companionFrozen":super::game_effects::GameEffects::plan(state.game_mode, &settings).freeze_companion,
         "companion":settings.companion_enabled,
         "companionCharacter":settings.companion_character,
         "companionReactive":settings.companion_reactive,"companionMonitor":settings.companion_monitor,
@@ -305,6 +306,7 @@ fn panel_style_payload(raw: &Value) -> Value {
         "companion",
         "companionCharacter",
         "companionReactive",
+        "companionFrozen",
         "companionMonitor",
         "waitingPulse",
         "hoverPeek",
@@ -329,11 +331,17 @@ mod notch_tests {
     #[test]
     fn notch_panel_payload_is_public_only_and_honors_zero_opacity() {
         let raw = json!({"background":"#123456","accent":"#abcdef","showDate":true,
+            "companionFrozen":true,
             "notchBorder":{"enabled":true,"color":"#000000","opacity":0,"width":4},
             "pid":99,"pty":42,"private":"must not reach Plasma"});
         let style = panel_style_payload(&raw);
         assert_eq!(style["notchBorder"]["opacity"], json!(0));
         assert_eq!(style["background"], json!("#123456"));
+        assert_eq!(style["companionFrozen"], json!(true));
+        assert_eq!(
+            panel_style_payload(&json!({"companionFrozen":false}))["companionFrozen"],
+            json!(false)
+        );
         assert!(style.get("private").is_none());
         assert!(style.get("pid").is_none());
         let script = panel_style_script(&[(145, 407), (97, 500)], &style);

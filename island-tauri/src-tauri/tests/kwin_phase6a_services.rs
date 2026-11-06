@@ -97,7 +97,6 @@ fn mock(slot: &mut Option<Mock>) -> &mut Mock {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn services_report_capabilities_snapshots_events_alerts_and_recover_in_the_real_app() {
     let _guard = lock();
     let bus = PrivateBus::start("p6a");
@@ -252,7 +251,6 @@ fn services_report_capabilities_snapshots_events_alerts_and_recover_in_the_real_
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn a_test_instance_without_an_explicit_system_bus_never_connects_to_any_bus() {
     let _guard = lock();
     let s = Stack::new("p6a-nobus");

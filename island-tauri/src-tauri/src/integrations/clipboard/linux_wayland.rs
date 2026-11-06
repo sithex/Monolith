@@ -74,6 +74,10 @@ impl Worker {
         wake.set_nonblocking(true)
             .and_then(|()| cancellation.set_nonblocking(true))
             .map_err(|_| IslandError::io("Cannot configure clipboard cancellation channel"))?;
+        *super::lock(&shared.watcher_wake)? = Some(
+            wake.try_clone()
+                .map_err(|_| IslandError::io("Cannot share clipboard wake channel"))?,
+        );
         let stop = Arc::new(AtomicBool::new(false));
         let halted = stop.clone();
         let state = shared.clone();
@@ -186,7 +190,7 @@ impl Drop for Worker {
         }
     }
 }
-fn wake(mut stream: &UnixStream) -> Result<(), IslandError> {
+pub(super) fn wake(mut stream: &UnixStream) -> Result<(), IslandError> {
     match stream.write(&[1]) {
         Ok(_) => Ok(()),
         Err(e)
@@ -737,9 +741,10 @@ impl State {
     }
     fn next_wait(&self) -> Duration {
         let now = Instant::now();
-        // Idle, nothing is time-bound: sleep until Wayland, a copy request or a stop wakes
-        // the loop (all three are fds in the poll set). Pauses need no wake: every capture
-        // re-checks `Shared::active` and a stale epoch is dropped at offer time.
+        // Idle, nothing is time-bound: sleep until Wayland, a copy request, a pause/resume or a
+        // stop wakes the loop (all are fds in the poll set). Pause/resume MUST wake it: the
+        // epoch fence has to be posted before the next selection event, or that event is
+        // discarded as queued-while-paused (the first copy after a resume would be lost).
         let mut deadline = now + Duration::from_secs(60);
         if let Some(s) = &self.selected {
             deadline = deadline.min(s.deadline);

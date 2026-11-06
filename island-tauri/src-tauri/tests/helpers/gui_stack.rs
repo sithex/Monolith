@@ -270,8 +270,11 @@ impl Stack {
                 });
             assert!(!alive, "private GUI process group {group} survived");
         }
-        wait_for("GUI X sockets removed", Duration::from_secs(5), || {
-            (sockets() == self.before).then_some(())
+        // Only our own display's socket: the directory is machine-global, so another session's
+        // Xvfb/Xwayland coming or going during the test must not fail this one.
+        let ours = format!("X{}", self.display.trim_start_matches(':'));
+        wait_for("GUI X socket removed", Duration::from_secs(5), || {
+            (!sockets().contains(&ours)).then_some(())
         });
     }
 }

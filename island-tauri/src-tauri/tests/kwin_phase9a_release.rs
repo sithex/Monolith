@@ -60,7 +60,6 @@ fn click(s: &Stack, e: &mut Wheel, origin: (i32, i32), selector: &str) {
     );
 }
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn anchor_client_complete_status_embedded_island_and_sigterm_use_real_eis() {
     let mut s = Stack::new("9a-release");
     prepare(&s);
@@ -129,7 +128,7 @@ fn anchor_client_complete_status_embedded_island_and_sigterm_use_real_eis() {
     let c = s.connect();
     let root = c.setup().roots[0].root;
     let w = wait_for("9a mapped window", Duration::from_secs(40), || {
-        find_island_window(&c, root, pid)
+        find_window_sized(&c, root, pid, host::overlay_size())
     });
     wait_for("9a private probe", Duration::from_secs(20), || {
         s.root.join("inst/test-control.sock").exists().then_some(())

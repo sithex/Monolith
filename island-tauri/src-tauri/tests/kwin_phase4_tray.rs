@@ -100,7 +100,6 @@ fn notify(s: &Stack, title: &str) {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn private_watcher_registers_real_tray_and_menu_dispatches_actor_intents() {
     let _guard = lock();
     let mut s = Stack::new("phase4-tray");

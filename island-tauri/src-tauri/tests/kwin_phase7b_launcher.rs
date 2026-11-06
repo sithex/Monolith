@@ -116,7 +116,7 @@ fn settled(s: &Stack, c: &RustConnection, w: u32, mode: IslandMode) {
     );
 }
 fn point(s: &Stack, origin: (i32, i32), selector: &str) -> (i32, i32) {
-    let p=eval(s,&format!("(()=>{{const e=document.querySelector({});if(!e)throw Error('Missing real input target');e.scrollIntoView({{block:'nearest'}});const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()",json!(selector)));
+    let p=eval(s,&format!("(()=>{{const q={0};const e=document.querySelector(q);if(!e)throw Error('Missing real input target '+q+'; present: '+[...document.querySelectorAll('[data-testid]')].map(e=>e.dataset.testid).join(' '));e.scrollIntoView({{block:'nearest'}});const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()",json!(selector)));
     (
         origin.0 + p[0].as_f64().unwrap() as i32,
         origin.1 + p[1].as_f64().unwrap() as i32,
@@ -126,10 +126,37 @@ fn click(s: &Stack, e: &mut Wheel, origin: (i32, i32), selector: &str) {
     let p = point(s, origin, selector);
     e.click_at(p.0, p.1);
 }
+/// Settings is tabbed (General / Appearance / Layout, ui/views/SettingsView.tsx).
+fn settings_tab(s: &Stack, e: &mut Wheel, o: (i32, i32), name: &str) {
+    let index = ["General", "Appearance", "Layout"]
+        .iter()
+        .position(|t| *t == name)
+        .unwrap()
+        + 1;
+    click(
+        s,
+        e,
+        o,
+        &format!(".settings-tabs [role=tab]:nth-child({index})"),
+    );
+    until(
+        s,
+        &format!("7b settings tab {name} selected"),
+        8,
+        &format!(
+            "document.querySelector('.settings-tabs [aria-selected=true]')?.textContent==={}",
+            json!(name)
+        ),
+    );
+}
 fn open(s: &Stack, c: &RustConnection, w: u32, e: &mut Wheel, o: (i32, i32), view: &str) {
     settled(s, c, w, IslandMode::Large);
-    click(s, e, o, "[data-testid=side-apps]");
-    until(s,"7b real side button opens launcher",10,"document.querySelector('.island').dataset.view==='launcher'&&!!document.querySelector('.app-grid')");
+    // On the launcher page the Apps side button is Back (geometry.ts sideBackFor), so only press
+    // it when another page is showing.
+    if eval(s, "document.querySelector('.island').dataset.view") != "launcher" {
+        click(s, e, o, "[data-testid=side-apps]");
+    }
+    until(s,&format!("7b real side button opens launcher (before {view})"),10,"document.querySelector('.island').dataset.view==='launcher'&&!!document.querySelector('.app-grid')");
     settled(s, c, w, IslandMode::Large);
     click(s, e, o, &format!("[data-testid=view-{view}]"));
     until(
@@ -146,6 +173,7 @@ fn open(s: &Stack, c: &RustConnection, w: u32, e: &mut Wheel, o: (i32, i32), vie
     assert_eq!(eval(s,"document.querySelector('.app-pane:not([hidden])').innerText.includes('Malformed app snapshot')"),false);
 }
 fn capture(s: &Stack, c: &RustConnection, w: u32, name: &str) {
+    let overlay = host::overlay_size();
     let mut last = None;
     wait_for(
         "7b content and pixels settle",
@@ -165,7 +193,7 @@ fn capture(s: &Stack, c: &RustConnection, w: u32, name: &str) {
                     )
                     .unwrap()
                 } else {
-                    Shot::grab(c, w, WIN_W, WIN_H).bgra
+                    Shot::grab(c, w, overlay.0, overlay.1).bgra
                 },
             );
             let same = last.as_ref() == Some(&pair);
@@ -179,11 +207,10 @@ fn capture(s: &Stack, c: &RustConnection, w: u32, name: &str) {
         },
     );
     let evidence = Evidence::new("phase7b");
-    Shot::grab(c, w, WIN_W, WIN_H).save_png(&evidence.path(&format!("{name}.png")));
+    Shot::grab(c, w, overlay.0, overlay.1).save_png(&evidence.path(&format!("{name}.png")));
     fs::write(evidence.path(&format!("{name}.json")),serde_json::to_vec(&eval(s,"[document.querySelector('.island'),...document.querySelectorAll('[data-side-button]')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})")).unwrap()).unwrap();
 }
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     let _guard = lock();
     let mut s = Stack::new("phase7b-launcher");
@@ -193,7 +220,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     let c = s.connect();
     let root = c.setup().roots[0].root;
     let w = wait_for("7b window", Duration::from_secs(30), || {
-        find_island_window(&c, root, app.0.id())
+        find_window_sized(&c, root, app.0.id(), host::overlay_size())
     });
     wait_for("7b control socket", Duration::from_secs(20), || {
         s.root.join("inst/test-control.sock").exists().then_some(())
@@ -239,6 +266,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     let pty = status(&s)["pty"].clone();
     for theme in ["skin", "neutral"] {
         open(&s, &c, w, &mut e, o, "settings");
+        settings_tab(&s, &mut e, o, "Appearance");
         click(&s, &mut e, o, &format!("[data-testid=appearance-{theme}]"));
         until(
             &s,
@@ -258,7 +286,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
             "calendar",
             "scratchpad",
             "downloads",
-            "controls",
+            // No "controls": that app was retired and its tile is never drawn (Launcher.tsx).
             "mixer",
             "brightness",
             "agents",
@@ -303,6 +331,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
             "document.querySelector('.app-grid')?.dataset.editing==='false'",
         );
         open(&s, &c, w, &mut e, o, "settings");
+        settings_tab(&s, &mut e, o, "Layout");
         point(&s, o, ".layout-editor");
         settled(&s, &c, w, IslandMode::Large);
         capture(&s, &c, w, &format!("{theme}-layout"));
@@ -313,7 +342,23 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     click(&s, &mut e, o, ".terminal");
     e.send("chord 29 22");
     open(&s, &c, w, &mut e, o, "settings");
-    click(&s, &mut e, o, ".preset-row button:first-child");
+    settings_tab(&s, &mut e, o, "Layout");
+    // First size tile = Compact (360 wide), LayoutEditor.tsx TILES. The editor lays itself out
+    // from an async geometry reply, so let the surface and the tile rect settle before pressing.
+    settled(&s, &c, w, IslandMode::Large);
+    let mut last = None;
+    wait_for(
+        "7b size tile position stable",
+        Duration::from_secs(8),
+        || {
+            let now = point(&s, o, ".le-tiles button:first-child");
+            let stable = last == Some(now);
+            last = Some(now);
+            std::thread::sleep(Duration::from_millis(300));
+            stable.then_some(())
+        },
+    );
+    click(&s, &mut e, o, ".le-tiles button:first-child");
     until(
         &s,
         "7b preset width changes without restart",

@@ -115,6 +115,30 @@ pub fn actor_state(s: &Stack) -> Value {
     )
 }
 
+fn fixture_outputs() -> Value {
+    json!({"outputs":[{"connected":true,"enabled":true,"priority":1,"name":"fixture","pos":{"x":0,"y":0},"size":{"width":1600,"height":1000}}]})
+}
+fn fixture_panels() -> Value {
+    json!([{"id":1,"location":"top","height":44,"x":0,"y":0,"widgets":[{"id":2,"type":"local.hermes.island.v3","x":725,"y":4,"width":150,"height":36}]}])
+}
+
+/// Size of the `--ui island` overlap viewport for the fixture panel `prepare` installs: the
+/// product's own `over_panel(ISLAND_OVERLAY_*)` result (clamped to the 1600x1000 output),
+/// not the 1180x820 below-panel window the Legacy page uses.
+pub fn overlay_size() -> (u16, u16) {
+    use hermes_island_lib::{
+        integrations::plasma::anchor::anchor_from_data,
+        window::{placement::over_panel, ISLAND_OVERLAY_HEIGHT, ISLAND_OVERLAY_WIDTH},
+    };
+    let anchor = anchor_from_data(&fixture_outputs(), &fixture_panels()).unwrap();
+    assert!(anchor.native, "fixture panel must be a native notch anchor");
+    let target = over_panel(&anchor, ISLAND_OVERLAY_WIDTH, ISLAND_OVERLAY_HEIGHT).unwrap();
+    (
+        target.width.try_into().unwrap(),
+        target.height.try_into().unwrap(),
+    )
+}
+
 /// Fixture executables (no real Plasma), the anchor-client replica, and the scratch layout.
 pub fn prepare(s: &Stack) {
     fs::create_dir(s.root.join("bin")).unwrap();
@@ -128,9 +152,10 @@ pub fn prepare(s: &Stack) {
         s.root.join("replica/.island-data-overlay"),
     )
     .unwrap();
-    let outputs = json!({"outputs":[{"connected":true,"enabled":true,"priority":1,"name":"fixture","pos":{"x":0,"y":0},"size":{"width":1600,"height":1000}}]});
-    let panels = json!([{"id":1,"location":"top","height":44,"x":0,"y":0,"widgets":[{"id":2,"type":"local.hermes.island.v3","x":725,"y":4,"width":150,"height":36}]}]);
-    for (name, value) in [("kscreen-doctor", outputs), ("qdbus6", panels)] {
+    for (name, value) in [
+        ("kscreen-doctor", fixture_outputs()),
+        ("qdbus6", fixture_panels()),
+    ] {
         let path = s.root.join("bin").join(name);
         fs::write(
             &path,

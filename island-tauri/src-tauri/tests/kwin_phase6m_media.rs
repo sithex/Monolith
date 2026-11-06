@@ -93,7 +93,6 @@ fn song() -> Value {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn media_lyrics_and_equalizer_work_end_to_end_in_the_real_app() {
     let _guard = lock();
     let bus = PrivateBus::start("p6m");
@@ -228,7 +227,6 @@ fn media_lyrics_and_equalizer_work_end_to_end_in_the_real_app() {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn a_test_instance_without_a_mock_bus_has_an_empty_media_state_and_stays_honest() {
     let _guard = lock();
     let s = Stack::new("p6m-nobus");

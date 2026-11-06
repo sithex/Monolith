@@ -61,6 +61,24 @@ fn launch(s: &Stack) -> Owned {
 fn rect(s: &Stack) -> RoundedRect {
     serde_json::from_value(eval(s, "(()=>{const e=document.querySelector('.island'),r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,radius:parseFloat(getComputedStyle(e).borderRadius)}})()" )).unwrap()
 }
+/// Exact outer-surface geometry check that reports the measured rect on failure.
+/// Under the native notch (the fixture panel is native) the outer corner radius is the
+/// product's `surfaceRadius(height)` (ui/island/motion-profile.ts), not a per-mode constant.
+fn surface_radius(height: f64) -> f64 {
+    (height.max(0.) * 0.34).min(28.)
+}
+fn assert_close(s: &Stack, field: &str, expected: f64) {
+    let r = rect(s);
+    let actual = match field {
+        "width" => r.width,
+        "radius" => r.radius,
+        _ => unreachable!(),
+    };
+    assert!(
+        (actual - expected).abs() < 0.1,
+        "outer {field}: expected {expected}, measured {r:?}"
+    );
+}
 fn settled(s: &Stack, conn: &RustConnection, window: u32, mode: IslandMode) {
     // Phase7b diagnostic begin
     eval(s,"(()=>{if(!window.__crossings){window.__crossings=[];for(const type of ['mouseover','mouseout'])addEventListener(type,e=>{const outer=document.querySelector('.island');window.__crossings.push({type,x:e.clientX,y:e.clientY,mode:outer?.dataset.state,target:e.target?.className,related:e.relatedTarget?.className});if(window.__crossings.length>60)window.__crossings.shift();});}return true})()");
@@ -136,10 +154,32 @@ fn mode(s: &Stack, conn: &RustConnection, window: u32, name: &str, value: Island
     settled(s, conn, window, value);
 }
 fn click(s: &Stack, eis: &mut Wheel, origin: (i32, i32), selector: &str) {
-    let point = eval(s, &format!("(()=>{{const e=document.querySelector({});if(!e)throw Error('missing click target');e.scrollIntoView({{block:'nearest'}});const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()", json!(selector)));
+    let point = eval(s, &format!("(()=>{{const e=document.querySelector({});if(!e)throw Error('missing click target; present: '+[...document.querySelectorAll('[data-testid]')].map(e=>e.dataset.testid).join(' '));e.scrollIntoView({{block:'nearest'}});const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()", json!(selector)));
     eis.click_at(
         origin.0 + point[0].as_f64().unwrap() as i32,
         origin.1 + point[1].as_f64().unwrap() as i32,
+    );
+}
+fn settings_tab(s: &Stack, eis: &mut Wheel, origin: (i32, i32), name: &str) {
+    let index = ["General", "Appearance", "Layout"]
+        .iter()
+        .position(|t| *t == name)
+        .unwrap()
+        + 1;
+    click(
+        s,
+        eis,
+        origin,
+        &format!(".settings-tabs [role=tab]:nth-child({index})"),
+    );
+    until(
+        s,
+        &format!("7a settings tab {name} selected"),
+        8,
+        &format!(
+            "document.querySelector('.settings-tabs [aria-selected=true]')?.textContent==={}",
+            json!(name)
+        ),
     );
 }
 fn view(
@@ -163,6 +203,7 @@ fn view(
     settled(s, conn, window, IslandMode::Large);
 }
 fn screenshot(s: &Stack, conn: &RustConnection, window: u32, name: &str) {
+    let overlay = host::overlay_size();
     assert_eq!(eval(s, "(()=>{const p=document.querySelector('.app-pane:not([hidden])');return p.scrollWidth<=p.clientWidth+1})()"), true, "view overflows horizontally");
     let mut previous = None;
     wait_for(
@@ -174,7 +215,7 @@ fn screenshot(s: &Stack, conn: &RustConnection, window: u32, name: &str) {
                     s,
                     "document.querySelector('.app-pane:not([hidden])').innerText",
                 ),
-                Shot::grab(conn, window, WIN_W, WIN_H).bgra,
+                Shot::grab(conn, window, overlay.0, overlay.1).bgra,
             );
             let stable = previous.as_ref() == Some(&pair);
             previous = Some(pair);
@@ -187,7 +228,7 @@ fn screenshot(s: &Stack, conn: &RustConnection, window: u32, name: &str) {
         },
     );
     let evidence = Evidence::new("phase7a");
-    Shot::grab(conn, window, WIN_W, WIN_H).save_png(&evidence.path(&format!("{name}.png")));
+    Shot::grab(conn, window, overlay.0, overlay.1).save_png(&evidence.path(&format!("{name}.png")));
     let r = rect(s);
     fs::write(
         evidence.path(&format!("{name}.json")),
@@ -197,7 +238,6 @@ fn screenshot(s: &Stack, conn: &RustConnection, window: u32, name: &str) {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     let _guard = lock();
     let mut s = Stack::new("phase7a");
@@ -207,7 +247,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     let root = conn.setup().roots[0].root;
     let pid = app.0.id();
     let window = wait_for("7a island window", Duration::from_secs(30), || {
-        find_island_window(&conn, root, pid)
+        find_window_sized(&conn, root, pid, host::overlay_size())
     });
     assert_identity(&conn, window, pid, true);
     assert_not_focused_on_show(&conn, root, window);
@@ -232,15 +272,16 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         .unwrap();
     let origin = (i32::from(pos.dst_x), i32::from(pos.dst_y));
     mode(&s, &conn, window, "still", IslandMode::Still);
-    assert!((rect(&s).width - 150.).abs() < 0.1);
-    assert!((rect(&s).radius - 20.).abs() < 0.1);
+    // Still = the native pill (fixture widget 150x36); hover/terminal sizes per IslandSurface.tsx.
+    assert_close(&s, "width", 150.);
+    assert_close(&s, "radius", surface_radius(36.));
     let mut eis = Wheel::new(&s);
     eis.move_to(100, 900);
     eval(&s,"(()=>{window.__frames=[];let last=null;const end=performance.now()+3500;function sample(now){if(last!==null)window.__frames.push(now-last);last=now;if(now<end&&window.__frames.length<240)requestAnimationFrame(sample)}requestAnimationFrame(sample);return true})()");
     client(&s, "enter");
     mode(&s, &conn, window, "hover", IslandMode::Hover);
-    assert!((rect(&s).width - 420.).abs() < 0.1);
-    assert!((rect(&s).radius - 28.).abs() < 0.1);
+    assert_close(&s, "width", 360.);
+    assert_close(&s, "radius", surface_radius(116.));
     let r = rect(&s);
     eis.move_to(origin.0 + r.x as i32 + 100, origin.1 + r.y as i32 + 80);
     client(&s, "leave");
@@ -258,8 +299,9 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         20,
         "window.__islandTerminalTest?.text().includes('island-test>')===true",
     );
-    assert!((rect(&s).width - 1040.).abs() < 0.1);
-    assert!((rect(&s).radius - 24.).abs() < 0.1);
+    // A fresh data dir starts on the Bigger layout preset (services/workspace.rs, PRESET_SIZES).
+    assert_close(&s, "width", 760.);
+    assert_close(&s, "radius", surface_radius(rect(&s).height));
     until(
         &s,
         "7a bounded frame sample finished",
@@ -308,8 +350,12 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         "!window.__islandTerminalTest.text().includes('UNSUBMITTED_7A_DRAFT')",
     );
     eval(&s,"(window.__islandTerminalTest.identity.options.cursorBlink=false,window.__islandTerminalTest.identity.blur(),true)");
-    for theme in ["skin", "neutral"] {
+    // Skin is the fresh-install default (services/frontend.rs), so pick neutral first: every
+    // iteration is a real change that must persist without a restart.
+    for theme in ["neutral", "skin"] {
         view(&s, &conn, window, &mut eis, origin, "settings");
+        // Colour schemes live on the Settings → Appearance tab (SettingsView.tsx).
+        settings_tab(&s, &mut eis, origin, "Appearance");
         click(
             &s,
             &mut eis,
@@ -351,10 +397,26 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                     35,
                     "document.querySelector('.ai-stats').getAttribute('aria-busy')==='false'",
                 );
-                assert!(text.as_str().unwrap().contains("Connect a provider"));
+                // Read after the adapter settled; the private HOME has no AI accounts.
+                let text = eval(
+                    &s,
+                    "document.querySelector('.app-pane:not([hidden])').innerText",
+                );
+                let text = text.as_str().unwrap();
+                assert!(
+                    text.contains("Not connected") && text.contains("Sign in"),
+                    "AI pane: {text}"
+                );
             }
             if id == "settings" {
-                assert!(text.as_str().unwrap().contains("Choose your apps"));
+                // innerText follows CSS text-transform (card titles are uppercase).
+                let text = text.as_str().unwrap().to_lowercase();
+                assert!(
+                    ["general", "appearance", "layout", "colour scheme"]
+                        .iter()
+                        .all(|t| text.contains(t)),
+                    "settings pane: {text}"
+                );
             }
             screenshot(&s, &conn, window, &format!("{theme}-{id}"));
         }
@@ -375,6 +437,20 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     );
     until(&s, "7a outer surface offset applied event-driven", 8, &format!("(()=>{{const r=document.querySelector('.island').getBoundingClientRect();return Math.abs(r.x-{})<0.1&&Math.abs(r.y-{})<0.1}})()",before.x+24.,before.y+12.));
     settled(&s, &conn, window, IslandMode::Large);
+    settings_tab(&s, &mut eis, origin, "Appearance");
+    // Leave a non-default choice persisted so the reload below proves it was read back.
+    click(&s, &mut eis, origin, "[data-testid=appearance-neutral]");
+    until(
+        &s,
+        "7a neutral re-selected",
+        8,
+        "document.documentElement.dataset.theme==='neutral'",
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&fs::read(s.root.join("inst/appearance.json")).unwrap())
+            .unwrap(),
+        "neutral"
+    );
     assert_eq!(eval(&s,"document.fonts.check('14px OpenRunde') && getComputedStyle(document.querySelector('[aria-label=\"UI font\"]')).fontFamily.includes('OpenRunde')"),true);
     // Reload is a new webview bootstrap; the persisted choice must still be neutral.
     eval(&s, "(setTimeout(()=>location.reload(),250),true)");

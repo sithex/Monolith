@@ -61,7 +61,7 @@ that, plus autostart, updating and the problems you're likely to hit.
 
 ## Tests and secrets hook
 
-See [the test commands and opt-in GUI suites](island-tauri/README.md#testing).
+See [the test commands and GUI suites](island-tauri/README.md#testing).
 Enable the tracked pre-commit hook from the repository root:
 
 ```sh

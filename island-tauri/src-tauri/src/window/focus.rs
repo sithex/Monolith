@@ -2,7 +2,8 @@
 //!
 //! KWin 6.8 activates a mapped Top/Overlay layer surface accepting input. It does not
 //! deactivate on None, and gtk-layer-shell's try_force_commit may skip pending commits.
-//! Remap when necessary instead of relying on two setters making two Wayland commits.
+//! A committed None frame precedes OnDemand, bypassing new-window focus prevention.
+//! Collapse remaps keyboard-inert to return focus through the compositor's history.
 use crate::{contract::island::IslandMode, error::IslandError};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{Manager, WebviewWindow};
@@ -52,29 +53,56 @@ pub(super) fn current(generation: u64) -> bool {
 }
 
 #[cfg(target_os = "linux")]
-pub(super) fn platform(window: &WebviewWindow, action: FocusPlan) -> Result<(), IslandError> {
+pub(super) fn platform(
+    window: &WebviewWindow,
+    action: FocusPlan,
+    generation: u64,
+) -> Result<(), IslandError> {
     use gtk::prelude::*;
     use gtk_layer_shell::{KeyboardMode, LayerShell};
     let gtk = window
         .gtk_window()
         .map_err(|e| IslandError::unavailable(e.to_string()))?;
     if super::wayland::is_wayland(&gtk) {
-        // None is the initial/preview state. Remapping with OnDemand activates on KWin
-        // without Exclusive; returning to None must unmap even before keyboard-enter
-        // arrives, since KWin does not deactivate on acceptsFocusChanged(false).
-        let armed = gtk.keyboard_mode() != KeyboardMode::None;
+        // Track the requested activation, not just GTK's asynchronous keyboard-enter:
+        // collapse may race a None frame while KWin is still processing the old open.
+        static ARMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
         match action {
             FocusPlan::Activate => {
-                if armed {
-                    gtk.hide();
+                ARMED.store(true, Ordering::SeqCst);
+                gtk.set_keyboard_mode(KeyboardMode::None);
+                if let Some(clock) = gtk.frame_clock() {
+                    use std::{cell::RefCell, rc::Rc};
+                    let signal = Rc::new(RefCell::new(None));
+                    let slot = signal.clone();
+                    let weak = gtk.downgrade();
+                    // GDK commits pending pixels in its after-paint handler. Connect AFTER
+                    // that handler so None is on the wire before requesting OnDemand.
+                    // Unlike try_force_commit this cannot silently skip a pending frame.
+                    let id = clock.connect_local("after-paint", true, move |args| {
+                        if let Some(id) = slot.borrow_mut().take() {
+                            if let Ok(clock) = args[0].get::<gdk::FrameClock>() {
+                                clock.disconnect(id);
+                            }
+                        }
+                        if current(generation) {
+                            if let Some(gtk) = weak.upgrade() {
+                                gtk.set_keyboard_mode(KeyboardMode::OnDemand);
+                                gtk.queue_draw();
+                            }
+                        }
+                        None
+                    });
+                    *signal.borrow_mut() = Some(id);
+                    clock.request_phase(gdk::FrameClockPhase::AFTER_PAINT);
                 }
-                gtk.set_keyboard_mode(KeyboardMode::OnDemand);
-                gtk.show();
                 gtk.queue_draw();
             }
             FocusPlan::Release => {
+                let armed = ARMED.swap(false, Ordering::SeqCst);
+                let interactive = gtk.keyboard_mode() != KeyboardMode::None;
                 gtk.set_keyboard_mode(KeyboardMode::None);
-                if armed || gtk.has_toplevel_focus() {
+                if armed || interactive || gtk.has_toplevel_focus() {
                     gtk.hide();
                     gtk.show();
                     gtk.queue_draw();

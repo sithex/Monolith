@@ -180,7 +180,7 @@ impl PlatformBackend {
                     if !crate::window::focus::current(generation) {
                         return Ok(());
                     }
-                    crate::window::focus::platform(&window, action)?;
+                    crate::window::focus::platform(&window, action, generation)?;
                     if let Some(surface) = surface {
                         let gtk = window
                             .gtk_window()

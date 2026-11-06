@@ -103,6 +103,9 @@ pub fn battery_alert(kind: AlertKind, percent: Option<f64>) -> NotificationInput
 }
 
 pub struct SystemServices {
+    game_pause: super::plasma::game_effects::PollPause,
+    game_watcher: tauri::async_runtime::JoinHandle<()>,
+    game_actor: crate::state::actor::Handle,
     pub apps: super::apps::AppServices,
     pub power: Arc<PowerService>,
     pub weather: Arc<WeatherService>,
@@ -120,6 +123,14 @@ impl SystemServices {
         hub: Arc<Hub>,
         data_dir: &Path,
     ) -> Result<Self, IslandError> {
+        use super::plasma::game_effects::{GameEffects, PollPause};
+        use tauri::Manager;
+        let game_actor = app
+            .state::<crate::state::host::IslandActor>()
+            .handle
+            .clone();
+        let game_pause = PollPause::default();
+        game_pause.set(GameEffects::plan(game_actor.state().game_mode, settings).pause_pollers);
         let bus = system_bus_address(test_instance, std::env::var("DBUS_SYSTEM_BUS_ADDRESS").ok());
         let sink_hub = Arc::clone(&hub);
         let power = PowerService::new(
@@ -130,9 +141,10 @@ impl SystemServices {
                 }
             }),
         );
-        let weather = WeatherService::new(
+        let weather = WeatherService::new_gated(
             WeatherConfig::for_instance(test_instance, |name| std::env::var(name).ok()),
             WeatherSettings::from(settings),
+            game_pause.clone(),
         )?;
         let bluetooth = BluetoothService::new();
         let media = MediaService::new();
@@ -152,7 +164,14 @@ impl SystemServices {
         );
         Self::forward(app, &power, &weather, &bluetooth);
         Self::forward_music(app, &media, &lyrics, &equalizer);
-        let apps = super::apps::AppServices::new(app, data_dir, test_instance, hub, power.clone());
+        let apps = super::apps::AppServices::new_gated(
+            app,
+            data_dir,
+            test_instance,
+            hub,
+            power.clone(),
+            game_pause.clone(),
+        );
         apps.configure(settings)?;
         power.start(bus.clone());
         bluetooth.start(bus);
@@ -165,7 +184,24 @@ impl SystemServices {
         ));
         lyrics.start(Arc::clone(&media));
         equalizer.start();
+        let mut states = game_actor.watch();
+        let (handle, pause) = (app.clone(), game_pause.clone());
+        let game_watcher = tauri::async_runtime::spawn(async move {
+            loop {
+                let game = states.borrow_and_update().game_mode;
+                match handle.state::<crate::services::Services>().settings.get() {
+                    Ok(settings) => pause.set(GameEffects::plan(game, &settings).pause_pollers),
+                    Err(error) => tracing::warn!(%error, "Game polling policy unavailable"),
+                }
+                if states.changed().await.is_err() {
+                    break;
+                }
+            }
+        });
         Ok(Self {
+            game_pause,
+            game_watcher,
+            game_actor,
             apps,
             power,
             weather,
@@ -275,6 +311,13 @@ impl SystemServices {
 
     /// A settings change reached the persisted store: tell each service.
     pub fn configure(&self, settings: &Settings) -> Result<(), IslandError> {
+        self.game_pause.set(
+            super::plasma::game_effects::GameEffects::plan(
+                self.game_actor.state().game_mode,
+                settings,
+            )
+            .pause_pollers,
+        );
         self.apps.configure(settings)?;
         self.power.configure(AlertSettings::from(settings));
         self.weather.configure(WeatherSettings::from(settings));
@@ -287,6 +330,7 @@ impl SystemServices {
     }
 
     pub fn shutdown(&self) {
+        self.game_watcher.abort();
         if let Err(error) = self.apps.shutdown() {
             tracing::error!(%error, "App shutdown failed");
         }

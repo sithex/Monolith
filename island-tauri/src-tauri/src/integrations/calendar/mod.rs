@@ -126,6 +126,7 @@ struct State {
     readable: bool,
 }
 pub struct CalendarService {
+    game_pause: crate::integrations::plasma::game_effects::PollPause,
     config: CalendarConfig,
     zones: Zones,
     client: reqwest::Client,
@@ -206,6 +207,12 @@ fn document(blocks: &BTreeMap<String, String>) -> String {
 }
 impl CalendarService {
     pub fn new(config: CalendarConfig) -> Result<Arc<Self>, IslandError> {
+        Self::new_gated(config, Default::default())
+    }
+    pub fn new_gated(
+        config: CalendarConfig,
+        game_pause: crate::integrations::plasma::game_effects::PollPause,
+    ) -> Result<Arc<Self>, IslandError> {
         let client = reqwest::Client::builder()
             .timeout(config.timeout)
             .connect_timeout(config.timeout)
@@ -237,6 +244,7 @@ impl CalendarService {
             None => (vec![], None),
         };
         let service = Arc::new(Self {
+            game_pause,
             zones: Zones::new(&config.tz)?,
             config,
             client,
@@ -648,18 +656,28 @@ impl CalendarService {
         let service = Arc::clone(self);
         let mut stop = self.stop.subscribe();
         *slot = Some(tauri::async_runtime::spawn(async move {
+            let mut pause = service.game_pause.subscribe();
             loop {
                 if *stop.borrow() {
                     return;
                 }
-                if service.refresh(epoch_ms()).await.is_err() {
-                    tracing::warn!("Calendar refresh failed");
+                let paused = *pause.borrow_and_update();
+                if paused {
+                    tokio::select! { _ = stop.changed() => return, _ = pause.changed() => {} }
+                    continue;
+                }
+                tokio::select! {
+                    _ = stop.changed() => return,
+                    _ = pause.changed() => continue,
+                    result = service.refresh(epoch_ms()) => {
+                        if result.is_err() { tracing::warn!("Calendar refresh failed"); }
+                    }
                 }
                 let delay = match service.next_refresh_delay() {
                     Ok(d) => d,
                     Err(_) => return,
                 };
-                tokio::select! {_=stop.changed()=>return,()=tokio::time::sleep(delay)=>{}}
+                tokio::select! {_=stop.changed()=>return,_=pause.changed()=>{},()=tokio::time::sleep(delay)=>{}}
             }
         }));
         Ok(())

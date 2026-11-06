@@ -109,6 +109,7 @@ struct Shared {
 }
 
 pub struct WeatherService {
+    game_pause: crate::integrations::plasma::game_effects::PollPause,
     pub status: Arc<Reporter>,
     pub topic: Latest<WeatherState>,
     config: WeatherConfig,
@@ -198,12 +199,20 @@ fn error_detail(error: &WeatherError) -> &'static str {
 
 impl WeatherService {
     pub fn new(config: WeatherConfig, settings: WeatherSettings) -> Result<Arc<Self>, IslandError> {
+        Self::new_gated(config, settings, Default::default())
+    }
+    pub fn new_gated(
+        config: WeatherConfig,
+        settings: WeatherSettings,
+        game_pause: crate::integrations::plasma::game_effects::PollPause,
+    ) -> Result<Arc<Self>, IslandError> {
         let client = open_meteo::client()
             .map_err(|_| IslandError::internal("Weather HTTP client unavailable"))?;
         let current = render(&policy::WeatherState::default(), settings.unit);
         let topic = Latest::new();
         topic.publish(current.clone());
         let service = Arc::new(Self {
+            game_pause,
             status: Reporter::new("weather"),
             topic,
             config,
@@ -368,20 +377,31 @@ impl WeatherService {
     }
 
     async fn worker(self: Arc<Self>, mut stop: watch::Receiver<bool>) {
+        let mut pause = self.game_pause.subscribe();
         loop {
             if *stop.borrow() {
                 return;
+            }
+            let paused = *pause.borrow_and_update();
+            if paused {
+                tokio::select! { _ = stop.changed() => return, _ = pause.changed() => {} }
+                continue;
             }
             let active = self.lock().settings.active();
             if !active {
                 self.report_inactive();
                 tokio::select! {
                     _ = stop.changed() => return,
+                    _ = pause.changed() => {},
                     () = self.kick.notified() => {}
                 }
                 continue;
             }
-            self.fetch_now().await;
+            tokio::select! {
+                _ = stop.changed() => return,
+                _ = pause.changed() => continue,
+                () = self.fetch_now() => {}
+            }
             let target = next_boundary(unix_now(), self.config.period_secs);
             loop {
                 let remaining = target.saturating_sub(unix_now());
@@ -390,6 +410,7 @@ impl WeatherService {
                 }
                 tokio::select! {
                     _ = stop.changed() => return,
+                    _ = pause.changed() => break,
                     () = self.kick.notified() => break,
                     () = tokio::time::sleep(Duration::from_secs(remaining.min(30))) => {}
                 }

@@ -9,6 +9,9 @@ use std::collections::BTreeMap;
 pub trait Clock {
     fn now_ms(&self) -> u64;
 }
+/// How long an approval notice stays up on its own (a blocking question outlives a toast);
+/// the waiting pulse and a later hover bring it back.
+const APPROVAL_NOTICE_MS: u64 = 45_000;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Timer {
     HoverDelay,
@@ -47,6 +50,11 @@ pub enum Intent {
     Quit,
     NotificationArrived(String),
     NotificationsSync(u32),
+    /// A Hermes approval/clarify request is waiting (its island prompt id): pop the hover
+    /// notice. It stays until answered, cleared or dismissed — no toast timer.
+    ApprovalShown(String),
+    /// That prompt went away (answered anywhere, settled, cancelled, terminal gone).
+    ApprovalCleared(String),
     TimerFired(Timer, u32),
     UpsertActivity(Activity),
     RemoveActivity(String),
@@ -376,6 +384,33 @@ impl Machine {
             Intent::RestartTerminal => effects.push(Effect::RestartTerminal),
             Intent::Quit => effects.push(Effect::Quit),
             Intent::NotificationsSync(unread) => self.state.unread = unread,
+            Intent::ApprovalShown(id) => {
+                // Like a toast, an approval never barges over DnD, a game or an open island;
+                // hovering the notch (or the waiting pulse) still reveals it.
+                if settings.approvals_in_notch && !self.state.dnd && !game {
+                    match self.state.mode {
+                        IslandMode::Still => {
+                            self.cancel_all();
+                            self.state.mode = IslandMode::Hover;
+                            self.state.hover_cause = Some(HoverCause::Alert { id });
+                            self.schedule(Timer::ToastTtl, APPROVAL_NOTICE_MS, now);
+                        }
+                        IslandMode::Hover if !self.pointer_inside && !self.panel_inside => {
+                            self.state.hover_cause = Some(HoverCause::Alert { id });
+                            self.schedule(Timer::ToastTtl, APPROVAL_NOTICE_MS, now);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Intent::ApprovalCleared(id) => {
+                if self.state.mode == IslandMode::Hover
+                    && self.state.hover_cause == Some(HoverCause::Alert { id })
+                {
+                    self.cancel_all();
+                    self.still();
+                }
+            }
             Intent::NotificationArrived(id) => {
                 // Repeated service polling is not a new event. Bound retention; a new
                 // notification id (including a new agent transition) can notify again.

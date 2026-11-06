@@ -16,6 +16,7 @@ pub mod pty;
 use crate::{
     contract::terminal::{TerminalEvent, TerminalSnapshot},
     error::IslandError,
+    services::approvals::{self, ApprovalService},
 };
 use flow::{Flow, DEFAULT_CREDIT_LIMIT, MAX_CHUNK};
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
@@ -142,6 +143,8 @@ struct SharedState {
     delivery: Mutex<()>,
     /// Hermes' busy/idle title marker, for the notch's "Hermes is working" pulse.
     activity: Mutex<activity::TitleActivity>,
+    /// Pending-approval tracker fed with the `⚠` title and the user's keystrokes.
+    approvals: std::sync::OnceLock<Arc<ApprovalService>>,
 }
 impl SharedState {
     fn activity(&self) -> MutexGuard<'_, activity::TitleActivity> {
@@ -187,6 +190,8 @@ struct Run {
     owned: Option<(u32, u64)>,
     cancel: Arc<AtomicBool>,
     wake: Option<Arc<OwnedFd>>,
+    /// This run's id in the approval tracker (`None` without a sidecar).
+    approval_run: Option<u64>,
 }
 
 pub struct Terminal {
@@ -253,9 +258,18 @@ impl Terminal {
                 state: Mutex::new(State::new(flow)),
                 delivery: Mutex::new(()),
                 activity: Mutex::new(activity::TitleActivity::default()),
+                approvals: std::sync::OnceLock::new(),
             }),
             run: Mutex::new(Run::default()),
         }
+    }
+
+    /// Mirror pending Hermes approvals: the child gets the sink URL and the tracker hears about
+    /// the `⚠` title and the user's typing.
+    pub fn with_approvals(self, approvals: Arc<ApprovalService>) -> Self {
+        // A fresh shared state has no value yet; ignoring the Err of a second call is correct.
+        let _ = self.shared.approvals.set(approvals);
+        self
     }
 
     /// Share the settings authority; read only when creating a new process, never restart on save.
@@ -364,6 +378,15 @@ impl Terminal {
     }
 
     pub fn input(&self, input: &str) -> Result<(), IslandError> {
+        // Typing is what makes a pending clarify unsafe to answer from the island.
+        let approval = self.run().ok().and_then(|run| run.approval_run);
+        if let (Some(id), Some(service)) = (approval, self.shared.approvals.get()) {
+            service.user_input(id, input);
+        }
+        self.write_input(input)
+    }
+
+    fn write_input(&self, input: &str) -> Result<(), IslandError> {
         let mut run = self.run()?;
         {
             let state = lock(&self.shared);
@@ -500,6 +523,17 @@ impl Terminal {
 
     fn spawn(&self, run: &mut Run) -> Result<TerminalSnapshot, IslandError> {
         let command = self.command()?;
+        // The sink URL goes to this child only; the guard retires the run on any early error.
+        let mut command = command;
+        let ticket = self.shared.approvals.get().and_then(|a| a.begin_run());
+        let mut approval_guard = ticket.as_ref().map(|t| {
+            command.env("HERMES_TUI_SIDECAR_URL", &t.url);
+            RunGuard {
+                service: self.shared.approvals.get().cloned(),
+                run: t.id,
+                armed: true,
+            }
+        });
         let pair = native_pty_system()
             .openpty(PtySize {
                 rows: 30,
@@ -539,7 +573,17 @@ impl Terminal {
             })
             .map(Arc::new);
         run.owned = pid.and_then(|p| process(p).map(|info| (p, info.birth)));
-
+        let approval: Option<(u64, Arc<ApprovalService>)> = ticket
+            .as_ref()
+            .zip(self.shared.approvals.get().cloned())
+            .map(|(t, service)| (t.id, service));
+        if let Some((run_id, service)) = &approval {
+            service.run_started(*run_id, pid);
+        }
+        run.approval_run = approval.as_ref().map(|(id, _)| *id);
+        if let Some(guard) = approval_guard.as_mut() {
+            guard.armed = false;
+        }
         // New run: fresh flow accounting, the attached client (if any) stays attached.
         let flow = Arc::new(Flow::new(self.cfg.credit_limit));
         let snapshot = {
@@ -566,10 +610,12 @@ impl Terminal {
             let wake = wake.clone();
             let leader = leader_fd.clone();
             let flow = flow.clone();
+            let approval = approval.clone();
             thread::spawn(move || {
                 let mut buffer = [0u8; 16384];
                 let mut pending = Vec::new();
                 shared.activity().reset();
+                let mut waiting = false;
                 while !cancel.load(Ordering::Acquire) {
                     // Credit: stop reading while too much is unacknowledged. Blocks on a
                     // condvar (no polling); woken by ack, re-attach, cancel and child exit.
@@ -581,7 +627,17 @@ impl Terminal {
                         Ok(0) => break,
                         Ok(n) => {
                             flow.read(n);
-                            shared.activity().output(&buffer[..n]);
+                            let now_waiting = {
+                                let mut activity = shared.activity();
+                                activity.output(&buffer[..n]);
+                                activity.waiting()
+                            };
+                            if now_waiting != waiting {
+                                waiting = now_waiting;
+                                if let Some((run_id, service)) = &approval {
+                                    service.title(*run_id, waiting);
+                                }
+                            }
                             pending.extend_from_slice(&buffer[..n]);
                             let text = decode(&mut pending, false);
                             publish(&shared, &text);
@@ -632,6 +688,10 @@ impl Terminal {
                 wait_ready(None, &wake, leader_fd.as_deref());
             };
             exited.store(true, Ordering::Release);
+            // Whatever the child asked can no longer be answered.
+            if let Some((run_id, service)) = &approval {
+                service.end_run(*run_id);
+            } 
             // The child is gone: the credit limit no longer applies, the reader drains what the
             // kernel still holds (bounded by the PTY buffer) and ends.
             flow.close();
@@ -672,6 +732,9 @@ impl Terminal {
     }
 
     fn release(&self, run: &mut Run) {
+        if let (Some(id), Some(service)) = (run.approval_run.take(), self.shared.approvals.get()) {
+            service.end_run(id);
+        }
         run.cancel.store(true, Ordering::Release);
         lock(&self.shared).flow.close();
         if let Some(wake) = &run.wake {
@@ -694,6 +757,33 @@ impl Terminal {
             }
         }
         run.wake.take();
+    }
+}
+
+impl approvals::TerminalKeys for Terminal {
+    fn pid(&self) -> Option<u32> {
+        Terminal::pid(self)
+    }
+
+    /// The island's own keystroke (a quick-pick digit): written like input but never counted
+    /// as the user typing.
+    fn send_key(&self, key: &str) -> Result<(), IslandError> {
+        self.write_input(key)
+    }
+}
+
+/// Retires an approval run when `spawn` fails before the child exists.
+struct RunGuard {
+    service: Option<Arc<ApprovalService>>,
+    run: u64,
+    armed: bool,
+}
+
+impl Drop for RunGuard {
+    fn drop(&mut self) {
+        if let (true, Some(service)) = (self.armed, &self.service) {
+            service.end_run(self.run);
+        }
     }
 }
 

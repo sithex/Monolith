@@ -2,6 +2,7 @@
 //! tests run against scratch dirs and a scratch `HOME`.
 
 pub mod ai_usage;
+pub mod approvals;
 pub mod autostart;
 pub mod frontend;
 pub mod palette;
@@ -114,6 +115,8 @@ pub struct Services {
     pub ai: Arc<ai_usage::AiUsageService>,
     pub stats: Arc<stats::StatsService>,
     pub terminal: Arc<terminal::Terminal>,
+    /// Mirrors Hermes' pending approval/clarify prompts (HERMES_TUI_SIDECAR_URL sink).
+    pub approvals: Arc<approvals::ApprovalService>,
     pub settings_topic: Arc<Latest<Settings>>,
     pub palette_topic: Arc<Latest<Palette>>,
     pub test_hooks: Mutex<Option<Arc<TestHooks>>>,
@@ -137,6 +140,15 @@ impl Services {
             cfg.data_dir.clone(),
             autostart,
         ));
+        let approvals = approvals::ApprovalService::new({
+            let settings = settings.clone();
+            Arc::new(move || {
+                settings
+                    .get()
+                    .map(|s| s.approvals_in_notch)
+                    .unwrap_or(false)
+            })
+        });
         Self {
             runtime: RuntimeInfo {
                 overlay: cfg.overlay,
@@ -158,14 +170,18 @@ impl Services {
                 cfg.home.clone(),
             )),
             stats: Arc::new(stats::StatsService::new(cfg.home.clone())),
-            terminal: Arc::new(terminal::Terminal::with_settings(
-                terminal::TerminalConfig::new(
-                    cfg.repo_root.clone(),
-                    cfg.home.clone(),
-                    cfg.fixture_pty,
-                ),
-                settings,
-            )),
+            terminal: Arc::new(
+                terminal::Terminal::with_settings(
+                    terminal::TerminalConfig::new(
+                        cfg.repo_root.clone(),
+                        cfg.home.clone(),
+                        cfg.fixture_pty,
+                    ),
+                    settings,
+                )
+                .with_approvals(approvals.clone()),
+            ),
+            approvals,
             settings_topic: Arc::new(Latest::new()),
             palette_topic: Arc::new(Latest::new()),
             test_hooks: Mutex::new(None),

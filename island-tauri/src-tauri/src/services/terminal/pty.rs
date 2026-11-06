@@ -61,6 +61,8 @@ pub fn scrub_key(key: &str) -> bool {
             | "HERMES_TUI_QUERY"
             | "HERMES_TUI_IMAGE"
             | "HERMES_TUI_RESUME"
+            // The island hands its own sink to its own child only (`Terminal::command`).
+            | "HERMES_TUI_SIDECAR_URL"
     ) || key.starts_with("KITTY_")
         || key.starts_with("HERMES_BOOT_")
         || key.starts_with("HERMES_SESSION_")

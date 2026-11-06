@@ -31,6 +31,8 @@ const COMMANDS: &[&str] = &[
     "ai_connect",
     "voice_command",
     "voice_panel",
+    "approval_get",
+    "approval_answer",
     "notifications_list",
     "notifications_dismiss",
     "notifications_clear",

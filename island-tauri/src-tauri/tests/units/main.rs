@@ -27,6 +27,7 @@ mod mixer_core_mixer_tests;
 mod mpris_core_fuzz;
 mod mpris_core_parse;
 mod mpris_core_players;
+mod approval_actor;
 mod notification_actor;
 mod notification_core_dbus;
 mod notification_core_edges;

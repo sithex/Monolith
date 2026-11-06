@@ -30,6 +30,8 @@ permissions = [
   "allow-ai-connect",
   "allow-voice-command",
   "allow-voice-panel",
+  "allow-approval-get",
+  "allow-approval-answer",
   "allow-notifications-list",
   "allow-notifications-dismiss",
   "allow-notifications-clear",

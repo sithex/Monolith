@@ -88,6 +88,13 @@ export const commands = {
 	voiceCommand: (op: VoiceOp) => typedError<VoiceStatus, IslandError>(__TAURI_INVOKE("voice_command", { op })),
 	/**  Hermes page voice picker + TTS mute (optional helpers; missing ones report unavailable). */
 	voicePanel: (op: VoicePanelOp) => typedError<VoicePanel, IslandError>(__TAURI_INVOKE("voice_panel", { op })),
+	/**  The prompt to show right now (the page also hears every change as `ApprovalChanged`). */
+	approvalGet: () => typedError<ApprovalChanged, IslandError>(__TAURI_INVOKE("approval_get")),
+	/**
+	 *  Answer the prompt the page saw. The prompt id must still be the pending one; every guard
+	 *  is re-checked in the service before the quick-pick digit is typed into the PTY.
+	 */
+	approvalAnswer: (answer: ApprovalAnswer) => typedError<ApprovalChanged, IslandError>(__TAURI_INVOKE("approval_answer", { answer })),
 	notificationsList: () => typedError<IslandNotification[], IslandError>(__TAURI_INVOKE("notifications_list")),
 	notificationsDismiss: (id: string) => typedError<null, IslandError>(__TAURI_INVOKE("notifications_dismiss", { id })),
 	notificationsClear: () => typedError<null, IslandError>(__TAURI_INVOKE("notifications_clear")),
@@ -149,6 +156,7 @@ export const commands = {
 export const events = {
 	agentsChanged: makeEvent<AgentsChanged, AgentsChanged>("agents-changed"),
 	anchorSignal: makeEvent<AnchorSignal, AnchorSignal>("anchor-signal"),
+	approvalChanged: makeEvent<ApprovalChanged, ApprovalChanged>("approval-changed"),
 	bluetoothChanged: makeEvent<BluetoothChanged, BluetoothChanged>("bluetooth-changed"),
 	brightnessChanged: makeEvent<BrightnessChanged, BrightnessChanged>("brightness-changed"),
 	calendarChanged: makeEvent<CalendarChanged, CalendarChanged>("calendar-changed"),
@@ -263,6 +271,55 @@ export type Appearance = "skin" | "neutral" | "ocean" | "dune" | "dusk" | "silk"
 /**  Accent and tint taken from the playing track's artwork (Nov 5); falls back to Skin. */
 "album";
 
+export type ApprovalAnswer = {
+	promptId: string,
+	choice: string,
+};
+
+/**  Latest-value topic: `rev` wraps, consumers keep the newest. */
+export type ApprovalChanged = {
+	rev: number,
+	prompt: ApprovalPrompt | null,
+	/**
+	 *  The terminal title says Hermes waits, but no structured request is known
+	 *  (a sudo/secret prompt, or a TUI that is not mirroring): read-only "open terminal".
+	 */
+	waitingUnknown: boolean,
+};
+
+export type ApprovalChoiceView = {
+	/**  What `approval_answer` takes back: `once|session|always|deny`, or `1`..`9` for clarify. */
+	id: string,
+	label: string,
+	style: ChoiceStyle,
+};
+
+export type ApprovalKind = 
+/**  A dangerous command waiting for once / session / always / deny. */
+"approval" | 
+/**  A clarify question with a short list of choices. */
+"clarify";
+
+export type ApprovalPrompt = {
+	/**  The island's id for this prompt; an answer must carry the id it saw. */
+	id: string,
+	kind: ApprovalKind,
+	/**  The command (approval) or the question (clarify), control characters replaced. */
+	text: string,
+	/**  The text was cut at the display limit, so it cannot be reviewed here. */
+	textTruncated: boolean,
+	description: string,
+	choices: ApprovalChoiceView[],
+	/**  Buttons may be pressed right now. */
+	answerable: boolean,
+	/**  An answer was already sent from the island; waiting for Hermes to settle it. */
+	answered: boolean,
+	/**  Why the buttons are off (shown instead of them), when `answerable` is false. */
+	note: string | null,
+	/**  Further requests queued behind this one. */
+	more: number,
+};
+
 export type AppsSnapshot = {
 	timer: TimerChanged | null,
 	scratchpad: ScratchpadChanged | null,
@@ -358,6 +415,9 @@ export type CalendarQuery = {
 };
 
 export type CalendarSource = "local" | "subscription";
+
+/**  Look of a choice button. `Option` is a clarify choice. */
+export type ChoiceStyle = "once" | "session" | "always" | "deny" | "option";
 
 export type ClipContent = { type: "text"; text: string } | { type: "image"; pngDataUrl: string; width: number; height: number } | { type: "files"; uris: string[] };
 

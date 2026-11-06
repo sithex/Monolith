@@ -4,6 +4,7 @@
 
 pub mod ai;
 pub mod apps;
+pub mod approvals;
 pub mod clipboard;
 pub mod controls;
 pub mod frontend;

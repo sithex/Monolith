@@ -8,6 +8,7 @@ import { Topline } from './Topline';
 import { ViewPager } from './ViewPager';
 import { Launcher, viewLabels } from './Launcher';
 import { SideControls } from './SideControls';
+import { CommandPalette } from './CommandPalette';
 import { VoiceControls } from './VoiceControls';
 import { ColorPickerPanel } from './components/ColorField';
 import { AppsView as AppsViewInner } from '../views/AppsView';
@@ -140,6 +141,7 @@ export function Island() {
     if ((event.target as HTMLElement).closest('button:not(:disabled)')) playClick(settings.clickSounds);
   }}><IslandSurface fail={fail}>
     <Topline fail={fail} />
+    <CommandPalette fail={fail} />
     <AnimatePresence>{state.mode === 'hover' && <motion.div key="preview" className="preview island-content" {...reveal}
       exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.9, y: -10, transition: { duration: 0.14, ease: [0.5, 0, 0.9, 0.4] } }}
       style={{ position: 'absolute', top: 42, left: 0, right: 0 }}><PreviewNotice fail={fail} /></motion.div>}</AnimatePresence>

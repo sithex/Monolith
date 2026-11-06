@@ -44,6 +44,8 @@ pub const COMPONENT: &str = "hermes-island";
 pub const COMPONENT_FRIENDLY: &str = "Hermes Island";
 pub const ACTION: &str = "toggle-island";
 pub const ACTION_FRIENDLY: &str = "Toggle Hermes Island";
+pub const PALETTE_ACTION: &str = "command-palette";
+const PALETTE_FRIENDLY: &str = "Command palette";
 /// KGlobalAccel `SetShortcutFlag`s.
 const SET_PRESENT: u32 = 2;
 const NO_AUTOLOADING: u32 = 4;
@@ -55,6 +57,7 @@ pub enum Event {
     Fullscreen(bool),
     /// The global shortcut was pressed.
     Toggle,
+    Palette,
 }
 
 /// The two settings the worker follows.
@@ -62,6 +65,7 @@ pub enum Event {
 pub struct Desired {
     pub auto: bool,
     pub shortcut: String,
+    pub palette_shortcut: String,
 }
 
 impl Desired {
@@ -69,6 +73,7 @@ impl Desired {
         Self {
             auto: s.game_mode_auto,
             shortcut: s.open_shortcut.clone(),
+            palette_shortcut: s.palette_shortcut.clone(),
         }
     }
 }
@@ -115,6 +120,7 @@ pub enum Action {
     /// Clear the fullscreen flag (detection unavailable or switched off).
     ClearFullscreen,
     ApplyShortcut(String),
+    ApplyPaletteShortcut(String),
 }
 
 #[derive(Clone, Debug)]
@@ -124,8 +130,9 @@ pub struct Plan {
     accel: Option<String>,
     want: Desired,
     script: Script,
-    /// The shortcut text last applied to the current KGlobalAccel incarnation.
+    /// The shortcut texts last applied to the current KGlobalAccel incarnation.
     applied: Option<String>,
+    applied_palette: Option<String>,
 }
 
 impl Plan {
@@ -136,6 +143,7 @@ impl Plan {
             want,
             script: Script::Absent,
             applied: None,
+            applied_palette: None,
         }
     }
     pub fn settings(&mut self, want: Desired) -> Vec<Action> {
@@ -168,6 +176,7 @@ impl Plan {
         }
         self.accel = owner;
         self.applied = None;
+        self.applied_palette = None;
         self.reconcile()
     }
     pub fn script_done(&mut self, ok: bool) -> Vec<Action> {
@@ -209,6 +218,14 @@ impl Plan {
         if self.accel.is_some() && self.applied.as_deref() != Some(self.want.shortcut.as_str()) {
             self.applied = Some(self.want.shortcut.clone());
             out.push(Action::ApplyShortcut(self.want.shortcut.clone()));
+        }
+        if self.accel.is_some()
+            && self.applied_palette.as_deref() != Some(self.want.palette_shortcut.as_str())
+        {
+            self.applied_palette = Some(self.want.palette_shortcut.clone());
+            out.push(Action::ApplyPaletteShortcut(
+                self.want.palette_shortcut.clone(),
+            ));
         }
         out
     }
@@ -310,8 +327,17 @@ async fn load_script(conn: &Connection, dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn action_id() -> Vec<&'static str> {
-    vec![COMPONENT, ACTION, COMPONENT_FRIENDLY, ACTION_FRIENDLY]
+fn action_id(action: &'static str) -> Vec<&'static str> {
+    vec![
+        COMPONENT,
+        action,
+        COMPONENT_FRIENDLY,
+        if action == PALETTE_ACTION {
+            PALETTE_FRIENDLY
+        } else {
+            ACTION_FRIENDLY
+        },
+    ]
 }
 
 type Keys = Vec<(Vec<i32>,)>;
@@ -350,7 +376,7 @@ async fn owners(conn: &Connection, code: i32) -> Vec<String> {
 }
 
 /// Registers `text` for the island action without ever taking another component's key.
-async fn apply_shortcut(conn: &Connection, text: &str) -> ShortcutStatus {
+async fn apply_shortcut(conn: &Connection, text: &str, action: &'static str) -> ShortcutStatus {
     let code = match keyseq::parse(text) {
         Ok(Some(code)) => code,
         Ok(None) => {
@@ -360,7 +386,7 @@ async fn apply_shortcut(conn: &Connection, text: &str) -> ShortcutStatus {
                 ACCEL_PATH,
                 ACCEL_IFACE,
                 "unregister",
-                &(COMPONENT, ACTION),
+                &(COMPONENT, action),
             )
             .await;
             return match result {
@@ -370,7 +396,7 @@ async fn apply_shortcut(conn: &Connection, text: &str) -> ShortcutStatus {
         }
         Err(e) => return ShortcutStatus::Failed(format!("{text}: {e}")),
     };
-    let id = action_id();
+    let id = action_id(action);
     let run = async {
         let () =
             dbus_util::call(conn, ACCEL, ACCEL_PATH, ACCEL_IFACE, "doRegister", &(&id,)).await?;
@@ -581,16 +607,21 @@ impl Worker {
         if plan.script_loaded() {
             let _ = unload_script(&self.conn).await;
         }
-        if self.accel.is_some() && !plan.want.shortcut.is_empty() {
-            let _: Result<(), _> = dbus_util::call(
-                &self.conn,
-                ACCEL,
-                ACCEL_PATH,
-                ACCEL_IFACE,
-                "setInactive",
-                &(action_id(),),
-            )
-            .await;
+        for (action, text) in [
+            (ACTION, &plan.want.shortcut),
+            (PALETTE_ACTION, &plan.want.palette_shortcut),
+        ] {
+            if self.accel.is_some() && !text.is_empty() {
+                let _: Result<(), _> = dbus_util::call(
+                    &self.conn,
+                    ACCEL,
+                    ACCEL_PATH,
+                    ACCEL_IFACE,
+                    "setInactive",
+                    &(action_id(action),),
+                )
+                .await;
+            }
         }
     }
 
@@ -602,8 +633,12 @@ impl Worker {
             return;
         }
         if let Ok((component, action, _ts)) = msg.body().deserialize::<(String, String, i64)>() {
-            if component == COMPONENT && action == ACTION {
-                (self.sink)(Event::Toggle);
+            if component == COMPONENT {
+                match action.as_str() {
+                    ACTION => (self.sink)(Event::Toggle),
+                    PALETTE_ACTION => (self.sink)(Event::Palette),
+                    _ => {}
+                }
             }
         }
     }
@@ -633,8 +668,12 @@ impl Worker {
                         }
                         todo.extend(plan.script_done(result.is_ok()));
                     }
+                    Action::ApplyPaletteShortcut(text) => {
+                        let status = apply_shortcut(&self.conn, &text, PALETTE_ACTION).await;
+                        tracing::info!(?status, "Command palette shortcut registration");
+                    }
                     Action::ApplyShortcut(text) => {
-                        let status = apply_shortcut(&self.conn, &text).await;
+                        let status = apply_shortcut(&self.conn, &text, ACTION).await;
                         if self.last_shortcut_log.as_ref() != Some(&status) {
                             match &status {
                                 ShortcutStatus::Bound(key) => {
@@ -703,11 +742,28 @@ pub fn start_for_app(app: &tauri::AppHandle) {
         }
     });
     let actor = app.state::<IslandActor>().handle.clone();
+    let palette_app = app.clone();
     let sink: Arc<dyn Fn(Event) + Send + Sync> = Arc::new(move |event| {
+        if event == Event::Palette {
+            let (actor, app) = (actor.clone(), palette_app.clone());
+            tauri::async_runtime::spawn(async move {
+                use tauri::Emitter;
+                if let Err(error) = actor.dispatch(Intent::Pin).await {
+                    tracing::warn!(%error, "Palette open refused");
+                    return;
+                }
+                if let Some(window) = app.get_webview_window(crate::window::ISLAND_LABEL) {
+                    if let Err(error) = window.emit("island-command-palette", ()) {
+                        tracing::warn!(%error, "Palette event refused");
+                    }
+                }
+            });
+            return;
+        }
         let intent = match event {
             Event::Fullscreen(on) => Intent::Fullscreen(on),
-            // Exactly what a click on the notch dispatches.
             Event::Toggle => Intent::PanelPin,
+            Event::Palette => return,
         };
         if let Err(error) = actor.try_dispatch(intent) {
             tracing::warn!(%error, "State actor refused a game mode event");
@@ -756,6 +812,7 @@ mod tests {
         Desired {
             auto,
             shortcut: key.into(),
+            palette_shortcut: String::new(),
         }
     }
 
@@ -766,7 +823,13 @@ mod tests {
         assert_eq!(p.kwin(None), vec![Action::ClearFullscreen]);
         assert_eq!(p.kwin(up(KW)), vec![Action::LoadScript]);
         // Any other input while the load is in flight does not request a second load.
-        assert_eq!(p.accel(up(AC)), vec![Action::ApplyShortcut(String::new())]);
+        assert_eq!(
+            p.accel(up(AC)),
+            vec![
+                Action::ApplyShortcut(String::new()),
+                Action::ApplyPaletteShortcut(String::new())
+            ]
+        );
         // Failure: cleared, logged by the worker, and no automatic retry.
         assert_eq!(p.script_done(false), vec![Action::ClearFullscreen]);
         assert_eq!(p.settings(want(true, "")), vec![]);
@@ -815,7 +878,10 @@ mod tests {
         assert_eq!(p.accel(None), vec![]);
         assert_eq!(
             p.accel(up(AC)),
-            vec![Action::ApplyShortcut("Meta+`".into())]
+            vec![
+                Action::ApplyShortcut("Meta+`".into()),
+                Action::ApplyPaletteShortcut(String::new())
+            ]
         );
         assert_eq!(p.accel(up(AC)), vec![], "same owner: nothing to redo");
         assert_eq!(p.settings(want(false, "Meta+`")), vec![]);
@@ -830,7 +896,48 @@ mod tests {
         // Not re-applied while KGlobalAccel is gone; re-applied once it is back.
         p.accel(None);
         assert_eq!(p.settings(want(false, "F9")), vec![]);
-        assert_eq!(p.accel(up(AC)), vec![Action::ApplyShortcut("F9".into())]);
+        assert_eq!(
+            p.accel(up(AC)),
+            vec![
+                Action::ApplyShortcut("F9".into()),
+                Action::ApplyPaletteShortcut(String::new())
+            ]
+        );
+    }
+
+    #[test]
+    fn palette_binding_is_independent_unbound_by_default_and_reapplied_on_owner_restart() {
+        let mut p = Plan::new(Desired::default());
+        assert!(p.accel(None).is_empty());
+        assert_eq!(
+            p.accel(up(AC)),
+            vec![
+                Action::ApplyShortcut(String::new()),
+                Action::ApplyPaletteShortcut(String::new())
+            ]
+        );
+        let mut desired = Desired {
+            palette_shortcut: "Ctrl+Alt+P".into(),
+            ..Desired::default()
+        };
+        assert_eq!(
+            p.settings(desired.clone()),
+            vec![Action::ApplyPaletteShortcut("Ctrl+Alt+P".into())]
+        );
+        assert!(p.settings(desired.clone()).is_empty());
+        p.accel(None);
+        assert_eq!(
+            p.accel(up(":1.7")),
+            vec![
+                Action::ApplyShortcut(String::new()),
+                Action::ApplyPaletteShortcut("Ctrl+Alt+P".into())
+            ]
+        );
+        desired.palette_shortcut.clear();
+        assert_eq!(
+            p.settings(desired),
+            vec![Action::ApplyPaletteShortcut(String::new())]
+        );
     }
 
     #[test]

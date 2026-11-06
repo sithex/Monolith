@@ -17,6 +17,7 @@ pub mod state;
 mod status_temps;
 pub mod testhooks;
 pub mod tray;
+pub mod ui_assets;
 pub mod window;
 
 use anyhow::Context;
@@ -169,7 +170,7 @@ fn prepare_identity() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_app(cli: cli::Cli) -> anyhow::Result<()> {
+fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
     use std::sync::Arc;
     use tauri::Manager;
     let repo_root = paths::repo_root();
@@ -288,7 +289,16 @@ fn run_app(cli: cli::Cli) -> anyhow::Result<()> {
             }
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build({
+            let mut context = tauri::generate_context!();
+            let env = std::env::var(ui_assets::FORCE_EMBEDDED_ENV).ok();
+            ui_assets::install(
+                &mut context,
+                &paths::repo_root(),
+                ui_assets::forced_reason(force_embedded_ui, env.as_deref()),
+            );
+            context
+        })
         .context("tauri runtime failed")?;
     app.run(|handle, event| {
         // Kill the PTY's owned process tree, stop watchers and remove the test socket.
@@ -342,6 +352,13 @@ fn run_app(cli: cli::Cli) -> anyhow::Result<()> {
 }
 
 pub fn run() -> ExitCode {
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    // `scripts/deploy-ui.sh` asks a binary which UI contract it was built with.
+    if args == [ui_assets::PRINT_CONTRACT_FLAG] {
+        println!("{}", ui_assets::contract_hash());
+        return ExitCode::SUCCESS;
+    }
+    let force_embedded_ui = ui_assets::take_force_flag(&mut args);
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -349,7 +366,6 @@ pub fn run() -> ExitCode {
         )
         .with_writer(std::io::stderr)
         .init();
-    let args: Vec<String> = std::env::args().skip(1).collect();
     if let Some(request) = cli_notify::parse(&args) {
         return match request.and_then(cli_notify::send) {
             Ok(reply) => {
@@ -369,7 +385,7 @@ pub fn run() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    match run_app(cli) {
+    match run_app(cli, force_embedded_ui) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("hermes-island: {error:#}");

@@ -9,9 +9,8 @@ mod gui_stack;
 mod host;
 use common::*;
 use gui_stack::Stack;
-use hermes_island_lib::contract::island::IslandMode;
 use host::*;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::{fs, path::Path, process::Command, thread::sleep, time::Duration};
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{ConnectionExt, CreateWindowAux, EventMask, WindowClass};
@@ -44,7 +43,8 @@ fn send(s: &Stack, title: &str) {
 }
 fn screenshot(s: &Stack, conn: &x11rb::rust_connection::RustConnection, window: u32) {
     let evidence = Evidence::new("phase4");
-    Shot::grab(conn, window, WIN_W, WIN_H).save_png(&evidence.path("toast-still-argb.png"));
+    Shot::grab(conn, window, overlay_size().0, overlay_size().1)
+        .save_png(&evidence.path("toast-still-argb.png"));
     let raw = s.root.join("capture.raw");
     let result = Command::new("/usr/bin/python3")
         .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/helpers/kwin_capture.py"))
@@ -123,52 +123,107 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     .unwrap();
     conn.map_window(underlay).unwrap().check().unwrap();
     conn.flush().unwrap();
-    let mut app = launch(&s);
+    let mut app = launch_ui(&s, "island");
     let pid = app.0.id();
     let window = wait_for("phase4 window", Duration::from_secs(30), || {
-        find_island_window(&conn, root, pid)
+        find_window_sized(&conn, root, pid, overlay_size())
     });
     wait_for("test-control", Duration::from_secs(20), || {
         s.root.join("inst/test-control.sock").exists().then_some(())
     });
-    wait_for("legacy page", Duration::from_secs(20), || {
-        (eval(&s, "!!document.querySelector('[data-state]')") == true).then_some(())
+    // Notifications are popup cards in the Island renderer (NotificationCards.tsx): they have
+    // their own lifetime and never move the island into a hover preview.
+    wait_for("island page", Duration::from_secs(20), || {
+        (eval(&s, "!!document.querySelector('.island')") == true).then_some(())
     });
+    let origin = {
+        let p = conn
+            .translate_coordinates(window, root, 0, 0)
+            .unwrap()
+            .reply()
+            .unwrap();
+        (i32::from(p.dst_x), i32::from(p.dst_y))
+    };
+    let card = "document.querySelector('[data-testid=notification-toast]')";
+    let card_text = |needle: &str| {
+        eval(
+            &s,
+            &format!("{card}?.textContent.includes({})===true", json!(needle)),
+        ) == true
+    };
+    let covers_card = || {
+        let r = eval(
+            &s,
+            &format!("(()=>{{const r={card}.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()"),
+        );
+        let (x, y) = (r[0].as_f64().unwrap() as i32, r[1].as_f64().unwrap() as i32);
+        input_region(&conn, window).iter().any(|row| {
+            (row.y as i32..row.y as i32 + row.height as i32).contains(&y)
+                && (row.x as i32..row.x as i32 + row.width as i32).contains(&x)
+        })
+    };
     let mut eis = Wheel::new(&s);
     eis.move_to(100, 900);
     sleep(Duration::from_millis(1600));
     assert_eq!(actor_state(&s)["mode"], "still");
-    eval(&s, "window.island.setSettings({toastTtlMs:1500})");
-    eval(&s,"(()=>{window.__mouse=[];for(const t of ['mouseover','mouseout','mouseenter','mouseleave'])document.addEventListener(t,e=>window.__mouse.push(t+'@'+e.clientX+','+e.clientY+'/'+(e.target.className||e.target.tagName)),true);return true})()");
+    // The collapsed island's own input region (native notch) is the baseline: cards add to it
+    // while visible and must leave exactly this behind.
+    let idle = input_region(&conn, window);
+    eval(
+        &s,
+        "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{toastTtlMs:1500}})",
+    );
     send(&s, "Auto-dismiss fixture");
-    wait_mode(&s, &conn, window, "preview", IslandMode::Hover);
-    wait_for("visible real toast", Duration::from_secs(5), || {
-        (eval(&s,"document.querySelector('[data-testid=notification-toast]')?.textContent.includes('Auto-dismiss fixture')")==true).then_some(())
+    wait_for("visible real card", Duration::from_secs(8), || {
+        (card_text("Auto-dismiss fixture") && covers_card()).then_some(())
     });
+    // Collapsed island: the card is shown and clickable, the island itself stays still.
+    assert_eq!(actor_state(&s)["mode"], "still");
+    assert_eq!(actor_state(&s)["hoverCause"], Value::Null);
     assert_not_focused_on_show(&conn, root, window);
-    wait_mode(&s, &conn, window, "idle", IslandMode::Still);
-    assert!(input_region(&conn, window).is_empty());
-    eval(&s, "window.island.setSettings({toastTtlMs:6000})");
+    wait_for(
+        "card auto-dismisses after its TTL",
+        Duration::from_secs(8),
+        || (eval(&s, &format!("!{card}")) == true).then_some(()),
+    );
+    wait_for("card input region released", Duration::from_secs(5), || {
+        (input_region(&conn, window) == idle).then_some(())
+    });
+    assert_eq!(actor_state(&s)["mode"], "still");
+    eval(
+        &s,
+        "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{toastTtlMs:6000}})",
+    );
     send(&s, "Build finished");
-    wait_mode(&s, &conn, window, "preview", IslandMode::Hover);
+    wait_for("second card", Duration::from_secs(8), || {
+        (card_text("Build finished") && covers_card()).then_some(())
+    });
     sleep(Duration::from_millis(1700));
     screenshot(&s, &conn, window);
-    let pos=eval(&s,"(()=>{const r=document.querySelector('[data-testid=notification-toast]').getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()");
+    let pos = eval(&s, &format!("(()=>{{const r={card}.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()"));
     eis.move_to(
-        210 + pos[0].as_f64().unwrap() as i32,
-        44 + pos[1].as_f64().unwrap() as i32,
+        origin.0 + pos[0].as_f64().unwrap() as i32,
+        origin.1 + pos[1].as_f64().unwrap() as i32,
     );
-    wait_for("pointer reads toast", Duration::from_secs(5), || {
-        (actor_state(&s)["hoverCause"]["type"] == "pointer").then_some(())
+    wait_for("pointer reads card", Duration::from_secs(5), || {
+        (eval(&s, "window.__TAURI_INTERNALS__.invoke('notification_popup',{op:{type:'list'}}).then(p=>p.items[0]?.paused===true)") == true).then_some(())
     });
     sleep(Duration::from_millis(6200));
-    assert_eq!(
-        actor_state(&s)["mode"],
-        "hover",
-        "PointerEnter did not cancel toast TTL"
+    assert!(
+        card_text("Build finished"),
+        "hovering the card did not pause its TTL"
     );
     eis.move_to(100, 900);
-    wait_mode(&s, &conn, window, "idle", IslandMode::Still);
+    wait_for(
+        "card expires after the pointer leaves",
+        Duration::from_secs(10),
+        || (eval(&s, &format!("!{card}")) == true).then_some(()),
+    );
+    wait_for(
+        "card input region released again",
+        Duration::from_secs(5),
+        || (input_region(&conn, window) == idle).then_some(()),
+    );
     eval(
         &s,
         "window.__TAURI_INTERNALS__.invoke('island_dispatch',{intent:{type:'setDnd',on:true}})",
@@ -176,7 +231,12 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     send(&s, "Stored silently");
     sleep(Duration::from_millis(1800));
     assert_eq!(actor_state(&s)["mode"], "still");
-    assert!(input_region(&conn, window).is_empty());
+    assert_eq!(
+        eval(&s, &format!("!{card}")),
+        true,
+        "DND must not draw a card"
+    );
+    assert_eq!(input_region(&conn, window), idle);
     let list = eval(
         &s,
         "window.__TAURI_INTERNALS__.invoke('notifications_list')",

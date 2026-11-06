@@ -60,7 +60,6 @@ fn click(s: &Stack, e: &mut Wheel, origin: (i32, i32), selector: &str) {
     );
 }
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn anchor_client_complete_status_embedded_island_and_sigterm_use_real_eis() {
     let mut s = Stack::new("9a-release");
     prepare(&s);

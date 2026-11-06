@@ -29,8 +29,8 @@ own_procs() { # private compositors/servers started by these tests (never the li
 status=0
 for suite in "$@"; do
     echo "=== $suite $(date +%T)"
-    "${low[@]}" cargo test --locked --test "$suite" -- --include-ignored \
-        --skip clipboard_source_helper --test-threads=1 ${GUI_TEST_ARGS:-} \
+    "${low[@]}" cargo test --locked --test "$suite" -- \
+        --test-threads=1 ${GUI_TEST_ARGS:-} \
         >"$logs/$suite.log" 2>&1
     rc=$?
     grep -E '^test |^test result:' "$logs/$suite.log" | grep -v '^test result: ok. 0 passed'

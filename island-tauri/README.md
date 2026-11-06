@@ -49,57 +49,62 @@ nice -n 15 ionice -c3 cargo test --locked --offline --no-fail-fast
 ```
 
 Build the UI first: Tauri embeds `dist/` even for tests. The runner config loader avoids
-writing Vite's config bundle through a shared `node_modules` symlink. The default Rust
-suite does not launch GUI windows. It still exercises real private Unix/TCP sockets,
-D-Bus mock servers and PTYs, so it needs an environment that permits those local
-operations. A sandbox denying socket creation with `EPERM` cannot run that coverage;
-those tests remain enabled.
+writing Vite's config bundle through a shared `node_modules` symlink.
 
-The window/clipboard/notification acceptance tests below are explicitly ignored because
-they launch actual KWin/Xwayland or Xvfb plus WebKit. KWin fixtures deliberately clear
-inherited display and bus variables and create a virtual compositor, private D-Bus,
-HOME and data directories. They do not connect to the live desktop selection. A live
-session variable alone cannot fix a missing tool, blocked socket or graphics backend.
-Prerequisites include `kwin_wayland`, `Xwayland`, `Xvfb`, `xfwm4`, `dbus-daemon`, Python
-GObject bindings, and the capture/input helper dependencies used by the fixtures.
+Two kinds of test binary live under `src-tauri/`:
 
-Run one suite from `src-tauri/`, in a local shell that allows compositor and socket access:
+- Pure and service tests (`--lib`, `--test units`, `--test services`): real private
+  Unix/TCP sockets, D-Bus mock servers and PTYs, no windows. This is the quick gate for
+  most changes: `cargo test --locked --lib --test units --test services` (about 20 s once
+  built). A sandbox denying socket creation with `EPERM` cannot run it.
+- Private-compositor GUI suites (`tests/kwin_*.rs`, `notification_monitor.rs`,
+  `xvfb_shape.rs`): they start a nested `kwin_wayland --virtual` + Xwayland (or Xvfb +
+  xfwm4), a private D-Bus, HOME and data directories, and drive the real app with
+  virtual input and screenshots. The fixtures clear the inherited display, bus and HOME,
+  so they never touch the live desktop; no `WAYLAND_DISPLAY`/`DISPLAY` is needed. They are
+  ordinary tests (not `#[ignore]`d), so a bare `cargo test` runs them (about 11 minutes)
+  and they fail closed when `kwin_wayland`, `Xwayland`, `Xvfb`, `xfwm4`, `dbus-daemon`,
+  Python GObject bindings or the capture/input helpers are missing.
 
-```sh
-WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 nice -n 15 ionice -c3 cargo test --locked --offline --test kwin_phase4_tray -- --ignored --test-threads=1
-```
-
-Run every GUI suite serially (the clipboard subprocess helper is invoked only by its parent):
+Run the GUI suites one binary at a time, at low priority, with a check that no compositor
+survives them:
 
 ```sh
-for source in tests/kwin_*.rs tests/notification_monitor.rs tests/xvfb_shape.rs; do
-  suite=${source##*/}
-  WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 nice -n 15 ionice -c3 cargo test --locked --offline --test "${suite%.rs}" -- --ignored --skip clipboard_source_helper --test-threads=1 || break
-done
+scripts/run-gui-tests.sh [LOG_DIR] [suite ...]   # no suite = all of them, logs in LOG_DIR
+GUI_TEST_ARGS="launcher_apps_layout" scripts/run-gui-tests.sh /tmp/logs kwin_phase7b_launcher
 ```
 
-Use the display names from your own session. Do not run an unfiltered `--ignored` across
-all targets: it also includes binding generation and subprocess-only helpers. Pure
-notification decoder and spike image-analysis tests remain in the default suite.
+Or by hand from `src-tauri/`: `nice -n 15 cargo test --locked --test kwin_phase4_tray -- --test-threads=1`.
+Each suite serialises its own tests; do not run two GUI binaries at once (they share the
+machine-wide X socket directory and are timing-sensitive). Leave the GUI binaries out with
+`cargo test --locked --lib --test units --test services`.
 
-Ignored GUI test inventory (names are Rust test filters):
+Still `#[ignore]`d on purpose: `clipboard_source_helper` (a subprocess fixture run by its
+parent test; it fails when run directly), `real_lrclib_smoke` and the Open-Meteo smoke test
+(they contact real servers; run by hand with `-- --ignored`) and `export_bindings`.
 
-| Target | Ignored GUI tests |
+GUI test inventory (names are Rust test filters):
+
+| Target | GUI tests |
 |---|---|
-| `kwin_gui` | `kwin_gui_preview`<br>`kwin_gui_overlay` |
+| `kwin_gui` | `kwin_gui_preview`, `kwin_gui_overlay` |
 | `kwin_phase3_actor` | `actor_owns_hover_tabs_focus_cues_and_geometry` |
 | `kwin_phase3_host` | `native_anchor_client_pin_coexistence_and_sigterm_cleanup` |
 | `kwin_phase4_notifications` | `cli_notify_toast_ttl_reading_and_dnd_on_private_kwin` |
 | `kwin_phase4_tray` | `private_watcher_registers_real_tray_and_menu_dispatches_actor_intents` |
-| `kwin_phase5_clipboard` | `clipboard_default_off_has_no_watcher_thread_or_connection`<br>`clipboard_real_watcher_reads_text_png_and_uri_list`<br>`clipboard_disable_joins_watcher_and_closes_its_connection`<br>`clipboard_pause_discards_real_offers_and_resume_captures_only_future_changes`<br>`clipboard_sensitive_hint_and_validated_deny_patterns_skip_real_offers`<br>`clipboard_concealed_and_transient_offers_are_skipped_and_counted_as_sensitive`<br>`clipboard_read_caps_drop_oversize_offers_and_a_following_offer_is_still_captured`<br>`clipboard_copy_echo_reorders_only_with_stable_id_and_pin`<br>`clipboard_pinned_survive_clear_and_persistence_is_private_pinned_only`<br>`clipboard_x11_only_environment_reports_unavailable_without_wayland_connection`<br>`clipboard_in_app_pause_and_push_update_the_actual_sibling_ui` |
-| `kwin_phase6a_services` | `services_report_capabilities_snapshots_events_alerts_and_recover_in_the_real_app`<br>`a_test_instance_without_an_explicit_system_bus_never_connects_to_any_bus` |
+| `kwin_phase5_clipboard` | 11 `clipboard_*` tests (real data-control watcher: text/PNG/URI list, pause/resume, sensitive hints, deny patterns, caps, echo, pinned persistence, X11-only) |
+| `kwin_phase6a_services` | `services_report_capabilities_snapshots_events_alerts_and_recover_in_the_real_app`, `a_test_instance_without_an_explicit_system_bus_never_connects_to_any_bus` |
 | `kwin_phase6b1_apps` | `apps_commands_events_and_secret_never_cross_ipc_logs_or_status` |
-| `kwin_phase6b2_controls` | `remaining_controls_ipc_events_commands_bootstrap_and_module_cleanup_are_private`<br>`agents_ipc_fixture_poll_event_and_module_cleanup_are_private`<br>`brightness_ipc_event_and_module_disable_reenable_use_only_the_private_daemon` |
-| `kwin_phase6m_media` | `media_lyrics_and_equalizer_work_end_to_end_in_the_real_app`<br>`a_test_instance_without_a_mock_bus_has_an_empty_media_state_and_stays_honest` |
+| `kwin_phase6b2_controls` | `remaining_controls_ipc_events_commands_bootstrap_and_module_cleanup_are_private`, `agents_ipc_fixture_poll_event_and_module_cleanup_are_private`, `brightness_ipc_event_and_module_disable_reenable_use_only_the_private_daemon` |
+| `kwin_phase6m_media` | `media_lyrics_and_equalizer_work_end_to_end_in_the_real_app`, `a_test_instance_without_a_mock_bus_has_an_empty_media_state_and_stays_honest` |
 | `kwin_phase7a_island` | `island_page_real_input_geometry_retained_draft_appearance_and_screenshots` |
-| `kwin_phase7b_launcher` | `launcher_apps_layout_and_draft_use_real_input_in_private_instance`<br>`acceptance::launcher_real_drag_done_persists_across_restart`<br>`acceptance::launcher_real_cancel_does_not_persist`<br>`acceptance::launcher_real_disable_badge_hides_unlocked_module`<br>`acceptance::launcher_home_and_settings_are_not_movable_or_disableable`<br>`acceptance::timer_completed_activity_is_dismissable_by_real_input`<br>`acceptance::frozen_prototype_keeps_real_terminal_and_motion_working`<br>`acceptance::native_pill_side_union_and_launcher_app_pacing_use_real_input`<br>`acceptance::media_capture_stops_on_real_navigation_and_collapse` |
+| `kwin_phase7b_launcher` | `launcher_apps_layout_and_draft_use_real_input_in_private_instance` and 8 `acceptance::*` (drag/cancel/hide badge, locked tiles, timer activity, frozen terminal, native pill + side union, media capture lifetime) |
 | `kwin_phase9a_release` | `anchor_client_complete_status_embedded_island_and_sigterm_use_real_eis` |
-| `kwin_shape` | `kwin_overlay_native_pill`<br>`kwin_preview_non_native_pill` |
-| `kwin_spike_panel` | `kwin_spike_panel` |
-| `notification_monitor` | `passive_notify_monitor_correlates_notify_return_closed_and_actions`<br>`owner_replacement_rearms_monitor_and_bounds_pending`<br>`loop_guard_and_policy_are_enforced_on_private_bus`<br>`privacy_scrub_at_capacity_repairs_renderer_after_delivery_overflow`<br>`monitor_denial_preserves_hermes_ingest_capability`<br>`dismiss_only_requests_remote_close_for_live_same_server_id` |
-| `xvfb_shape` | `overlay_cycle_with_window_manager`<br>`preview_cycle_non_native_pill`<br>`click_through_is_physical_without_window_manager` |
+| `kwin_shape` | `kwin_overlay_native_pill`, `kwin_preview_non_native_pill` |
+| `kwin_spike_panel` | `kwin_spike_panel` (plus its pure `spike_analysis` unit tests) |
+| `notification_monitor` | 6 private-bus monitor tests |
+| `xvfb_shape` | `overlay_cycle_with_window_manager`, `preview_cycle_non_native_pill`, `click_through_is_physical_without_window_manager` |
+
+Island-page (`--ui island`) tests find their window by the product's own overlap size
+(`phase3_host::overlay_size()` = `over_panel(...)` for the fixture panel), not the 1180x820
+size of the Legacy page; use `find_window_sized` for new ones.

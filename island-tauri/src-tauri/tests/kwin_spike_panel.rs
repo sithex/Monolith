@@ -991,7 +991,6 @@ fn translucent_open(s: &Stack) {
 // ---------------------------------------------------------------------------------------------
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn kwin_spike_panel() {
     let _guard = lock();
     let evidence = Evidence::new("phase2_5");

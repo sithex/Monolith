@@ -28,7 +28,6 @@ use std::{
 use zbus::{Message, OwnedVariant};
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn passive_notify_monitor_correlates_notify_return_closed_and_actions() {
     let _guard = lock();
     let s = Stack::new("monitor-notify");
@@ -62,7 +61,6 @@ fn passive_notify_monitor_correlates_notify_return_closed_and_actions() {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn owner_replacement_rearms_monitor_and_bounds_pending() {
     let _guard = lock();
     let s = Stack::new("monitor-rearm");
@@ -94,7 +92,6 @@ fn owner_replacement_rearms_monitor_and_bounds_pending() {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn loop_guard_and_policy_are_enforced_on_private_bus() {
     let _guard = lock();
     let s = Stack::new("monitor-policy");
@@ -155,7 +152,6 @@ fn loop_guard_and_policy_are_enforced_on_private_bus() {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn privacy_scrub_at_capacity_repairs_renderer_after_delivery_overflow() {
     let _guard = lock();
     // Keep KWin's derived EIS AF_UNIX path below the kernel's 108-byte limit.
@@ -206,7 +202,6 @@ fn privacy_scrub_at_capacity_repairs_renderer_after_delivery_overflow() {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn monitor_denial_preserves_hermes_ingest_capability() {
     let _guard = lock();
     let s = Stack::new("monitor-denial");
@@ -264,7 +259,6 @@ fn monitor_denial_preserves_hermes_ingest_capability() {
 }
 
 #[test]
-#[ignore = "requires a private KWin/Xwayland compositor and WebKit; see README Testing"]
 fn dismiss_only_requests_remote_close_for_live_same_server_id() {
     let _guard = lock();
     let s = Stack::new("monitor-dismiss");

@@ -1,10 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import frozenXterm from "./scripts/phase7b-frozen-xterm.mjs";
+import uiManifest from "./scripts/write-ui-manifest.mjs";
 
 // Tauri serves `dist/` (frontendDist) in production and http://localhost:5173 in `cargo tauri dev`.
 export default defineConfig({
-  plugins: [frozenXterm(), react()],
+  plugins: [frozenXterm(), react(), uiManifest()],
   clearScreen: false,
   server: { port: 5173, strictPort: true },
   build: {

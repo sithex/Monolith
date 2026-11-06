@@ -42,6 +42,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 regex = "1.13.1"
 xxhash-rust = { version = "=0.8.15", features = ["xxh3"] }
 base64 = "=0.23.1"
+# Release UI-from-disk manifest verification (ui_assets.rs); already in the tree at 0.10.9.
+sha2 = "0.10"
 # Phase 6a weather (SPEC §3.5): Open-Meteo over HTTPS. Verified on crates.io/docs.rs: 0.13.5
 # (MSRV 1.85); `rustls` = rustls + aws-lc-rs + platform verifier, no native-tls/OpenSSL.
 # Bodies are parsed by weather-core (256 KiB cap), so the `json` feature is not enabled.

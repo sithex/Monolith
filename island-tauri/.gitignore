@@ -5,3 +5,5 @@ src-tauri/gen/
 evidence/
 dev-bin/
 __pycache__/
+.dist-staging/
+dist.old/

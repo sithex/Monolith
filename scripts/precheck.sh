@@ -10,7 +10,7 @@
 #   scripts/precheck.sh --keep-logs    keep the log directory even when everything passes
 #
 # Steps: rust-test (lib+units+services), clippy (-D warnings, lib+tests), bindings, tsc,
-# test-ui, qml (offscreen qmltestrunner), launcher (run.sh rollback + launch tests),
+# test-ui, qml (offscreen Qt 6 qmltestrunner; QT6_BIN=<dir> overrides), launcher (run.sh rollback + launch tests),
 # py-tests (island/tests), secrets (staged content; --all is informational). Not covered: the nested-compositor GUI suites.
 set -uo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -75,10 +75,19 @@ step bindings "check-bindings (bindings.ts current, no split types)" \
   in_dir "$APP" run node scripts/check-bindings.mjs
 step tsc "tsc --noEmit" in_dir "$APP" run npx tsc --noEmit -p .
 step test-ui "npm run test:ui" in_dir "$APP" run npm run -s test:ui -- --test-reporter=dot
+# A Qt 6 tool by name: QT6_BIN/<name>, Arch's /usr/lib/qt6/bin, Fedora's /usr/lib64/qt6/bin, then
+# <name>-qt6 or <name>6 on PATH. Never the bare name: /usr/bin/qmltestrunner is a thin wrapper that
+# exits 1 silently on Arch, and Qt 5's runner on Fedora.
+qt6_tool() {
+  local name="$1" candidate
+  for candidate in ${QT6_BIN:+"$QT6_BIN/$name"} "/usr/lib/qt6/bin/$name" "/usr/lib64/qt6/bin/$name"; do
+    [[ -x "$candidate" && -f "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+  done
+  command -v "$name-qt6" || command -v "${name}6"
+}
 qml_run() {
   local runner
-  # /usr/bin/qmltestrunner is a thin wrapper that exits 1 silently here; use the real binary.
-  runner=$(ls /usr/lib/qt6/bin/qmltestrunner 2>/dev/null || command -v qmltestrunner) || { echo "qmltestrunner not found"; return 1; }
+  runner=$(qt6_tool qmltestrunner) || { echo "Qt 6 qmltestrunner not found (Arch: qt6-declarative, Fedora: qt6-qtdeclarative-devel)"; return 1; }
   QT_QPA_PLATFORM=offscreen run "$runner" -platform offscreen -input "$ROOT/island/qmltests"
 }
 step qml "qmltestrunner (offscreen) island/qmltests" in_dir "$ROOT" qml_run

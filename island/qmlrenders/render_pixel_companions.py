@@ -7,6 +7,7 @@ Writes DIR/frames/*.png (true 20x20 captures), DIR/sheet-1x.png and DIR/sheet-8x
 import argparse, json, os, subprocess, tempfile
 from pathlib import Path
 from PIL import Image, ImageDraw
+import qt6_tools
 
 ROOT = Path(__file__).resolve().parents[2]
 ap = argparse.ArgumentParser()
@@ -21,7 +22,7 @@ src = src.replace('outputDirectory: "/tmp/companion-pixel"', "outputDirectory: "
 src = src.replace('characterIds: ["companioncube", "nurgling", "hollowknight", "frog"]', "characterIds: " + json.dumps(ids))
 with tempfile.TemporaryDirectory(prefix="companion-pixel-", dir=os.environ.get("TMPDIR")) as tmp:
     h = Path(tmp) / "tst_companion_pixel.qml"; h.write_text(src)
-    r = subprocess.run(["/usr/lib/qt6/bin/qmltestrunner", "-input", str(h)], capture_output=True, text=True,
+    r = subprocess.run([qt6_tools.require("qmltestrunner"), "-input", str(h)], capture_output=True, text=True,
                        env={**os.environ, "QT_QPA_PLATFORM": "offscreen", "QT_QUICK_BACKEND": "software"})
     (out / "render-log.txt").write_text(r.stdout + r.stderr)
     if r.returncode: print(r.stdout[-3000:], r.stderr[-3000:]); raise SystemExit(r.returncode)

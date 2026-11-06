@@ -10,7 +10,7 @@ import { searchCommands, nextSelection, type SearchItem } from './command-search
 import './command-palette.css';
 
 export const openCommandPalette = () => window.dispatchEvent(new Event('island-command-palette'));
-export function CommandPalette({ fail }: { fail(error: unknown): void }) {
+export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): void; onOpenChange?(open: boolean): void }) {
   const state = useIslandState(), settings = useSettings(), launcher = useLauncher(), calendar = useApp('calendar');
   const [open, setOpen] = useState(false), [query, setQuery] = useState(''), [selection, setSelection] = useState(0);
   const [clips, setClips] = useState<ClipSummary[]>([]), [notice, setNotice] = useState('');
@@ -45,6 +45,7 @@ export function CommandPalette({ fail }: { fail(error: unknown): void }) {
     void listen('island-command-palette', show).then(off => { if (disposed) off(); else unlisten = off; }).catch(fail);
     return () => { disposed = true; unlisten?.(); window.removeEventListener('island-command-palette', show); window.removeEventListener('keydown', chord, true); };
   }, []);
+  useEffect(() => { onOpenChange?.(open && state.mode === 'large'); }, [open, state.mode, onOpenChange]);
   useEffect(() => { if (state.mode !== 'large') { isOpen.current = false; setOpen(false); } }, [state.mode]);
   useEffect(() => {
     if (!open || state.mode !== 'large') return;

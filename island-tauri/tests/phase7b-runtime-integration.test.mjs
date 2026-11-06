@@ -252,7 +252,7 @@ function surfaceHarness({unchangedSizing=false,maxHeight=1190}={}) {
   // Animation is a hook-free recording boundary; all sizing and content measurement
   // below still execute the actual IslandSurface component.
   const C=d.load('ui/island/IslandSurface.tsx').IslandSurface;
-  return {...d,state,starts,renderSurface:()=>d.render(C,{children:null,fail:e=>{throw e;}})};
+  return {...d,state,starts,renderSurface:(props={})=>d.render(C,{children:null,fail:e=>{throw e;},...props})};
 }
 
 test('explicit custom preset terminal height can exceed the old 672px per-view default',()=>{
@@ -283,6 +283,9 @@ test('content-fitted Settings honors the explicit height cap without forcing emp
         assert.equal(fitted.props.initial.height,expected);
         assert.equal(h.starts.at(-1).height,expected,'animation target follows content, not the old 640px Settings ceiling');
         assert.equal(fitted.props.style['--open-content-height'],`${expected-44}px`);
+        const palette=h.renderSurface({paletteOpen:true});
+        assert.equal(palette.props.initial.height,Math.min(1190,Math.max(560,expected)),'palette expands short pages without violating the saved ceiling');
+        assert.equal(h.renderSurface({paletteOpen:false}).props.initial.height,expected,'closing restores content-fit size');
       }finally{h.dispose();frames.length=0;}
     }
   });

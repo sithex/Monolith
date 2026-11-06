@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notification-popup"
+description = "Enables the notification_popup command without any pre-configured scope."
+commands.allow = ["notification_popup"]
+
+[[permission]]
+identifier = "deny-notification-popup"
+description = "Denies the notification_popup command without any pre-configured scope."
+commands.deny = ["notification_popup"]

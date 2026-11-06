@@ -19,6 +19,8 @@ import {
   type IslandNotification,
   type NotificationClosed,
   type NotificationSnapshot,
+  type NotificationPopups,
+  type PopupOp,
   type Palette,
   type Settings,
   type SettingsPatch,
@@ -76,6 +78,9 @@ export const reportGeometry = (report: GeometryReport): Promise<GeometryAck> =>
 export const bootstrap = (): Promise<BootstrapSnapshot> => unwrap(commands.islandBootstrap());
 export const notificationsList = (): Promise<IslandNotification[]> => unwrap(commands.notificationsList());
 export const notificationsDismiss = (id: string) => unwrap(commands.notificationsDismiss(id));
+export type { NotificationPopups, Popup, PopupOp } from './bindings';
+export const notificationPopup = (op: PopupOp): Promise<NotificationPopups> => unwrap(commands.notificationPopup(op));
+export const onNotificationPopups = (cb: (n: NotificationPopups) => void) => events.notificationPopups.listen(event => cb(event.payload));
 export const notificationsClear = () => unwrap(commands.notificationsClear());
 export const clipboardList = (query: string | null = null, limit = 100): Promise<ClipSummary[]> => unwrap(commands.clipboardList(query, limit));
 export const clipboardGet = (id: string): Promise<ClipContent> => unwrap(commands.clipboardGet(id));

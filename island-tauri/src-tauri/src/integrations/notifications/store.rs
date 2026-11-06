@@ -52,6 +52,36 @@ impl NotificationStore {
             ..Self::default()
         })
     }
+    pub fn override_urgency(&mut self, id: &str, urgency: Urgency) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.notification.id == id) {
+            entry.notification.urgency = urgency;
+        }
+    }
+    pub fn retain_history(&mut self) {
+        for entry in &mut self.entries {
+            entry.expires_at = None;
+        }
+    }
+    pub fn deactivate_server(&mut self, server_id: u32) -> Changes {
+        let rev = self.revision();
+        let mut changes = Changes::default();
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .find(|e| e.server_id == Some(server_id))
+        {
+            entry.notification.rev = rev;
+            entry.notification.actions.clear();
+            entry.notification.can_invoke_actions = false;
+            entry.expires_at = None;
+            changes
+                .events
+                .push(Delta::NotificationReceived(NotificationReceived(
+                    entry.notification.clone(),
+                )));
+        }
+        changes
+    }
     pub fn policy(&self) -> &StorePolicy {
         &self.policy
     }

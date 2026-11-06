@@ -102,9 +102,12 @@ export function geometryReport(outer: HTMLElement, state: IslandState, settled: 
     }) : [];
   // Docked island extensions (the colour picker): layout box of a fixed element, like an
   // interactive side button, so its entrance animation never shifts the input region.
-  const extensions = state.mode === 'large' ? Array.from(outer.ownerDocument?.querySelectorAll<HTMLElement>('[data-island-extension]') ?? [])
-    .filter(e => !!e.dataset?.islandExtension && e.getClientRects().length > 0)
-    .map(e => ({ x: e.offsetLeft, y: e.offsetTop, width: e.offsetWidth, height: e.offsetHeight, radius: parseFloat(getComputedStyle(e).borderRadius) || 0 })) : [];
+  const extensions = Array.from(outer.ownerDocument?.querySelectorAll<HTMLElement>('[data-island-extension]') ?? [])
+    .filter(e => !!e.dataset?.islandExtension && (state.mode === 'large' || e.dataset.islandExtension === 'notification') && e.getClientRects().length > 0)
+    .map(e => {
+      const box = e.dataset.islandExtension === 'notification' ? e.getBoundingClientRect() : null;
+      return { x: box?.x ?? e.offsetLeft, y: box?.y ?? e.offsetTop, width: box?.width ?? e.offsetWidth, height: box?.height ?? e.offsetHeight, radius: parseFloat(getComputedStyle(e).borderRadius) || 0 };
+    });
   return { stateRev: state.rev, mode: state.mode, scale, settled,
     rects: [{ x: rect.x, y: rect.y, width: rect.width, height: rect.height,
       radius: parseFloat(getComputedStyle(outer).borderRadius) || 0 }, ...buttons, ...extensions] };

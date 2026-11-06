@@ -66,6 +66,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::notifications::notifications_list,
             commands::notifications::notifications_dismiss,
             commands::notifications::notifications_clear,
+            integrations::notifications::popup_commands::notification_popup,
             commands::clipboard::clipboard_list,
             commands::clipboard::clipboard_get,
             commands::clipboard::clipboard_copy,
@@ -112,6 +113,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             contract::notify::NotificationReceived,
             contract::notify::NotificationClosed,
             contract::notify::NotificationSnapshot,
+            integrations::notifications::popups::NotificationPopups,
             contract::clipboard::ClipboardAdded,
             contract::clipboard::ClipboardStatusChanged,
             contract::events::PowerChanged,
@@ -526,6 +528,8 @@ mod tests {
             ("TilesOp", "durationMs"),
             // SPEC §5.2: notification progress is absent for non-progress notifications.
             ("IslandNotification", "progress"),
+            // Critical notification cards deliberately have no expiry deadline.
+            ("Popup", "remainingMs"),
         ];
         for declaration in generated.split("export type ").skip(1) {
             let (name, body) = declaration.split_once(" = ").unwrap();

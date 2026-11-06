@@ -28,6 +28,7 @@ const AppsView = memo(AppsViewInner), SettingsView = memo(SettingsViewInner);
 const MonitorView = memo(MonitorViewInner), AiStatsView = memo(AiStatsViewInner);
 if (typeof window !== 'undefined') window.setTimeout(() => { void loadTerminal(); }, 0);
 import { PreviewNotice } from './PreviewNotice';
+import { NotificationCards } from './notifications/NotificationCards';
 import { createClickSound } from './click-sound';
 import './island.css';
 import './polish.css';
@@ -142,7 +143,7 @@ export function Island() {
   // still fades); otherwise the OS preference. Default transitions follow the speed setting.
   return <MotionConfig reducedMotion={settings.reduceMotion ? 'always' : 'user'} transition={motionSpeedDefault(settings.animationSpeed)}><main onClickCapture={event => {
     if ((event.target as HTMLElement).closest('button:not(:disabled)')) playClick(settings.clickSounds);
-  }}><IslandSurface fail={fail}>
+  }}><NotificationCards fail={fail} /><IslandSurface fail={fail}>
     <Topline fail={fail} />
     <AnimatePresence>{state.mode === 'hover' && <motion.div key="preview" className="preview island-content" {...reveal}
       exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.9, y: -10, transition: { duration: 0.14, ease: [0.5, 0, 0.9, 0.4] } }}

@@ -592,7 +592,7 @@ impl NativeHost {
                                 };
                                 let script = monitor_script(enabled, &style, origins.as_deref());
                                 let reconcile = || -> Result<Value> {
-                                    let mut command = std::process::Command::new("/usr/bin/qdbus6");
+                                    let mut command = std::process::Command::new(super::qdbus::program());
                                     command.args(["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", &script]);
                                     let out = crate::services::process::run_bounded(command, Duration::from_secs(3), 65536, false)?;
                                     Ok(serde_json::from_slice(&out).unwrap_or(Value::Null))
@@ -748,7 +748,7 @@ impl NativeHost {
                             targets.sort_unstable();
                             targets.dedup();
                             if !targets.is_empty() {
-                                let mut command = std::process::Command::new("/usr/bin/qdbus6");
+                                let mut command = std::process::Command::new(super::qdbus::program());
                                 command.args(["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", &panel_style_script(&targets, &style)]);
                                 match crate::services::process::run_bounded(command, Duration::from_secs(1), 4096, false) {
                                     Ok(_) => {

@@ -105,6 +105,18 @@ class HermesThemeTests(unittest.TestCase):
         self.assertEqual(self.base_path.read_bytes(), original)
         self.assertEqual(list(self.skin.parent.glob("*.tmp")), [])
 
+    def test_light_community_palette_becomes_a_complete_skin(self):
+        # Catppuccin Latte (ui/island/tokens/schemes.ts): a light background must pass the
+        # same validation and map every skin role, with no dark_colors/light_colors override.
+        latte = {"name": "ripple-island", "background": "#eff1f5", "surface": "#ccd0da", "border": "#bcc0cc",
+                 "dim": "#6c6f85", "text": "#4c4f69", "primary": "#1e66f5", "accent": "#8839ef", "error": "#d20f39"}
+        self.assertEqual(self.success(self.run_helper(palette=latte)), {"skin": "ripple-island", "changed": True})
+        colors = json.loads(self.skin.read_text())["colors"]
+        for role, expected in {"background": "#eff1f5", "ui_accent": "#8839ef", "ui_text": "#4c4f69", "ui_primary": "#1e66f5",
+                               "ui_error": "#d20f39", "status_bar_bg": "#ccd0da", "ui_border": "#bcc0cc", "banner_dim": "#6c6f85"}.items():
+            self.assertEqual(colors[role], expected, role)
+        self.assertNotIn("light_colors", json.loads(self.skin.read_text()))
+
     def test_reapply_remembers_original_and_restore_reactivates_it(self):
         self.success(self.run_helper())
         self.success(self.run_helper(palette={**PALETTE, "accent": "#123ABC"}))

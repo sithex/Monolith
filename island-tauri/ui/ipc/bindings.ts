@@ -261,7 +261,7 @@ export type Appearance = "skin" | "neutral" | "ocean" | "dune" | "dusk" | "silk"
 /**  Palette derived from `customAccent`/`customBackground`/`customText` (Nov 2). */
 "custom" | 
 /**  Accent and tint taken from the playing track's artwork (Nov 5); falls back to Skin. */
-"album";
+"album" | "catppuccin-mocha" | "catppuccin-macchiato" | "catppuccin-frappe" | "catppuccin-latte" | "dracula" | "nord" | "gruvbox-dark" | "gruvbox-light" | "tokyo-night" | "tokyo-storm" | "rose-pine" | "rose-pine-moon" | "rose-pine-dawn" | "one-dark" | "solarized-dark" | "solarized-light";
 
 export type AppsSnapshot = {
 	timer: TimerChanged | null,

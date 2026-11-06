@@ -31,6 +31,7 @@ import { PreviewNotice } from './PreviewNotice';
 import { createClickSound } from './click-sound';
 import './island.css';
 import './polish.css';
+import '../views/settings/settings-controls.css';
 import { schemePalette } from './tokens/schemes';
 import { useHermesThemeSync, themePayload } from './hermes-theme';
 import { notchSchemeSet } from '../ipc/client';

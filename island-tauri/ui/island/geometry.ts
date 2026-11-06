@@ -189,8 +189,10 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
     // reports while the shell contracts. An unsettled still frame used to keep KWin
     // blurring the region under the fading shell, smearing the notch clock into a flat
     // grey box for the last ~350 ms of every close (concept-pics/bug2.png).
+    // Independent extensions (notification cards) are part of the key: they appear and vanish
+    // without a state revision change, and Rust must see both transitions.
     const key = report.mode === 'still' && report.settled && nativePill() !== null
-      ? JSON.stringify({ rev: report.stateRev, mode: report.mode, scale: report.scale }) : JSON.stringify(report);
+      ? JSON.stringify({ rev: report.stateRev, mode: report.mode, scale: report.scale, extensions: report.rects.slice(1) }) : JSON.stringify(report);
     if (key !== last) { last = key; pending = report; void drain(); }
     // Follow a running translation glide every frame so ShapeInput tracks the moving surface,
     // and keep reporting through the blur hold so the final settled report is sent.

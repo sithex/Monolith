@@ -39,3 +39,31 @@ test('collapsed geometry includes only notification extensions, not other hidden
   const report = geometryReport(outer, { rev: 1, mode: 'still' }, true, 1);
   assert.equal(report.rects.length, 2); assert.deepEqual(report.rects[1], { x: 400, y: 50, width: 390, height: 150, radius: 18 });
 });
+test('a settled still island under the notch re-reports when a card appears or disappears', async () => {
+  const { createGeometryReporter } = load('ui/island/geometry.ts');
+  const queue = [], sent = [], tick = () => new Promise(resolve => setImmediate(resolve));
+  const cards = [];
+  globalThis.innerWidth = 1180; globalThis.innerHeight = 820; globalThis.devicePixelRatio = 1;
+  globalThis.window = { addEventListener() {}, removeEventListener() {}, dispatchEvent() {} };
+  globalThis.document = { documentElement: { dataset: {} } };
+  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  globalThis.requestAnimationFrame = cb => { queue.push(cb); return queue.length; }; globalThis.cancelAnimationFrame = () => {};
+  const px = { '--native-pill-x': '500px', '--native-pill-y': '4px', '--native-pill-width': '144px', '--native-pill-height': '26px', '--native-pill-radius': '13px' };
+  globalThis.getComputedStyle = () => ({ visibility: 'visible', borderRadius: '13px', transform: 'none', getPropertyValue: key => px[key] ?? '' });
+  const outer = { style: { setProperty() {} }, ownerDocument: { documentElement: { dataset: {} }, querySelectorAll: () => cards }, getBoundingClientRect: () => ({ x: 500, y: 4, width: 144, height: 26 }) };
+  const card = { dataset: { islandExtension: 'notification' }, getClientRects: () => [{}], getBoundingClientRect: () => ({ x: 400, y: 50, width: 390, height: 150 }) };
+  const state = { rev: 3, mode: 'still' };
+  const owner = createGeometryReporter(outer, () => state, () => ({ x: 0, y: 0 }), async r => sent.push(r), assert.fail);
+  const flush = async () => { while (queue.length) queue.shift()(); await tick(); };
+  // Let the post-close blur hold elapse so the report is the final settled one.
+  await new Promise(resolve => setTimeout(resolve, 120));
+  owner.schedule(true); await flush();
+  const base = sent.length;
+  cards.push(card); owner.schedule(true); await flush();
+  assert.equal(sent.length, base + 1, 'a new card must reach Rust even though rev/mode did not change');
+  assert.equal(sent.at(-1).rects.length, 2);
+  cards.length = 0; owner.schedule(true); await flush();
+  assert.equal(sent.length, base + 2, 'a removed card must release its input region');
+  assert.equal(sent.at(-1).rects.length, 1);
+  owner.dispose();
+});

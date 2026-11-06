@@ -15,7 +15,7 @@ export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): v
   const [open, setOpen] = useState(false), [query, setQuery] = useState(''), [selection, setSelection] = useState(0);
   const [clips, setClips] = useState<ClipSummary[]>([]), [notice, setNotice] = useState('');
   const input = useRef<HTMLInputElement>(null), dialog = useRef<HTMLDivElement>(null), previous = useRef<HTMLElement | null>(null);
-  const isOpen = useRef(open), busy = useRef(false), currentState = useRef(state); isOpen.current = open; currentState.current = state;
+  const isOpen = useRef(open), busy = useRef(false), settingJump = useRef(false), currentState = useRef(state); isOpen.current = open; currentState.current = state;
   const navigate = (view: IslandView) => dispatch({ type: 'selectView', view });
   const close = (restore = true) => {
     isOpen.current = false; setOpen(false);
@@ -62,9 +62,11 @@ export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): v
   }, [open, state.mode]);
   // Focus non-terminal pages on an explicit open/page switch, never on hover previews.
   useEffect(() => {
-    if (state.mode !== 'large' || state.view === 'terminal' || isOpen.current) return;
+    if (state.mode !== 'large' || state.view === 'terminal' || isOpen.current || settingJump.current) return;
     const frame = requestAnimationFrame(() => {
+      if (isOpen.current || settingJump.current) return;
       const pane = document.querySelector<HTMLElement>(`[data-pane="${state.view}"] .app-pane:not([hidden])`);
+      if (pane?.contains(document.activeElement)) return;
       const target = pane?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled), textarea, [tabindex="0"]');
       if (target) target.focus(); else if (pane) { pane.tabIndex = -1; pane.focus(); }
     });
@@ -77,8 +79,12 @@ export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): v
     for (const card of SETTINGS_CARDS) for (const row of card.rows) {
       if (row.when && !row.when(settings)) continue;
       result.push({ id: `setting:${row.id}`, label: row.label, group: 'Settings', detail: card.title, keywords: `${row.hint ?? ''} ${row.keys.join(' ')}`, run: async () => {
-        await navigate('settings');
-        window.dispatchEvent(new CustomEvent('island-setting-jump', { detail: row.id }));
+        // The row jump owns focus; generic page-open focus must not win its RAF race.
+        settingJump.current = true;
+        try {
+          await navigate('settings');
+          window.dispatchEvent(new CustomEvent('island-setting-jump', { detail: row.id }));
+        } finally { requestAnimationFrame(() => { settingJump.current = false; }); }
       } });
     }
     result.push({ id: 'timer:five', label: 'Start a five-minute timer', group: 'Quick actions', keywords: 'countdown 5 minutes', run: async () => { appStores.timer.apply(await appApi.timerCommand({ type: 'setCountdown', durationMs: 300000 })); } });

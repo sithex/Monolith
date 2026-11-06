@@ -257,12 +257,15 @@ fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
         f64::from(target.width),
         f64::from(target.height),
     );
+    // Record it first: a page load racing this relocation then re-applies the new position.
+    *runtime
+        .native_pill
+        .lock()
+        .map_err(|_| anyhow::anyhow!("Native pill poisoned"))? = Some(pill);
     let window = app
         .get_webview_window(ISLAND_LABEL)
         .context("Missing island window")?;
-    let values =
-        json!({"x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius});
-    window.eval(format!("(()=>{{const v={values};for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');window.dispatchEvent(new Event('island-native-pill'));window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('island-surfaces-changed'));}})()"))?;
+    window.eval(crate::window::native_pill_script(&pill))?;
     Ok(json!({"x":target.x,"y":target.y,"width":target.width,"height":target.height}))
 }
 

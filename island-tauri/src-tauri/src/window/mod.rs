@@ -47,6 +47,18 @@ pub struct IslandRuntime {
     /// position, so status `bounds` use this on the native Wayland path.
     pub placement: Mutex<(f64, f64, f64, f64)>,
     pub wayland: bool,
+    /// The native notch's CURRENT window-relative box. The initialization script only knows the
+    /// startup snapshot, so every page load (a `reload-ui` deploy, a web-process restart)
+    /// re-applies this one; otherwise a reload after a relocation draws the island at the
+    /// startup position (e.g. 8 px low once a maximized window docked the floating panel).
+    pub native_pill: Mutex<Option<RoundedRect>>,
+}
+
+/// JS that publishes `pill` as the `--native-pill-*` CSS variables and tells the island
+/// renderer to re-measure. Shared by relocation and the page-load re-apply.
+pub fn native_pill_script(pill: &RoundedRect) -> String {
+    let values = serde_json::json!({ "x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius });
+    format!("(()=>{{const v={values};for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');window.dispatchEvent(new Event('island-native-pill'));window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('island-surfaces-changed'));}})()")
 }
 
 /// The page the window loads for `--ui` (`harness` is `index.html` from the config).
@@ -227,6 +239,21 @@ pub fn create_island_window(
         let values = serde_json::json!({ "x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius });
         builder = builder.initialization_script(format!(r#"(()=>{{const values={values};const apply=()=>{{if(!document.documentElement)return false;for(const [k,v] of Object.entries(values))document.documentElement.style.setProperty('--native-pill-'+k,v+'px');return true;}};if(!apply()){{const observer=new MutationObserver(()=>{{if(apply())observer.disconnect();}});observer.observe(document,{{childList:true}});}}}})();"#));
     }
+    if overlap_pill.is_some() {
+        builder = builder.on_page_load(|window, payload| {
+            if payload.event() != tauri::webview::PageLoadEvent::Finished {
+                return;
+            }
+            let current = window
+                .try_state::<IslandRuntime>()
+                .and_then(|runtime| runtime.native_pill.lock().ok().and_then(|pill| *pill));
+            if let Some(pill) = current {
+                if let Err(error) = window.eval(native_pill_script(&pill)) {
+                    tracing::warn!(%error, "Could not re-apply the notch position after a page load");
+                }
+            }
+        });
+    }
     let window = builder
         .build()
         .map_err(|e| IslandError::internal(format!("window creation failed: {e}")))?;
@@ -275,6 +302,7 @@ pub fn create_island_window(
         actor_geometry: matches!(cli.ui, UiKind::Legacy | UiKind::Island),
         placement: Mutex::new((origin.x, origin.y, config.width, config.height)),
         wayland: on_wayland,
+        native_pill: Mutex::new(overlap_pill),
     });
 
     window
@@ -286,6 +314,33 @@ pub fn create_island_window(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_pill_script_publishes_every_css_variable_and_remeasures() {
+        let script = native_pill_script(&RoundedRect {
+            x: 1050.0,
+            y: 0.0,
+            width: 200.0,
+            height: 32.0,
+            radius: 16.0,
+        });
+        for (key, value) in [
+            ("x", "1050"),
+            ("y", "0"),
+            ("width", "200"),
+            ("height", "32"),
+            ("radius", "16"),
+        ] {
+            assert!(
+                script.contains(&format!("\"{key}\":{value}")),
+                "{key} missing in {script}"
+            );
+        }
+        assert!(script.contains("'--native-pill-'+k"));
+        for event in ["island-native-pill", "resize", "island-surfaces-changed"] {
+            assert!(script.contains(&format!("new Event('{event}')")));
+        }
+    }
 
     #[test]
     fn preview_report_covers_the_whole_window_and_is_settled() {

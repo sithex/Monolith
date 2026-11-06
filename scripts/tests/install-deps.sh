@@ -9,6 +9,7 @@ mkdir "$scratch/bin"
 for tool in sudo pacman dnf; do
   printf '#!/bin/sh\necho "%s $*" >>"%s/argv"\n' "$tool" "$scratch" >"$scratch/bin/$tool"
 done
+# shellcheck disable=SC2016 # expands in the stub, not here
 printf '#!/bin/sh\necho "${FAKE_UID:-1000}"\n' >"$scratch/bin/id"
 chmod +x "$scratch/bin/"*
 checks=0

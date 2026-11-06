@@ -14,6 +14,8 @@
 # (default ~/.hermes/cache/scratch/monolith-fedora). Docker limits: --cpus=8 --cpu-shares=256.
 # Known, not distro-specific: on Node < 26 one palette test fails (Node EventTarget bug);
 # it is reported as KNOWN and does not fail the run.
+# The step snippets are single-quoted on purpose: they expand inside the container.
+# shellcheck disable=SC2016
 set -euo pipefail
 
 image=fedora:latest
@@ -24,7 +26,7 @@ while [[ $# -gt 0 ]]; do
     --image) shift; image=${1:?--image needs a value} ;;
     --name) shift; name=${1:?--name needs a value} ;;
     --keep-going) keep_going=1 ;;
-    -h | --help) sed -n '2,17p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,16p' "$0"; exit 0 ;;
     *) printf 'fedora-check: unknown option %s\n' "$1" >&2; exit 2 ;;
   esac
   shift

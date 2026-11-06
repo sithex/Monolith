@@ -31,7 +31,9 @@ import { PreviewNotice } from './PreviewNotice';
 import { createClickSound } from './click-sound';
 import './island.css';
 import './polish.css';
-import { schemePalette } from './tokens/schemes';
+import './tokens/light-tone.css';
+import './tokens/scheme-picker.css';
+import { schemePalette, schemeById, isLightPalette } from './tokens/schemes';
 import { useHermesThemeSync, themePayload } from './hermes-theme';
 import { notchSchemeSet } from '../ipc/client';
 import { useAlbumScheme } from './album-scheme';
@@ -69,6 +71,7 @@ export function Island() {
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = appearance;
+    root.dataset.tone = isLightPalette(effective) ? 'light' : 'dark';
     root.dataset.reduceMotion = String(settings.reduceMotion === true);
     root.dataset.font = settings.uiFont;
     root.dataset.glass = String(settings.translucent !== false);
@@ -150,7 +153,7 @@ export function Island() {
           <div className="view-pane" data-pane={view}>
             <div className="app-pane" hidden={view !== 'launcher'}>{view === 'launcher' && <Launcher navigate={navigate} fail={fail} />}</div>
             <motion.div className="app-pane terminal-pane" hidden={view !== 'terminal'} initial={false} animate={{ opacity: view === 'terminal' ? 1 : 0 }}>
-              {state.terminalStarted && <Suspense fallback={null}><TerminalView active={active && view === 'terminal'} palette={effective} fontSize={settings.terminalFontSize}
+              {state.terminalStarted && <Suspense fallback={null}><TerminalView active={active && view === 'terminal'} palette={effective} ansi16={schemeById(appearance).ansi16} fontSize={settings.terminalFontSize}
                 fontFamily={settings.terminalFontFamily ?? ''} scrollback={settings.terminalScrollback ?? 5000}
                 cursorStyle={settings.terminalCursorStyle ?? 'block'} cursorBlink={settings.terminalCursorBlink !== false} fail={fail} /></Suspense>}
             </motion.div>

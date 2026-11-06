@@ -1,0 +1,77 @@
+/* Light tone (Nov 6). Island.tsx sets <html data-tone="light"> when the effective background
+   is light (Catppuccin Latte, Gruvbox Light, Rosé Pine Dawn, Solarized Light, or a light
+   Custom/Album/override). The island's surface language paints with white overlays
+   (rgb(255 255 255 / a)); on a light background those vanish, so every such rule gets an
+   override here that paints with the scheme's own text colour at the same strength. Dark
+   schemes never match, so their look is untouched. Pinned in sync by phase7b-themes.test.mjs
+   (every white-overlay rule in the island CSS needs a counterpart below). */
+html[data-tone='light'] {
+  color-scheme: light;
+  --v-fill: color-mix(in srgb, var(--ui-text) 6.5%, transparent);
+  --v-fill-hi: color-mix(in srgb, var(--ui-text) 12%, transparent);
+  --v-fill-soft: color-mix(in srgb, var(--ui-text) 4.5%, transparent);
+  --v-stroke: color-mix(in srgb, var(--ui-text) 9%, transparent);
+  --v-stroke-hi: color-mix(in srgb, var(--ui-text) 18%, transparent);
+  --v-hover: color-mix(in srgb, var(--ui-text) 9%, transparent);
+  --v-track: color-mix(in srgb, var(--ui-text) 16%, transparent);
+  --v-dim: var(--ui-dim);
+}
+html[data-tone='light'][data-glass='true'] { --v-fill: var(--v-fill-soft); }
+
+/* media.css */
+html[data-tone='light'] .now-playing .artwork { background: color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+html[data-tone='light'] .now-playing .track-progress progress::-webkit-progress-bar { background: color-mix(in srgb, var(--ui-text) 12%, transparent); }
+html[data-tone='light'] .island .now-playing .lyrics-toggle[aria-pressed='true'] { background: color-mix(in srgb, var(--ui-text) 12%, transparent); }
+html[data-tone='light'] .island .now-playing .am-lyrics button:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-text) 7%, transparent); }
+
+/* polish.css */
+html[data-tone='light'] .island .scheme-row:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-text) 4.5%, transparent); }
+html[data-tone='light'] .scheme-selected { background: color-mix(in srgb, var(--ui-text) 8.5%, transparent); box-shadow: inset 0 0 0 .75px color-mix(in srgb, var(--ui-text) 14%, transparent); }
+html[data-tone='light'] .le-host { background: radial-gradient(120% 90% at 50% 0, color-mix(in srgb, var(--ui-text) 5%, transparent), transparent 60%), rgb(0 0 0 / .25); }
+html[data-tone='light'] .le-panel { background: color-mix(in srgb, var(--ui-text) 4%, transparent); border-bottom: .5px solid color-mix(in srgb, var(--ui-text) 6%, transparent); }
+html[data-tone='light'] .le-notch { box-shadow: 0 0 0 .5px color-mix(in srgb, var(--ui-text) 8%, transparent); }
+html[data-tone='light'] .le-mini-term { background: color-mix(in srgb, var(--ui-text) 3.5%, transparent); }
+html[data-tone='light'] .island .le-chip { background: color-mix(in srgb, var(--ui-text) 5%, transparent); }
+html[data-tone='light'] .le-tile { background: color-mix(in srgb, var(--ui-text) 5%, transparent); border: 1px solid color-mix(in srgb, var(--ui-text) 7%, transparent); }
+html[data-tone='light'] .island .color-swatch > span { box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ui-text) 18%, transparent); }
+html[data-tone='light'] .color-pop-dot { box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ui-text) 30%, transparent); }
+html[data-tone='light'] .color-pop-x:hover { background: var(--v-hover, color-mix(in srgb, var(--ui-text) 8%, transparent)); }
+html[data-tone='light'] .color-pop-sv { box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ui-text) 12%, transparent); }
+html[data-tone='light'] .color-pop-presets button { box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ui-text) 25%, transparent); }
+html[data-tone='light'] .color-pop-row input { background: color-mix(in srgb, var(--ui-text) 4%, transparent); }
+
+/* surface.css */
+html[data-tone='light'][data-glass='true'] .island .card,
+html[data-tone='light'][data-glass='true'] .island .settings-card,
+html[data-tone='light'][data-glass='true'] .island .app-tile { background: color-mix(in srgb, var(--ui-text) 6%, transparent); border-color: color-mix(in srgb, var(--ui-text) 8%, transparent); }
+html[data-tone='light'] .island input[type='range'] { background: linear-gradient(to right, color-mix(in srgb, var(--ui-text) 92%, transparent) 0 var(--fill), var(--v-track) var(--fill) 100%); }
+html[data-tone='light'] .live-side-button { color: color-mix(in srgb, var(--ui-text) 90%, transparent); }
+html[data-tone='light'] .app-tile { border: 1px solid color-mix(in srgb, var(--ui-text) 4%, transparent); }
+html[data-tone='light'] .app-tile svg { color: var(--tone, color-mix(in srgb, var(--ui-text) 85%, transparent)); }
+html[data-tone='light'] .app-tile:hover:not(:disabled) { border-color: color-mix(in srgb, var(--ui-text) 12%, transparent); }
+html[data-tone='light'] .hidden-grid { background: color-mix(in srgb, var(--ui-text) 2.5%, transparent); }
+html[data-tone='light'] .hidden-grid[data-over='true'] { outline-color: color-mix(in srgb, var(--ui-text) 35%, transparent); background: color-mix(in srgb, var(--ui-text) 6%, transparent); }
+html[data-tone='light'] .timer-tabs button { color: color-mix(in srgb, var(--ui-text) 50%, transparent); }
+html[data-tone='light'] .mixer-divider { background: color-mix(in srgb, var(--ui-text) 12%, transparent); }
+html[data-tone='light'] .fader-fill { background: color-mix(in srgb, var(--ui-text) 92%, transparent); }
+html[data-tone='light'] .fader[data-muted='true'] .fader-fill { background: color-mix(in srgb, var(--ui-text) 35%, transparent); }
+
+/* updates.css */
+html[data-tone='light'] .updates-hero { background: color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+html[data-tone='light'] .updates-app .updates-refresh { border: 1px solid color-mix(in srgb, var(--ui-text) 10%, transparent); background: color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+html[data-tone='light'] .updates-app .updates-refresh:hover { background: color-mix(in srgb, var(--ui-text) 12%, transparent); }
+html[data-tone='light'] .updates-unknown > span { background: color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+html[data-tone='light'] .updates-search { background: color-mix(in srgb, var(--ui-text) 4.5%, transparent); border: 1px solid color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+html[data-tone='light'] .updates-packages { scrollbar-color: color-mix(in srgb, var(--ui-text) 20%, transparent) transparent; }
+html[data-tone='light'] .updates-group ul { background: color-mix(in srgb, var(--ui-text) 4.5%, transparent); }
+html[data-tone='light'] .updates-row + .updates-row { border-top: 1px solid color-mix(in srgb, var(--ui-text) 4.5%, transparent); }
+html[data-tone='light'] .updates-bump { border: 1px solid color-mix(in srgb, var(--ui-text) 7%, transparent); }
+html[data-tone='light'] .updates-footer { border-top: 1px solid color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+html[data-tone='light'] .updates-app .updates-action { background: color-mix(in srgb, var(--ui-text) 12%, transparent); }
+html[data-tone='light'] .updates-app .updates-action:hover { background: color-mix(in srgb, var(--ui-text) 17%, transparent); }
+html[data-tone='light'] .updates-commands { background: color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+html[data-tone='light'] .updates-command + .updates-command { border-top: 1px solid color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+html[data-tone='light'] .updates-command button { border: 1px solid color-mix(in srgb, var(--ui-text) 8%, transparent); background: color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
+
+/* Inline-styled whites (Launcher tile icons, the volume fader glyph) read these variables. */
+html[data-tone='light'] { --tile-ink: color-mix(in srgb, var(--ui-text) 85%, transparent); --fader-ink: color-mix(in srgb, var(--ui-text) 60%, transparent); }

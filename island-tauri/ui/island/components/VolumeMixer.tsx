@@ -34,7 +34,7 @@ function Fader({ value, label, muted, onCommit }: { value: number; label: string
     <div className="fader-track" ref={track}>
       <div className="fader-fill" style={{ height: `${draft}%`, transition: dragging ? 'none' : 'height .22s cubic-bezier(.33,1,.68,1)' }} />
       <svg className="fader-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-        style={{ color: draft > 12 ? 'rgb(0 0 0 / .55)' : 'rgb(255 255 255 / .6)' }}><path d="M4 9h4l5-5v16l-5-5H4z" /></svg>
+        style={{ color: draft > 12 ? 'rgb(0 0 0 / .55)' : 'var(--fader-ink, rgb(255 255 255 / .6))' }}><path d="M4 9h4l5-5v16l-5-5H4z" /></svg>
     </div>
   </div>;
 }

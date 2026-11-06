@@ -5,13 +5,13 @@ import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { newTerminalChannel, terminalAttach, terminalInput, terminalCopy, terminalResize, terminalAck, terminalRestart, type Palette, type TerminalEvent } from '../ipc/client';
 import { runtimeStore } from '../stores';
 import { createTerminalFlow } from './terminal-flow';
-import { keepIslandColours } from './terminal-colours';
+import { keepIslandColours, xtermTheme } from './terminal-colours';
 import { terminalShortcut, keepTerminalClipboard, trackAppSelection } from './terminal-shortcuts';
 import { createAutoRestart } from './terminal-respawn';
 import { applyTerminalOptions, terminalOptions, type TerminalLook } from './terminal-options';
 import '@xterm/xterm/css/xterm.css';
-export function TerminalView({ active, palette, fontSize, fail, fontFamily = '', scrollback = 5000, cursorStyle = 'block', cursorBlink = true }:
-  { active: boolean; palette: Palette; fontSize: number; fail(error: unknown): void } & Partial<TerminalLook>) {
+export function TerminalView({ active, palette, ansi16, fontSize, fail, fontFamily = '', scrollback = 5000, cursorStyle = 'block', cursorBlink = true }:
+  { active: boolean; palette: Palette; ansi16?: readonly string[]; fontSize: number; fail(error: unknown): void } & Partial<TerminalLook>) {
   const host = useRef<HTMLDivElement>(null), term = useRef<Terminal | null>(null);
   const visible = useRef(active), resize = useRef(() => {});
   visible.current = active;
@@ -20,7 +20,7 @@ export function TerminalView({ active, palette, fontSize, fail, fontFamily = '',
     if (!host.current) return;
     const terminal = new Terminal({ ...terminalOptions({ fontFamily, scrollback, cursorStyle, cursorBlink }), fontSize,
       // Proposed API only for `terminal.unicode` (the Unicode 11 width table below).
-      theme: theme(palette), allowProposedApi: true, allowTransparency: true });
+      theme: xtermTheme(palette, ansi16), allowProposedApi: true, allowTransparency: true });
     // xterm defaults to Unicode 6 widths (emoji = 1 cell) while the Hermes TUI (Ink/string-width)
     // counts them as 2: every emoji line shifted the TUI's cursor math and left ghost columns.
     terminal.loadAddon(new Unicode11Addon()); terminal.unicode.activeVersion = '11';
@@ -90,7 +90,7 @@ export function TerminalView({ active, palette, fontSize, fail, fontFamily = '',
     return () => { disposed = true; respawn.dispose(); osc.forEach(handler => handler.dispose()); flow.dispose(); observer.disconnect(); input.dispose(); terminal.dispose(); term.current = null; if (frame !== null) cancelAnimationFrame(frame); if (retry !== null) clearTimeout(retry); };
     // The first palette/font are supplied by bootstrap; subsequent changes update options below.
   }, []);
-  useEffect(() => { if (term.current) { term.current.options.fontSize = fontSize; term.current.options.theme = theme(palette); resize.current(); } }, [palette, fontSize]);
+  useEffect(() => { if (term.current) { term.current.options.fontSize = fontSize; term.current.options.theme = xtermTheme(palette, ansi16); resize.current(); } }, [palette, ansi16, fontSize]);
   // Nov 5: font family / scrollback / cursor apply to the live instance (never recreated).
   useEffect(() => {
     if (term.current && applyTerminalOptions(term.current.options as unknown as Record<string, unknown>, { fontFamily, scrollback, cursorStyle, cursorBlink })) resize.current();
@@ -98,6 +98,3 @@ export function TerminalView({ active, palette, fontSize, fail, fontFamily = '',
   useEffect(() => { if (active) resize.current(); }, [active]);
   return <div className="terminal" ref={host} aria-label="Hermes interactive terminal" />;
 }
-// Transparent: the island surface (incl. its blur/tint) shows through, so a
-// partial last row never paints a strip in another colour.
-function theme(palette: Palette) { return { background: '#00000000', foreground: palette.text, cursor: palette.accent, selectionBackground: palette.border }; }

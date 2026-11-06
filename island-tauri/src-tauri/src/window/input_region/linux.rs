@@ -160,6 +160,49 @@ impl PlatformBackend {
             .map_err(|_| IslandError::timeout("monitor transfer timed out"))?
     }
 
+    pub fn focus_restore(
+        &self,
+        action: crate::window::focus::FocusPlan,
+        generation: u64,
+        input: &[ShapeRow],
+        paint: Option<&[ShapeRow]>,
+    ) -> Result<(), IslandError> {
+        let (window, surface, input, paint) = (
+            self.window.clone(),
+            self.wayland.clone(),
+            input.to_vec(),
+            paint.map(<[ShapeRow]>::to_vec),
+        );
+        let (tx, rx) = mpsc::channel();
+        self.window
+            .run_on_main_thread(move || {
+                let result = (|| {
+                    if !crate::window::focus::current(generation) {
+                        return Ok(());
+                    }
+                    crate::window::focus::platform(&window, action)?;
+                    if let Some(surface) = surface {
+                        let gtk = window
+                            .gtk_window()
+                            .map_err(|e| IslandError::unavailable(e.to_string()))?;
+                        let mut surface = surface
+                            .lock()
+                            .map_err(|_| IslandError::internal("surface lock poisoned"))?;
+                        surface.refresh(&gtk)?;
+                        surface.set_input_region(&input)?;
+                        if let Some(paint) = paint {
+                            surface.set_blur_region(&paint)?;
+                        }
+                    }
+                    Ok(())
+                })();
+                let _ = tx.send(result);
+            })
+            .map_err(|e| IslandError::unavailable(e.to_string()))?;
+        rx.recv_timeout(MAIN_THREAD_TIMEOUT)
+            .map_err(|_| IslandError::timeout("focus restore timed out"))?
+    }
+
     pub fn xid(&self) -> u32 {
         self.xid
     }
@@ -310,6 +353,22 @@ fn apply_on_main_thread(window: &WebviewWindow, rows: &[ShapeRow]) -> Result<i32
 }
 
 impl InputRegionBackend for PlatformBackend {
+    fn focus(
+        &mut self,
+        action: crate::window::focus::FocusPlan,
+        generation: u64,
+        input: &[ShapeRow],
+        paint: Option<&[ShapeRow]>,
+    ) -> Result<(), IslandError> {
+        self.focus_restore(action, generation, input, paint)?;
+        if self.wayland.is_none() && crate::window::focus::current(generation) {
+            self.apply(input)?;
+            if let Some(paint) = paint {
+                self.paint(paint)?;
+            }
+        }
+        Ok(())
+    }
     fn apply(&mut self, region: &[ShapeRow]) -> Result<(), IslandError> {
         let applied = region;
         // Identical coverage, far fewer rectangles for GTK, the compositor and the blur hint.

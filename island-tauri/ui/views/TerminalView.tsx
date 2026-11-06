@@ -72,7 +72,7 @@ export function TerminalView({ active, palette, fontSize, fail, fontFamily = '',
         if (size && size.cols >= 2 && size.rows >= 2 && (terminal.cols !== size.cols || terminal.rows !== size.rows)) {
           terminal.resize(size.cols, size.rows); void terminalResize(size.cols, size.rows).catch(fail);
         }
-        terminal.focus();
+        if (!document.querySelector('[data-command-palette]')) terminal.focus();
       });
     };
     const observer = new ResizeObserver(() => resize.current()); observer.observe(host.current);
@@ -95,7 +95,16 @@ export function TerminalView({ active, palette, fontSize, fail, fontFamily = '',
   useEffect(() => {
     if (term.current && applyTerminalOptions(term.current.options as unknown as Record<string, unknown>, { fontFamily, scrollback, cursorStyle, cursorBlink })) resize.current();
   }, [fontFamily, scrollback, cursorStyle, cursorBlink]);
-  useEffect(() => { if (active) resize.current(); }, [active]);
+  useEffect(() => {
+    if (!active) return;
+    // Focus now, not only after ResizeObserver/the shell's settling fit. A reopen can
+    // have exactly the old dimensions, and typing must work during its animation.
+    if (!document.querySelector('[data-command-palette]')) term.current?.focus();
+    resize.current();
+    const refocus = () => { if (!document.querySelector('[data-command-palette]')) term.current?.focus(); };
+    window.addEventListener('island-terminal-focus', refocus);
+    return () => window.removeEventListener('island-terminal-focus', refocus);
+  }, [active]);
   return <div className="terminal" ref={host} aria-label="Hermes interactive terminal" />;
 }
 // Transparent: the island surface (incl. its blur/tint) shows through, so a

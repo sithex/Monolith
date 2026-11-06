@@ -6,6 +6,7 @@
 
 #[cfg(target_os = "linux")]
 pub mod crossing;
+pub mod focus;
 #[cfg(target_os = "linux")]
 pub mod frame_clock;
 pub mod input_region;

@@ -63,7 +63,7 @@ pub fn init_layer_surface(
     window.set_anchor(Edge::Top, true);
     window.set_anchor(Edge::Left, true);
     window.set_exclusive_zone(-1);
-    window.set_keyboard_mode(KeyboardMode::OnDemand);
+    window.set_keyboard_mode(KeyboardMode::None);
     let display = window.display();
     let (x, y) = (origin.0.round() as i32, origin.1.round() as i32);
     let monitor = display

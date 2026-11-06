@@ -93,7 +93,7 @@ struct FakeAccel {
     log: Log,
     /// key code → (component, friendly component, action friendly)
     taken: BTreeMap<i32, (String, String, String)>,
-    ours: Mutex<Vec<Key>>,
+    ours: Mutex<BTreeMap<String, Vec<Key>>>,
 }
 
 #[zbus::interface(name = "org.kde.KGlobalAccel")]
@@ -104,8 +104,13 @@ impl FakeAccel {
         self.log.lock().unwrap().push(format!("register {}", id[1]));
     }
     #[zbus(name = "shortcutKeys")]
-    async fn shortcut_keys(&self, _id: Vec<String>) -> Vec<Key> {
-        self.ours.lock().unwrap().clone()
+    async fn shortcut_keys(&self, id: Vec<String>) -> Vec<Key> {
+        self.ours
+            .lock()
+            .unwrap()
+            .get(&id[1])
+            .cloned()
+            .unwrap_or_default()
     }
     #[zbus(name = "globalShortcutAvailable")]
     async fn global_shortcut_available(&self, key: Key, component: String) -> bool {
@@ -131,7 +136,7 @@ impl FakeAccel {
             .unwrap_or_default()
     }
     #[zbus(name = "setShortcutKeys")]
-    async fn set_shortcut_keys(&self, _id: Vec<String>, keys: Vec<Key>, flags: u32) -> Vec<Key> {
+    async fn set_shortcut_keys(&self, id: Vec<String>, keys: Vec<Key>, flags: u32) -> Vec<Key> {
         // Like kglobalaccel: keys owned by another component are silently dropped.
         let kept: Vec<Key> = keys
             .into_iter()
@@ -141,7 +146,10 @@ impl FakeAccel {
             .lock()
             .unwrap()
             .push(format!("set {:?} flags {flags}", kept));
-        *self.ours.lock().unwrap() = kept.clone();
+        self.ours
+            .lock()
+            .unwrap()
+            .insert(id[1].clone(), kept.clone());
         kept
     }
     #[zbus(name = "unregister")]
@@ -150,7 +158,7 @@ impl FakeAccel {
             .lock()
             .unwrap()
             .push(format!("unregister {component} {action}"));
-        self.ours.lock().unwrap().clear();
+        self.ours.lock().unwrap().remove(&action);
         true
     }
     #[zbus(name = "setInactive")]
@@ -176,7 +184,7 @@ async fn fake_accel(address: &str, log: Log) -> Connection {
             FakeAccel {
                 log,
                 taken,
-                ours: Mutex::new(Vec::new()),
+                ours: Mutex::new(BTreeMap::new()),
             },
         )
         .build()
@@ -233,6 +241,7 @@ async fn gamemode_detection_shortcut_conflict_toggle_and_kwin_restart() {
     let sink_events = events.clone();
     let (settings, rx) = watch::channel(Desired {
         auto: true,
+        palette_shortcut: String::new(),
         shortcut: "Meta+`".into(),
     });
     let host = GameModeHost::start(
@@ -289,6 +298,7 @@ async fn gamemode_detection_shortcut_conflict_toggle_and_kwin_restart() {
     // A free key is bound (no autoloading: the setting is the authority) and a press toggles.
     settings.send_replace(Desired {
         auto: true,
+        palette_shortcut: "Ctrl+Alt+P".into(),
         shortcut: "Ctrl+Alt+H".into(),
     });
     wait_status(&host, "free key bound", |s| {
@@ -307,6 +317,24 @@ async fn gamemode_detection_shortcut_conflict_toggle_and_kwin_restart() {
     assert!(!events.lock().unwrap().contains(&Event::Toggle));
     press(&accel, "toggle-island").await;
     wait_event(&events, "toggle press", Event::Toggle);
+    let palette_code = keyseq::parse("Ctrl+Alt+P").unwrap().unwrap();
+    wait_until(
+        "palette registered independently",
+        Duration::from_secs(5),
+        || {
+            accel_log
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|line| *line == format!("set [([{palette_code}],)] flags 6"))
+                .then_some(())
+        },
+    );
+    press(&client, "command-palette").await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(!events.lock().unwrap().contains(&Event::Palette));
+    press(&accel, "command-palette").await;
+    wait_event(&events, "palette press", Event::Palette);
 
     // KWin crashes: the fullscreen flag is cleared; when it is back the script is reloaded once.
     events.lock().unwrap().clear();
@@ -337,6 +365,7 @@ async fn gamemode_detection_shortcut_conflict_toggle_and_kwin_restart() {
     let unloads = count(&kwin_log, "unload");
     settings.send_replace(Desired {
         auto: false,
+        palette_shortcut: String::new(),
         shortcut: String::new(),
     });
     wait_status(&host, "auto off + unbound", |s| {

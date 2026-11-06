@@ -248,6 +248,7 @@ function surfaceHarness({unchangedSizing=false,maxHeight=1190}={}) {
     'ui/stores/apps.ts':{useLayout:()=>({rev:1,unchangedSizing,layout:{...layoutFixture,preset:{type:'custom',width:820,maxHeight},buttons:[]}}),useLauncher:()=>({rev:1,items:[]})},
     'ui/island/geometry.ts':{...load('ui/island/geometry.ts'),nativePill:()=>null},
     'ui/island/components/IslandShell.tsx':{UI_SPRING:{}},
+    'ui/island/ApprovalNotice.tsx':{useApprovalHover:()=>({active:false,width:360,height:116})},
   });
   // Animation is a hook-free recording boundary; all sizing and content measurement
   // below still execute the actual IslandSurface component.

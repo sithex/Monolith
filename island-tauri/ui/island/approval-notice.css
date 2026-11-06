@@ -1,0 +1,22 @@
+.island .approval-notice { display: flex; flex-direction: column; gap: 8px; padding: 2px 4px 0; min-width: 0; }
+.island .approval-head { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.island .approval-head strong { flex: 1; min-width: 0; font-size: var(--fs-base); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.island .approval-more { font-size: var(--fs-sm); color: var(--skin-dim, #999); }
+.island .approval-dismiss { flex: none; width: 24px; height: 24px; padding: 0; border-radius: 50%; font-size: var(--fs-xl); line-height: 1; }
+.island .approval-text { margin: 0; padding: 7px 9px; border-radius: var(--radius-md); background: rgba(0, 0, 0, .28); border: 1px solid var(--skin-border, #444);
+  font: var(--fs-md) / 16px 'DejaVu Sans Mono', monospace; color: var(--skin-text, #ddd); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.island .approval-text.expanded { display: block; max-height: 144px; overflow-y: auto; }
+.island .approval-expand { align-self: flex-start; background: transparent; padding: 0 4px; font-size: var(--fs-sm); color: var(--skin-accent); }
+.island .approval-desc, .island .approval-note { margin: 0; font-size: var(--fs-sm); color: var(--skin-dim, #999); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.island .approval-note { white-space: normal; flex: 1; min-width: 0; }
+.island .approval-actions { display: flex; align-items: center; gap: 8px; }
+.island .approval-actions.choices-clarify { flex-direction: column; align-items: stretch; gap: 4px; }
+.island .approval-choice, .island .approval-open { height: 30px; padding: 0 12px; border-radius: 15px; font-size: var(--fs-md); border: 1px solid var(--skin-border, #444); }
+.island .choices-approval .approval-choice { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.island .choices-clarify .approval-choice { text-align: left; border-radius: var(--radius-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.island .approval-choice.style-once { background: var(--skin-accent); color: var(--skin-background, #111); border-color: transparent; font-weight: 600; }
+.island .approval-choice.style-once:hover:not(:disabled) { filter: brightness(1.1); background: var(--skin-accent); }
+.island .approval-choice.style-deny { color: var(--skin-error, #ff8888); }
+.island .approval-open { flex: none; background: transparent; }
+.island .approval-notice button:focus-visible { outline: 2px solid var(--skin-accent); outline-offset: 2px; }

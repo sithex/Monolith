@@ -131,6 +131,9 @@ export const aiConnect = (provider: AiProvider): Promise<AiConnectResult> =>
   unwrap(commands.aiConnect(provider));
 export const voiceCommand = (op: VoiceOp): Promise<VoiceStatus> => unwrap(commands.voiceCommand(op));
 export const voicePanel = (op: VoicePanelOp): Promise<VoicePanel> => unwrap(commands.voicePanel(op));
+export const approvalGet = () => unwrap(commands.approvalGet());
+export const approvalAnswer = (answer: import('./bindings').ApprovalAnswer) => unwrap(commands.approvalAnswer(answer));
+export const onApprovalChanged = (cb: (v: import('./bindings').ApprovalChanged) => void) => events.approvalChanged.listen(e => cb(e.payload));
 
 export const newTerminalChannel = (): Channel<TerminalEvent> => new Channel<TerminalEvent>();
 

@@ -182,6 +182,26 @@ fn settings_tab(s: &Stack, eis: &mut Wheel, origin: (i32, i32), name: &str) {
         ),
     );
 }
+/// Pick a colour scheme through the real picker. Schemes with variants live inside a
+/// collapsible family row (SchemePicker.tsx): open the family first when its radio is hidden.
+fn pick_scheme(s: &Stack, eis: &mut Wheel, origin: (i32, i32), id: &str, family: &str) {
+    let radio = format!("[data-testid=appearance-{id}]");
+    if eval(s, &format!("!document.querySelector({})", json!(radio))) == true {
+        click(
+            s,
+            eis,
+            origin,
+            &format!("[data-testid=scheme-family-{family}]"),
+        );
+        until(
+            s,
+            &format!("7a scheme family {family} expanded"),
+            8,
+            &format!("document.querySelector('[data-testid=scheme-family-{family}]')?.getAttribute('aria-expanded')==='true' && !!document.querySelector({})", json!(radio)),
+        );
+    }
+    click(s, eis, origin, &radio);
+}
 fn view(
     s: &Stack,
     conn: &RustConnection,
@@ -336,6 +356,17 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     assert!(pty.as_u64().unwrap() > 0);
     click(&s, &mut eis, origin, "[data-testid=collapse]");
     mode(&s, &conn, window, "still", IslandMode::Still);
+    // Release remaps the X11 window; it must come back where it was (WM placement moved it).
+    let after = conn
+        .translate_coordinates(window, root, 0, 0)
+        .unwrap()
+        .reply()
+        .unwrap();
+    assert_eq!(
+        (i32::from(after.dst_x), i32::from(after.dst_y)),
+        origin,
+        "collapse moved the overlay window"
+    );
     assert_eq!(status(&s)["pty"], pty);
     client(&s, "pin");
     mode(&s, &conn, window, "large", IslandMode::Large);
@@ -356,12 +387,8 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         view(&s, &conn, window, &mut eis, origin, "settings");
         // Colour schemes live on the Settings → Appearance tab (SettingsView.tsx).
         settings_tab(&s, &mut eis, origin, "Appearance");
-        click(
-            &s,
-            &mut eis,
-            origin,
-            &format!("[data-testid=appearance-{theme}]"),
-        );
+        // skin is a standalone row; neutral lives in the Monolith family.
+        pick_scheme(&s, &mut eis, origin, theme, "monolith");
         until(
             &s,
             "7a appearance changed without restart",
@@ -439,7 +466,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     settled(&s, &conn, window, IslandMode::Large);
     settings_tab(&s, &mut eis, origin, "Appearance");
     // Leave a non-default choice persisted so the reload below proves it was read back.
-    click(&s, &mut eis, origin, "[data-testid=appearance-neutral]");
+    pick_scheme(&s, &mut eis, origin, "neutral", "monolith");
     until(
         &s,
         "7a neutral re-selected",

@@ -66,7 +66,7 @@ results=()
 step() { # key, shell snippet run in /work inside the container
   local key="$1" snippet="$2" start rc=0 verdict
   if [[ "$failed" == 1 && "$keep_going" == 0 ]]; then
-    results+=("$(printf '%-16s SKIP' "$key")")
+    results+=("$(printf '%-19s SKIP' "$key")")
     return 0
   fi
   start=$SECONDS
@@ -77,7 +77,7 @@ step() { # key, shell snippet run in /work inside the container
     if [[ "$key" == test-ui ]] && known_ui_failure "$logs/$key.log"; then verdict=KNOWN; fi
   fi
   [[ "$verdict" == FAIL ]] && failed=1
-  results+=("$(printf '%-16s %-5s %4ss  %s' "$key" "$verdict" "$((SECONDS - start))" "$(summary "$key")")")
+  results+=("$(printf '%-19s %-5s %4ss  %s' "$key" "$verdict" "$((SECONDS - start))" "$(summary "$key")")")
   printf 'fedora-check: %s\n' "${results[-1]}"
 }
 # Exactly one failing test, the palette one, on Node < 26.
@@ -106,7 +106,10 @@ step optional-names 'read -r -a cmd <<<"$(bash scripts/install-deps.sh --print -
   wanted=("${cmd[@]:2}")
   found=$(dnf -q repoquery --qf "%{name}\n" "${wanted[@]}" | sort -u)
   missing=()
-  for p in "${wanted[@]}"; do grep -qx -- "$p" <<<"$found" || missing+=("$p"); done
+  for p in "${wanted[@]}"; do
+    # A name dnf install accepts: a package, or a capability one provides (npm -> nodejs-npm).
+    grep -qx -- "$p" <<<"$found" || [[ -n "$(dnf -q repoquery --whatprovides "$p")" ]] || missing+=("$p")
+  done
   ((${#missing[@]} == 0)) || { echo "not in the Fedora repos: ${missing[*]}"; exit 1; }
   echo "all ${#wanted[@]} Fedora package names resolve"'
 step install-deps-checks 'bash scripts/tests/install-deps.sh'

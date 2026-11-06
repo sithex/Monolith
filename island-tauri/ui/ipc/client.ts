@@ -22,6 +22,7 @@ import {
   type Palette,
   type Settings,
   type SettingsPatch,
+  type MonolithCost,
   type SystemStats,
   type TerminalEvent,
   type TerminalSnapshot,
@@ -50,6 +51,7 @@ export type {
   Palette,
   Settings,
   SettingsPatch,
+  MonolithCost,
   SystemStats,
   TerminalEvent,
   TerminalSnapshot,
@@ -126,6 +128,7 @@ export const terminalAck = async (seq: number): Promise<void> => {
   await unwrap(commands.terminalAck(seq));
 };
 export const systemStats = (): Promise<SystemStats> => unwrap(commands.systemStats());
+export const monolithCost = (): Promise<MonolithCost> => unwrap(commands.monolithCost());
 export const aiUsage = (): Promise<AiUsage> => unwrap(commands.aiUsage());
 export const aiConnect = (provider: AiProvider): Promise<AiConnectResult> =>
   unwrap(commands.aiConnect(provider));

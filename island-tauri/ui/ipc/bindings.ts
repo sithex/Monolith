@@ -81,6 +81,11 @@ export const commands = {
 	 */
 	terminalAck: (seq: number) => typedError<null, IslandError>(__TAURI_INVOKE("terminal_ack", { seq })),
 	systemStats: () => typedError<SystemStats, IslandError>(__TAURI_INVOKE("system_stats")),
+	/**
+	 *  Monolith's own CPU / PSS / wakeups plus plasmashell and kwin CPU, averaged over the last
+	 *  ~10 s. Sampled per call, so only while the Monitor view is visible and polling.
+	 */
+	monolithCost: () => typedError<MonolithCost, IslandError>(__TAURI_INVOKE("monolith_cost")),
 	/**  Cached 60 s; concurrent callers are coalesced behind one refresh. */
 	aiUsage: () => typedError<AiUsage, IslandError>(__TAURI_INVOKE("ai_usage")),
 	/**  `provider` is an enum allow-list: anything else is rejected before this runs. */
@@ -736,6 +741,25 @@ export type ModuleId = string;
  *  Object keys in opaque data are user data, not contract field names.
  */
 export type ModuleJsonValue = null | boolean | number | string | ModuleJsonValue[] | { [key in string]: ModuleJsonValue };
+
+/**
+ *  Monolith's own running cost (Monitor view, "Monolith cost" card). CPU is a percentage of
+ *  ONE core averaged over `windowSecs` (the last ~10 s); every value is `null` while it is
+ *  unavailable (first sample, process not running), never a fabricated zero.
+ */
+export type MonolithCost = {
+	/**  The island's whole process tree: main, WebKit processes, helpers, terminal + children. */
+	cpu: number | null,
+	/**  Proportional set size of that tree, in bytes. */
+	pssBytes: number | null,
+	/**  Scheduler wakeups per second (voluntary + involuntary context switches, all threads). */
+	wakeups: number | null,
+	processes: number,
+	threads: number,
+	plasmashellCpu: number | null,
+	kwinCpu: number | null,
+	windowSecs: number,
+};
 
 export type NetworkStats = {
 	rxBytesPerSecond: number,

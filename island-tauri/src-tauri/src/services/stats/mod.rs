@@ -1,19 +1,25 @@
 //! System metrics (SPEC §3.5). Linux reads `/proc` + `statvfs` with no subprocess; other
 //! platforms answer `unsupported` until their phase (`sysinfo`, Phase 8).
 
-use crate::{contract::system::SystemStats, error::IslandError};
+use crate::{
+    contract::system::{MonolithCost, SystemStats},
+    error::IslandError,
+};
 use std::path::PathBuf;
 #[cfg(target_os = "linux")]
 use std::sync::Mutex;
 
 #[cfg(target_os = "linux")]
 pub mod linux_proc;
+pub mod self_cost;
 
 pub struct StatsService {
     #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     disk_path: PathBuf,
     #[cfg(target_os = "linux")]
     sampler: Mutex<linux_proc::Sampler>,
+    #[cfg(target_os = "linux")]
+    cost: Mutex<(self_cost::CostSampler, self_cost::ProcFinder)>,
 }
 
 impl StatsService {
@@ -23,6 +29,8 @@ impl StatsService {
             disk_path,
             #[cfg(target_os = "linux")]
             sampler: Mutex::new(linux_proc::Sampler::default()),
+            #[cfg(target_os = "linux")]
+            cost: Mutex::new(Default::default()),
         }
     }
 
@@ -34,6 +42,30 @@ impl StatsService {
             .lock()
             .map_err(|_| IslandError::internal("stats sampler is poisoned"))?;
         Ok(sampler.sample(&self.disk_path))
+    }
+
+    /// Monolith's own cost (island process tree, plasmashell, kwin). Reads `/proc` only when
+    /// called, i.e. while the Monitor view polls; nothing runs in the background.
+    #[cfg(target_os = "linux")]
+    pub fn monolith_cost(&self) -> Result<MonolithCost, IslandError> {
+        let mut guard = self
+            .cost
+            .lock()
+            .map_err(|_| IslandError::internal("cost sampler is poisoned"))?;
+        let (sampler, finder) = &mut *guard;
+        let input = self_cost::read_input(std::process::id(), finder);
+        Ok(sampler.sample(
+            std::time::Instant::now(),
+            &input,
+            self_cost::ticks_per_second(),
+        ))
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn monolith_cost(&self) -> Result<MonolithCost, IslandError> {
+        Err(IslandError::unsupported(
+            "the Monolith cost readout is not implemented on this platform yet",
+        ))
     }
 
     #[cfg(not(target_os = "linux"))]

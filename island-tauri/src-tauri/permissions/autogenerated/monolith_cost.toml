@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-monolith-cost"
+description = "Enables the monolith_cost command without any pre-configured scope."
+commands.allow = ["monolith_cost"]
+
+[[permission]]
+identifier = "deny-monolith-cost"
+description = "Denies the monolith_cost command without any pre-configured scope."
+commands.deny = ["monolith_cost"]

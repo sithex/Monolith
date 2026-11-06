@@ -6,7 +6,9 @@
 #
 # Default suites: every tests/kwin_*.rs, tests/notification_monitor.rs, tests/xvfb_shape.rs.
 # Needs: built UI (`npm run build:ui` in island-tauri/), kwin_wayland, Xwayland, Xvfb, xfwm4,
-# dbus-daemon, python3-gobject. The fixtures clear the inherited environment, so the live
+# dbus-daemon, python3-gobject. Arch: kwin xorg-xwayland xorg-server-xvfb xfwm4 dbus python-gobject
+# libei. Fedora: kwin xorg-x11-server-Xwayland xorg-x11-server-Xvfb xfwm4 dbus-daemon python3-gobject
+# libei. The fixtures clear the inherited environment, so the live
 # desktop's display, bus and HOME are never used. Extra test-binary args: GUI_TEST_ARGS="...".
 set -u
 here=$(cd "$(dirname "$0")/.." && pwd)

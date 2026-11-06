@@ -58,7 +58,10 @@ Tests: `tests/run_rollback_test.sh` (fake binaries).
 scripts/precheck.sh            # Rust tests + clippy, bindings, tsc, test:ui, QML, launcher tests, secrets
 scripts/precheck.sh --fast     # skips the Rust steps
 scripts/install-pre-push-hook.sh   # optional; installs a pre-push hook that runs it (--remove to undo)
+scripts/fedora-container-check.sh  # optional, needs Docker: build + test `git archive HEAD` on fresh Fedora
 ```
+
+`scripts/install-deps.sh --with-test-deps` installs what the service tests need on Arch or Fedora.
 
 It runs at low CPU/IO priority, prints a PASS/FAIL table and exits non-zero on any failure; the log
 of each failing step is kept (path printed). The nested-compositor GUI suites are not included.
@@ -116,7 +119,11 @@ Two kinds of test binary live under `src-tauri/`:
   so they never touch the live desktop; no `WAYLAND_DISPLAY`/`DISPLAY` is needed. They are
   ordinary tests (not `#[ignore]`d), so a bare `cargo test` runs them (about 11 minutes)
   and they fail closed when `kwin_wayland`, `Xwayland`, `Xvfb`, `xfwm4`, `dbus-daemon`,
-  Python GObject bindings or the capture/input helpers are missing.
+  Python GObject bindings or the capture/input helpers are missing. Packages: `kwin
+  xorg-xwayland xorg-server-xvfb xfwm4 dbus python-gobject libei` on Arch, `kwin
+  xorg-x11-server-Xwayland xorg-x11-server-Xvfb xfwm4 dbus-daemon python3-gobject libei` on
+  Fedora. In Docker, Fedora's `kwin_wayland` needs `--cap-add=SYS_NICE` (it has
+  `cap_sys_nice` set).
 
 Run the GUI suites one binary at a time, at low priority, with a check that no compositor
 survives them:

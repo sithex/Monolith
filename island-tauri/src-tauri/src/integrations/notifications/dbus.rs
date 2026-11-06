@@ -76,6 +76,9 @@ pub struct DbusNotification {
     pub image_data: Option<ImageData>,
     pub origin_name: Option<String>,
     pub formatting: Formatting,
+    pub suppress_sound: bool,
+    pub sound_file: Option<String>,
+    pub sound_name: Option<String>,
 }
 
 impl NotifyArgs {
@@ -94,16 +97,18 @@ impl NotifyArgs {
                 bounded(s, MAX_HINT_STRING_BYTES)?;
             }
             match (key.as_str(), value) {
-                ("urgency", HintValue::Byte(0..=2)) | ("transient", HintValue::Bool(_)) => {}
+                ("urgency", HintValue::Byte(0..=2))
+                | ("transient" | "suppress-sound", HintValue::Bool(_)) => {}
                 (
                     "desktop-entry" | "category" | "image-path" | "image_path"
-                    | "x-kde-origin-name",
+                    | "x-kde-origin-name" | "sound-file" | "sound-name",
                     HintValue::String(_),
                 ) => {}
                 ("image-data" | "icon_data", HintValue::ImageData(image)) => image.validate()?,
                 (
-                    "urgency" | "transient" | "desktop-entry" | "category" | "image-path"
-                    | "image_path" | "x-kde-origin-name" | "image-data" | "icon_data",
+                    "urgency" | "transient" | "suppress-sound" | "sound-file" | "sound-name"
+                    | "desktop-entry" | "category" | "image-path" | "image_path"
+                    | "x-kde-origin-name" | "image-data" | "icon_data",
                     _,
                 ) => return Err(Error::invalid("wrong notification hint type or value")),
                 _ => {}
@@ -160,6 +165,12 @@ impl NotifyArgs {
             image_data: image("image-data").or_else(|| image("icon_data")),
             origin_name: string("x-kde-origin-name"),
             formatting,
+            suppress_sound: matches!(
+                self.hints.get("suppress-sound"),
+                Some(HintValue::Bool(true))
+            ),
+            sound_file: string("sound-file"),
+            sound_name: string("sound-name"),
         })
     }
 }

@@ -26,6 +26,27 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(2);
 const PENDING_TTL: Duration = Duration::from_secs(5);
 const MAX_MESSAGE: usize = 128 * 1024;
 
+pub async fn invoke_on(
+    connection: &Connection,
+    owner: &str,
+    id: u32,
+    key: &str,
+) -> Result<(), IslandError> {
+    tokio::time::timeout(
+        CALL_TIMEOUT,
+        connection.call_method(
+            Some(owner),
+            PATH,
+            Some("org.kde.NotificationManager"),
+            "InvokeAction",
+            &(id, key),
+        ),
+    )
+    .await
+    .map_err(|_| IslandError::timeout("Notification action invocation"))?
+    .map_err(|_| IslandError::unsupported("Notification server cannot invoke this action"))?;
+    Ok(())
+}
 pub async fn next(stream: &mut MessageStream) -> Option<zbus::Result<Message>> {
     poll_fn(|cx| Pin::new(&mut *stream).poll_next(cx)).await
 }
@@ -119,6 +140,29 @@ impl Monitor {
         .map_err(transport)?;
         Ok(true)
     }
+    /// Invoke only on the captured unique server, never emit forged application signals.
+    pub async fn invoke(
+        &self,
+        expected: Option<&str>,
+        id: u32,
+        key: &str,
+    ) -> Result<bool, IslandError> {
+        let control = self
+            .control
+            .lock()
+            .map_err(|_| IslandError::internal("Monitor control poisoned"))?
+            .clone();
+        let Some((connection, current)) = control else {
+            return Ok(false);
+        };
+        if expected != Some(current.as_str())
+            || owner(&connection).await?.as_deref() != Some(current.as_str())
+        {
+            return Ok(false);
+        }
+        invoke_on(&connection, &current, id, key).await?;
+        Ok(true)
+    }
     pub async fn run(
         self: Arc<Self>,
         hub: Arc<Hub>,
@@ -147,6 +191,7 @@ impl Monitor {
                 .control
                 .lock()
                 .map_err(|_| IslandError::internal("Monitor control poisoned"))? = None;
+            self.update(|r| r.available = false)?;
             hub.reset_server()?;
             if let Err(error) = result {
                 tracing::warn!(%error, "Notification mirror disconnected");
@@ -185,6 +230,7 @@ impl Monitor {
             .map_err(transport)?;
         let mut current = owner(&a).await?;
         let mut stream = self.arm(&a, address, current.as_deref()).await?;
+        hub.refresh_policy()?;
         let mut core = Decoder::default();
         loop {
             let deadline = core.pending.front().map(|(_, _, at)| *at + PENDING_TTL);
@@ -214,6 +260,7 @@ impl Monitor {
                         hub.reset_server()?;
                         current=replacement;
                         stream=self.arm(&a,address,current.as_deref()).await?;
+                        hub.refresh_policy()?;
                         self.update(|r|r.rearms=r.rearms.wrapping_add(1))?;
                     }
                 },
@@ -224,9 +271,14 @@ impl Monitor {
                             if let Some(raw)=n.image_data.take(){
                                 n.input.icon_png=Some(tokio::task::spawn_blocking(move||encode(raw)).await.map_err(|_|IslandError::internal("Image worker failed"))??);
                             }
-                            hub.insert(n.input)?;
+                            if n.input.icon_png.is_none() {
+                                let hint = n.image_path.clone().unwrap_or_else(|| n.app_icon.clone());
+                                n.input.icon_png = tokio::task::spawn_blocking(move || super::effects::icon(&hint)).await.ok().flatten();
+                            }
+                            hub.insert_system(*n, current.as_deref().unwrap_or(""))?;
                         },
                         Ok(Observed::Closed(id))=>hub.server_closed(id)?,
+                        Ok(Observed::Expired(id))=>hub.server_expired(id)?,
                         Ok(Observed::Action)=>self.update(|r|r.observed_actions=r.observed_actions.wrapping_add(1))?,
                         Ok(Observed::Ignored)=>{},
                         Err(_)=>self.update(|r|r.invalid=r.invalid.wrapping_add(1))?,
@@ -308,6 +360,7 @@ impl Monitor {
 pub enum Observed {
     Notification(Box<super::dbus::DbusNotification>),
     Closed(u32),
+    Expired(u32),
     Action,
     Ignored,
 }
@@ -390,8 +443,13 @@ impl Decoder {
         {
             match h.member().map(|v| v.as_str()) {
                 Some("NotificationClosed") => {
-                    let (id, _): (u32, u32) = message.body().deserialize().map_err(transport)?;
-                    return Ok(Observed::Closed(id));
+                    let (id, reason): (u32, u32) =
+                        message.body().deserialize().map_err(transport)?;
+                    return Ok(if reason == 1 {
+                        Observed::Expired(id)
+                    } else {
+                        Observed::Closed(id)
+                    });
                 }
                 Some("ActionInvoked") => {
                     let (_, _): (u32, String) = message.body().deserialize().map_err(transport)?;
@@ -420,10 +478,9 @@ fn decode_args(message: &Message) -> Result<NotifyArgs, IslandError> {
     for (key, value) in raw {
         let parsed = match key.as_str() {
             "urgency" => u8::try_from(value).map(HintValue::Byte),
-            "transient" => bool::try_from(value).map(HintValue::Bool),
-            "desktop-entry" | "category" | "image-path" | "image_path" | "x-kde-origin-name" => {
-                String::try_from(value).map(HintValue::String)
-            }
+            "transient" | "suppress-sound" => bool::try_from(value).map(HintValue::Bool),
+            "desktop-entry" | "category" | "image-path" | "image_path" | "x-kde-origin-name"
+            | "sound-file" | "sound-name" => String::try_from(value).map(HintValue::String),
             "image-data" | "icon_data" => {
                 type RawImage = (i32, i32, i32, bool, i32, i32, Vec<u8>);
                 RawImage::try_from(value).map(|(w, h, stride, alpha, bits, channels, data)| {
@@ -501,4 +558,48 @@ fn encode(raw: ImageData) -> Result<String, IslandError> {
         return Err(IslandError::invalid("Encoded notification icon too large"));
     }
     Ok(text)
+}
+
+#[cfg(test)]
+mod sound_hint_tests {
+    use super::*;
+
+    #[test]
+    fn real_wire_decode_keeps_sound_hints_for_policy() {
+        let hints: BTreeMap<String, OwnedVariant> = BTreeMap::from([
+            ("suppress-sound".into(), true.into()),
+            (
+                "sound-file".into(),
+                zbus::wire::Str::from("/usr/share/sounds/message.oga").into(),
+            ),
+            (
+                "sound-name".into(),
+                zbus::wire::Str::from("message-new-instant").into(),
+            ),
+        ]);
+        let message = Message::method_call(PATH, "Notify")
+            .interface(NAME)
+            .build(&(
+                "Mail",
+                0u32,
+                "",
+                "New message",
+                "Hello",
+                Vec::<String>::new(),
+                hints,
+                6000i32,
+            ))
+            .unwrap();
+        let args = decode_args(&message).unwrap();
+        assert!(matches!(
+            args.hints.get("suppress-sound"),
+            Some(HintValue::Bool(true))
+        ));
+        assert!(
+            matches!(args.hints.get("sound-file"), Some(HintValue::String(s)) if s.ends_with("message.oga"))
+        );
+        assert!(
+            matches!(args.hints.get("sound-name"), Some(HintValue::String(s)) if s == "message-new-instant")
+        );
+    }
 }

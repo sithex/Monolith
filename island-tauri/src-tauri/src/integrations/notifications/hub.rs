@@ -27,6 +27,16 @@ struct Inner {
     store: NotificationStore,
     pending: VecDeque<(Changes, Option<String>)>,
     repair_needed: bool,
+    popups: popups::Popups,
+    routes: std::collections::HashMap<String, Route>,
+}
+#[derive(Clone)]
+pub struct Route {
+    pub owner: String,
+    pub server_id: u32,
+    pub desktop_entry: Option<String>,
+    pub live: bool,
+    pub default_action: bool,
 }
 pub struct Hub {
     inner: Mutex<Inner>,
@@ -38,6 +48,10 @@ pub struct Hub {
     pub dropped: AtomicU32,
     pub monitor: Arc<super::linux_monitor::Monitor>,
     mirror_enabled: watch::Sender<bool>,
+    pub takeover_enabled: watch::Sender<bool>,
+    pub inhibited: std::sync::atomic::AtomicBool,
+    #[cfg(target_os = "linux")]
+    sound: effects::Sound,
 }
 impl Hub {
     pub fn new(actor: Handle, settings: Arc<SettingsService>) -> Arc<Self> {
@@ -46,6 +60,8 @@ impl Hub {
                 store: NotificationStore::default(),
                 pending: VecDeque::new(),
                 repair_needed: false,
+                popups: popups::Popups::default(),
+                routes: std::collections::HashMap::new(),
             }),
             wake: Notify::new(),
             actor,
@@ -58,6 +74,10 @@ impl Hub {
             dropped: AtomicU32::new(0),
             monitor: Arc::default(),
             mirror_enabled: watch::channel(false).0,
+            takeover_enabled: watch::channel(false).0,
+            inhibited: std::sync::atomic::AtomicBool::new(false),
+            #[cfg(target_os = "linux")]
+            sound: effects::Sound::default(),
         })
     }
     fn now(&self) -> f64 {
@@ -71,11 +91,23 @@ impl Hub {
             .inner
             .lock()
             .map_err(|_| IslandError::internal("Notification store poisoned"))?;
-        let settings = self.settings.get()?;
+        let mut settings = self.settings.get()?;
+        settings.dnd = self.actor.state().dnd;
+        settings.game_mode = self.actor.state().game_mode;
         let mut policy = inner.store.policy().clone();
-        policy.dnd = self.actor.state().dnd;
+        policy.dnd = settings.dnd;
         policy.redact_bodies = settings.redact_bodies;
-        policy.denied_apps = settings.notification_denied_apps.into_iter().collect();
+        policy.denied_apps = settings.notification_denied_apps.iter().cloned().collect();
+        inner.popups.configure(&settings);
+        self.takeover_enabled.send_if_modified(|enabled| {
+            let next = settings.silence_kde_popups
+                && settings.notifications_enabled
+                && settings.system_notification_mirror
+                && self.monitor.status().available;
+            let changed = *enabled != next;
+            *enabled = next;
+            changed
+        });
         self.mirror_enabled.send_if_modified(|enabled| {
             let changed = *enabled != settings.system_notification_mirror;
             *enabled = settings.system_notification_mirror;
@@ -84,6 +116,7 @@ impl Hub {
         let privacy = inner.store.set_policy(policy).map_err(core_error)?;
         self.queue(&mut inner, privacy);
         let (value, changes) = work(&mut inner.store, self.now())?;
+        inner.store.retain_history();
         self.queue(&mut inner, changes);
         drop(inner);
         self.wake.notify_one();
@@ -93,9 +126,41 @@ impl Hub {
         if changes.events.is_empty() && changes.close_server_ids.is_empty() {
             return;
         }
+        inner.popups.tick(self.origin.elapsed().as_millis() as u64);
         // Capacity is EVENTS, not batches (clear/privacy operations can emit 200 deltas).
         let mut close_server_ids = changes.close_server_ids;
-        for event in changes.events {
+        for mut event in changes.events {
+            if let Delta::NotificationReceived(n) = &mut event {
+                if changes.id.as_deref() == Some(n.0.id.as_str()) {
+                    if let Ok(settings) = self.settings.get() {
+                        n.0.urgency = popups::urgency(&settings, &n.0.app_name, n.0.urgency);
+                        inner.store.override_urgency(&n.0.id, n.0.urgency);
+                    }
+                }
+            }
+            match &event {
+                Delta::NotificationReceived(n)
+                    if changes.id.as_deref() == Some(n.0.id.as_str()) =>
+                {
+                    if let Ok(mut settings) = self.settings.get() {
+                        settings.dnd = self.actor.state().dnd;
+                        settings.game_mode = self.actor.state().game_mode;
+                        let mut notification: wire::IslandNotification = n.0.clone().into();
+                        notification.can_invoke_actions =
+                            inner.routes.get(&notification.id).is_some_and(|r| r.live);
+                        inner.popups.insert(
+                            notification,
+                            &settings,
+                            self.origin.elapsed().as_millis() as u64,
+                        );
+                    }
+                }
+                Delta::NotificationReceived(n) => inner.popups.update(n.0.clone().into()),
+                Delta::NotificationClosed(c) => {
+                    inner.popups.remove(&c.id);
+                    inner.routes.remove(&c.id);
+                }
+            }
             if inner.pending.len() == 128 {
                 inner.pending.pop_front();
                 inner.repair_needed = true;
@@ -122,8 +187,93 @@ impl Hub {
             Ok((store.list().into_iter().map(Into::into).collect(), changes))
         })
     }
-    pub fn insert(&self, input: NotificationInput) -> Result<(), IslandError> {
+    pub fn insert(&self, mut input: NotificationInput) -> Result<(), IslandError> {
+        let settings = self.settings.get()?;
+        input.urgency = popups::urgency(&settings, &input.app_name, input.urgency);
+        // History outlives presentation. The server still owns its own lifecycle.
+        input.ttl_ms = Some(0.);
         self.mutate(|store, now| Ok(((), store.insert(input, now).map_err(core_error)?)))
+    }
+    #[cfg(target_os = "linux")]
+    pub fn insert_system(&self, n: dbus::DbusNotification, owner: &str) -> Result<(), IslandError> {
+        let mut settings = self.settings.get()?;
+        settings.dnd = self.actor.state().dnd;
+        settings.game_mode = self.actor.state().game_mode;
+        if let Some(server_id) = n.input.server_id {
+            let mut inner = self
+                .inner
+                .lock()
+                .map_err(|_| IslandError::internal("Notification routes poisoned"))?;
+            // Bounded by history, including rejected notifications.
+            if inner.routes.len() >= STORE_CAPACITY {
+                let ids: std::collections::HashSet<_> =
+                    inner.store.list().into_iter().map(|n| n.id).collect();
+                inner.routes.retain(|id, _| ids.contains(id));
+            }
+            inner.routes.insert(
+                format!("d-{server_id}"),
+                Route {
+                    owner: owner.into(),
+                    server_id,
+                    desktop_entry: n.desktop_entry.clone(),
+                    live: true,
+                    default_action: n.input.actions.iter().any(|a| a.key == "default"),
+                },
+            );
+        }
+        self.sound
+            .play(&n, &settings, self.inhibited.load(Ordering::Relaxed));
+        self.insert(n.input)
+    }
+    pub fn popup_snapshot(&self) -> Result<popups::NotificationPopups, IslandError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| IslandError::internal("Notification popups poisoned"))?;
+        inner.popups.tick(self.origin.elapsed().as_millis() as u64);
+        Ok(inner.popups.snapshot())
+    }
+    pub fn popup_change(&self, id: &str, paused: Option<bool>) -> Result<(), IslandError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| IslandError::internal("Notification popups poisoned"))?;
+        if let Some(paused) = paused {
+            inner
+                .popups
+                .pause(id, paused, self.origin.elapsed().as_millis() as u64);
+        } else {
+            inner.popups.tick(self.origin.elapsed().as_millis() as u64);
+            inner.popups.remove(id);
+        }
+        drop(inner);
+        self.wake.notify_one();
+        Ok(())
+    }
+    pub fn action_route(&self, id: &str, key: &str) -> Result<Route, IslandError> {
+        let inner = self
+            .inner
+            .lock()
+            .map_err(|_| IslandError::internal("Notification routes poisoned"))?;
+        let item = inner
+            .store
+            .list()
+            .into_iter()
+            .find(|n| n.id == id)
+            .ok_or_else(|| IslandError::unavailable("Notification is no longer available"))?;
+        if key != "default"
+            && !item
+                .actions
+                .iter()
+                .any(|a| a.key == key && key != "inline-reply")
+        {
+            return Err(IslandError::invalid("Notification action was not offered"));
+        }
+        inner
+            .routes
+            .get(id)
+            .cloned()
+            .ok_or_else(|| IslandError::unavailable("Notification has no application route"))
     }
     pub fn dismiss(&self, id: &str) -> Result<(), IslandError> {
         self.mutate(|store, _| Ok(((), store.dismiss(id))))
@@ -133,6 +283,18 @@ impl Hub {
     }
     pub fn server_closed(&self, id: u32) -> Result<(), IslandError> {
         self.mutate(|store, _| Ok(((), store.server_closed(id))))
+    }
+    pub fn server_expired(&self, id: u32) -> Result<(), IslandError> {
+        {
+            let mut inner = self
+                .inner
+                .lock()
+                .map_err(|_| IslandError::internal("Notification routes poisoned"))?;
+            if let Some(route) = inner.routes.get_mut(&format!("d-{id}")) {
+                route.live = false;
+            }
+        }
+        self.mutate(|store, _| Ok(((), store.deactivate_server(id))))
     }
     pub fn reset_server(&self) -> Result<(), IslandError> {
         self.mutate(|store, _| Ok(((), store.reset_server())))
@@ -149,22 +311,31 @@ impl Hub {
         app: tauri::AppHandle,
         mut stopped: watch::Receiver<bool>,
     ) -> Result<(), IslandError> {
+        let mut state_changes = self.actor.watch();
         loop {
             // Register before inspecting the queue, avoiding lost wakeups between drain/wait.
             let notified = self.wake.notified();
             tokio::pin!(notified);
             notified.as_mut().enable();
-            let (pending, unread, expiry, repair) = {
+            let (pending, unread, expiry, repair, popup_state) = {
                 let mut inner = self
                     .inner
                     .lock()
                     .map_err(|_| IslandError::internal("Notification store poisoned"))?;
                 let expired = inner.store.expire(self.now()).map_err(core_error)?;
                 self.queue(&mut inner, expired);
+                let now = self.origin.elapsed().as_millis() as u64;
+                inner.popups.tick(now);
+                let popup_deadline = inner.popups.deadline(now).map(|at| self.epoch + at as f64);
+                let expiry = match (inner.store.next_expiry(), popup_deadline) {
+                    (Some(a), Some(b)) => Some(a.min(b)),
+                    (a, b) => a.or(b),
+                };
+                let popup_state = inner.popups.take_dirty().then(|| inner.popups.snapshot());
                 (
                     inner.pending.drain(..).collect::<Vec<_>>(),
                     inner.store.len() as u32,
-                    inner.store.next_expiry(),
+                    expiry,
                     if std::mem::take(&mut inner.repair_needed) {
                         Some(wire::NotificationSnapshot {
                             rev: inner.store.current_revision(),
@@ -173,8 +344,14 @@ impl Hub {
                     } else {
                         None
                     },
+                    popup_state,
                 )
             };
+            if let Some(popups) = popup_state {
+                popups
+                    .emit_to(&app, ISLAND_LABEL)
+                    .map_err(|_| IslandError::internal("Notification popups emit failed"))?;
+            }
             if let Some(repair) = repair {
                 repair
                     .emit_to(&app, ISLAND_LABEL)
@@ -193,12 +370,8 @@ impl Hub {
                                 .store
                                 .is_current(&n.0.id, n.0.rev);
                             if current {
-                                if changes.toast {
-                                    self.actor
-                                        .dispatch(Intent::NotificationArrived(n.0.id.clone()))
-                                        .await?;
-                                }
-                                // Recheck after the actor await and hold serialization
+                                // Popup presentation is independent of the hover-preview state.
+                                // Recheck and hold serialization
                                 // through emit, so a concurrent scrub cannot be undone.
                                 let inner = self.inner.lock().map_err(|_| {
                                     IslandError::internal("Notification store poisoned")
@@ -248,6 +421,7 @@ impl Hub {
             tokio::select! { biased;
                 result=stopped.changed()=>{if result.is_err()||*stopped.borrow(){break;}},
                 ()=&mut notified=>{},
+                changed=state_changes.changed()=>{ if changed.is_err() { break; } self.refresh_policy()?; },
                 ()=wait=>{},
             }
         }
@@ -283,6 +457,8 @@ pub struct Notifications {
     task: Mutex<Option<tauri::async_runtime::JoinHandle<Result<(), IslandError>>>>,
     ingest: Mutex<Option<IngestServer>>,
     monitor_task: Mutex<Option<tauri::async_runtime::JoinHandle<Result<(), IslandError>>>>,
+    #[cfg(target_os = "linux")]
+    takeover_task: Mutex<Option<tauri::async_runtime::JoinHandle<Result<(), IslandError>>>>,
 }
 impl Notifications {
     pub fn start(
@@ -302,13 +478,22 @@ impl Notifications {
             hub.mirror_enabled.subscribe(),
             stopped.clone(),
         ));
-        let task = tauri::async_runtime::spawn(hub.clone().run(app, stopped));
+        let task = tauri::async_runtime::spawn(hub.clone().run(app, stopped.clone()));
+        #[cfg(target_os = "linux")]
+        let takeover_task = tauri::async_runtime::spawn(takeover::run(
+            hub.clone(),
+            std::env::var("DBUS_SESSION_BUS_ADDRESS").unwrap_or_default(),
+            hub.takeover_enabled.subscribe(),
+            stopped,
+        ));
         Ok(Self {
             hub,
             stop,
             task: Mutex::new(Some(task)),
             ingest: Mutex::new(Some(ingest)),
             monitor_task: Mutex::new(Some(monitor_task)),
+            #[cfg(target_os = "linux")]
+            takeover_task: Mutex::new(Some(takeover_task)),
         })
     }
     pub fn shutdown(&self) -> Result<(), IslandError> {
@@ -328,7 +513,20 @@ impl Notifications {
             .lock()
             .map_err(|_| IslandError::internal("Monitor slot poisoned"))?
             .take();
+        #[cfg(target_os = "linux")]
+        let takeover_task = self
+            .takeover_task
+            .lock()
+            .map_err(|_| IslandError::internal("Inhibitor slot poisoned"))?
+            .take();
         tauri::async_runtime::block_on(async move {
+            #[cfg(target_os = "linux")]
+            if let Some(task) = takeover_task {
+                tokio::time::timeout(Duration::from_secs(3), task)
+                    .await
+                    .map_err(|_| IslandError::timeout("KDE inhibitor shutdown"))?
+                    .map_err(|_| IslandError::internal("KDE inhibitor task panicked"))??;
+            }
             if let Some(mut ingest) = ingest {
                 ingest.shutdown().await?;
             }

@@ -91,6 +91,8 @@ export const commands = {
 	notificationsList: () => typedError<IslandNotification[], IslandError>(__TAURI_INVOKE("notifications_list")),
 	notificationsDismiss: (id: string) => typedError<null, IslandError>(__TAURI_INVOKE("notifications_dismiss", { id })),
 	notificationsClear: () => typedError<null, IslandError>(__TAURI_INVOKE("notifications_clear")),
+	/**  Popup dismissal is presentation-only. History dismissal remains a separate command. */
+	notificationPopup: (op: PopupOp) => typedError<NotificationPopups, IslandError>(__TAURI_INVOKE("notification_popup", { op })),
 	clipboardList: (query: string | null, limit: number) => typedError<ClipSummary[], IslandError>(__TAURI_INVOKE("clipboard_list", { query, limit })),
 	clipboardGet: (id: string) => typedError<ClipContent, IslandError>(__TAURI_INVOKE("clipboard_get", { id })),
 	clipboardCopy: (id: string) => typedError<null, IslandError>(__TAURI_INVOKE("clipboard_copy", { id })),
@@ -164,6 +166,7 @@ export const events = {
 	mediaChanged: makeEvent<MediaChanged, MediaChanged>("media-changed"),
 	mixerChanged: makeEvent<MixerChanged, MixerChanged>("mixer-changed"),
 	notificationClosed: makeEvent<NotificationClosed, NotificationClosed>("notification-closed"),
+	notificationPopups: makeEvent<NotificationPopups, NotificationPopups>("notification-popups"),
 	notificationReceived: makeEvent<NotificationReceived, NotificationReceived>("notification-received"),
 	notificationSnapshot: makeEvent<NotificationSnapshot, NotificationSnapshot>("notification-snapshot"),
 	paletteChanged: makeEvent<PaletteChanged, PaletteChanged>("palette-changed"),
@@ -787,6 +790,11 @@ export type NotificationMonitorStatus = {
 	observedActions: number,
 };
 
+export type NotificationPopups = {
+	rev: number,
+	items: Popup[],
+};
+
 export type NotificationReceived = IslandNotification;
 
 /**
@@ -869,6 +877,15 @@ export type Palette = {
 };
 
 export type PaletteChanged = Palette;
+
+export type Popup = {
+	notification: IslandNotification,
+	remainingMs: number | null,
+	ttlMs: number,
+	paused: boolean,
+};
+
+export type PopupOp = { type: "list" } | { type: "dismiss"; id: string } | { type: "pause"; id: string; paused: boolean } | { type: "invoke"; id: string; key: string } | { type: "reply"; id: string; text: string };
 
 /**  SPEC §4.5 latest-value topics added in Phase 6a (additive). */
 export type PowerChanged = PowerState;

@@ -33,6 +33,7 @@ permissions = [
   "allow-notifications-list",
   "allow-notifications-dismiss",
   "allow-notifications-clear",
+  "allow-notification-popup",
   "allow-clipboard-list",
   "allow-clipboard-get",
   "allow-clipboard-copy",

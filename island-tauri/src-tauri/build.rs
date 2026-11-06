@@ -34,6 +34,7 @@ const COMMANDS: &[&str] = &[
     "notifications_list",
     "notifications_dismiss",
     "notifications_clear",
+    "notification_popup",
     "clipboard_list",
     "clipboard_get",
     "clipboard_copy",

@@ -143,19 +143,32 @@ impl<B: InputRegionBackend> InputRegionController<B> {
             });
         }
         let measured = region_rows(&report.rects, report.mode, report.scale, false)?;
-        let painted = if self.exact_paint
-            && self.native_pill
-            && report.mode == IslandMode::Still
-            && report.settled
-        {
-            Vec::new()
+        // The first rect is the morphing island; additional rects are independently
+        // visible extensions (notification cards when collapsed). Never include the
+        // transparent notch surface or the gaps between those cards in input.
+        let collapsed = if self.native_pill && report.mode == IslandMode::Still {
+            Some(region_rows(
+                report.rects.get(1..).unwrap_or_default(),
+                report.mode,
+                report.scale,
+                false,
+            )?)
+        } else {
+            None
+        };
+        let painted = if self.exact_paint && report.settled {
+            collapsed.clone().unwrap_or(measured)
         } else {
             measured
         };
-        let target = if self.exact_paint {
-            if self.native_pill && report.mode == IslandMode::Still {
-                Vec::new()
-            } else if let Some(pill) = self.pill_exclusion {
+        let target = if let Some(cards) = collapsed {
+            if let Some(pill) = self.pill_exclusion {
+                subtract_rect(&cards, pill, report.scale)?
+            } else {
+                cards
+            }
+        } else if self.exact_paint {
+            if let Some(pill) = self.pill_exclusion {
                 subtract_rect(&painted, pill, report.scale)?
             } else {
                 painted.clone()
@@ -273,6 +286,31 @@ mod tests {
         f.0.lock().unwrap().applies.len()
     }
 
+    #[test]
+    fn collapsed_cards_keep_only_their_own_input_rows_and_release_on_removal() {
+        let (mut c, _) = ctl(true);
+        c.install().unwrap();
+        let mut card = rect(100., 100.);
+        card.y = 60.;
+        card.height = 80.;
+        card.radius = 12.;
+        c.report(&report(
+            1,
+            IslandMode::Still,
+            vec![rect(0., 50.), card],
+            true,
+        ))
+        .unwrap();
+        let rows = c.applied().unwrap();
+        assert!(!rows.is_empty());
+        assert!(rows.iter().all(|r| r.y >= 60
+            && r.y < 140
+            && r.x >= 100
+            && i32::from(r.x) + i32::from(r.width) <= 200));
+        c.report(&report(1, IslandMode::Still, vec![rect(0., 50.)], true))
+            .unwrap();
+        assert!(c.applied().unwrap().is_empty());
+    }
     #[test]
     fn install_applies_an_empty_region_exactly_once_and_does_not_dedupe_against_unknown_default() {
         let (mut c, f) = ctl(true);

@@ -1,6 +1,6 @@
 use super::blocking;
 use crate::{
-    contract::system::{GeoPlace, SystemStats, WeatherState},
+    contract::system::{GeoPlace, MonolithCost, SystemStats, WeatherState},
     error::IslandError,
     integrations::system_services::SystemServices,
     services::Services,
@@ -14,6 +14,17 @@ pub async fn system_stats(
 ) -> Result<SystemStats, IslandError> {
     let stats = Arc::clone(&services.stats);
     blocking(move || stats.sample()).await
+}
+
+/// Monolith's own CPU / PSS / wakeups plus plasmashell and kwin CPU, averaged over the last
+/// ~10 s. Sampled per call, so only while the Monitor view is visible and polling.
+#[tauri::command]
+#[specta::specta]
+pub async fn monolith_cost(
+    services: tauri::State<'_, Services>,
+) -> Result<MonolithCost, IslandError> {
+    let stats = Arc::clone(&services.stats);
+    blocking(move || stats.monolith_cost()).await
 }
 
 /// SPEC §4.3 `weather_refresh`: fetch now (only when weather is enabled with a location;

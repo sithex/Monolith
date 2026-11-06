@@ -53,7 +53,26 @@ PlasmoidItem {
     readonly property int displayHints: Plasmoid.containmentDisplayHints
     onDisplayHintsChanged: if (root.online) panelSettled.restart()
     Timer { id: panelSettled; interval: 450; onTriggered: root.requests.enqueue("moved") }
-    Timer { interval: 15000; running: true; repeat: true; triggeredOnStart: true; onTriggered: root.requests.enqueue("status") }
+    // Online/offline used to be polled: `anchor-client.py status` every 15 s per notch, i.e. a
+    // python start (~13 ms) three times per 15 s on a three-monitor desktop, forever. The island
+    // owns the D-Bus name below for as long as it runs, so its appearance and disappearance are
+    // events; one status read follows each (late enough for status.json to be fresh or stale),
+    // plus a slow safety net for an island that runs without the name.
+    DBus.DBusServiceWatcher {
+        id: islandName
+        busType: DBus.BusType.Session
+        watchedService: "local.hermes.Monolith"
+        onRegisteredChanged: {
+            if (registered) { islandUp.restart(); islandUpLate.restart(); }
+            else { islandUp.stop(); islandUpLate.stop(); islandGone.restart(); }
+        }
+    }
+    // Just launched: its first status write lands within a second or two.
+    Timer { id: islandUp; interval: 1500; onTriggered: root.requests.enqueue("status") }
+    Timer { id: islandUpLate; interval: 6000; onTriggered: root.requests.enqueue("status") }
+    // Gone: status.json counts as stale after 8 s; ask once it has.
+    Timer { id: islandGone; interval: 9000; onTriggered: root.requests.enqueue("status") }
+    Timer { id: statusSafetyNet; objectName: "statusSafetyNet"; interval: 120000; running: true; repeat: true; triggeredOnStart: true; onTriggered: root.requests.enqueue("status") }
     Timer { interval: Math.max(100, 60000 - Date.now() % 60000); running: true; onTriggered: { root.now = new Date(); interval = Math.max(100, 60000 - Date.now() % 60000); restart(); } }
     // Settings → Notch → Width (pushed as notchWidth; 144 = the original slot).
     readonly property real notchWidth: Math.max(110, Math.min(320, Number(root.appearance.notchWidth) || 144))
@@ -66,8 +85,11 @@ PlasmoidItem {
     property real pointerX: 0
     property real pointerY: 0
     property real pointerAt: 0
+    // Game mode may freeze the companion (and the notch's own animations); no pointer data is
+    // wanted then, so the relay's signals aren't even delivered to this process.
+    readonly property bool frozen: root.appearance.companionFrozen === true
     DBus.SignalWatcher {
-        enabled: root.companion
+        enabled: root.companion && !root.frozen
         busType: DBus.BusType.Session
         service: "local.hermes.Monolith"
         path: "/Companion"
@@ -105,6 +127,7 @@ PlasmoidItem {
         companion: root.companion
         companionCharacter: String(root.appearance.companionCharacter || "blob")
         companionReactive: root.appearance.companionReactive !== false
+        companionFrozen: root.frozen
         companionMonitor: String(root.appearance.companionMonitor || "")
         pointerX: root.pointerX
         pointerY: root.pointerY

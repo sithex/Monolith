@@ -26,12 +26,18 @@ Item {
 
     // 1 while the pointer is on the notch: tears dry up, the mouth smiles.
     property real cheer: face && face.happy ? 1 : 0
-    Behavior on cheer { enabled: art.face && art.face.motion; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+    Behavior on cheer { enabled: art.face && art.face.motion && !art.face.frozen; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
     Connections {
         target: art.face
+        // Game-mode freeze: a tear in flight or a drip is dropped, not left hanging mid-air.
+        function onFrozenChanged() {
+            if (!art.face.frozen) return;
+            shotAnim.stop(); dripAnim.stop();
+            art.shot = 0; art.splash = 0; art.dripAt = 0;
+        }
         function onBlinked(resting) {
-            if (resting && art.face.attended && !art.face.happy && !art.face.thinking && !art.face.sleepy && art.face.motion && Math.random() < .3)
+            if (resting && art.face.attended && !art.face.frozen && !art.face.happy && !art.face.thinking && !art.face.sleepy && art.face.motion && Math.random() < .3)
                 art.shoot();
         }
     }
@@ -189,12 +195,13 @@ Item {
     // pointer move for a minute: the streams hold a still frame) or with animations off.
     readonly property int flowSteps: 8
     property int flowFrame: 0
-    Timer {
-        id: flowTick
-        interval: 125
-        repeat: true
-        running: art.flowing && art.face && art.face.attended && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy && !art.face.settled
-        onTriggered: art.flowFrame = (art.flowFrame + 1) % art.flowSteps
+    // Asks the notch for its stepped clock (the same ~8 Hz tick that drives the working pulse
+    // and the music bars) instead of running a timer of its own: two timers of equal period
+    // fire out of phase and repaint the panel twice per tick.
+    readonly property bool clockWanted: flowing && !!face && face.attended && face.visible && face.motion && !face.happy && !face.sleepy && !face.settled && !face.frozen
+    Connections {
+        target: art.face
+        function onFrameChanged() { if (art.clockWanted) art.flowFrame = (art.flowFrame + 1) % art.flowSteps; }
     }
     // Flow and drip are alternatives; flow is on.
     readonly property bool flowing: true
@@ -210,7 +217,7 @@ Item {
     Timer {
         id: dripper
         interval: 3500
-        running: !art.flowing && art.face && art.face.attended && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy
+        running: !art.flowing && art.face && art.face.attended && art.face.visible && art.face.motion && !art.face.happy && !art.face.sleepy && !art.face.frozen
         repeat: true
         onTriggered: {
             if (!dripAnim.running) {

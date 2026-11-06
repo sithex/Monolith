@@ -27,6 +27,7 @@ permissions = [
   "allow-terminal-restart",
   "allow-terminal-ack",
   "allow-system-stats",
+  "allow-monolith-cost",
   "allow-ai-usage",
   "allow-ai-connect",
   "allow-voice-command",

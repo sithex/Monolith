@@ -327,3 +327,22 @@ pub struct SystemStats {
     pub disk: Option<DiskStats>,
     pub network: Option<NetworkStats>,
 }
+
+/// Monolith's own running cost (Monitor view, "Monolith cost" card). CPU is a percentage of
+/// ONE core averaged over `windowSecs` (the last ~10 s); every value is `null` while it is
+/// unavailable (first sample, process not running), never a fabricated zero.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct MonolithCost {
+    /// The island's whole process tree: main, WebKit processes, helpers, terminal + children.
+    pub cpu: Option<f64>,
+    /// Proportional set size of that tree, in bytes.
+    pub pss_bytes: Option<f64>,
+    /// Scheduler wakeups per second (voluntary + involuntary context switches, all threads).
+    pub wakeups: Option<f64>,
+    pub processes: u32,
+    pub threads: u32,
+    pub plasmashell_cpu: Option<f64>,
+    pub kwin_cpu: Option<f64>,
+    pub window_secs: f64,
+}

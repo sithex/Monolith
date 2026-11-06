@@ -59,6 +59,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::terminal::terminal_restart,
             commands::terminal::terminal_ack,
             commands::system::system_stats,
+            commands::system::monolith_cost,
             commands::ai::ai_usage,
             commands::ai::ai_connect,
             commands::voice::voice_command,
@@ -537,6 +538,13 @@ mod tests {
             ("IslandNotification", "progress"),
             // Critical notification cards deliberately have no expiry deadline.
             ("Popup", "remainingMs"),
+            // Monolith cost card: a rate is unavailable until the window has two samples, or
+            // while plasmashell/kwin are not running; never a fabricated zero.
+            ("MonolithCost", "cpu"),
+            ("MonolithCost", "pssBytes"),
+            ("MonolithCost", "wakeups"),
+            ("MonolithCost", "plasmashellCpu"),
+            ("MonolithCost", "kwinCpu"),
         ];
         for declaration in generated.split("export type ").skip(1) {
             let (name, body) = declaration.split_once(" = ").unwrap();

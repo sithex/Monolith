@@ -88,6 +88,7 @@ fn legacy_mode_name(mode: IslandMode) -> &'static str {
         IslandMode::Large => "pinned",
     }
 }
+
 /// Sample the services the collapsed notch reflects. Missing or disabled modules simply
 /// contribute nothing; this never blocks on a worker.
 fn live_state(app: &tauri::AppHandle) -> super::notch_live::NotchLive {
@@ -184,6 +185,8 @@ fn snapshot(
         "anchor":anchor,"bounds":bounds,"windowId":xid,"rectangles":rectangles,"pty":services.terminal.pid().unwrap_or(0),
         "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
         "gameMode":state.game_mode,
+        // Notch holds completely still: game mode on and "freeze the companion" kept enabled
+        // (a derived boolean, so the QML never has to know about game-mode sources or settings).
         "companionFrozen":super::game_effects::GameEffects::plan(state.game_mode, &settings).freeze_companion,
         "companion":settings.companion_enabled,
         "companionCharacter":settings.companion_character,
@@ -348,6 +351,30 @@ mod notch_tests {
         assert!(script.contains("[[145,407],[97,500]]"));
         assert!(script.contains("notchAppearance"));
         assert!(!script.contains("private"));
+    }
+    #[test]
+    fn companion_freezes_only_in_game_mode_with_the_setting_on() {
+        let companion_frozen = |game: bool, freeze: bool| {
+            let settings = crate::contract::settings::Settings {
+                game_mode_freeze_companion: freeze,
+                ..Default::default()
+            };
+            super::super::game_effects::GameEffects::plan(game, &settings).freeze_companion
+        };
+        assert!(companion_frozen(true, true));
+        assert!(
+            !companion_frozen(true, false),
+            "setting off: game mode alone does not freeze"
+        );
+        assert!(!companion_frozen(false, true), "no game mode, no freeze");
+        assert!(!companion_frozen(false, false));
+        let raw = json!({"companionFrozen":true,"gameMode":true,"pid":1});
+        let style = panel_style_payload(&raw);
+        assert_eq!(style["companionFrozen"], json!(true));
+        assert!(
+            style.get("gameMode").is_none(),
+            "only the derived flag reaches Plasma"
+        );
     }
     #[test]
     fn monitor_script_never_creates_panels_and_reports_placement() {

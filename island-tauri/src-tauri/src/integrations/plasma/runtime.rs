@@ -430,6 +430,8 @@ impl NativeHost {
                     }
                 }
                 PanelCommand::Status => (None, None),
+                // Not a notch command: the reply is the reload outcome and nothing else.
+                PanelCommand::ReloadUi => return Ok(crate::ui_assets::reload_ui(&handle)),
                 PanelCommand::Moved => {
                     // Best effort: a full queue already has a pending refresh to piggyback on.
                     let _ = clicks.try_send(StatusMsg::Moved);

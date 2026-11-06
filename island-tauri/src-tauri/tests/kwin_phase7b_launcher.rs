@@ -126,6 +126,21 @@ fn click(s: &Stack, e: &mut Wheel, origin: (i32, i32), selector: &str) {
     let p = point(s, origin, selector);
     e.click_at(p.0, p.1);
 }
+/// Pick a colour scheme through the real picker. Schemes with variants live inside a
+/// collapsible family row (SchemePicker.tsx): open the family first when its radio is hidden.
+fn pick_scheme(s: &Stack, e: &mut Wheel, o: (i32, i32), id: &str, family: &str) {
+    let radio = format!("[data-testid=appearance-{id}]");
+    if eval(s, &format!("!document.querySelector({})", json!(radio))) == true {
+        click(s, e, o, &format!("[data-testid=scheme-family-{family}]"));
+        until(
+            s,
+            &format!("7b scheme family {family} expanded"),
+            8,
+            &format!("document.querySelector('[data-testid=scheme-family-{family}]')?.getAttribute('aria-expanded')==='true' && !!document.querySelector({})", json!(radio)),
+        );
+    }
+    click(s, e, o, &radio);
+}
 /// Settings is tabbed (General / Appearance / Layout, ui/views/SettingsView.tsx).
 fn settings_tab(s: &Stack, e: &mut Wheel, o: (i32, i32), name: &str) {
     let index = ["General", "Appearance", "Layout"]
@@ -267,7 +282,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     for theme in ["skin", "neutral"] {
         open(&s, &c, w, &mut e, o, "settings");
         settings_tab(&s, &mut e, o, "Appearance");
-        click(&s, &mut e, o, &format!("[data-testid=appearance-{theme}]"));
+        pick_scheme(&s, &mut e, o, theme, "monolith");
         until(
             &s,
             "7b real theme selection",

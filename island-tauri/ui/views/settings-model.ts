@@ -26,9 +26,17 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
     { id: 'swipeNavigation', label: 'Swipe between views', hint: 'Horizontal drag or two-finger swipe changes app', keys: ['swipeNavigation'] },
     { id: 'stealth', label: 'Auto-hide when idle', keys: ['stealth'] },
     { id: 'clickSounds', label: 'Click sounds', keys: ['clickSounds'] },
+  ] },
+  { id: 'shortcuts', title: 'Shortcuts', tab: 'general', rows: [
+    { id: 'openShortcut', label: 'Open shortcut', hint: 'KDE global shortcut that opens the island; not set = none', keys: ['openShortcut'] },
+    { id: 'paletteShortcut', label: 'Command palette shortcut', hint: 'KDE global shortcut that opens the command palette; not set = none', keys: ['paletteShortcut'] },
+  ] },
+  { id: 'gameMode', title: 'Game mode', tab: 'general', rows: [
     { id: 'gameModeAuto', label: 'Game mode automatically', hint: 'Quiets the island while a fullscreen game has focus', keys: ['gameModeAuto'] },
     { id: 'gameMode', label: 'Game mode now', hint: 'Quiet the island until you turn it off', keys: ['gameMode'] },
-    { id: 'openShortcut', label: 'Open shortcut', hint: 'KDE syntax, e.g. Meta+`, Ctrl+Alt+Space', keys: ['openShortcut'] },
+    { id: 'gameModeDnd', label: 'Do Not Disturb while gaming', hint: 'Notifications wait quietly in history during game mode', keys: ['gameModeDnd'] },
+    { id: 'gameModeFreezeCompanion', label: 'Freeze the companion', hint: 'The notch companion stops animating during game mode', keys: ['gameModeFreezeCompanion'] },
+    { id: 'gameModePausePollers', label: 'Pause background updates', hint: 'Weather, calendar, stats and update checks wait until game mode ends', keys: ['gameModePausePollers'] },
   ] },
   { id: 'terminalCommand', title: 'Terminal launch', tab: 'general', reset: false, rows: [
     { id: 'terminalCommand', label: 'Hermes launch command', hint: 'Command the terminal runs (hermes --cli, --tui)', keys: ['terminalCommand'] },
@@ -37,8 +45,12 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
     { id: 'notificationsEnabled', label: 'Hermes notifications', hint: 'Agent and system alerts on the island', keys: ['notificationsEnabled'] },
     { id: 'dnd', label: 'Do Not Disturb', hint: 'Keep arrivals quietly, no toast', keys: ['dnd'] },
     { id: 'systemNotificationMirror', label: 'Mirror desktop notifications', hint: 'Show other apps\' notifications too', keys: ['systemNotificationMirror'] },
+    { id: 'silenceKdePopups', label: 'Silence KDE popups', hint: 'Monolith shows them; KDE keeps history', keys: ['silenceKdePopups'] },
+    { id: 'notificationSound', label: 'Notification sound', hint: 'Play a sound for new notifications (per-app rules can mute)', keys: ['notificationSound'] },
+    { id: 'approvalsInNotch', label: 'Approvals in the notch', hint: 'Approve or deny Hermes requests from the notch hover', keys: ['approvalsInNotch'] },
     { id: 'redactBodies', label: 'Hide message text', hint: 'Only titles are kept', keys: ['redactBodies'] },
     { id: 'deniedApps', label: 'Blocked apps', hint: 'Apps that never notify', keys: ['notificationDeniedApps'] },
+    { id: 'appRules', label: 'Per-app rules', hint: 'Popup, sound and urgency for each app', keys: ['notificationAppRules'] },
   ] },
   { id: 'clock', title: 'Clock', tab: 'general', rows: [
     { id: 'showDate', label: 'Show date under time', keys: ['showDate'] },
@@ -87,7 +99,7 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
   { id: 'text', title: 'Text', tab: 'appearance', rows: [
     { id: 'uiFont', label: 'UI font', hint: 'System or OpenRunde', keys: ['uiFont'] },
     { id: 'terminalFontSize', label: 'Terminal font size', keys: ['terminalFontSize'] },
-    { id: 'terminalFontFamily', label: 'Terminal font', hint: 'Font family list; empty = DejaVu Sans Mono', keys: ['terminalFontFamily'] },
+    { id: 'terminalFontFamily', label: 'Terminal font', hint: 'Installed fonts; Default = DejaVu Sans Mono', keys: ['terminalFontFamily'] },
     { id: 'terminalScrollback', label: 'Terminal scrollback', hint: 'Lines kept above the screen', keys: ['terminalScrollback'] },
     { id: 'terminalCursorStyle', label: 'Terminal cursor', hint: 'Block, bar or underline', keys: ['terminalCursorStyle'] },
     { id: 'terminalCursorBlink', label: 'Blinking cursor', keys: ['terminalCursorBlink'] },
@@ -148,22 +160,29 @@ export function shownRows(tab: Tab, query: string, settings: Partial<Settings>):
   return new Set(SETTINGS_CARDS.filter(card => card.tab === tab).flatMap(card => card.rows.filter(row => visible(row, settings)).map(row => row.id)));
 }
 
-// ── Open shortcut ────────────────────────────────────────────────────────────────────────
-const MODIFIERS = new Set(['meta', 'super', 'ctrl', 'control', 'alt', 'altgr', 'shift']);
+// ── Shortcuts ────────────────────────────────────────────────────────────────────────────
+// Mirrors Rust `check_shortcut` → `crate::keyseq::parse` (src-tauri/src/keyseq.rs).
+const MODIFIERS = new Set(['meta', 'super', 'win', 'ctrl', 'control', 'alt', 'shift']);
+const NAMED_KEYS = new Set(['esc', 'escape', 'tab', 'backspace', 'return', 'enter', 'ins', 'insert', 'del', 'delete', 'pause', 'print',
+  'home', 'end', 'left', 'up', 'right', 'down', 'pgup', 'pageup', 'pgdown', 'pagedown', 'space', 'menu']);
+/** keyseq.rs `key_code`: a named key, F1–F35, or one printable ASCII character. */
+export const isShortcutKey = (key: string) => NAMED_KEYS.has(key.toLowerCase()) || /^f([1-9]|[12]\d|3[0-5])$/i.test(key) || /^[\x21-\x7e]$/.test(key);
 /** KDE shortcut syntax check (`Meta+\``, `Ctrl+Alt+Space`); null when valid. Empty = no shortcut. */
 export function shortcutError(value: string): string | null {
   const text = value.trim();
   if (!text) return null;
   if (text.length > 64) return 'At most 64 characters';
-  if (/[\p{Cc},]/u.test(text)) return 'No commas or control characters';
+  if (/[\p{Cc},]/u.test(text) || !/^[\x20-\x7e]*$/.test(text)) return 'No commas, control or non-ASCII characters';
   // A trailing "++" means the key itself is "+".
   const parts = text.endsWith('++') ? [...text.slice(0, -2).split('+'), '+'] : text.split('+');
   if (parts.some(p => p.trim() === '')) return 'Use Modifier+Key, e.g. Meta+` or Ctrl+Alt+Space';
   const key = parts[parts.length - 1]!.trim(), mods = parts.slice(0, -1).map(p => p.trim().toLowerCase());
   const bad = mods.find(m => !MODIFIERS.has(m));
   if (bad) return `Unknown modifier "${bad}" (use Meta, Ctrl, Alt or Shift)`;
-  if (new Set(mods).size !== mods.length) return 'A modifier is repeated';
+  const bits = mods.map(m => m === 'super' || m === 'win' ? 'meta' : m === 'control' ? 'ctrl' : m);
+  if (new Set(bits).size !== bits.length) return 'A modifier is repeated';
   if (MODIFIERS.has(key.toLowerCase())) return 'End with a key, not a modifier';
+  if (!isShortcutKey(key)) return `Unknown key "${key}"`;
   if (!mods.length && key.length === 1) return 'Add a modifier, e.g. Meta+' + key;
   return null;
 }

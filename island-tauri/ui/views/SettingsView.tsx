@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { displayOutputs, settingsDefaults, terminalCopy, type Appearance, type Settings, type SettingsPatch } from '../ipc/client';
@@ -10,7 +10,13 @@ import { DraftRange } from '../island/components/AppPrimitives';
 import { TerminalCommandSettings } from '../island/TerminalCommandSettings';
 import { uiSpring } from '../island/motion-profile';
 import { SCHEMES } from '../island/tokens/schemes';
-import { DEFAULT_APPEARANCE, cardSpec, exportSettings, fontFamilyError, normalize, parseImport, resetPatch, rowSpec, searchRows, shortcutError, shownRows, type Tab } from './settings-model';
+import { DEFAULT_APPEARANCE, cardSpec, exportSettings, normalize, parseImport, resetPatch, rowSpec, searchRows, shownRows, type Tab } from './settings-model';
+import { commands, type FontFamily } from '../ipc/bindings';
+import { useNotifications } from '../ipc/notifications';
+import { ShortcutRecorder } from './settings/ShortcutRecorder';
+import { FontPicker } from './settings/FontPicker';
+import { AppRulesEditor } from './settings/AppRulesEditor';
+import { rulesSummary } from './settings/app-rules';
 
 const message = (e: unknown) => e instanceof Error ? e.message : String(e);
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -32,26 +38,6 @@ export function ResetHeader({ title, onReset }: { title: string; onReset?(): Pro
           onClick={() => { setBusy(true); void onReset().finally(() => { setBusy(false); setArmed(false); }); }}>Confirm</button></>
       : <button type="button" className="link" aria-label={`Reset ${title}`} onClick={() => setArmed(true)}>Reset</button>)}
   </header>;
-}
-/** Text setting saved on Enter/blur; validated locally first, Rust's error shown on rejection. */
-function TextSetting({ label, value, placeholder, validate, onSave, maxLength }: {
-  label: string; value: string; placeholder?: string; maxLength: number;
-  validate(value: string): string | null; onSave(value: string): Promise<void>;
-}) {
-  const [draft, setDraft] = useState(value), [error, setError] = useState<string | null>(null), previous = useRef(value);
-  useEffect(() => { if (draft === previous.current) setDraft(value); previous.current = value; }, [value]);
-  const local = validate(draft), shown = error ?? local;
-  const commit = () => {
-    if (local || draft.trim() === value) return;
-    setError(null);
-    onSave(draft.trim()).catch(e => setError(message(e)));
-  };
-  return <div className="settings-text-field">
-    <input type="text" aria-label={label} value={draft} placeholder={placeholder} maxLength={maxLength} spellCheck={false} autoComplete="off"
-      aria-invalid={shown ? true : undefined} onChange={e => { setDraft(e.target.value); setError(null); }} onBlur={commit}
-      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape' && draft !== value) { e.preventDefault(); e.stopPropagation(); setDraft(value); setError(null); } }} />
-    {shown && <p className="settings-field-error" role="alert">{shown}</p>}
-  </div>;
 }
 function DeniedApps({ value, onSave }: { value: string; onSave(apps: string[]): void }) {
   const [open, setOpen] = useState(false), [draft, setDraft] = useState(value);
@@ -127,6 +113,9 @@ export function SettingsView() {
   const [error, setError] = useState(''), [tab, setTab] = useState<Tab>('general'), [query, setQuery] = useState('');
   const [offsetPreview, setOffsetPreview] = useState<{ x: number; y: number } | null>(null);
   const [outputs, setOutputs] = useState<string[] | null>(null);
+  const [fonts, setFonts] = useState<FontFamily[] | null>(null), [fontError, setFontError] = useState<string | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const notifications = useNotifications();
   // Never disable controls while a save is in flight (that froze sliders mid-drag);
   // saves are serialized in the store and the newest value wins.
   const patch = (p: SettingsPatch) => { setError(''); void saveSettings(p).catch(e => setError(String(e))); };
@@ -141,6 +130,17 @@ export function SettingsView() {
     displayOutputs().then(names => { if (live) setOutputs(names); }, () => { if (live) setOutputs([]); });
     return () => { live = false; };
   }, [wantOutputs]);
+  // Installed fonts (fontconfig, cached in Rust) only once the terminal font row is shown.
+  const wantFonts = show('terminalFontFamily');
+  useEffect(() => {
+    if (!wantFonts || fonts !== null) return;
+    let live = true;
+    commands.fontFamilies().then(r => { if (live) setFonts(r.status === 'ok' ? r.data : []); }, () => { if (live) setFonts([]); });
+    return () => { live = false; };
+  }, [wantFonts]);
+  // App-name suggestions: apps seen in notifications (newest first), then blocked apps.
+  const seenApps = [...notifications.map(n => n.appName), ...(settings.notificationDeniedApps ?? [])];
+  const appRules = settings.notificationAppRules ?? [];
   const reset = (cardId: string) => async () => {
     setError('');
     try {
@@ -186,19 +186,33 @@ export function SettingsView() {
       {toggle('swipeNavigation', 'swipeNavigation')}
       {toggle('stealth', 'stealth')}
       {toggle('clickSounds', 'clickSounds')}
+    </>)}
+    {section('shortcuts', <>
+      {show('openShortcut') && <Row label={rowSpec('openShortcut').label} hint={rowSpec('openShortcut').hint}>
+        <ShortcutRecorder label="Open shortcut" value={settings.openShortcut ?? ''} onSave={value => saveSettings({ openShortcut: value })} /></Row>}
+      {show('paletteShortcut') && <Row label={rowSpec('paletteShortcut').label} hint={rowSpec('paletteShortcut').hint}>
+        <ShortcutRecorder label="Command palette shortcut" value={settings.paletteShortcut ?? ''} onSave={value => saveSettings({ paletteShortcut: value })} /></Row>}
+    </>)}
+    {section('gameMode', <>
       {toggle('gameModeAuto', 'gameModeAuto')}
       {toggle('gameMode', 'gameMode', true)}
-      {show('openShortcut') && <Row label="Open shortcut" hint={rowSpec('openShortcut').hint}>
-        <TextSetting label="Open shortcut" value={settings.openShortcut ?? ''} placeholder="Meta+`" maxLength={64} validate={shortcutError}
-          onSave={value => saveSettings({ openShortcut: value })} /></Row>}
+      {toggle('gameModeDnd', 'gameModeDnd')}
+      {toggle('gameModeFreezeCompanion', 'gameModeFreezeCompanion')}
+      {toggle('gameModePausePollers', 'gameModePausePollers')}
     </>)}
     {show('terminalCommand') && <TerminalCommandSettings value={settings.terminalCommand ?? ''} onSave={command => saveSettings({ terminalCommand: command })} />}
     {section('notifications', <>
       {toggle('notificationsEnabled', 'notificationsEnabled')}
       {toggle('dnd', 'dnd')}
       {toggle('systemNotificationMirror', 'systemNotificationMirror')}
+      {toggle('silenceKdePopups', 'silenceKdePopups', true)}
+      {toggle('notificationSound', 'notificationSound')}
+      {toggle('approvalsInNotch', 'approvalsInNotch')}
       {toggle('redactBodies', 'redactBodies')}
       {show('deniedApps') && <DeniedApps value={denied} onSave={apps => patch({ notificationDeniedApps: apps })} />}
+      {show('appRules') && <Row label={rowSpec('appRules').label} hint={rulesSummary(appRules)}>
+        <button className="link" type="button" aria-expanded={rulesOpen} onClick={() => setRulesOpen(!rulesOpen)}>{rulesOpen ? 'Close' : 'Edit'}</button></Row>}
+      {show('appRules') && rulesOpen && <AppRulesEditor rules={appRules} seenApps={seenApps} onSave={rules => saveSettings({ notificationAppRules: rules })} />}
     </>)}
     {section('clock', toggle('showDate', 'showDate'))}
     {isLinux && section('display', show('displayBackend') && <Row label="Display server" hint={`Running on ${runningBackend === 'wayland' ? 'native Wayland' : 'X11 (XWayland)'}${(settings.displayBackend ?? 'wayland') !== runningBackend ? ' · applies when the island restarts' : ''}`}>
@@ -238,9 +252,9 @@ export function SettingsView() {
         <button aria-pressed={settings.uiFont === 'system'} onClick={() => patch({ uiFont: 'system' })}>System</button>
         <button aria-pressed={settings.uiFont === 'openrunde'} onClick={() => patch({ uiFont: 'openrunde' })}>OpenRunde</button></div></Row>}
       {show('terminalFontSize') && range('terminalFontSize', 'Terminal font size', 8, 24, 'px')}
-      {show('terminalFontFamily') && <Row label="Terminal font" hint="Font family list; empty = DejaVu Sans Mono">
-        <TextSetting label="Terminal font" value={settings.terminalFontFamily ?? ''} placeholder="DejaVu Sans Mono" maxLength={128} validate={fontFamilyError}
-          onSave={value => saveSettings({ terminalFontFamily: value })} /></Row>}
+      {show('terminalFontFamily') && <Row label="Terminal font" hint={fontError ?? rowSpec('terminalFontFamily').hint}>
+        <FontPicker label="Terminal font" value={settings.terminalFontFamily ?? ''} fonts={fonts} error={fontError}
+          onChange={value => { setFontError(null); saveSettings({ terminalFontFamily: value }).catch(e => setFontError(message(e))); }} /></Row>}
       {show('terminalScrollback') && <Row label="Terminal scrollback" hint="Lines kept above the screen">
         <DraftRange aria-label="Terminal scrollback" min={500} max={100000} step={500} value={settings.terminalScrollback ?? 5000}
           onCommit={(v, final) => { if (final) patch({ terminalScrollback: v }); }} />

@@ -17,9 +17,9 @@ const ids = groups => groups.map(g => [g.card.id, g.rows.map(r => r.id)]);
 test('search filters rows across tabs by label + hint, case/accent-insensitively, grouped by card', () => {
   const s = { translucent: true, companionEnabled: true, showNotchOnEveryMonitor: false, reduceMotion: false };
   assert.deepEqual(ids(model.searchRows('CURSOR', s)), [['text', ['terminalCursorStyle', 'terminalCursorBlink']]]);
-  assert.deepEqual(ids(model.searchRows('game', s)), [['behavior', ['gameModeAuto', 'gameMode']]]);
-  // Hint text matches too ("KDE syntax" lives only in the shortcut hint); every word must match.
-  assert.deepEqual(ids(model.searchRows('kde syntax', s)), [['behavior', ['openShortcut']]]);
+  assert.deepEqual(ids(model.searchRows('game', s)), [['gameMode', ['gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers']]]);
+  // Hint text matches too ("global" lives only in the shortcut hints); every word must match.
+  assert.deepEqual(ids(model.searchRows('kde global', s)), [['shortcuts', ['openShortcut', 'paletteShortcut']]]);
   assert.deepEqual(model.searchRows('kde banana', s), []);
   assert.deepEqual(model.searchRows('   ', s), [], 'blank query = no search');
   assert.deepEqual(ids(model.searchRows('móñitor', s)).map(([card]) => card), ['apps', 'notch'], 'accents folded; Hardware monitor + notch rows');
@@ -53,7 +53,11 @@ test('reset key sets: every card resets exactly its rows\' keys, keys are real s
   }
   assert.ok(!owner.has('moduleRegistry'), 'apps registry is never reset from Settings');
   assert.deepEqual(model.cardKeys('motion'), ['reduceMotion', 'animationSpeed']);
-  assert.deepEqual(model.cardKeys('behavior'), ['swipeNavigation', 'stealth', 'clickSounds', 'gameModeAuto', 'gameMode', 'openShortcut']);
+  assert.deepEqual(model.cardKeys('behavior'), ['swipeNavigation', 'stealth', 'clickSounds']);
+  assert.deepEqual(model.cardKeys('shortcuts'), ['openShortcut', 'paletteShortcut']);
+  assert.deepEqual(model.cardKeys('gameMode'), ['gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers']);
+  for (const key of ['silenceKdePopups', 'notificationSound', 'notificationAppRules', 'approvalsInNotch', 'notificationDeniedApps'])
+    assert.equal(owner.get(key), 'notifications', key);
   for (const key of ['notchWaitingPulse', 'notchHoverPeek', 'companionReactive', 'notchMonitors', 'companionMonitor', 'showNotchOnEveryMonitor', 'companionCharacter'])
     assert.equal(owner.get(key), 'notch', key);
   for (const key of ['terminalFontFamily', 'terminalScrollback', 'terminalCursorStyle', 'terminalCursorBlink', 'terminalFontSize'])

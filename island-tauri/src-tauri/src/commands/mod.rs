@@ -6,6 +6,7 @@ pub mod ai;
 pub mod apps;
 pub mod clipboard;
 pub mod controls;
+pub mod fonts;
 pub mod frontend;
 pub mod island;
 pub mod media;

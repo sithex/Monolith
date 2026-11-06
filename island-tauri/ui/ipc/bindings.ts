@@ -62,6 +62,7 @@ export const commands = {
 	 *  checklist. Read-only, bounded (3 s, 1 MiB); empty when KScreen is unavailable.
 	 */
 	displayOutputs: () => typedError<string[], IslandError>(__TAURI_INVOKE("display_outputs")),
+	fontFamilies: () => typedError<FontFamily[], IslandError>(__TAURI_INVOKE("font_families")),
 	/**
 	 *  Spawn the PTY on first call; later calls only replace the output channel (idempotent).
 	 *  Returns the snapshot (replay + `seq`); the channel then carries only newer chunks.
@@ -465,6 +466,15 @@ export type EqualizerChanged = {
 };
 
 export type ErrorCode = "invalid" | "unsupported" | "unavailable" | "busy" | "io" | "timeout" | "internal";
+
+/**
+ *  One installed family. `monospace`: some face reports fontconfig spacing mono (100) or
+ *  dual-width (90).
+ */
+export type FontFamily = {
+	family: string,
+	monospace: boolean,
+};
 
 /**  Explicit user-selected weather location (SPEC §3.5, §5.2). */
 export type GeoPlace = {

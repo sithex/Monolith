@@ -34,7 +34,9 @@ impl IslandSink {
     fn focus(&self) {
         match self.app.get_webview_window(ISLAND_LABEL) {
             Some(window) => {
-                if let Err(error) = window.set_focus() {
+                if let Err(error) =
+                    crate::window::focus::apply(&window, crate::window::focus::FocusPlan::Activate)
+                {
                     tracing::warn!(%error, "Island focus request failed");
                 }
             }
@@ -45,6 +47,18 @@ impl IslandSink {
 
 impl Sink for IslandSink {
     fn apply(&mut self, effects: &[Effect], snapshot: &Snapshot) -> Result<(), IslandError> {
+        // Release independently of event emission: an emit failure must not retain focus.
+        if crate::window::focus::plan(snapshot.state.mode, effects.contains(&Effect::RequestFocus))
+            == crate::window::focus::FocusPlan::Release
+        {
+            if let Some(window) = self.app.get_webview_window(ISLAND_LABEL) {
+                if let Err(error) =
+                    crate::window::focus::apply(&window, crate::window::focus::FocusPlan::Release)
+                {
+                    tracing::warn!(%error, "Island keyboard release failed");
+                }
+            }
+        }
         // State first: the UI must never lag behind a cue or a focus change.
         if effects.contains(&Effect::EmitState) {
             bus::emit_state(&self.app, snapshot.state.clone())?;

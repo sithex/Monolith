@@ -3,6 +3,7 @@ import { systemStats } from '../ipc/client';
 import { monitorStore, runtimeStore, useMonitor } from '../stores';
 import { formatSize } from '../island/components/AppPrimitives';
 import { createVisiblePoller } from './visible-poller';
+import { useGamePollingActive } from './game-polling';
 function Gauge({ label, value, hint }: { label: string; value: number | null; hint: string }) {
   const percent = value !== null && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
   return <section className="card gauge"><h3>{label}<strong>{percent === null ? 'Unavailable' : `${percent.toFixed(1)}%`}</strong></h3>
@@ -10,6 +11,7 @@ function Gauge({ label, value, hint }: { label: string; value: number | null; hi
 }
 const bytes = (n: number | null | undefined) => n == null ? 'Unavailable' : formatSize(n);
 export function MonitorView({ active }: { active: boolean }) {
+  active = useGamePollingActive(active);
   const stats = useMonitor(), [error, setError] = useState('');
   const [poller] = useState(() => createVisiblePoller(systemStats, (value, rev) => { monitorStore.apply(value, rev); setError(''); }, error => setError(String(error))));
   useEffect(() => {

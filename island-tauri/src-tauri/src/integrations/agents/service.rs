@@ -11,7 +11,7 @@ use std::{
     collections::{BTreeSet, VecDeque},
     path::PathBuf,
     process::Command,
-    sync::{Arc, Condvar, Mutex},
+    sync::{Arc, Mutex},
     thread::JoinHandle,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -65,12 +65,12 @@ struct State {
     current: AgentsChanged,
 }
 pub struct AgentService {
+    game_pause: crate::integrations::plasma::game_effects::PollPause,
     config: AgentConfig,
     sink: Arc<dyn AgentEvents>,
     state: Mutex<State>,
     serial: Mutex<()>,
     stop: Mutex<bool>,
-    wake: Condvar,
     worker: Mutex<Option<JoinHandle<()>>>,
     /// Last rows read, so an untouched database costs a `stat` instead of a Python start.
     rows: Mutex<Option<(Fingerprint, std::time::Instant, Vec<core::SessionRow>)>>,
@@ -78,6 +78,13 @@ pub struct AgentService {
 }
 impl AgentService {
     pub fn new(config: AgentConfig, sink: Arc<dyn AgentEvents>) -> Arc<Self> {
+        Self::new_gated(config, sink, Default::default())
+    }
+    pub fn new_gated(
+        config: AgentConfig,
+        sink: Arc<dyn AgentEvents>,
+        game_pause: crate::integrations::plasma::game_effects::PollPause,
+    ) -> Arc<Self> {
         let current = AgentsChanged {
             rev: 0,
             available: false,
@@ -88,6 +95,7 @@ impl AgentService {
         let topic = Latest::new();
         topic.publish(current.clone());
         Arc::new(Self {
+            game_pause,
             config,
             sink,
             state: Mutex::new(State {
@@ -97,7 +105,6 @@ impl AgentService {
             }),
             serial: Mutex::new(()),
             stop: Mutex::new(false),
-            wake: Condvar::new(),
             worker: Mutex::new(None),
             rows: Mutex::new(None),
             topic,
@@ -298,6 +305,16 @@ impl AgentService {
                         Ok(stop) if !*stop => {}
                         _ => return,
                     }
+                    let generation = service.game_pause.generation();
+                    let stopped = || service.stop.lock().map_or(true, |s| *s);
+                    if service.game_pause.paused() {
+                        service.game_pause.wait_blocking(
+                            generation,
+                            Duration::from_secs(86400),
+                            stopped,
+                        );
+                        continue;
+                    }
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .map(|d| d.as_secs_f64());
@@ -309,14 +326,7 @@ impl AgentService {
                         }
                         Err(_) => return,
                     }
-                    let guard = match service.stop.lock() {
-                        Ok(guard) => guard,
-                        Err(_) => return,
-                    };
-                    match service.wake.wait_timeout_while(guard, POLL, |stop| !*stop) {
-                        Ok((stop, _)) if !*stop => {}
-                        _ => return,
-                    }
+                    service.game_pause.wait_blocking(generation, POLL, stopped);
                 })
                 .map_err(|_| IslandError::io("Agent worker unavailable"))?,
         );
@@ -327,7 +337,7 @@ impl AgentService {
             .stop
             .lock()
             .map_err(|_| IslandError::internal("Agent stop poisoned"))? = true;
-        self.wake.notify_all();
+        self.game_pause.wake_stop();
         if let Some(task) = self
             .worker
             .lock()

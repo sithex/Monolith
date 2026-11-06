@@ -50,6 +50,7 @@ struct Slots {
     tiles: Option<Arc<TilesService>>,
 }
 pub struct AppServices {
+    game_pause: super::plasma::game_effects::PollPause,
     slots: Mutex<Slots>,
     app: tauri::AppHandle,
     data: PathBuf,
@@ -180,7 +181,18 @@ impl AppServices {
         hub: Arc<Hub>,
         power: Arc<PowerService>,
     ) -> Self {
+        Self::new_gated(app, data, test_instance, hub, power, Default::default())
+    }
+    pub fn new_gated(
+        app: &tauri::AppHandle,
+        data: &Path,
+        test_instance: bool,
+        hub: Arc<Hub>,
+        power: Arc<PowerService>,
+        game_pause: super::plasma::game_effects::PollPause,
+    ) -> Self {
         Self {
+            game_pause,
             power,
             slots: Mutex::new(Slots::default()),
             app: app.clone(),
@@ -256,19 +268,22 @@ impl AppServices {
         }
         if active(settings, "calendar") {
             if slots.calendar.is_none() {
-                let calendar = CalendarService::new(CalendarConfig {
-                    data: self.data.clone(),
-                    loopback_test: self.test_instance,
-                    timeout: Duration::from_secs(10),
-                    tz: if self.test_instance {
-                        TzConfig {
-                            local: Some("UTC".into()),
-                            dir: None,
-                        }
-                    } else {
-                        TzConfig::default()
+                let calendar = CalendarService::new_gated(
+                    CalendarConfig {
+                        data: self.data.clone(),
+                        loopback_test: self.test_instance,
+                        timeout: Duration::from_secs(10),
+                        tz: if self.test_instance {
+                            TzConfig {
+                                local: Some("UTC".into()),
+                                dir: None,
+                            }
+                        } else {
+                            TzConfig::default()
+                        },
                     },
-                })?;
+                    self.game_pause.clone(),
+                )?;
                 self.forward(&calendar.topic);
                 calendar.start()?;
                 slots.calendar = Some(calendar);
@@ -314,10 +329,11 @@ impl AppServices {
         }
         if active(settings, "update-badge") {
             if slots.updates.is_none() {
-                let service = UpdatesService::start(
+                let service = UpdatesService::start_gated(
                     Runner::for_instance(self.test_instance, fixture_from_env()),
                     Arc::new(MonotonicClock::default()),
                     self.power.topic.subscribe(),
+                    self.game_pause.clone(),
                 );
                 self.forward(&service.topic);
                 slots.updates = Some(service);
@@ -385,13 +401,14 @@ impl AppServices {
                     std::env::var_os("HOME").map(PathBuf::from),
                     std::env::var_os("HERMES_ISLAND_AGENT_DB").map(PathBuf::from),
                 );
-                let service = AgentService::new(
+                let service = AgentService::new_gated(
                     config,
                     Arc::new(AgentHubSink::new(
                         self.hub.clone(),
                         self.actor.clone(),
                         Arc::new(MonotonicClock::default()),
                     )),
+                    self.game_pause.clone(),
                 );
                 self.forward(&service.topic);
                 service.start()?;

@@ -229,6 +229,22 @@ test('Settings exposes working display backend controls only for desktop Linux a
     }
   }
 });
+test('palette setting jumps focus the matching row after the filtered DOM commits',()=>{
+  const events=new EventTarget(),log=[];
+  const control={focus(){log.push('row-focus');}};
+  const row={dataset:{settingLabel:'Terminal font'},querySelector(){return control;},scrollIntoView(){log.push('row-scroll');}};
+  const d=driver({'ui/stores/index.ts':{useSettings:()=>({}),useAppearance:()=> 'green',usePalette:()=>({}),saveSettings:async()=>{}}});
+  try { globals({window:events,document:{documentElement:{dataset:{displayBackend:'x11'}},querySelectorAll:()=>[row],querySelector:()=>null}},()=>{
+    const C=d.load('ui/views/SettingsView.tsx').SettingsView;
+    d.render(C);
+    const event=new Event('island-setting-jump');event.detail='not-a-setting';events.dispatchEvent(event);
+    // Ignore an unknown id, then use the real model's row id.
+    const jump=new Event('island-setting-jump');jump.detail='terminalFontFamily';events.dispatchEvent(jump);
+    const tree=d.render(C);
+    assert.equal(labeled(tree,'Search settings').props.value,'Terminal font');
+    assert.deepEqual(log,['row-scroll','row-focus']);
+  }); } finally {globals({window:events},()=>d.dispose());}
+});
 test('Notch width handler preserves the 110–320 range and writes only final commits with no island size changes',()=>{
   const {NotchControls}=load('ui/island/NotchControls.tsx');
   for(const width of [undefined,110,144,320]) {
@@ -253,7 +269,7 @@ function surfaceHarness({unchangedSizing=false,maxHeight=1190}={}) {
   // Animation is a hook-free recording boundary; all sizing and content measurement
   // below still execute the actual IslandSurface component.
   const C=d.load('ui/island/IslandSurface.tsx').IslandSurface;
-  return {...d,state,starts,renderSurface:()=>d.render(C,{children:null,fail:e=>{throw e;}})};
+  return {...d,state,starts,renderSurface:(props={})=>d.render(C,{children:null,fail:e=>{throw e;},...props})};
 }
 
 test('explicit custom preset terminal height can exceed the old 672px per-view default',()=>{
@@ -284,6 +300,9 @@ test('content-fitted Settings honors the explicit height cap without forcing emp
         assert.equal(fitted.props.initial.height,expected);
         assert.equal(h.starts.at(-1).height,expected,'animation target follows content, not the old 640px Settings ceiling');
         assert.equal(fitted.props.style['--open-content-height'],`${expected-44}px`);
+        const palette=h.renderSurface({paletteOpen:true});
+        assert.equal(palette.props.initial.height,Math.min(1190,Math.max(560,expected)),'palette expands short pages without violating the saved ceiling');
+        assert.equal(h.renderSurface({paletteOpen:false}).props.initial.height,expected,'closing restores content-fit size');
       }finally{h.dispose();frames.length=0;}
     }
   });

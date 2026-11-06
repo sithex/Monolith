@@ -76,15 +76,16 @@ test('AI unknown prices stay null and invalid numbers cannot poison charts',()=>
 });
 test('AI visible polling is sixty seconds, starts on every activation and guards stale timer callbacks',()=>{
   const source=readFileSync(new URL('../ui/views/AiStatsView.tsx',import.meta.url),'utf8');
-  assert.match(source,/if \(!visible.current\) return/);
+  assert.match(source,/useGamePollingActive\(active\)/);
   assert.match(source,/if \(!active\) return/);
-  assert.match(source,/void refresh\(\);[\s\S]*60_000/);
-  assert.match(source,/clearInterval\(poll\)/);
+  assert.match(source,/createVisiblePoller\([\s\S]*60_000/);
+  assert.match(source,/poller.setVisible\(active\)/);
+  assert.match(source,/poller.dispose\(\)/);
   assert.doesNotMatch(source,/active && !data/);
 });
 test('AI runtime polling never fetches hidden, coalesces flights and refreshes every reopen',async()=>{
   const {createTopic}=load('ui/stores/topic.ts'), store=createTopic(); store.seed(null,0);
-  const slots=[],effects=[],timers=new Map(),reads=[];let index=0,nextTimer=0;
+  const slots=[],effects=[],timers=new Map(),reads=[];let index=0,nextTimer=0,game=false;
   const hooks={...React,
     useState(initial){const i=index++;slots[i]??={value:typeof initial==='function'?initial():initial};return [slots[i].value,v=>{slots[i].value=typeof v==='function'?v(slots[i].value):v;}];},
     useRef(initial){const i=index++;return slots[i]??={current:initial};},
@@ -94,13 +95,15 @@ test('AI runtime polling never fetches hidden, coalesces flights and refreshes e
   const source=readFileSync(new URL('../ui/views/AiStatsView.tsx',import.meta.url),'utf8');
   const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   const module={exports:{}};
-  const fakeWindow={setInterval(fn,ms){const id=++nextTimer;timers.set(id,{fn,ms});return id;},clearInterval(id){timers.delete(id);}};
+  const fakeWindow={setInterval(fn,ms){const id=++nextTimer;timers.set(id,{fn,ms});return id;},clearInterval(id){timers.delete(id);},setTimeout(fn,ms){const id=++nextTimer;timers.set(id,{fn:()=>{timers.delete(id);fn();},ms});return id;},clearTimeout(id){timers.delete(id);}};
   const require=name=>{
     if(name==='react')return hooks;
     if(name==='react/jsx-runtime')return {jsx:React.createElement,jsxs:React.createElement};
     if(name==='../ipc/client')return {aiUsage:()=>new Promise((resolve,reject)=>reads.push({resolve,reject})),aiConnect:async()=>({launched:true})};
     if(name==='../stores')return {useAi:()=>store.getSnapshot(),aiStore:store};
     if(name==='./adapters')return {dashboardFromUsage};
+    if(name==='./visible-poller')return load('ui/views/visible-poller.ts');
+    if(name==='./game-polling')return {useGamePollingActive:active=>load('ui/views/game-polling-policy.ts').gamePollingActive(active,game,true)};
     if(name.endsWith('.css'))return {};
     if(name.endsWith('/AiDashboard'))return {AiDashboard};
     throw Error(name);
@@ -111,13 +114,15 @@ test('AI runtime polling never fetches hidden, coalesces flights and refreshes e
   try {
     render(false);assert.equal(reads.length,0);assert.equal(timers.size,0);
     render(true);assert.equal(reads.length,1);
-    const firstPoll=[...timers.values()].find(t=>t.ms===60000).fn;
-    firstPoll();assert.equal(reads.length,1,'one flight');
+    render(true);assert.equal(reads.length,1,'one flight');
     reads[0].resolve(fixture());await tick();assert.equal(store.getSnapshot().local.available,true);
+    const firstPoll=[...timers.values()].find(t=>t.ms===60000).fn;
     firstPoll();assert.equal(reads.length,2);reads[1].resolve(fixture());await tick();
     render(false);assert.equal(timers.size,0);firstPoll();assert.equal(reads.length,2,'queued hidden callback is inert');
     render(true);assert.equal(reads.length,3,'refresh cached data on reopen');reads[2].resolve(fixture());await tick();
+    game=true;render(true);assert.equal(timers.size,0,'game pause stops poll and clock');
+    game=false;render(true);assert.equal(reads.length,4,'game resume immediately refreshes');reads[3].resolve(fixture());await tick();
     const finalPoll=[...timers.values()].find(t=>t.ms===60000).fn;
-    for(const slot of slots)slot?.cleanup?.();finalPoll();assert.equal(reads.length,3,'unmounted callback is inert');
+    for(const slot of slots)slot?.cleanup?.();finalPoll();assert.equal(reads.length,4,'unmounted callback is inert');
   } finally {for(const slot of slots)slot?.cleanup?.();}
 });

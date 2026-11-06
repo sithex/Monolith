@@ -67,6 +67,14 @@ impl UpdatesService {
         clock: Arc<dyn Clock + Send + Sync>,
         power: watch::Receiver<Option<PowerState>>,
     ) -> Arc<Self> {
+        Self::start_gated(runner, clock, power, Default::default())
+    }
+    pub fn start_gated(
+        runner: Runner,
+        clock: Arc<dyn Clock + Send + Sync>,
+        power: watch::Receiver<Option<PowerState>>,
+        game_pause: crate::integrations::plasma::game_effects::PollPause,
+    ) -> Arc<Self> {
         let badge = Badge::compute(
             Err(UpdatesError::CommandFailed),
             Some(Err(UpdatesError::CommandFailed)),
@@ -77,7 +85,7 @@ impl UpdatesService {
         let (service, rx) = Self::new(wire(&badge, 0, None, 0, false));
         let owned = service.clone();
         service.own(tauri::async_runtime::spawn(async move {
-            worker(owned, runner, clock, power, rx).await
+            worker(owned, runner, clock, power, rx, game_pause).await
         }));
         service
     }
@@ -161,7 +169,10 @@ async fn worker(
     clock: Arc<dyn Clock + Send + Sync>,
     mut power: watch::Receiver<Option<PowerState>>,
     mut rx: mpsc::Receiver<Request<UpdatesChanged, UpdatesOp>>,
+    game_pause: crate::integrations::plasma::game_effects::PollPause,
 ) {
+    let mut pause = game_pause.subscribe();
+    let mut was_paused = false;
     let mut stop = service.stop.subscribe();
     let mut model = Model {
         schedule: Schedule::new(true),
@@ -184,6 +195,20 @@ async fn worker(
         if *stop.borrow() {
             break;
         }
+        let paused = *pause.borrow_and_update();
+        if paused {
+            was_paused = true;
+            tokio::select! {
+                _ = stop.changed() => break,
+                _ = pause.changed() => {},
+                request = rx.recv() => {
+                    let Some(request) = request else { break; };
+                    respond(request.reply, Ok(service.current()));
+                }
+            }
+            continue;
+        }
+        let resumed = std::mem::take(&mut was_paused);
         let now = clock.now_ms() / 1000;
         model.schedule.on_battery = power
             .borrow()
@@ -194,8 +219,8 @@ async fn worker(
             && model
                 .last_attempt
                 .is_none_or(|last| now.saturating_sub(last) >= 15);
-        if force || model.schedule.due(now, model.last_attempt, model.last_ok) {
-            tokio::select! {_=stop.changed()=>break,()=model.check(&runner,now)=>{}}
+        if resumed || force || model.schedule.due(now, model.last_attempt, model.last_ok) {
+            tokio::select! {_=stop.changed()=>break,_=pause.changed()=>{was_paused=true;continue;},()=model.check(&runner,now)=>{}}
         }
         let now = clock.now_ms() / 1000;
         let next = model.next(now);
@@ -208,6 +233,7 @@ async fn worker(
         ));
         tokio::select! {
             _=stop.changed()=>break,
+            _=pause.changed()=>{was_paused=true;},
             changed=power.changed()=>{if changed.is_err(){break;}},
             ()=tokio::time::sleep(Duration::from_secs(next.saturating_sub(now).max(1)))=>{},
             request=rx.recv()=>{let Some(request)=request else{break;};forced=true;if !request.reply.is_closed(){respond(request.reply,Ok(service.current()));}},

@@ -15,7 +15,7 @@ export { UI_SPRING };
 function arrive(root: HTMLElement) {
   root.style.opacity = '0'; root.dataset.arrived = 'true'; root.dataset.morphing = 'false';
 }
-export function IslandSurface({ children, fail }: { children: ReactNode; fail(error: unknown): void }) {
+export function IslandSurface({ children, fail, paletteOpen = false }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean }) {
   const state = useIslandState(), settings = useSettings();
   // Settings → Motion → Reduce motion forces the same path as the OS preference.
   const reduced = useReducedMotion() === true || settings.reduceMotion === true;
@@ -77,7 +77,9 @@ export function IslandSurface({ children, fail }: { children: ReactNode; fail(er
   // height slider never grows the terminal past 672px (or Settings past 640px).
   // Content-sized pages still shrink to their content below this ceiling.
   const maxHeight = state.mode === 'large' && !layout.unchangedSizing ? customHeight : baseHeight;
-  const height = fitsContent && contentH !== null ? Math.min(maxHeight, Math.max(200, contentH)) : maxHeight;
+  // The palette needs a usable list even above a short content-fitted settings page.
+  // Keep the user's explicit height ceiling and viewport constraints authoritative.
+  const height = fitsContent && contentH !== null ? Math.min(maxHeight, Math.max(paletteOpen ? 560 : 200, contentH)) : maxHeight;
   const fit = fitSurface(width, height, viewport, state.mode === 'large' ? visible : undefined);
   const limit = fitSurface(Infinity, Infinity, viewport, state.mode === 'large' ? visible : undefined);
   liveLayout.current = effectiveLayout(visible, fit.buttonScale);

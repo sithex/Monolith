@@ -29,6 +29,16 @@ use crate::window::shape::{normalize_rows, region_rows, subtract_rect, union_row
 pub trait InputRegionBackend: Send {
     /// Apply `region` (physical px, window-relative). Empty slice = fully click-through.
     fn apply(&mut self, region: &[ShapeRow]) -> Result<(), IslandError>;
+    /// Activation may recreate the native surface; restore owned geometry before returning.
+    fn focus(
+        &mut self,
+        _action: super::focus::FocusPlan,
+        _generation: u64,
+        _input: &[ShapeRow],
+        _paint: Option<&[ShapeRow]>,
+    ) -> Result<(), IslandError> {
+        Ok(())
+    }
     /// Read the region back from the windowing system (tests + status).
     fn readback(&self) -> Result<Vec<ShapeRow>, IslandError>;
     /// Painted blur is independent of input (the native pill owns overlapped input).
@@ -91,6 +101,19 @@ impl<B: InputRegionBackend> InputRegionController<B> {
             self.painted = Some(Vec::new());
         }
         self.apply_verified(&[])
+    }
+
+    pub fn focus(
+        &mut self,
+        action: super::focus::FocusPlan,
+        generation: u64,
+    ) -> Result<(), IslandError> {
+        self.backend.focus(
+            action,
+            generation,
+            self.applied.as_deref().unwrap_or(&[]),
+            self.painted.as_deref(),
+        )
     }
 
     pub fn applied(&self) -> Option<&[ShapeRow]> {
@@ -226,6 +249,11 @@ mod tests {
 
     #[derive(Default)]
     struct Log {
+        focuses: Vec<(
+            super::super::focus::FocusPlan,
+            Vec<ShapeRow>,
+            Option<Vec<ShapeRow>>,
+        )>,
         applies: Vec<Vec<ShapeRow>>,
         lie: bool,
         fail: bool,
@@ -233,6 +261,20 @@ mod tests {
     #[derive(Clone, Default)]
     struct Fake(Arc<Mutex<Log>>);
     impl InputRegionBackend for Fake {
+        fn focus(
+            &mut self,
+            action: super::super::focus::FocusPlan,
+            _generation: u64,
+            input: &[ShapeRow],
+            paint: Option<&[ShapeRow]>,
+        ) -> Result<(), IslandError> {
+            self.0.lock().unwrap().focuses.push((
+                action,
+                input.to_vec(),
+                paint.map(<[ShapeRow]>::to_vec),
+            ));
+            Ok(())
+        }
         fn apply(&mut self, region: &[ShapeRow]) -> Result<(), IslandError> {
             let mut log = self.0.lock().unwrap();
             if log.fail {
@@ -311,6 +353,25 @@ mod tests {
             .unwrap();
         assert!(c.applied().unwrap().is_empty());
     }
+
+    #[test]
+    fn focus_passes_current_owned_input_and_paint_even_after_deduped_geometry() {
+        let (mut c, f) = ctl(true);
+        c.install().unwrap();
+        c.report(&report(1, IslandMode::Large, vec![rect(0., 50.)], true))
+            .unwrap();
+        let input = c.applied.clone().unwrap();
+        let paint = c.painted.clone();
+        c.focus(super::super::focus::FocusPlan::Activate, 1)
+            .unwrap();
+        assert_eq!(
+            f.0.lock().unwrap().focuses.last(),
+            Some(&(super::super::focus::FocusPlan::Activate, input, paint))
+        );
+        c.focus(super::super::focus::FocusPlan::Release, 2).unwrap();
+        assert_eq!(f.0.lock().unwrap().focuses.len(), 2);
+    }
+
     #[test]
     fn install_applies_an_empty_region_exactly_once_and_does_not_dedupe_against_unknown_default() {
         let (mut c, f) = ctl(true);

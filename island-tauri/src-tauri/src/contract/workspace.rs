@@ -67,6 +67,7 @@ pub enum LayoutAction {
     Collapse {},
     // Manual game mode on/off (`settings.gameMode`).
     ToggleGameMode {},
+    CommandPalette {},
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, specta::Type)]

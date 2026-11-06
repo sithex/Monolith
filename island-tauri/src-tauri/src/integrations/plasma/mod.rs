@@ -2,6 +2,7 @@
 pub mod anchor;
 #[cfg(target_os = "linux")]
 pub mod companion;
+pub mod game_effects;
 #[cfg(target_os = "linux")]
 pub mod gamemode;
 #[cfg(target_os = "linux")]

@@ -259,9 +259,11 @@ test('content-fitted Settings honors the explicit height cap without forcing emp
   class Observer {observe(){} unobserve(){} disconnect(){}}
   globals({innerWidth:1920,innerHeight:1440,addEventListener(){},removeEventListener(){},ResizeObserver:Observer,MutationObserver:Observer,
     requestAnimationFrame:cb=>{frames.push(cb);return frames.length;},cancelAnimationFrame(){},getComputedStyle:()=>({paddingTop:'0',paddingBottom:'0'})},()=>{
-    for(const [childHeight,expected] of [[300,344],[900,944],[2000,1190]]) {
+    // [visible child height, height hidden inside a [data-fit-scroll] scroller (null: none), expected]
+    for(const [childHeight,hidden,expected] of [[300,null,344],[900,null,944],[2000,null,1190],[374,0,418],[374,600,1018],[374,2000,1190]]) {
       const h=surfaceHarness();try {
-        const tree=h.renderSurface(),child={offsetHeight:childHeight},pane={firstElementChild:child,offsetHeight:500};
+        const scroller=hidden===null?null:{scrollHeight:300+hidden,clientHeight:300};
+        const tree=h.renderSurface(),child={offsetHeight:childHeight,querySelector:sel=>sel==='[data-fit-scroll]'?scroller:null},pane={firstElementChild:child,offsetHeight:500};
         const root={getBoundingClientRect:()=>({width:820,height:1190}),style:{getPropertyValue:()=>'',setProperty(){}},querySelector:selector=>selector.includes('.app-pane')?pane:selector==='.topline'?{offsetHeight:42}:selector==='.terminal-wrap'?{offsetHeight:500}:{}};
         tree.props.ref.current=root;h.state.view='settings';h.state.rev++;
         h.renderSurface();while(frames.length)frames.shift()();

@@ -478,7 +478,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                         const out=kids.some(k=>{const kr=R(k);return kr.width>0&&(kr.right>rr.right+1||kr.left<rr.left-1)});const lap=l&&kids.some(k=>{const kr=R(k);return kr.width>0&&kr.left<R(l).right-1&&kr.top<R(l).bottom-1&&kr.bottom>R(l).top+1});\
                         return (out||lap)?(r.dataset.settingId||r.textContent.slice(0,30))+(out?':out':':overlap'):null}).filter(Boolean);\
                         const cards=[...c.querySelectorAll(':scope > .settings-card, :scope > section')].filter(e=>e.offsetParent).map(R);const cardGap=cards.length<2?99:Math.min(...cards.slice(1).map((b,i)=>b.top-cards[i].bottom));\
-                        return {rail:rail.width,gap:cr.left-rail.right,cardGap,spill:c.scrollWidth-c.clientWidth,paneRight:pane.right-cr.right,rows:c.querySelectorAll('.settings-row').length,bad}})()");
+                        return {rail:rail.width,gap:cr.left-rail.right,cardGap,fitClient:c.clientHeight,fitScroll:c.scrollHeight,spill:c.scrollWidth-c.clientWidth,paneRight:pane.right-cr.right,rows:c.querySelectorAll('.settings-row').length,bad}})()");
                     assert!((30.0..=56.0).contains(&g["rail"].as_f64().unwrap()), "{section}: rail width {g}");
                     assert!(g["gap"].as_f64().unwrap() >= 0.0, "{section}: content overlaps rail {g}");
                     assert!(g["spill"].as_f64().unwrap() <= 1.0, "{section}: horizontal overflow {g}");
@@ -486,6 +486,11 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                     assert!(g["rows"].as_u64().unwrap() > 0, "{section}: empty section {g}");
                     // Separate cards: a visible gap between every pair of stacked cards.
                     assert!(g["cardGap"].as_f64().unwrap() >= 10.0, "{section}: cards touch {g}");
+                    // The island grows to fit the section (up to its maximum height) instead of
+                    // squeezing it into a small scroll box: Settings scrolls inside .settings-content,
+                    // and that hidden height must still count when the island sizes itself.
+                    let (client, scroll) = (g["fitClient"].as_f64().unwrap(), g["fitScroll"].as_f64().unwrap());
+                    assert!(client >= scroll.min(450.0) - 1.0, "{section}: island did not grow to fit Settings {g}");
                     assert_eq!(g["bad"], serde_json::json!([]), "{section}: misplaced controls {g}");
                     screenshot(&s, &conn, window, &format!("{theme}-settings-{section}"));
                 }

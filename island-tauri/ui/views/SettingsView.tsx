@@ -223,7 +223,7 @@ export function SettingsView() {
         aria-label={section.name} aria-current={tab === section.id ? 'page' : undefined} onClick={() => { setTab(section.id); setQuery(''); }}>
         <SectionIcon section={section.id} /><span className="settings-rail-name" role="tooltip">{section.name}</span>
       </button>)}</nav>
-      <div className="settings-content">
+      <div className="settings-content" data-fit-scroll="">
         {searching ? <>
           {results.length === 0 && <p className="settings-empty" role="status">No settings match “{query.trim()}”</p>}
           {SETTINGS_SECTIONS.map(section => { const groups = results.filter(group => group.card.tab === section.id); return groups.length > 0 && <section className="settings-results" key={section.id} aria-label={section.name}>

@@ -59,7 +59,11 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
       if (watched !== child) { if (watched) ro.unobserve(watched); ro.observe(child); watched = child; }
       const cs = getComputedStyle(pane), wrap = root.querySelector<HTMLElement>('.terminal-wrap');
       const chrome = (root.querySelector<HTMLElement>('.topline')?.offsetHeight ?? 42) + (wrap?.offsetHeight ?? 0) - pane.offsetHeight + 2;
-      const want = Math.ceil(chrome + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + child.offsetHeight);
+      // A view with its own scroller (Settings' .settings-content) reports only its visible
+      // height; add what that scroller hides so the island still grows to fit (up to its max).
+      const scroller = child.querySelector<HTMLElement>('[data-fit-scroll]');
+      const hidden = scroller ? Math.max(0, scroller.scrollHeight - scroller.clientHeight) : 0;
+      const want = Math.ceil(chrome + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + child.offsetHeight + hidden);
       setContentH(h => h !== null && Math.abs(h - want) < 2 ? h : want);
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };

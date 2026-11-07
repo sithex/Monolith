@@ -127,6 +127,18 @@ TestCase {
         }
     }
 
+    function test_facing_retention() {
+        // Salamander keeps its last horizontal facing when gazeX is near centre.
+        const f = createTemporaryObject(factory, suite, { character: "salamander" });
+        point(f, 900, 0);
+        point(f, 0, 0);
+        const centerFacingRight = picture(f);
+        point(f, -900, 0);
+        point(f, 0, 0);
+        const centerFacingLeft = picture(f);
+        verify(centerFacingRight !== centerFacingLeft, "salamander retains facing when pointer returns to center");
+    }
+
     // A gaze target reversed mid-glide must end at the new target (it used to compare
     // with the half-animated value, skip the update and finish the stale glide).
     function test_reversed_glide_settles() {

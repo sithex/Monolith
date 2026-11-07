@@ -4,7 +4,8 @@ import { appApi, clipboardCopy, clipboardList, type ClipSummary, type IslandView
 import { dispatch, useIslandState } from '../ipc/island-state';
 import { useSettings } from '../stores';
 import { appStores, useApp, useLauncher } from '../stores/apps';
-import { SETTINGS_CARDS } from '../views/settings-model';
+import { SETTINGS_CARDS, sectionName } from '../views/settings-model';
+import { openSetting } from '../views/settings/SettingsLink';
 import { ACTION_OPTIONS, runSideAction } from './side-actions';
 import { searchCommands, nextSelection, type SearchItem } from './command-search';
 import './command-palette.css';
@@ -78,12 +79,11 @@ export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): v
       .map(option => ({ id: option.key, label: option.label, group: option.group === 'Apps' ? 'Pages' : 'Quick actions', run: () => runSideAction(option.action, view => { void navigate(view).catch(fail); }) }));
     for (const card of SETTINGS_CARDS) for (const row of card.rows) {
       if (row.when && !row.when(settings)) continue;
-      result.push({ id: `setting:${row.id}`, label: row.label, group: 'Settings', detail: card.title, keywords: `${row.hint ?? ''} ${row.keys.join(' ')}`, run: async () => {
+      result.push({ id: `setting:${row.id}`, label: row.label, group: 'Settings', detail: card.title, keywords: `${row.hint ?? ''} ${row.synonyms ?? ''} ${sectionName(card.tab)} ${row.keys.join(' ')}`, run: async () => {
         // The row jump owns focus; generic page-open focus must not win its RAF race.
         settingJump.current = true;
         try {
-          await navigate('settings');
-          window.dispatchEvent(new CustomEvent('island-setting-jump', { detail: row.id }));
+          await openSetting(row.id);
         } finally { requestAnimationFrame(() => { settingJump.current = false; }); }
       } });
     }

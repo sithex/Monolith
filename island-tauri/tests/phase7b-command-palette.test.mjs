@@ -50,7 +50,8 @@ function harness() {
     if (name === '../stores') return { useSettings: () => ({ clipboardHistory: true }) };
     if (name === '../stores/apps') return { useLauncher: () => ({ items: [] }), useApp: () => null, appStores: { timer: { apply() {} } } };
     if (name === '../ipc/client') return { clipboardList: async () => { io.push('clips'); return [{ id: 'clip', preview: 'Copied phrase', kind: 'text', sourceApp: null }]; }, clipboardCopy: async id => actions.push(['copy', id]), appApi: { timerCommand: async op => actions.push(op) } };
-    if (name === '../views/settings-model') return { SETTINGS_CARDS: [{ title: 'Appearance', rows: [{ id: 'font', label: 'Terminal font', keys: ['terminalFontFamily'] }] }] };
+    if (name === '../views/settings-model') return { sectionName: () => 'Terminal', SETTINGS_CARDS: [{ tab: 'terminal', title: 'Terminal', rows: [{ id: 'font', label: 'Terminal font', keys: ['terminalFontFamily'] }] }] };
+    if (name === '../views/settings/SettingsLink') return { openSetting: async rowId => { actions.push({ type: 'selectView', view: 'settings' }); const event = new Event('island-setting-jump'); event.detail = rowId; events.dispatchEvent(event); } };
     if (name === './side-actions') return { ACTION_OPTIONS: [{ key: 'dnd', label: 'Do Not Disturb', group: 'Quick actions', action: { type: 'toggleDnd' } }], runSideAction: async action => actions.push(action) };
     if (name === './command-search') return { searchCommands, nextSelection };
     if (name.endsWith('.css')) return {};

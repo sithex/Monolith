@@ -22,6 +22,7 @@ import { QuickInfo } from '../island/components/QuickInfo';
 import { ControlsApp } from '../island/components/ControlsApp';
 import { AgentRunChips } from '../island/components/AgentRunChips';
 import { UpdatesApp } from '../island/components/UpdatesApp';
+import { SettingsLink } from './settings/SettingsLink';
 import type { CalendarPresentation, CalendarLabels } from '../island/app-presentations';
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 export function AppsView({ view, active }: { view: IslandView; active: boolean }) {
@@ -68,7 +69,7 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
     return () => { queryStore.reset(); pendingQuery.current = null; };
   }, [active, view, month, calendar?.rev, calendarEpoch, calendarReload, queryStore]);
   if (!active) return null;
-  const unavailable = <p className="unavailable">This module is disabled or its service has not supplied a snapshot. Enable it in Settings.</p>;
+  const unavailable = <p className="unavailable">This module is disabled or its service has not supplied a snapshot. <SettingsLink rowId={view === 'clipboard' ? 'clipboardHistory' : 'arrangeApps'} label="Enable it in Settings" variant="text" />.</p>;
   let content;
   try {
     if (view === 'timer' && timer) content = <TimerApp snapshot={adapt.adaptTimer(timer)} completedKind={timer.completedKind} intents={{ timer: op => enqueueEpochCommand(appStores.timer,run,()=>appApi.timerCommand(op)) }} />;

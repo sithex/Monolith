@@ -101,7 +101,7 @@ export function LayoutEditor() {
   };
   const activeTile = snapshot.unchangedSizing ? null : layout.preset.type;
   return <>
-    <section className="settings-card layout-editor" aria-label="Layout editor"><h3>Side buttons</h3>
+    <section className="settings-card layout-editor" data-setting-id="sideButtons" tabIndex={-1} aria-label="Layout editor"><h3>Side buttons</h3>
       <div ref={host} className="le-host" style={{ height: Math.ceil(maxStageH * scale) }}>
         {geometry && <div className="le-scaled" data-live={draft !== null} style={{ ['--le-boost' as string]: boost, width: stageW, height: stageH, transform: `scale(${scale})`, left: `calc(50% - ${stageW * scale / 2}px)` }} data-testid="layout-editor">
           <div className="le-panel" style={{ height: STRIP - 8 }}><span className="le-notch" /></div>
@@ -156,7 +156,7 @@ export function LayoutEditor() {
       <div className="settings-row"><span className="label">Spacing</span><DraftRange aria-label="Side button spacing" min={4} max={24} step={1} value={layout.gap} onCommit={v => { void send({ type: 'gap', gap: v }); }} /><output>{Math.round(layout.gap)}px</output></div>
       {error && <p role="alert">{error}</p>}
     </section>
-    <section className="settings-card" aria-label="Island size"><h3>Size</h3>
+    <section className="settings-card" data-setting-id="islandSize" tabIndex={-1} aria-label="Island size"><h3>Size</h3>
       {snapshot.unchangedSizing && <p className="muted" style={{ fontSize: 11 }}>Default sizes per app · pick a size to choose your own.</p>}
       <div className="le-tiles" role="group" aria-label="Size preset">{TILES.map(t =>
         <button key={t.type} className="le-tile" aria-pressed={activeTile === t.type}

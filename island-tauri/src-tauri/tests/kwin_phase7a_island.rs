@@ -160,25 +160,20 @@ fn click(s: &Stack, eis: &mut Wheel, origin: (i32, i32), selector: &str) {
         origin.1 + point[1].as_f64().unwrap() as i32,
     );
 }
-fn settings_tab(s: &Stack, eis: &mut Wheel, origin: (i32, i32), name: &str) {
-    let index = ["General", "Appearance", "Layout"]
-        .iter()
-        .position(|t| *t == name)
-        .unwrap()
-        + 1;
+fn settings_section(s: &Stack, eis: &mut Wheel, origin: (i32, i32), section: &str) {
     click(
         s,
         eis,
         origin,
-        &format!(".settings-tabs [role=tab]:nth-child({index})"),
+        &format!(".settings-rail [data-section={section}]"),
     );
     until(
         s,
-        &format!("7a settings tab {name} selected"),
+        &format!("7a settings section {section} selected"),
         8,
         &format!(
-            "document.querySelector('.settings-tabs [aria-selected=true]')?.textContent==={}",
-            json!(name)
+            "document.querySelector('.settings-rail [aria-current=page]')?.dataset.section==={}",
+            json!(section)
         ),
     );
 }
@@ -385,8 +380,8 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     // iteration is a real change that must persist without a restart.
     for theme in ["neutral", "skin"] {
         view(&s, &conn, window, &mut eis, origin, "settings");
-        // Colour schemes live on the Settings → Appearance tab (SettingsView.tsx).
-        settings_tab(&s, &mut eis, origin, "Appearance");
+        // Colour schemes live in Settings → Look (SettingsView.tsx).
+        settings_section(&s, &mut eis, origin, "look");
         // skin is a standalone row; neutral lives in the Monolith family.
         pick_scheme(&s, &mut eis, origin, theme, "monolith");
         until(
@@ -454,13 +449,41 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
             }
             if id == "settings" {
                 // innerText follows CSS text-transform (card titles are uppercase).
+                // Settings reopens on the last section used, so open General explicitly.
+                eval(&s, "document.querySelector('.settings-rail [data-section=general]').click()");
+                std::thread::sleep(Duration::from_millis(400));
+                let text = eval(&s, "document.querySelector('.app-pane:not([hidden])').innerText");
                 let text = text.as_str().unwrap().to_lowercase();
+                // Seven-section icon rail.
+                assert_eq!(
+                    eval(&s, "[...document.querySelectorAll('.settings-rail [data-section]')].map(b=>b.dataset.section).join(',')"),
+                    "general,notifications,look,notch,terminal,apps,island",
+                    "settings rail sections"
+                );
                 assert!(
-                    ["general", "appearance", "layout", "colour scheme"]
-                        .iter()
-                        .all(|t| text.contains(t)),
+                    ["behavior", "clock", "shortcuts"].iter().all(|t| text.contains(t)),
                     "settings pane: {text}"
                 );
+                // Rendered layout of every section: the rail keeps its width and sits left of the
+                // content, nothing spills past the pane horizontally, every row's control stays
+                // inside its row, and a row's label never overlaps its control.
+                for section in ["general", "notifications", "look", "notch", "terminal", "apps", "island"] {
+                    eval(&s, &format!("document.querySelector('.settings-rail [data-section={section}]').click()"));
+                    std::thread::sleep(Duration::from_millis(450));
+                    let g = eval(&s, "(()=>{const R=e=>e.getBoundingClientRect(),rail=R(document.querySelector('.settings-rail')),c=document.querySelector('.settings-content'),cr=R(c),pane=R(document.querySelector('.app-pane:not([hidden])'));\
+                        const bad=[...c.querySelectorAll('.settings-row')].filter(r=>r.offsetParent).map(r=>{const rr=R(r),l=r.querySelector(':scope > .label'),kids=[...r.children].filter(k=>k!==l);\
+                        const out=kids.some(k=>{const kr=R(k);return kr.width>0&&(kr.right>rr.right+1||kr.left<rr.left-1)});const lap=l&&kids.some(k=>{const kr=R(k);return kr.width>0&&kr.left<R(l).right-1&&kr.top<R(l).bottom-1&&kr.bottom>R(l).top+1});\
+                        return (out||lap)?(r.dataset.settingId||r.textContent.slice(0,30))+(out?':out':':overlap'):null}).filter(Boolean);\
+                        return {rail:rail.width,gap:cr.left-rail.right,spill:c.scrollWidth-c.clientWidth,paneRight:pane.right-cr.right,rows:c.querySelectorAll('.settings-row').length,bad}})()");
+                    assert!((30.0..=56.0).contains(&g["rail"].as_f64().unwrap()), "{section}: rail width {g}");
+                    assert!(g["gap"].as_f64().unwrap() >= 0.0, "{section}: content overlaps rail {g}");
+                    assert!(g["spill"].as_f64().unwrap() <= 1.0, "{section}: horizontal overflow {g}");
+                    assert!(g["paneRight"].as_f64().unwrap() >= -1.0, "{section}: content past the pane {g}");
+                    assert!(g["rows"].as_u64().unwrap() > 0, "{section}: empty section {g}");
+                    assert_eq!(g["bad"], serde_json::json!([]), "{section}: misplaced controls {g}");
+                    screenshot(&s, &conn, window, &format!("{theme}-settings-{section}"));
+                }
+                eval(&s, "document.querySelector('.settings-rail [data-section=general]').click()");
             }
             screenshot(&s, &conn, window, &format!("{theme}-{id}"));
         }
@@ -481,7 +504,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     );
     until(&s, "7a outer surface offset applied event-driven", 8, &format!("(()=>{{const r=document.querySelector('.island').getBoundingClientRect();return Math.abs(r.x-{})<0.1&&Math.abs(r.y-{})<0.1}})()",before.x+24.,before.y+12.));
     settled(&s, &conn, window, IslandMode::Large);
-    settings_tab(&s, &mut eis, origin, "Appearance");
+    settings_section(&s, &mut eis, origin, "look");
     // Leave a non-default choice persisted so the reload below proves it was read back.
     pick_scheme(&s, &mut eis, origin, "neutral", "monolith");
     until(

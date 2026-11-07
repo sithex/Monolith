@@ -14,31 +14,31 @@ const settingsKeys = () => [...src('ui/ipc/bindings.ts').match(/export type Sett
   .replace(/\/\*\*[\s\S]*?\*\//g, '').matchAll(/^\s*(\w+)\??:/gm)].map(m => m[1]);
 const ids = groups => groups.map(g => [g.card.id, g.rows.map(r => r.id)]);
 
-test('search filters rows across tabs by label + hint, case/accent-insensitively, grouped by card', () => {
+test('search filters rows across sections by label + hint, case/accent-insensitively, grouped by card', () => {
   const s = { translucent: true, companionEnabled: true, showNotchOnEveryMonitor: false, reduceMotion: false };
-  assert.deepEqual(ids(model.searchRows('CURSOR', s)), [['text', ['terminalCursorStyle', 'terminalCursorBlink']]]);
+  assert.deepEqual(ids(model.searchRows('CURSOR', s)), [['terminal', ['terminalCursorStyle', 'terminalCursorBlink']]]);
   assert.deepEqual(ids(model.searchRows('game', s)), [['gameMode', ['gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers']]]);
   // Hint text matches too ("global" lives only in the shortcut hints); every word must match.
   assert.deepEqual(ids(model.searchRows('kde global', s)), [['shortcuts', ['openShortcut', 'paletteShortcut']]]);
   assert.deepEqual(model.searchRows('kde banana', s), []);
   assert.deepEqual(model.searchRows('   ', s), [], 'blank query = no search');
-  assert.deepEqual(ids(model.searchRows('móñitor', s)).map(([card]) => card), ['apps', 'notch'], 'accents folded; Hardware monitor + notch rows');
-  // Rows hidden by their condition are not findable.
-  assert.deepEqual(ids(model.searchRows('glass', { ...s, translucent: false })), [['surface', ['translucent']]], '"Frosted glass" hint');
+  assert.deepEqual(ids(model.searchRows('móñitor', s)).map(([card]) => card), ['notch', 'companion', 'apps'], 'accents folded; notch, companion and hardware monitor rows');
+  // Dependent preferences remain findable while their parent feature is off.
+  assert.deepEqual(ids(model.searchRows('glass', { ...s, translucent: false })), [['surface', ['translucent', 'glassStrength']]], 'glass controls remain reachable');
   assert.deepEqual(ids(model.searchRows('glass', s)), [['surface', ['translucent', 'glassStrength']]]);
-  assert.ok(!ids(model.searchRows('monitors', s)).flat(2).includes('notchMonitors'), 'checklist only with every-monitor on');
+  assert.ok(ids(model.searchRows('monitors', s)).flat(2).includes('notchMonitors'), 'saved checklist remains reachable with every-monitor off');
   assert.ok(ids(model.searchRows('monitors', { ...s, showNotchOnEveryMonitor: true })).flat(2).includes('notchMonitors'));
   // Page order: groups follow SETTINGS_CARDS order regardless of match position.
   const order = model.SETTINGS_CARDS.map(c => c.id), hit = model.searchRows('a', s).map(g => g.card.id);
   assert.deepEqual(hit, order.filter(id => hit.includes(id)));
 });
 
-test('shownRows is the active tab without a query and the search hits (any tab) with one', () => {
+test('shownRows is the active section without a query and the search hits (any section) with one', () => {
   const s = { translucent: false };
   const general = model.shownRows('general', '', s);
-  assert.ok(general.has('gameMode') && general.has('openShortcut') && !general.has('reduceMotion'));
-  assert.ok(!model.shownRows('appearance', '', s).has('glassStrength'));
-  const hits = model.shownRows('layout', 'scrollback', s);
+  assert.ok(!general.has('gameMode') && general.has('openShortcut') && !general.has('reduceMotion'));
+  assert.ok(model.shownRows('look', '', s).has('glassStrength'));
+  const hits = model.shownRows('island', 'scrollback', s);
   assert.deepEqual([...hits], ['terminalScrollback']);
 });
 
@@ -53,16 +53,18 @@ test('reset key sets: every card resets exactly its rows\' keys, keys are real s
   }
   assert.ok(!owner.has('moduleRegistry'), 'apps registry is never reset from Settings');
   assert.deepEqual(model.cardKeys('motion'), ['reduceMotion', 'animationSpeed']);
-  assert.deepEqual(model.cardKeys('behavior'), ['swipeNavigation', 'stealth', 'clickSounds']);
+  assert.deepEqual(model.cardKeys('behavior'), ['swipeNavigation', 'stealth', 'hoverDelay']);
   assert.deepEqual(model.cardKeys('shortcuts'), ['openShortcut', 'paletteShortcut']);
-  assert.deepEqual(model.cardKeys('gameMode'), ['gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers']);
-  for (const key of ['silenceKdePopups', 'notificationSound', 'notificationAppRules', 'approvalsInNotch', 'notificationDeniedApps'])
+  assert.deepEqual(model.cardKeys('gameMode'), ['dnd', 'gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers']);
+  for (const key of ['silenceKdePopups', 'notificationAppRules', 'approvalsInNotch', 'notificationDeniedApps'])
     assert.equal(owner.get(key), 'notifications', key);
-  for (const key of ['notchWaitingPulse', 'notchHoverPeek', 'companionReactive', 'notchMonitors', 'companionMonitor', 'showNotchOnEveryMonitor', 'companionCharacter'])
+  for (const key of ['notchWaitingPulse', 'notchHoverPeek', 'notchMonitors', 'showNotchOnEveryMonitor'])
     assert.equal(owner.get(key), 'notch', key);
   for (const key of ['terminalFontFamily', 'terminalScrollback', 'terminalCursorStyle', 'terminalCursorBlink', 'terminalFontSize'])
-    assert.equal(owner.get(key), 'text', key);
-  for (const card of ['backup', 'terminalCommand', 'layoutEditor']) assert.equal(model.cardSpec(card).reset, false, card);
+    assert.equal(owner.get(key), 'terminal', key);
+  for (const key of ['companionEnabled', 'companionReactive', 'companionMonitor', 'companionCharacter']) assert.equal(owner.get(key), 'companion', key);
+  assert.equal(owner.get('notificationSound'), 'sounds');
+  for (const card of ['backup', 'layoutEditor']) assert.equal(model.cardSpec(card).reset, false, card);
   const defaults = Object.fromEntries([...keys].map(k => [k, `default-${k}`]));
   assert.deepEqual(model.resetPatch('motion', defaults), { reduceMotion: 'default-reduceMotion', animationSpeed: 'default-animationSpeed' });
   assert.equal(model.cardSpec('scheme').resetsAppearance, true);

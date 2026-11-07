@@ -141,26 +141,16 @@ fn pick_scheme(s: &Stack, e: &mut Wheel, o: (i32, i32), id: &str, family: &str) 
     }
     click(s, e, o, &radio);
 }
-/// Settings is tabbed (General / Appearance / Layout, ui/views/SettingsView.tsx).
-fn settings_tab(s: &Stack, e: &mut Wheel, o: (i32, i32), name: &str) {
-    let index = ["General", "Appearance", "Layout"]
-        .iter()
-        .position(|t| *t == name)
-        .unwrap()
-        + 1;
-    click(
-        s,
-        e,
-        o,
-        &format!(".settings-tabs [role=tab]:nth-child({index})"),
-    );
+/// Select the stable section ID on the Settings rail (ui/views/SettingsView.tsx).
+fn settings_section(s: &Stack, e: &mut Wheel, o: (i32, i32), section: &str) {
+    click(s, e, o, &format!(".settings-rail [data-section={section}]"));
     until(
         s,
-        &format!("7b settings tab {name} selected"),
+        &format!("7b settings section {section} selected"),
         8,
         &format!(
-            "document.querySelector('.settings-tabs [aria-selected=true]')?.textContent==={}",
-            json!(name)
+            "document.querySelector('.settings-rail [aria-current=page]')?.dataset.section==={}",
+            json!(section)
         ),
     );
 }
@@ -281,7 +271,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     let pty = status(&s)["pty"].clone();
     for theme in ["skin", "neutral"] {
         open(&s, &c, w, &mut e, o, "settings");
-        settings_tab(&s, &mut e, o, "Appearance");
+        settings_section(&s, &mut e, o, "look");
         pick_scheme(&s, &mut e, o, theme, "monolith");
         until(
             &s,
@@ -350,7 +340,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
             "document.querySelector('.app-grid')?.dataset.editing==='false'",
         );
         open(&s, &c, w, &mut e, o, "settings");
-        settings_tab(&s, &mut e, o, "Layout");
+        settings_section(&s, &mut e, o, "island");
         point(&s, o, ".layout-editor");
         settled(&s, &c, w, IslandMode::Large);
         capture(&s, &c, w, &format!("{theme}-layout"));
@@ -361,7 +351,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     click(&s, &mut e, o, ".terminal");
     e.send("chord 29 22");
     open(&s, &c, w, &mut e, o, "settings");
-    settings_tab(&s, &mut e, o, "Layout");
+    settings_section(&s, &mut e, o, "island");
     // First size tile = Compact (360 wide), LayoutEditor.tsx TILES. The editor lays itself out
     // from an async geometry reply, so let the surface and the tile rect settle before pressing.
     settled(&s, &c, w, IslandMode::Large);

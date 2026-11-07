@@ -79,8 +79,9 @@ test('recorder: every key we can emit passes the settings validator (mirror of R
 
 test('shortcut rows use the recorder, stay unbound by default and never preset a key', () => {
   const view = src('ui/views/SettingsView.tsx');
-  assert.match(view, /<ShortcutRecorder label="Open shortcut" value=\{settings\.openShortcut \?\? ''\}/);
-  assert.match(view, /<ShortcutRecorder label="Command palette shortcut" value=\{settings\.paletteShortcut \?\? ''\}/);
+  assert.match(view, /<ShortcutRecorder label=\{label\} value=\{settings\[id\] \?\? ''\}/);
+  assert.match(view, /onSave=\{value => saveSettings\(\{ \[id\]: value \}\)\}/);
+  assert.match(view, /case 'openShortcut': case 'paletteShortcut':/);
   const rec = src('ui/views/settings/ShortcutRecorder.tsx');
   assert.doesNotMatch(rec, /useEffect\(\(\) => \{[^}]*save\(['"`][A-Za-z]/, 'no automatic save of a literal chord');
   assert.match(rec, /Type it/, 'typed fallback kept for chords KWin grabs');
@@ -134,7 +135,7 @@ test('font picker model stays cheap with a large mock list (rendered rows capped
 
 test('font picker is wired to the terminal font row and the installed-font command', () => {
   const view = src('ui/views/SettingsView.tsx');
-  assert.match(view, /<FontPicker label="Terminal font" value=\{settings\.terminalFontFamily \?\? ''\}/);
+  assert.match(view, /<FontPicker label=\{label\} value=\{settings\.terminalFontFamily \?\? ''\}/);
   assert.match(view, /commands\.fontFamilies\(\)/);
   assert.match(src('ui/views/settings/FontPicker.tsx'), /monoDefault = true/, 'monospace-only is the default for the terminal font');
   assert.match(src('ui/ipc/bindings.ts'), /__TAURI_INVOKE\("font_families"\)/);

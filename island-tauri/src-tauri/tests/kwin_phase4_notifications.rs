@@ -293,7 +293,7 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
         "window.__TAURI_INTERNALS__.invoke('island_dispatch',{intent:{type:'selectView',view:'settings'}})",
     );
     wait_for("settings sound row", Duration::from_secs(8), || {
-        (eval(&s, "(()=>{const b=[...document.querySelectorAll('.settings-row .link[aria-expanded=false]')].find(b=>b.closest('[data-setting-label=\"Per-app rules\"]'));b?.click();return !!document.querySelector('.settings-row > .sound-picker')&&!!document.querySelector('.app-rule .sound-picker')})()") == true)
+        (eval(&s, "(()=>{document.querySelector('.settings-rail [data-section=notifications]:not([aria-current])')?.click();const b=[...document.querySelectorAll('.settings-row .link[aria-expanded=false]')].find(b=>b.closest('[data-setting-label=\"Per-app rules\"]'));b?.click();return !!document.querySelector('.settings-row > .sound-picker')&&!!document.querySelector('.app-rule .sound-picker')})()") == true)
             .then_some(())
     });
     std::thread::sleep(Duration::from_millis(600));

@@ -5,6 +5,16 @@ const root=process.env.ISLAND_UI_ROOT ?? new URL('../ui',import.meta.url).pathna
 const { NotchControls }=load(`${root}/island/NotchControls.tsx`);
 const { DraftRange }=load(`${root}/island/components/AppPrimitives.tsx`);
 const children=e=>[e,...[e?.props?.children].flat(Infinity).filter(Boolean).flatMap(c=>typeof c==='object'?children(c):[])];
+test('every notch and companion row has its stable ID target even when disabled', () => {
+ const { SETTINGS_CARDS } = load(`${root}/views/settings-model.ts`);
+ const expected = SETTINGS_CARDS.filter(card => ['notch', 'companion'].includes(card.id)).flatMap(card => card.rows.map(row => row.id));
+ for (const settings of [{}, { showNotchOnEveryMonitor: false, companionEnabled: false, notchBorderEnabled: false }]) {
+  const tree = NotchControls({ settings, background: '#000000', accent: '#00ff00', patch() {} });
+  const targets = children(tree).filter(node => node.props?.['data-setting-id']);
+  assert.deepEqual(targets.map(node => node.props['data-setting-id']), expected);
+  assert.ok(targets.every(node => node.props['data-setting-label'] && node.props.tabIndex === -1));
+ }
+});
 test('notch appearance controls emit independent color and border settings',()=>{
  const calls=[];
  const controls=children(NotchControls({settings:{panelClockColor:'#123456',notchBorderEnabled:true,notchBorderColor:'#abcdef',notchBorderOpacity:.6,notchBorderWidth:2.5},background:'#000000',accent:'#00ff00',patch:p=>calls.push(p)}));
@@ -35,8 +45,9 @@ test('companion character picker lists every character and patches the choice',(
  const calls=[];
  const all=s=>children(NotchControls({settings:s,background:'#000000',accent:'#00ff00',patch:p=>calls.push(p)}));
  const picker=s=>all(s).find(e=>e.props?.value!==undefined&&typeof e.props?.onPick==='function'&&e.props?.value!==e.props?.label&&!('resetLabel' in e.props));
- // Hidden while the companion is off.
- assert.equal(picker({companionEnabled:false}),undefined);
+ // Saved character stays editable while the companion is off; it must not enable it.
+ picker({companionEnabled:false}).props.onPick('frog');
+ assert.deepEqual(calls.pop(),{companionCharacter:'frog'});
  const p=picker({});
  assert.equal(p.props.value,'blob');
  const tiles=children(p.type(p.props)).filter(e=>e.props?.role==='radio');

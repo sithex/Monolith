@@ -3,10 +3,24 @@
 // restores and the rows a search can find never drift apart. Pure: no React, no IPC.
 import type { Appearance, Settings, SettingsPatch } from '../ipc/client';
 
-export type Tab = 'general' | 'appearance' | 'layout';
+export const SETTINGS_SECTIONS = [
+  { id: 'general', name: 'General' },
+  { id: 'notifications', name: 'Notifications' },
+  { id: 'look', name: 'Look' },
+  { id: 'notch', name: 'Notch & companion' },
+  { id: 'terminal', name: 'Terminal' },
+  { id: 'apps', name: 'Apps & widgets' },
+  { id: 'island', name: 'Island & backup' },
+] as const;
+export type Tab = typeof SETTINGS_SECTIONS[number]['id'];
+export const SECTION_STORAGE_KEY = 'monolith-settings-section';
+export const sectionName = (id: Tab) => SETTINGS_SECTIONS.find(s => s.id === id)!.name;
+export const savedSection = (value: string | null): Tab => SETTINGS_SECTIONS.find(s => s.id === value)?.id ?? 'general';
 export type SettingKey = keyof Settings;
 export type RowSpec = {
-  id: string; label: string; hint?: string; keys: readonly SettingKey[];
+  id: string; label: string; hint?: string; synonyms?: string; keys: readonly SettingKey[];
+  /** External editors can own keys without allowing Reset to erase their data. */
+  resetKeys?: readonly SettingKey[];
   /** Shown only when this holds (e.g. glass strength needs translucency). */
   when?(settings: Partial<Settings>): boolean;
 };
@@ -21,7 +35,9 @@ export type CardSpec = {
 export const DEFAULT_APPEARANCE: Appearance = 'skin';
 const on = (key: SettingKey) => (s: Partial<Settings>) => s[key] !== false;
 
-export const SETTINGS_CARDS: readonly CardSpec[] = [
+// The original row catalogue keeps IDs stable across navigation changes. Section/card
+// composition below is the sole navigation model; catalogue groups are not sections.
+const ROW_CATALOG: readonly { id: string; title: string; tab: string; rows: readonly RowSpec[]; reset?: boolean; resetsAppearance?: boolean }[] = [
   { id: 'behavior', title: 'Behavior', tab: 'general', rows: [
     { id: 'swipeNavigation', label: 'Swipe between views', hint: 'Horizontal drag or two-finger swipe changes app', keys: ['swipeNavigation'] },
     { id: 'stealth', label: 'Auto-hide when idle', keys: ['stealth'] },
@@ -115,6 +131,85 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
   ] },
 ];
 
+const catalogue = new Map(ROW_CATALOG.flatMap(card => card.rows.map(row => [row.id, row] as const)));
+const refinements: Record<string, Partial<RowSpec>> = {
+  stealth: { hint: 'Dims the closed notch to 15% while idle; hover or focus restores it' },
+  gameModeAuto: { hint: 'Automatically quiets the island while a fullscreen window has focus' },
+  gameMode: { hint: 'Manual override: quiet the island now, until you turn this switch off' },
+  notificationSoundId: { label: 'Notification sound choice' },
+  borderEnabled: { label: 'Island outline' },
+  notchMonitors: { label: 'Notch monitors', hint: 'Choose displays with existing top panels; empty selection means all' },
+  everyMonitor: { hint: 'Adds notches to existing top panels, without creating panels' },
+  companionCharacter: { label: 'Companion character', synonyms: 'face pet mascot character' },
+  notchWidth: { label: 'Notch width' },
+  translucent: { synonyms: 'blur glass transparency frosted' },
+  glassStrength: { synonyms: 'blur glass transparency opacity' },
+  dnd: { synonyms: 'mute quiet silence dnd focus' },
+  terminalCommand: { synonyms: 'xterm console shell executable launch' },
+  arrangeApps: { keys: ['moduleRegistry'], resetKeys: [] },
+};
+const rows = (...ids: string[]): RowSpec[] => ids.map(id => {
+  const original = catalogue.get(id);
+  if (!original) throw new Error(`Unknown settings row ${id}`);
+  // Keep dependent controls reachable even while their feature is off. Editing them
+  // changes the saved preference, never implicitly enables the parent feature.
+  const { when: _when, ...row } = original;
+  return { ...row, ...refinements[id] };
+});
+export const SETTINGS_CARDS: readonly CardSpec[] = [
+  { id: 'behavior', title: 'Behavior', tab: 'general', rows: [...rows('swipeNavigation', 'stealth'),
+    { id: 'hoverDelay', label: 'Hover delay', hint: 'Preview delay in milliseconds; 0 disables hover preview', keys: ['hoverDelay'] }] },
+  { id: 'startup', title: 'Startup', tab: 'general', rows: [
+    { id: 'autostart', label: 'Start at login', synonyms: 'startup login boot', keys: ['autostart'] },
+    { id: 'showInTaskbar', label: 'Show in taskbar', hint: 'Window/taskbar preference', keys: ['showInTaskbar'] }] },
+  { id: 'clock', title: 'Clock', tab: 'general', rows: [...rows('showDate'),
+    { id: 'hourFormat', label: 'Time format', synonyms: 'time 24h 12h am pm clock', keys: ['hourFormat'] }] },
+  { id: 'shortcuts', title: 'Shortcuts', tab: 'general', rows: rows('openShortcut', 'paletteShortcut') },
+  { id: 'notifications', title: 'Notifications', tab: 'notifications', rows: rows('notificationsEnabled', 'systemNotificationMirror', 'silenceKdePopups', 'approvalsInNotch', 'redactBodies', 'deniedApps', 'appRules') },
+  { id: 'gameMode', title: 'Focus', tab: 'notifications', rows: rows('dnd', 'gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers') },
+  { id: 'sounds', title: 'Sounds', tab: 'notifications', rows: rows('notificationSound', 'notificationSoundId', 'clickSounds') },
+  { id: 'popups', title: 'Popups', tab: 'notifications', rows: [
+    { id: 'toastTtlMs', label: 'Popup duration', hint: 'How long notification popups stay visible', synonyms: 'toast timeout duration', keys: ['toastTtlMs'] }] },
+  { id: 'scheme', title: 'Colour scheme', tab: 'look', resetsAppearance: true, rows: rows('scheme', 'hermesThemeSync', 'overrides') },
+  { id: 'surface', title: 'Surface', tab: 'look', rows: rows('translucent', 'glassStrength', 'borderEnabled') },
+  { id: 'motion', title: 'Motion', tab: 'look', rows: rows('reduceMotion', 'animationSpeed') },
+  { id: 'text', title: 'UI font', tab: 'look', rows: rows('uiFont') },
+  { id: 'notch', title: 'Notch', tab: 'notch', rows: rows('everyMonitor', 'notchMonitors', 'waitingPulse', 'hoverPeek', 'notchColor', 'notchWidth', 'notchBorder', 'notchBorderColor', 'notchBorderOpacity', 'notchBorderWidth') },
+  { id: 'companion', title: 'Companion', tab: 'notch', rows: rows('companion', 'companionCharacter', 'companionReactive', 'companionMonitor') },
+  { id: 'display', title: 'Display', tab: 'notch', rows: [...rows('displayBackend'),
+    { id: 'displayId', label: 'Island display', hint: 'Blank follows the default display; saved output names are retained', keys: ['displayId'] }] },
+  { id: 'terminal', title: 'Terminal', tab: 'terminal', rows: rows('terminalCommand', 'terminalFontFamily', 'terminalFontSize', 'terminalScrollback', 'terminalCursorStyle', 'terminalCursorBlink') },
+  { id: 'apps', title: 'Apps', tab: 'apps', rows: rows('hardwareMonitor', 'arrangeApps') },
+  { id: 'clipboard', title: 'Clipboard', tab: 'apps', rows: [
+    { id: 'clipboardHistory', label: 'Clipboard history', hint: 'Opt in to collecting copied text and images', keys: ['clipboardHistory'] },
+    { id: 'clipboardHistorySize', label: 'Clipboard history size', hint: 'Maximum entries kept', keys: ['clipboardHistorySize'] },
+    { id: 'clipboardPersist', label: 'Keep pinned clips after restart', hint: 'Only pinned items are saved to disk', keys: ['clipboardPersist'] },
+    { id: 'clipboardDenyPatterns', label: 'Clipboard exclusion patterns', hint: 'One Rust regular expression per line; matching clips are not collected', synonyms: 'regex privacy passwords deny', keys: ['clipboardDenyPatterns'] }] },
+  { id: 'weather', title: 'Weather', tab: 'apps', rows: [
+    { id: 'weatherEnabled', label: 'Weather', hint: 'Enable weather updates for the selected location', keys: ['weatherEnabled'] },
+    { id: 'weatherLocation', label: 'Weather location', hint: 'Choose a city; clear to remove the saved location', keys: ['weatherLocation'] },
+    { id: 'weatherUnit', label: 'Temperature unit', hint: 'Fahrenheit or Celsius', keys: ['weatherUnit'] }] },
+  { id: 'battery', title: 'Battery', tab: 'apps', rows: [
+    { id: 'batteryAlerts', label: 'Battery alerts', keys: ['batteryAlerts'] },
+    { id: 'batteryLowPercent', label: 'Low battery threshold', keys: ['batteryLowPercent'] },
+    { id: 'batteryCriticalPercent', label: 'Critical battery threshold', keys: ['batteryCriticalPercent'] }] },
+  { id: 'music', title: 'Music', tab: 'apps', rows: [
+    { id: 'lyricsEnabled', label: 'Synced lyrics', hint: 'Opt in to LRCLIB lookups that send track title, artist, album and duration', keys: ['lyricsEnabled'] },
+    { id: 'equalizerEnabled', label: 'Live equalizer', hint: 'Opt in to capturing the playing output stream, never the microphone', keys: ['equalizerEnabled'] },
+    { id: 'equalizerBands', label: 'Equalizer bands', hint: 'Whole bands, from 8 to 32', keys: ['equalizerBands'] }] },
+  { id: 'layoutEditor', title: 'Island layout', tab: 'island', reset: false, rows: rows('sideButtons', 'islandSize') },
+  { id: 'position', title: 'Position', tab: 'island', rows: rows('offsetX', 'offsetY') },
+  { id: 'backup', title: 'Backup', tab: 'island', reset: false, rows: rows('exportSettings', 'importSettings') },
+];
+
+export function settingLocation(id: string): { card: CardSpec; row: RowSpec } | null {
+  for (const card of SETTINGS_CARDS) {
+    const row = card.rows.find(row => row.id === id);
+    if (row) return { card, row };
+  }
+  return null;
+}
+
 const ROWS = new Map(SETTINGS_CARDS.flatMap(card => card.rows.map(row => [row.id, row] as const)));
 export const rowSpec = (id: string): RowSpec => {
   const row = ROWS.get(id);
@@ -129,7 +224,7 @@ export const cardSpec = (id: string): CardSpec => {
 
 /** Every setting key a card's Reset restores (union of its rows' keys, schema order kept). */
 export function cardKeys(cardId: string): SettingKey[] {
-  return [...new Set(cardSpec(cardId).rows.flatMap(row => row.keys))];
+  return [...new Set(cardSpec(cardId).rows.flatMap(row => row.resetKeys ?? row.keys))];
 }
 /** The patch that resets one card to the Rust defaults (`settings_defaults`). */
 export function resetPatch(cardId: string, defaults: Settings): SettingsPatch {
@@ -150,7 +245,7 @@ export function searchRows(query: string, settings: Partial<Settings>, cards: re
   const words = normalize(query).split(/\s+/).filter(Boolean);
   if (!words.length) return [];
   return cards.map(card => ({ card, rows: card.rows.filter(row => {
-    const text = normalize(`${row.label} ${row.hint ?? ''}`);
+    const text = normalize(`${row.label} ${row.hint ?? ''} ${row.synonyms ?? ''} ${card.title} ${sectionName(card.tab)} ${row.keys.join(' ')}`);
     return visible(row, settings) && words.every(word => text.includes(word));
   }) })).filter(group => group.rows.length > 0);
 }

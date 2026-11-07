@@ -401,7 +401,9 @@ file_value_as_json!(
 );
 
 #[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
-fn check_app_rules(rules: &Vec<NotificationAppRule>) -> Result<Vec<NotificationAppRule>, IslandError> {
+fn check_app_rules(
+    rules: &Vec<NotificationAppRule>,
+) -> Result<Vec<NotificationAppRule>, IslandError> {
     let mut seen = BTreeSet::new();
     if rules.len() > MAX_NOTIFICATION_APP_RULES
         || rules.iter().any(|rule| {
@@ -675,7 +677,10 @@ mod tests {
     fn notification_app_rules_are_exact_unique_and_bounded() {
         let ok = json!([{"app": "Discord", "popup": false, "sound": true, "urgency": "low"},
                         {"app": "discord", "popup": true, "sound": false, "urgency": "app"}]);
-        let s = patch(json!({"notificationAppRules": ok})).unwrap().apply(&Settings::default()).unwrap();
+        let s = patch(json!({"notificationAppRules": ok}))
+            .unwrap()
+            .apply(&Settings::default())
+            .unwrap();
         assert_eq!(s.notification_app_rules.len(), 2);
         assert_eq!(s.notification_app_rules[0].urgency, RuleUrgency::Low);
         for bad in [
@@ -684,14 +689,22 @@ mod tests {
             json!([{"app": " A", "popup": true, "sound": true, "urgency": "app"}]),
             json!([{"app": "", "popup": true, "sound": true, "urgency": "app"}]),
         ] {
-            assert!(patch(json!({"notificationAppRules": bad})).unwrap().apply(&Settings::default()).is_err());
+            assert!(patch(json!({"notificationAppRules": bad}))
+                .unwrap()
+                .apply(&Settings::default())
+                .is_err());
         }
         assert!(patch(json!({"notificationAppRules": [{"app": "A", "popup": true, "sound": true, "urgency": "loud"}]})).is_err());
         assert!(patch(json!({"notificationAppRules": [{"app": "A", "popup": true, "sound": true, "urgency": "app", "x": 1}]})).is_err());
         let many: Vec<_> = (0..=MAX_NOTIFICATION_APP_RULES)
-            .map(|i| json!({"app": format!("a{i}"), "popup": true, "sound": true, "urgency": "app"}))
+            .map(
+                |i| json!({"app": format!("a{i}"), "popup": true, "sound": true, "urgency": "app"}),
+            )
             .collect();
-        assert!(patch(json!({"notificationAppRules": many})).unwrap().apply(&Settings::default()).is_err());
+        assert!(patch(json!({"notificationAppRules": many}))
+            .unwrap()
+            .apply(&Settings::default())
+            .is_err());
     }
 
     #[test]

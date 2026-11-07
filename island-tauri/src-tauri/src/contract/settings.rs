@@ -60,6 +60,7 @@ pub enum CompanionCharacter {
     Necronoverlord,
     Canoptekscarab,
     Eyeofsauron,
+    Sonichu,
 }
 
 // Deserialize the removed ID at the boundary only. A serde alias on Blob makes
@@ -80,6 +81,7 @@ impl<'de> Deserialize<'de> for CompanionCharacter {
             "necronoverlord" => Ok(Self::Necronoverlord),
             "canoptekscarab" => Ok(Self::Canoptekscarab),
             "eyeofsauron" => Ok(Self::Eyeofsauron),
+            "sonichu" => Ok(Self::Sonichu),
             _ => Err(serde::de::Error::unknown_variant(
                 &id,
                 &[
@@ -94,6 +96,7 @@ impl<'de> Deserialize<'de> for CompanionCharacter {
                     "necronoverlord",
                     "canoptekscarab",
                     "eyeofsauron",
+                    "sonichu",
                 ],
             )),
         }
@@ -445,7 +448,9 @@ pub fn sound_id_ok(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && !id.starts_with(['.', '-'])
-        && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
 }
 
 #[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`

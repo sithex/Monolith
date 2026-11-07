@@ -282,6 +282,37 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
         .unwrap()
         .iter()
         .all(|n| n["canInvokeActions"] == false));
+    // Settings > Notifications sound picker, rendered: dropdown and play button share one row
+    // (same vertical centre, button to the right), in the main row and in a per-app rule.
+    eval(
+        &s,
+        "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{dnd:false,notificationAppRules:[{app:'Fixture',popup:true,sound:true,urgency:'app',soundId:''}]}})",
+    );
+    eval(
+        &s,
+        "window.__TAURI_INTERNALS__.invoke('island_dispatch',{intent:{type:'selectView',view:'settings'}})",
+    );
+    wait_for("settings sound row", Duration::from_secs(8), || {
+        (eval(&s, "(()=>{const b=[...document.querySelectorAll('.settings-row .link[aria-expanded=false]')].find(b=>b.closest('[data-setting-label=\"Per-app rules\"]'));b?.click();return !!document.querySelector('.settings-row > .sound-picker')&&!!document.querySelector('.app-rule .sound-picker')})()") == true)
+            .then_some(())
+    });
+    std::thread::sleep(Duration::from_millis(600));
+    let pickers = eval(
+        &s,
+        "[...document.querySelectorAll('.sound-picker')].map(p=>{const R=e=>e.getBoundingClientRect(),d=R(p.querySelector('.dropdown-trigger')),b=R(p.querySelector('.sound-preview')),row=R(p.parentElement),l=p.parentElement.querySelector(':scope > .label, :scope > .app-rule-name');\
+         return [Math.abs((d.y+d.height/2)-(b.y+b.height/2)),b.x-d.right,Math.abs((row.y+row.height/2)-(d.y+d.height/2)),b.right<=row.right+0.5?1:0,l?R(l).right-d.x:-1,b.width-b.height]})",
+    );
+    let pickers = pickers.as_array().unwrap();
+    assert_eq!(pickers.len(), 2, "global and per-app pickers: {pickers:?}");
+    for p in pickers {
+        let g: Vec<f64> = p.as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+        assert!(g[0] <= 1.0, "play button level with the dropdown: {g:?}");
+        assert!((2.0..=12.0).contains(&g[1]), "play button just right of the dropdown: {g:?}");
+        assert!(g[2] <= 2.0, "picker centred in its row: {g:?}");
+        assert_eq!(g[3], 1.0, "play button inside the row: {g:?}");
+        assert!(g[4] <= 0.0, "label and dropdown don't overlap: {g:?}");
+        assert!(g[5].abs() < 0.5, "play button is round: {g:?}");
+    }
     assert_eq!(unsafe { libc::kill(pid as i32, libc::SIGTERM) }, 0);
     wait_for("phase4 app exits", Duration::from_secs(15), || {
         app.0.try_wait().unwrap().map(|_| ())

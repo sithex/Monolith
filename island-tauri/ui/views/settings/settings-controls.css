@@ -60,3 +60,15 @@
 .app-rule-combo input[type='text']:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 .app-rule-suggestions { max-height: 210px; }
 .app-rules .settings-field-error { margin: 0; }
+
+/* Sound picker: dropdown and play button on one line, vertically centred, in both the
+   Notifications row and each per-app rule. */
+.sound-picker { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.settings-row > .sound-picker { flex: 0 1 256px; }
+.sound-picker .dropdown, .settings-row .sound-picker .dropdown, .app-rule .sound-picker .dropdown { flex: 1 1 auto; min-width: 0; }
+.app-rule > .sound-picker { flex: 0 0 168px; gap: 4px; }
+.island .sound-picker .sound-preview { flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; margin: 0; border-radius: 50%; background: var(--v-fill); color: var(--v-dim); }
+.island .app-rule .sound-picker .sound-preview { width: 28px; height: 28px; }
+.island .sound-picker .sound-preview:hover:not(:disabled) { color: var(--ui-accent); }
+.island .sound-picker .sound-preview:disabled { opacity: .4; }
+.sound-preview svg { display: block; width: 12px; height: 12px; margin-left: 1px; }

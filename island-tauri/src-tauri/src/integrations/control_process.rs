@@ -124,8 +124,11 @@ impl Runner {
             "hermes-fish",
             "checkupdates",
             "paru",
+            "dnf",
+            "rpm",
         ]
         .contains(&executable.as_str())
+            || !crate::integrations::updates::core::dnf_rpm_argv_allowed(argv)
         {
             return Err(IslandError::invalid("Controls executable not allowed"));
         }

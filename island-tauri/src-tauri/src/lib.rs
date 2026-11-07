@@ -10,6 +10,7 @@ pub mod identity;
 pub mod integrations;
 pub mod keyseq;
 pub mod paths;
+pub mod platform;
 pub mod services;
 pub mod singleton;
 pub mod state;

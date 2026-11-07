@@ -10,6 +10,7 @@ fn upd(name: &str, source: Source, ignored: bool) -> Update {
         new_version: "2-1".to_string(),
         ignored,
         source,
+        arch: None,
     }
 }
 

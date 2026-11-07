@@ -1,7 +1,9 @@
 //! The update model: [`Update`] records, the [`Source`] enum, and the
-//! [`Badge`] computed by [`Badge::compute`]. Kernel/reboot classification
-//! lives in [`is_kernel`].
+//! [`Badge`] computed by [`Badge::compute`] / [`Badge::compute_repo_only`].
+//! Reboot classification lives in [`is_kernel`] (pacman) and
+//! [`super::dnf::is_reboot_pkg_dnf`] (Fedora).
 
+use crate::integrations::updates::core::dnf::is_reboot_pkg_dnf;
 use crate::integrations::updates::core::error::UpdatesError;
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +18,8 @@ pub enum Source {
     Repo,
     /// `paru -Qua` (AUR packages).
     Aur,
+    /// `dnf check-upgrade` (Fedora repositories).
+    Dnf,
 }
 
 /// One `<pkgname> <oldver> -> <newver>` update line.
@@ -29,12 +33,19 @@ pub struct Update {
     /// IgnorePkg). Ignored updates are excluded from counts.
     pub ignored: bool,
     pub source: Source,
+    /// RPM architecture (`x86_64`, `i686`, `noarch`, …) for dnf updates: multilib systems have
+    /// one update per `name.arch`. `None` for pacman/AUR (one package per name).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arch: Option<String>,
 }
 
 impl Update {
-    /// Whether updating this package likely needs a reboot.
+    /// Whether updating this package likely needs a reboot (per backend's package names).
     pub fn needs_reboot(&self) -> bool {
-        is_kernel(&self.name)
+        match self.source {
+            Source::Dnf => is_reboot_pkg_dnf(&self.name),
+            Source::Repo | Source::Aur => is_kernel(&self.name),
+        }
     }
 }
 
@@ -71,6 +82,15 @@ fn non_ignored(updates: &[Update]) -> u32 {
     updates.iter().filter(|u| !u.ignored).count() as u32
 }
 
+/// The AUR half of a check.
+enum Aur {
+    /// Not part of this check (dnf, or pacman without `paru`): unknown, not an error, and it
+    /// does not make the total unknown.
+    NotChecked,
+    /// Ran (or known empty): the outcome.
+    Checked(Result<Vec<Update>, UpdatesError>),
+}
+
 impl Badge {
     /// Compute the badge from the latest check results.
     ///
@@ -88,40 +108,75 @@ impl Badge {
         last_ok_secs: Option<u64>,
         prev_ok: Option<&[Update]>,
     ) -> Badge {
+        let aur = Aur::Checked(aur.unwrap_or_else(|| Ok(Vec::new())));
+        Self::build(repo, "repo", aur, now_secs, last_ok_secs, prev_ok)
+    }
+
+    /// Like [`Badge::compute`] for a check with no AUR half (dnf; pacman without `paru`):
+    /// `count` = `repo_count`, `aur_count` stays `None` (unknown, not 0), and only `repo` can
+    /// make the counts unknown. `label` prefixes a repo error (`"repo"`, `"dnf"`).
+    pub fn compute_repo_only(
+        repo: Result<Vec<Update>, UpdatesError>,
+        label: &str,
+        now_secs: u64,
+        last_ok_secs: Option<u64>,
+        prev_ok: Option<&[Update]>,
+    ) -> Badge {
+        Self::build(
+            repo,
+            label,
+            Aur::NotChecked,
+            now_secs,
+            last_ok_secs,
+            prev_ok,
+        )
+    }
+
+    fn build(
+        repo: Result<Vec<Update>, UpdatesError>,
+        label: &str,
+        aur: Aur,
+        now_secs: u64,
+        last_ok_secs: Option<u64>,
+        prev_ok: Option<&[Update]>,
+    ) -> Badge {
         let mut errors: Vec<String> = Vec::new();
+        let previous = |aur_side: bool| {
+            prev_ok.map(|prev| {
+                prev.iter()
+                    .filter(|u| (u.source == Source::Aur) == aur_side)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+        };
 
         let repo_known = match repo {
             Ok(updates) => Some(updates),
             Err(e) => {
-                errors.push(format!("repo: {e}"));
-                prev_ok.map(|prev| {
-                    prev.iter()
-                        .filter(|u| u.source == Source::Repo)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                })
+                errors.push(format!("{label}: {e}"));
+                previous(false)
             }
         };
 
+        // Outer None = AUR not checked; inner None = AUR failed with no fallback.
         let aur_known = match aur {
-            None => Some(Vec::new()),
-            Some(Ok(updates)) => Some(updates),
-            Some(Err(e)) => {
+            Aur::NotChecked => None,
+            Aur::Checked(Ok(updates)) => Some(Some(updates)),
+            Aur::Checked(Err(e)) => {
                 errors.push(format!("aur: {e}"));
-                prev_ok.map(|prev| {
-                    prev.iter()
-                        .filter(|u| u.source == Source::Aur)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                })
+                Some(previous(true))
             }
         };
 
         let (count, repo_count, aur_count) = match (&repo_known, &aur_known) {
-            (Some(repo_items), Some(aur_items)) => {
+            (Some(repo_items), Some(Some(aur_items))) => {
                 let repo_n = non_ignored(repo_items);
                 let aur_n = non_ignored(aur_items);
                 (Some(repo_n + aur_n), Some(repo_n), Some(aur_n))
+            }
+            (Some(repo_items), None) => {
+                let repo_n = non_ignored(repo_items);
+                (Some(repo_n), Some(repo_n), None)
             }
             _ => (None, None, None),
         };
@@ -130,13 +185,14 @@ impl Badge {
         if let Some(repo_items) = &repo_known {
             items.extend_from_slice(repo_items);
         }
-        if let Some(aur_items) = &aur_known {
+        if let Some(Some(aur_items)) = &aur_known {
             items.extend_from_slice(aur_items);
         }
         items.sort_by(|a, b| {
             b.needs_reboot()
                 .cmp(&a.needs_reboot())
                 .then_with(|| a.name.cmp(&b.name))
+                .then_with(|| a.arch.cmp(&b.arch))
         });
         let needs_reboot = items.iter().any(Update::needs_reboot);
 

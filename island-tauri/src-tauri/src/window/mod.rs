@@ -56,6 +56,21 @@ pub struct IslandRuntime {
 
 /// JS that publishes `pill` as the `--native-pill-*` CSS variables and tells the island
 /// renderer to re-measure. Shared by relocation and the page-load re-apply.
+/// Window-local y of the placement's top edge: the Wayland layer surface starts
+/// `wayland::TOP_BLEED` px above it (see there). Main thread only (asks GDK).
+#[cfg(target_os = "linux")]
+fn top_bleed() -> f64 {
+    use gtk::prelude::*;
+    if gdk::Display::default().is_some_and(|display| display.backend().is_wayland()) {
+        f64::from(wayland::TOP_BLEED)
+    } else {
+        0.
+    }
+}
+#[cfg(not(target_os = "linux"))]
+fn top_bleed() -> f64 {
+    0.
+}
 pub fn native_pill_script(pill: &RoundedRect) -> String {
     let values = serde_json::json!({ "x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius });
     format!("(()=>{{const v={values};for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');window.dispatchEvent(new Event('island-native-pill'));window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('island-surfaces-changed'));}})()")
@@ -192,7 +207,7 @@ pub fn create_island_window(
                 config.height = f64::from(target.height);
                 overlap_pill = Some(RoundedRect {
                     x: anchor.pill.x - origin.x,
-                    y: anchor.pill.y - origin.y,
+                    y: anchor.pill.y - origin.y + top_bleed(),
                     width: anchor.pill.width,
                     height: anchor.pill.height,
                     radius: anchor.pill_radius,

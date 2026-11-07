@@ -36,6 +36,12 @@ use wayland_protocols_plasma::blur::client::{
 };
 
 pub const NAMESPACE: &str = "hermes-island";
+/// Logical px the layer surface is placed ABOVE its placement (a negative top margin), with
+/// the page's notch position pushed down by the same amount so nothing moves on screen.
+/// WebKitGTK's DMA-BUF renderer darkens the top two pixel rows of the surface (row 0 black,
+/// row 1 dimmed, wherever the page paints anything), and the open island touches the top of
+/// the screen, so those rows showed as a black line across it. They now sit off-screen.
+pub const TOP_BLEED: i32 = 4;
 
 pub fn is_wayland(window: &gtk::ApplicationWindow) -> bool {
     window.display().backend().is_wayland()
@@ -72,7 +78,7 @@ pub fn init_layer_surface(
     let area = monitor.geometry();
     LayerShell::set_monitor(window, &monitor);
     window.set_layer_shell_margin(Edge::Left, (x - area.x()).max(0));
-    window.set_layer_shell_margin(Edge::Top, (y - area.y()).max(0));
+    window.set_layer_shell_margin(Edge::Top, (y - area.y()).max(0) - TOP_BLEED);
     tracing::info!(
         monitor = monitor.model().as_deref().unwrap_or("?"),
         margin_left = x - area.x(),

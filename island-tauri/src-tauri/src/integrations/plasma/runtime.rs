@@ -233,9 +233,14 @@ fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
     use crate::window::{placement::over_panel, ISLAND_OVERLAY_HEIGHT, ISLAND_OVERLAY_WIDTH};
     let target = over_panel(anchor, ISLAND_OVERLAY_WIDTH, ISLAND_OVERLAY_HEIGHT)?;
     let runtime = app.state::<IslandRuntime>();
+    // The Wayland surface starts TOP_BLEED px above `target` (window/wayland.rs).
+    #[cfg(target_os = "linux")]
+    let bleed = if runtime.wayland { f64::from(crate::window::wayland::TOP_BLEED) } else { 0. };
+    #[cfg(not(target_os = "linux"))]
+    let bleed = 0.;
     let pill = crate::contract::island::RoundedRect {
         x: anchor.pill.x - f64::from(target.x),
-        y: anchor.pill.y - f64::from(target.y),
+        y: anchor.pill.y - f64::from(target.y) + bleed,
         width: anchor.pill.width,
         height: anchor.pill.height,
         radius: anchor.pill_radius,

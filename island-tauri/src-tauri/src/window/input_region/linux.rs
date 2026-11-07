@@ -141,7 +141,10 @@ impl PlatformBackend {
                         }
                         LayerShell::set_monitor(&gtk, &monitor);
                         gtk.set_layer_shell_margin(Edge::Left, target.x - area.x());
-                        gtk.set_layer_shell_margin(Edge::Top, target.y - area.y());
+                        gtk.set_layer_shell_margin(
+                            Edge::Top,
+                            target.y - area.y() - crate::window::wayland::TOP_BLEED,
+                        );
                         gtk.resize(target.width as i32, target.height as i32);
                         surface
                             .lock()

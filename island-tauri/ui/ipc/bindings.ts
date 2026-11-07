@@ -564,7 +564,7 @@ export type CompanionCharacter =
 /**  A crying boy in a basement, after The Binding of Isaac. */
 "isaac" | "notchmimic" | "companioncube" | "nurgling" | "hollowknight" | 
 /**  A little frog that snaps flies out of the air. */
-"frog";
+"frog" | "necronwarrior" | "necronoverlord" | "canoptekscarab" | "eyeofsauron";
 
 export type CueKind = "click";
 

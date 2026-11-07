@@ -452,6 +452,10 @@ mod tests {
             "nurgling",
             "hollowknight",
             "frog",
+            "necronwarrior",
+            "necronoverlord",
+            "canoptekscarab",
+            "eyeofsauron",
         ] {
             assert!(companion.contains(&format!("\"{id}\"")));
         }

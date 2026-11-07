@@ -2,14 +2,14 @@ import "../plasma-anchor/contents/ui" as Panel
 import QtQuick
 import QtTest
 
-// Pixel-art companions (Cube, Nurgling, Hollow Knight, Frog): real pointer input moves
+// Pixel-art companions: real pointer input moves
 // the artwork, all drawing stays on whole pixels inside the 20×20 slot in every state,
 // sub-pixel brain jitter draws nothing, and the hover/habit/sleep looks appear.
 TestCase {
     id: suite
     name: "CompanionPixel"
     width: 220; height: 220; visible: true; when: windowShown
-    readonly property var ids: ["companioncube", "nurgling", "hollowknight", "frog"]
+    readonly property var ids: ["companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron"]
 
     Component {
         id: factory
@@ -114,7 +114,7 @@ TestCase {
     }
 
     function test_directional_habits() {
-        for (const id of ["hollowknight", "frog"]) {
+        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron"]) {
             const f = createTemporaryObject(factory, suite, { character: id }), a = f.art;
             point(f, 900, 200);
             a.lastHabitAt = 0; a.startHabit();

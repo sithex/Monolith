@@ -286,6 +286,10 @@ mod tests {
             "nurgling",
             "hollowknight",
             "frog",
+            "necronwarrior",
+            "necronoverlord",
+            "canoptekscarab",
+            "eyeofsauron",
         ] {
             svc.patch(&patch(json!({"companionCharacter": id})))
                 .unwrap();

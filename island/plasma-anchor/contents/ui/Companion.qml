@@ -23,7 +23,7 @@ Item {
     id: face
     // Character id from the island's settings; unknown ids fall back to the blob.
     property string character: "blob"
-    readonly property var characters: ({ blob: "characters/Blob.qml", isaac: "characters/Isaac.qml", notchmimic: "characters/NotchMimic.qml", companioncube: "characters/CompanionCube.qml", nurgling: "characters/Nurgling.qml", hollowknight: "characters/HollowKnight.qml", frog: "characters/Frog.qml" })
+    readonly property var characters: ({ blob: "characters/Blob.qml", isaac: "characters/Isaac.qml", notchmimic: "characters/NotchMimic.qml", companioncube: "characters/CompanionCube.qml", nurgling: "characters/Nurgling.qml", hollowknight: "characters/HollowKnight.qml", frog: "characters/Frog.qml", necronwarrior: "characters/NecronWarrior.qml", necronoverlord: "characters/NecronOverlord.qml", canoptekscarab: "characters/CanoptekScarab.qml", eyeofsauron: "characters/EyeOfSauron.qml" })
     readonly property string shownCharacter: Object.prototype.hasOwnProperty.call(characters, character) ? character : "blob"
     readonly property Item art: artLoader.item
     // The square the current character wants in the notch.

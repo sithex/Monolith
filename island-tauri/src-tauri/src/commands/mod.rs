@@ -2,6 +2,7 @@
 //! returns `Result<_, IslandError>`. Keep `lib.rs::specta_builder`, `build.rs::COMMANDS` and
 //! `permissions/island.toml` in sync (`command_lists_match` fails otherwise).
 
+pub mod agent_live;
 pub mod ai;
 pub mod approvals;
 pub mod apps;

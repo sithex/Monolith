@@ -101,6 +101,10 @@ export const commands = {
 	aiUsage: () => typedError<AiUsage, IslandError>(__TAURI_INVOKE("ai_usage")),
 	/**  `provider` is an enum allow-list: anything else is rejected before this runs. */
 	aiConnect: (provider: AiProvider) => typedError<AiConnectResult, IslandError>(__TAURI_INVOKE("ai_connect", { provider })),
+	/**  One read-only poll of the Hermes home for the AI Agents Live page (docs/agent-live.md). */
+	agentLiveRaw: (req: AgentLiveRequest) => typedError<AgentLiveRaw, IslandError>(__TAURI_INVOKE("agent_live_raw", { req })),
+	/**  Get / replace the persisted 5-hour block history (newest 200 kept). */
+	agentLiveBlocks: (op: AgentLiveBlocksOp) => typedError<AgentLiveBlocks, IslandError>(__TAURI_INVOKE("agent_live_blocks", { op })),
 	voiceCommand: (op: VoiceOp) => typedError<VoiceStatus, IslandError>(__TAURI_INVOKE("voice_command", { op })),
 	/**  Hermes page voice picker + TTS mute (optional helpers; missing ones report unavailable). */
 	voicePanel: (op: VoicePanelOp) => typedError<VoicePanel, IslandError>(__TAURI_INVOKE("voice_panel", { op })),
@@ -231,6 +235,75 @@ export type AgentChip = {
 	apiCallCount: number | null,
 	isDelegated: boolean,
 	children: number,
+};
+
+export type AgentLiveBlock = {
+	resetAt: number,
+	peak: number,
+};
+
+export type AgentLiveBlocks = {
+	blocks: AgentLiveBlock[],
+};
+
+export type AgentLiveBlocksOp = { type: "get" } | { type: "set"; blocks: AgentLiveBlock[] };
+
+export type AgentLiveLog = {
+	cursor: string,
+	/**  Complete new lines of `logs/agent.log` since the request cursor. */
+	lines: string[],
+	rotated: boolean,
+	error: string | null,
+};
+
+export type AgentLiveProc = {
+	pid: number,
+	ppid: number,
+	/**  Basename of `/proc/<pid>/exe`, else `comm`. */
+	exe: string,
+};
+
+export type AgentLiveRaw = {
+	/**  Epoch ms. */
+	now: number,
+	hermesHome: string,
+	islandPid: number,
+	/**  Pid of the Hermes child the island's terminal runs. */
+	terminalPid: number | null,
+	/**  This user's processes from `/proc`; `None` when `/proc` is unreadable. */
+	procs: AgentLiveProc[] | null,
+	activeSessions: JsonValue,
+	activeSessionsError: string | null,
+	processes: JsonValue,
+	/**  Every `snapshot-<pid>.json` that parses, newest first. */
+	snapshots: AgentLiveSnapshot[],
+	snapshotError: string | null,
+	plan: JsonValue,
+	planError: string | null,
+	log: AgentLiveLog,
+	db: DbData | null,
+	dbError: string | null,
+	/**  sqlite busy/locked this call (`db` is `None` then; the UI keeps its last good copy). */
+	dbBusy: boolean,
+	history: HistoryRaw | null,
+	historyError: string | null,
+};
+
+export type AgentLiveRequest = {
+	/**  Session the UI resolved last tick; `None` = none yet (then `db` is `None`). */
+	sessionId: string | null,
+	/**  Opaque, from the previous `AgentLiveRaw.log.cursor`; `None` = start. */
+	logCursor: string | null,
+	/**  True only while the Usage page is shown (history is cached ~60 s). */
+	history: boolean,
+};
+
+export type AgentLiveSnapshot = {
+	pid: number,
+	/**  `/proc/<pid>` exists. */
+	alive: boolean,
+	mtimeMs: number,
+	data: JsonValue,
 };
 
 export type AgentsChanged = {
@@ -495,6 +568,58 @@ export type CompanionCharacter =
 
 export type CueKind = "click";
 
+/**  Habby `DbData` (metrics-model.ts). */
+export type DbData = {
+	/**  The live session; with compaction continuations the chain SUM (id = newest segment). */
+	live: DbSession | null,
+	/**  Compression continuation chain, root first, newest last. */
+	chain: string[],
+	children: DbSession[],
+	tasks: DbTask[],
+	delegations: DbDelegation[],
+	/**  Newest not-ended top-level session (Habby's `db-newest` fallback). */
+	newestTopLevel: string | null,
+	toolsByName: DbToolCount[],
+	turns: number | null,
+};
+
+export type DbDelegation = {
+	id: string,
+	state: string | null,
+	dispatchedAt: number | null,
+	completedAt: number | null,
+	goals: string[],
+};
+
+export type DbSession = {
+	id: string,
+	title: string | null,
+	model: string | null,
+	calls: number,
+	input: number,
+	output: number,
+	cacheRead: number,
+	cacheWrite: number,
+	cost: number | null,
+	tools: number,
+	startedAt: number | null,
+	endedAt: number | null,
+	lastActivityAt: number | null,
+	lastSeen: number | null,
+};
+
+export type DbTask = {
+	task: string,
+	model: string | null,
+	calls: number,
+	cost: number | null,
+};
+
+export type DbToolCount = {
+	name: string,
+	n: number,
+};
+
 export type DiskStats = {
 	total: number,
 	used: number,
@@ -578,6 +703,36 @@ export type GeometryReport = {
 	rects: RoundedRect[],
 	scale: number,
 	settled: boolean,
+};
+
+export type HistoryDay = {
+	d: string,
+	sessions: number,
+	tokens: number,
+	cost: number,
+	subCost: number,
+};
+
+export type HistoryModel = {
+	d: string,
+	model: string,
+	cost: number,
+	tokens: number,
+};
+
+/**  Habby `HistoryRaw` (metrics-model.ts); the optional VS Code (X4) fields are never set here. */
+export type HistoryRaw = {
+	days: HistoryDay[],
+	models: HistoryModel[],
+	top: HistoryTop[],
+	savings: number | null,
+};
+
+export type HistoryTop = {
+	id: string,
+	title: string | null,
+	cost: number,
+	segments: number,
 };
 
 export type HourFormat = "h12" | "h24";

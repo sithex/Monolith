@@ -32,6 +32,8 @@ permissions = [
   "allow-process-kill",
   "allow-ai-usage",
   "allow-ai-connect",
+  "allow-agent-live-raw",
+  "allow-agent-live-blocks",
   "allow-voice-command",
   "allow-voice-panel",
   "allow-approval-get",

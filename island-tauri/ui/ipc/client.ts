@@ -139,6 +139,11 @@ export const monolithCost = (): Promise<MonolithCost> => unwrap(commands.monolit
 export const processList = (): Promise<ProcessList> => unwrap(commands.processList());
 export const processKill = (pid: number, startTicks: number, signal: KillSignal): Promise<null> =>
   unwrap(commands.processKill(pid, startTicks, signal));
+export type { AgentLiveRaw, AgentLiveRequest, AgentLiveBlocksOp, AgentLiveBlocks } from './bindings';
+export const agentLiveRaw = (req: import('./bindings').AgentLiveRequest): Promise<import('./bindings').AgentLiveRaw> =>
+  unwrap(commands.agentLiveRaw(req));
+export const agentLiveBlocks = (op: import('./bindings').AgentLiveBlocksOp): Promise<import('./bindings').AgentLiveBlocks> =>
+  unwrap(commands.agentLiveBlocks(op));
 export const aiUsage = (): Promise<AiUsage> => unwrap(commands.aiUsage());
 export const aiConnect = (provider: AiProvider): Promise<AiConnectResult> =>
   unwrap(commands.aiConnect(provider));

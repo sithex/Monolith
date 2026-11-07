@@ -65,6 +65,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::system::process_kill,
             commands::ai::ai_usage,
             commands::ai::ai_connect,
+            commands::agent_live::agent_live_raw,
+            commands::agent_live::agent_live_blocks,
             commands::voice::voice_command,
             commands::voice::voice_panel,
             commands::approvals::approval_get,
@@ -541,6 +543,18 @@ mod tests {
             ("TilesOp", "durationMs"),
             // SPEC §5.2: notification progress is absent for non-progress notifications.
             ("IslandNotification", "progress"),
+            // docs/agent-live.md: Habby's DbData/HistoryRaw nulls and the optional terminal pid.
+            ("AgentLiveRaw", "terminalPid"),
+            ("DbSession", "cost"),
+            ("DbSession", "startedAt"),
+            ("DbSession", "endedAt"),
+            ("DbSession", "lastActivityAt"),
+            ("DbSession", "lastSeen"),
+            ("DbTask", "cost"),
+            ("DbDelegation", "dispatchedAt"),
+            ("DbDelegation", "completedAt"),
+            ("DbData", "turns"),
+            ("HistoryRaw", "savings"),
             // Critical notification cards deliberately have no expiry deadline.
             ("Popup", "remainingMs"),
             // Monolith cost card: a rate is unavailable until the window has two samples, or

@@ -1,6 +1,7 @@
 //! Ported island-rust services (SPEC §1.1). Every service takes its directories explicitly so
 //! tests run against scratch dirs and a scratch `HOME`.
 
+pub mod agent_live;
 pub mod ai_usage;
 pub mod approvals;
 pub mod autostart;
@@ -113,6 +114,8 @@ pub struct Services {
     pub palette: Arc<palette::PaletteService>,
     pub voice: Arc<voice::VoiceService>,
     pub ai: Arc<ai_usage::AiUsageService>,
+    /// AI Agents Live page: read-only Hermes home reader (docs/agent-live.md).
+    pub agent_live: Arc<agent_live::AgentLiveService>,
     pub stats: Arc<stats::StatsService>,
     pub terminal: Arc<terminal::Terminal>,
     /// Mirrors Hermes' pending approval/clarify prompts (HERMES_TUI_SIDECAR_URL sink).
@@ -168,6 +171,14 @@ impl Services {
             ai: Arc::new(ai_usage::AiUsageService::new(
                 cfg.repo_root.clone(),
                 cfg.home.clone(),
+            )),
+            agent_live: Arc::new(agent_live::AgentLiveService::new(
+                if cfg.test_instance {
+                    cfg.home.join(".hermes")
+                } else {
+                    profile_dir(std::env::var_os("HERMES_HOME"), &cfg.home)
+                },
+                &cfg.data_dir,
             )),
             stats: Arc::new(stats::StatsService::new(cfg.home.clone())),
             terminal: Arc::new(
@@ -276,6 +287,18 @@ mod tests {
         assert_eq!(runtime["testHooks"], false);
         assert_eq!(runtime["ui"], "legacy");
         assert_eq!(runtime["platform"], "linux");
+        // A test instance must ignore any inherited HERMES_HOME, just like its other services.
+        let raw = services.agent_live.raw(
+            &crate::contract::agent_live::AgentLiveRequest {
+                session_id: None,
+                log_cursor: None,
+                history: false,
+            },
+            None,
+        );
+        assert_eq!(raw.hermes_home, cfg.home.join(".hermes").to_string_lossy());
+        assert!(raw.snapshots.is_empty());
+        assert!(!cfg.home.join(".hermes").exists());
         // Settings live in the scratch data dir; autostart is refused for a test instance and
         // the scratch home stays untouched.
         let patch: crate::contract::settings::SettingsPatch =

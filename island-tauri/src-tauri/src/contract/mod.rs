@@ -1,6 +1,7 @@
 //! Types that cross the IPC boundary (SPEC §5.1). camelCase serde, no 64-bit integers, inputs
 //! deny unknown fields, exactly one TypeScript type per Rust type.
 
+pub mod agent_live;
 pub mod ai;
 pub mod approvals;
 pub mod apps;

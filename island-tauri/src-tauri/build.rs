@@ -33,6 +33,8 @@ const COMMANDS: &[&str] = &[
     "process_kill",
     "ai_usage",
     "ai_connect",
+    "agent_live_raw",
+    "agent_live_blocks",
     "voice_command",
     "voice_panel",
     "approval_get",

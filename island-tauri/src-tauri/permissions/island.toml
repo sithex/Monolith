@@ -26,6 +26,7 @@ permissions = [
   "allow-terminal-resize",
   "allow-terminal-restart",
   "allow-terminal-ack",
+  "allow-terminal-open-link",
   "allow-system-stats",
   "allow-monolith-cost",
   "allow-process-list",

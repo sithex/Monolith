@@ -81,6 +81,11 @@ export const commands = {
 	 *  sequence numbers are ignored, not errors.
 	 */
 	terminalAck: (seq: number) => typedError<null, IslandError>(__TAURI_INVOKE("terminal_ack", { seq })),
+	/**
+	 *  Override xterm's blocking confirm/window.open for OSC 8 links. Launch in a separate user
+	 *  scope (or a detached child if systemd-run is absent), without waiting for the browser.
+	 */
+	terminalOpenLink: (uri: string) => typedError<null, IslandError>(__TAURI_INVOKE("terminal_open_link", { uri })),
 	systemStats: () => typedError<SystemStats, IslandError>(__TAURI_INVOKE("system_stats")),
 	/**
 	 *  Monolith's own CPU / PSS / wakeups plus plasmashell and kwin CPU, averaged over the last

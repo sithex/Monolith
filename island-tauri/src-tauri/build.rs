@@ -27,6 +27,7 @@ const COMMANDS: &[&str] = &[
     "terminal_resize",
     "terminal_restart",
     "terminal_ack",
+    "terminal_open_link",
     "system_stats",
     "monolith_cost",
     "process_list",

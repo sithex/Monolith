@@ -131,6 +131,9 @@ export const terminalResize = async (cols: number, rows: number): Promise<void> 
   await unwrap(commands.terminalResize(cols, rows));
 };
 export const terminalRestart = (): Promise<TerminalSnapshot> => unwrap(commands.terminalRestart());
+export const terminalOpenLink = async (uri: string): Promise<void> => {
+  await unwrap(commands.terminalOpenLink(uri));
+};
 export const terminalAck = async (seq: number): Promise<void> => {
   await unwrap(commands.terminalAck(seq));
 };

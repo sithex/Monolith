@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm/lib/xterm.js';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
-import { newTerminalChannel, terminalAttach, terminalInput, terminalCopy, terminalResize, terminalAck, terminalRestart, type Palette, type TerminalEvent } from '../ipc/client';
+import { newTerminalChannel, terminalAttach, terminalInput, terminalCopy, terminalResize, terminalAck, terminalRestart, terminalOpenLink, type Palette, type TerminalEvent } from '../ipc/client';
 import { runtimeStore } from '../stores';
 import { createTerminalFlow } from './terminal-flow';
 import { keepIslandColours, xtermTheme } from './terminal-colours';
@@ -20,7 +20,9 @@ export function TerminalView({ active, palette, ansi16, fontSize, fail, fontFami
     if (!host.current) return;
     const terminal = new Terminal({ ...terminalOptions({ fontFamily, scrollback, cursorStyle, cursorBlink }), fontSize,
       // Proposed API only for `terminal.unicode` (the Unicode 11 width table below).
-      theme: xtermTheme(palette, ansi16), allowProposedApi: true, allowTransparency: true });
+      theme: xtermTheme(palette, ansi16), allowProposedApi: true, allowTransparency: true,
+      // OSC 8 only: replace xterm's blocking confirm/window.open, not TUI mouse handling.
+      linkHandler: { activate: (_event, uri) => { void terminalOpenLink(uri).catch(fail); } } });
     // xterm defaults to Unicode 6 widths (emoji = 1 cell) while the Hermes TUI (Ink/string-width)
     // counts them as 2: every emoji line shifted the TUI's cursor math and left ghost columns.
     terminal.loadAddon(new Unicode11Addon()); terminal.unicode.activeVersion = '11';

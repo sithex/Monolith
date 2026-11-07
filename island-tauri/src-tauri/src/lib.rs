@@ -59,6 +59,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::terminal::terminal_resize,
             commands::terminal::terminal_restart,
             commands::terminal::terminal_ack,
+            commands::terminal::terminal_open_link,
             commands::system::system_stats,
             commands::system::monolith_cost,
             commands::system::process_list,

@@ -1,0 +1,21 @@
+name: habby-metrics
+version: 1.1.0
+description: "Observer hooks that write a live metrics snapshot, an events JSONL and the official plan windows to HERMES_HOME/cache/habby-metrics for Centenaria's AI Agents tab (Linux port of the Habby plugin). Files only: no network listener or requests, no message text; plan windows only from Hermes's in-memory cache (Monolith disables upstream fetch mode)."
+author: "Nick (Habby fork; Centenaria Linux port)"
+provides_hooks:
+  - pre_llm_call
+  - pre_api_request
+  - post_api_request
+  - api_request_error
+  - pre_tool_call
+  - post_tool_call
+  - subagent_start
+  - subagent_stop
+  - pre_approval_request
+  - post_approval_response
+  - on_human_input_request
+  - on_human_input_resolved
+  - on_session_start
+  - on_session_end
+  - pre_auxiliary_call
+  - post_auxiliary_call

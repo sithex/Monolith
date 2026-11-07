@@ -220,6 +220,9 @@ fn view(
 fn screenshot(s: &Stack, conn: &RustConnection, window: u32, name: &str) {
     let overlay = host::overlay_size();
     assert_eq!(eval(s, "(()=>{const p=document.querySelector('.app-pane:not([hidden])');return p.scrollWidth<=p.clientWidth+1})()"), true, "view overflows horizontally");
+    // Blinking carets (a focused field, the layout editor's mini terminal) never settle; freeze
+    // them for the pixel comparison only.
+    eval(s, "document.getElementById('test-no-caret')||document.head.append(Object.assign(document.createElement('style'),{id:'test-no-caret',textContent:'*{caret-color:transparent!important}.le-mini-caret{animation:none!important}'}))");
     let mut previous = None;
     wait_for(
         "7a view text and pixels identical on consecutive captures",

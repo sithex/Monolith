@@ -182,12 +182,45 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .mixer select { flex: 1; }
 
 /* ---- Settings ------------------------------------------------------------ */
-.settings-panel { gap: 12px; }
-/* Opaque mix instead of backdrop-filter: a sticky blur re-rendered on every scroll/morph frame. */
-.settings-tabs { display: flex; gap: 2px; padding: 3px; background: color-mix(in srgb, var(--ui-background) 94%, white); box-shadow: 0 -6px 0 color-mix(in srgb, var(--ui-background) 94%, white); border-radius: var(--radius-xl); position: sticky; top: 0; z-index: 4; }
-.settings-tabs button { flex: 1; padding: 6px 8px; font-size: var(--fs-md); font-weight: 500; border-radius: var(--radius-md); position: relative; color: var(--v-dim); background: none; }
-.settings-tabs button[aria-selected='true'] { color: var(--ui-text); }
-.settings-tabs .tab-bg { position: absolute; inset: 0; border-radius: var(--radius-md); background: var(--v-fill-hi); z-index: -1; }
+.settings-panel { gap: 12px; container-type: inline-size; height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden; }
+.settings-layout { display: flex; gap: 12px; flex: 1; min-height: 0; overflow: hidden; }
+.settings-rail { display: flex; flex-direction: column; gap: 4px; width: 40px; flex: 0 0 40px; padding: 2px 0; position: relative; z-index: 2; }
+.island .settings-rail > button { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 36px; padding: 0; border-radius: var(--radius-lg); background: transparent; color: var(--v-dim); }
+.island .settings-rail > button[aria-current='page'] { color: var(--ui-accent); background: var(--v-fill-hi); }
+.island .settings-rail > button:hover { background: var(--v-hover); color: var(--ui-text); }
+.settings-rail svg { width: 20px; height: 20px; flex: none; }
+.settings-rail-name { position: absolute; left: 44px; top: 50%; transform: translateY(-50%); width: max-content; max-width: 220px; box-sizing: border-box; padding: 6px 10px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-md); background: var(--ui-surface); color: var(--ui-text); font-size: var(--fs-sm); pointer-events: none; visibility: hidden; opacity: 0; }
+.settings-rail button:hover .settings-rail-name, .settings-rail button:focus-visible .settings-rail-name { visibility: visible; opacity: 1; }
+.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 4px 12px; overscroll-behavior: contain; }
+.settings-section-title { font-size: var(--fs-body); font-weight: 600; margin: 0 0 12px; color: var(--ui-text); }
+.settings-panel > .settings-search { flex: none; }
+.settings-results { margin-bottom: 16px; }
+.settings-results h3 { color: var(--ui-accent); font-size: var(--fs-body); margin: 0 0 8px; }
+.settings-results h4 { color: var(--v-dim); font-size: var(--fs-sm); margin: 12px 0 4px; }
+.island .settings-result { display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: 3px; width: 100%; padding: 9px 10px; background: transparent; border-radius: var(--radius-md); color: var(--ui-text); }
+.island .settings-result:hover { background: var(--v-hover); }
+.settings-result small { color: var(--v-dim); font-size: var(--fs-sm); }
+.settings-panel [data-setting-id] { scroll-margin: 12px; border-radius: var(--radius-md); }
+.settings-panel [data-setting-highlight] { background: var(--v-fill-hi); outline: 1px solid var(--ui-accent); outline-offset: -1px; animation: settings-highlight 1.2s ease-out; }
+@keyframes settings-highlight { from { background: color-mix(in srgb, var(--ui-accent) 24%, transparent); } to { background: var(--v-fill-hi); } }
+.settings-panel .settings-draft-field { flex: 0 1 280px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.settings-panel .settings-draft-field form { display: flex; gap: 6px; }
+.settings-panel .settings-draft-field input { flex: 1; min-width: 0; height: 30px; box-sizing: border-box; }
+.settings-panel .settings-draft-field textarea { width: 100%; box-sizing: border-box; background: var(--v-fill); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-md); }
+.settings-panel .settings-draft-field .link { align-self: flex-end; }
+.settings-place-results { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+@container (max-width: 420px) {
+  .settings-layout { flex-direction: column; gap: 8px; }
+  .settings-rail { width: auto; flex: none; flex-direction: row; overflow-x: auto; gap: 4px; padding: 2px; }
+  .island .settings-rail > button { width: auto; height: 30px; gap: 5px; padding: 0 9px; white-space: nowrap; }
+  .settings-rail svg { width: 16px; height: 16px; }
+  .settings-rail-name { position: static; transform: none; width: auto; padding: 0; border: 0; background: none; visibility: visible; opacity: 1; }
+  .settings-content .settings-row { flex-wrap: wrap; gap: 6px; }
+  .settings-content .settings-row > .label { flex-basis: 100%; }
+  .settings-content .settings-row > input.switch { margin-left: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .settings-panel [data-setting-highlight] { animation: none; } }
+.settings-panel[data-reduce-motion='true'] [data-setting-highlight] { animation: none; }
 .settings-card { background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: var(--radius-3xl); padding: 4px 14px; }
 .settings-card > h3 { font-size: var(--fs-sm); font-weight: 600; color: var(--v-dim); text-transform: uppercase; letter-spacing: .4px; margin: 10px 0 2px; }
 .settings-row { display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: var(--fs-body); }

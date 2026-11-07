@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 /** Editing a launch preference never starts, stops, or writes to the active PTY. */
-export function TerminalCommandSettings({ value, onSave }: {
-  value: string; onSave(command: string): Promise<unknown>;
+export function TerminalCommandSettings({ value, onSave, embedded = false }: {
+  value: string; onSave(command: string): Promise<unknown>; embedded?: boolean;
 }) {
   const [draft, setDraft] = useState(value), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [notice, setNotice] = useState('');
@@ -22,8 +22,9 @@ export function TerminalCommandSettings({ value, onSave }: {
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { saving.current = false; setBusy(false); }
   };
-  return <section className="settings-card terminal-command" aria-label="Terminal launch settings">
-    <h3>Terminal</h3>
+  const Container = embedded ? 'div' : 'section';
+  return <Container className={embedded ? 'terminal-command' : 'settings-card terminal-command'} aria-label="Terminal launch settings">
+    {!embedded && <h3>Terminal</h3>}
     <form onSubmit={event => { event.preventDefault(); void save(draft); }}>
       <label htmlFor="terminal-launch-command">Hermes launch command</label>
       <input id="terminal-launch-command" type="text" aria-label="Hermes launch command" value={draft}
@@ -47,5 +48,5 @@ export function TerminalCommandSettings({ value, onSave }: {
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status" className="muted">{notice}</p>}
     </form>
-  </section>;
+  </Container>;
 }

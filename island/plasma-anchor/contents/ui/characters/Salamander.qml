@@ -1,16 +1,17 @@
 import QtQuick
 
 // A cute fire salamander (Salamandra salamandra), as crisp 1× pixel art:
-// glossy black body with vibrant fire-yellow parotoid blotches and dorsal spots,
-// a wide friendly flat head, big round dark eyes with 1 px white specular highlights,
-// a gentle curved smile, little stubby front toes peeking at the bottom, and a thick tail
-// curling in at the side.
+// chubby charcoal-slate body visible on dark notch backgrounds,
+// vibrant fire-yellow and orange parotoid blotches and dorsal spots,
+// rounded wide head with big cute eyes set wide on top,
+// dark pupils with 1 px white glints that follow the pointer,
+// sweet smile and pink blush cheeks, four splayed legs with toes,
+// and a thick tail curling around the side.
 //
-// Pointer tracking: dark pupils slide within the eyes; the head shifts 1 px toward the pointer.
-// Hover reaction (hoverMark): happy squint with rosy cheek blush and a tiny pink tongue.
-// Idle habit: a quick tongue flick toward the pointer side (mirrored via habitDirection),
-// then settles back cleanly.
-// Dozing: brain's half lids droop over the eyes; no extra timers.
+// Pointer tracking: whole-pixel pupils moving inside white sclera.
+// Hover (hoverMark): happy squint ^^ eyes, rosy cheeks, and cute pink tongue.
+// Idle habit: tongue flick burst toward the pointer side (mirrored via habitDirection).
+// Doze: half lids droop over the eyes; no extra timers.
 HabitCharacter {
     id: art
     gazeScale: 1
@@ -20,12 +21,6 @@ HabitCharacter {
     // Pointer tracking in whole pixels
     readonly property int pupilX: gazePx(gazeX, 0.65, -1, 1)
     readonly property int pupilY: gazePx(gazeY, 0.75, -1, 1)
-    readonly property int headShiftX: gazePx(gazeX, 0.45, -1, 1)
-    readonly property int headShiftY: gazePx(gazeY, 0.45, -1, 1)
-
-    // Head position (base at x: 2, y: 2)
-    readonly property int headX: 2 + headShiftX
-    readonly property int headY: 2 + headShiftY
 
     // Eye states
     readonly property real open: face ? face.blink * face.lid : 1
@@ -37,22 +32,19 @@ HabitCharacter {
     onHabitStarted: habitDirection = gazeX < 0 ? -1 : 1
 
     readonly property var colors: ({
-        "K": "#0c0d10",
-        "k": "#16181e",
-        "S": "#2e3844",
-        "s": "#445264",
-        "Y": "#fccf05",
-        "H": "#fee440",
-        "O": "#d09c04",
-        "E": "#384656",
-        "D": "#020305",
-        "W": "#ffffff",
-        "M": "#242c36",
+        "O": "#1e222a",
+        "B": "#444b5a",
+        "H": "#5e687c",
+        "Y": "#ffd21a",
+        "A": "#ff8a1a",
+        "W": "#f4f6fc",
+        "E": "#111318",
         "P": "#f48ca0",
-        "p": "#d85472"
+        "T": "#f05472",
+        "M": "#242a36"
     })
 
-    // Grounded body, curling tail, and front toes (20x20 slot)
+    // Grounded body, splayed legs with toes, and curling tail (20x20 slot)
     Item {
         objectName: "salamanderBody"
         width: 20
@@ -60,158 +52,107 @@ HabitCharacter {
         PixelSprite {
             colors: art.colors
             rows: [
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "...............OYY..",
-                "..............YHHHY.",
-                "..............OHHHY.",
-                ".....kKKKKKKk..kKYYk",
-                "....kKKYYHHYKKk..kKK",
-                "...kKKYYYYYYYYKKk.KK",
-                "...kKKKYYYYYYKKKKkKK",
-                "...kKK.kKKKKk.kKKKKk",
-                "..kY.Y.kKKKKk.kY.Y..",
-                "..kKKK..kKKk..kKKK..",
-                "...................."
-            ]
-        }
-    }
-
-    // Friendly flat head: shifts 1 px toward pointer
-    Item {
-        objectName: "salamanderHead"
-        x: art.headX
-        y: art.headY
-        width: 15
-        height: 11
-
-        // Base skull with parotoid gland blotches and smile
-        PixelSprite {
-            colors: art.colors
-            rows: [
-                ".OYYs.....sYYO.",
-                "YHHHYsssssYHHHY",
-                "OHHYK.....KYHHO",
-                "kYYk.......kYYk",
-                "kK...........Kk",
-                "kK....s.s....Kk",
-                "kKK.........KKk",
-                ".kKK.......KKk.",
-                "..kKKKM...MKKk.",
-                "...kKK.MMM.KKk.",
-                ".....kKKKKk...."
+                "...OOO........OOO...",
+                "..OWWWO.OOOO.OWWWO..",
+                ".OWWWWOOHHHHOOWWWWO.",
+                ".OWWWWOBBHHBBOOWWWWO",
+                "..OWWOBBBBBBBBOWWO..",
+                ".OAAOBPOBBBBOPBOAAO.",
+                "OAYYAOBBM..MBBOAYYAO",
+                ".OAYAOOBBMMBBOOAYAO.",
+                "..OO.OBBY..YBBO.OO..",
+                "OO.O.OBYY..YYBO.O.OO",
+                ".OO.OBBYA..AYBBO.OO.",
+                "...OBBBBBBBBBO......",
+                "...OBBYY..YYBBO..OO.",
+                "..OBBBYA..AYBBO.OYYO",
+                ".OO.OBBYYYYYBBOOAYAO",
+                "O.O.OBBBBBBBBOAYAO..",
+                "....OBBBBBBBBOYYAO..",
+                ".....OBBBBBBAYYAO...",
+                "......OOOOOOAYAO....",
+                "...........OOOO....."
             ]
         }
 
-        // Dark eye sockets
+        // Moving dark pupils (2x2 with 1 px white glint)
         Repeater {
-            model: [2, 9]
-            PixelSprite {
-                required property int modelData
-                x: modelData
-                y: 2
-                colors: art.colors
-                rows: [
-                    ".EE.",
-                    "EEEE",
-                    "EEEE",
-                    ".EE."
-                ]
-            }
-        }
-
-        // Moving dark pupils (whole pixels)
-        Repeater {
-            model: [2, 9]
+            model: [3, 15]
             PixelSprite {
                 required property int modelData
                 required property int index
                 objectName: "companionEye" + index
                 visible: !art.eyesShut && !art.happy
-                x: modelData + Math.max(0, Math.min(2, 1 + art.pupilX))
-                y: 2 + Math.max(0, Math.min(2, 1 + art.pupilY))
+                x: modelData + art.pupilX
+                y: 2 + art.pupilY
                 colors: art.colors
-                rows: ["DD", "DD"]
-            }
-        }
-
-        // Specular 1 px white highlights at top of eyes
-        Repeater {
-            model: [2, 9]
-            PixelSprite {
-                required property int modelData
-                visible: !art.eyesShut && !art.happy
-                x: modelData + 1
-                y: 2
-                colors: art.colors
-                rows: ["W"]
-            }
-        }
-
-        // Half lids while dozing
-        Repeater {
-            model: [2, 9]
-            PixelSprite {
-                required property int modelData
-                visible: art.dozing
-                x: modelData
-                y: 2
-                colors: art.colors
-                rows: [
-                    ".KK.",
-                    "kKKk"
-                ]
+                rows: art.pupilX > 0 ? ["EW", "EE"] : ["WE", "EE"]
             }
         }
 
         // Shut lids while blinking
         Repeater {
-            model: [2, 9]
+            model: [2, 13]
             PixelSprite {
                 required property int modelData
                 visible: art.eyesShut && !art.happy
                 x: modelData
-                y: 3
+                y: 1
                 colors: art.colors
-                rows: ["kKKk"]
+                rows: [
+                    ".OOO.",
+                    "OBBBO",
+                    "OOOOO",
+                    ".BBB."
+                ]
+            }
+        }
+
+        // Half lids while dozing
+        Repeater {
+            model: [2, 13]
+            PixelSprite {
+                required property int modelData
+                visible: art.dozing
+                x: modelData
+                y: 1
+                colors: art.colors
+                rows: [
+                    ".OOO.",
+                    "OBBBO"
+                ]
             }
         }
 
         // Happy squint eyes on hover
         Repeater {
-            model: [2, 9]
+            model: [2, 13]
             PixelSprite {
                 required property int modelData
                 visible: art.happy
                 x: modelData
-                y: 2
+                y: 1
                 colors: art.colors
                 rows: [
-                    ".ss.",
-                    "s..s"
+                    ".OOO.",
+                    "O.O.O",
+                    "OBBBO",
+                    ".BBB."
                 ]
             }
         }
 
-        // Hover reaction: happy cheek blush + tiny pink tongue
+        // Hover reaction: happy cheek blush + cute pink tongue
         PixelSprite {
             objectName: "hoverMark"
             visible: art.happy
-            x: 1
-            y: 6
+            x: 5
+            y: 5
             colors: art.colors
             rows: [
-                "PP..........PP",
-                "..............",
-                "....pPPp......",
-                ".....PP......."
+                "PP......PP",
+                "....TT....",
+                "....PP...."
             ]
         }
     }
@@ -226,24 +167,24 @@ HabitCharacter {
         PixelSprite {
             colors: art.colors
             rows: art.habitFrame === 1 ? [
-                "", "", "", "", "", "", "", "", "", "",
-                ".........pP........."
+                "", "", "", "", "", "", "",
+                "..........T........."
             ] : art.habitFrame === 2 ? [
-                "", "", "", "", "", "", "", "", "",
-                "...........PP.......",
-                ".........pPP........"
+                "", "", "", "", "", "",
+                "............T.......",
+                "..........TP........"
             ] : art.habitFrame === 3 ? [
-                "", "", "", "", "", "", "", "",
-                ".............HPP....",
-                "...........PPP......",
-                ".........pPP........"
+                "", "", "", "", "",
+                "..............W.....",
+                "............PT......",
+                "..........TP........"
             ] : art.habitFrame === 4 ? [
-                "", "", "", "", "", "", "", "", "",
-                "...........PP.......",
-                ".........pPP........"
+                "", "", "", "", "", "",
+                "............T.......",
+                "..........TP........"
             ] : art.habitFrame === 5 ? [
-                "", "", "", "", "", "", "", "", "", "",
-                ".........P.........."
+                "", "", "", "", "", "", "",
+                "..........T........."
             ] : []
         }
     }

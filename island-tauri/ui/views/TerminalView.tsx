@@ -5,6 +5,7 @@ import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { newTerminalChannel, terminalAttach, terminalInput, terminalCopy, terminalResize, terminalAck, terminalRestart, terminalOpenLink, type Palette, type TerminalEvent } from '../ipc/client';
 import { runtimeStore } from '../stores';
 import { createTerminalFlow } from './terminal-flow';
+import { shouldOpenTerminalLink } from './terminal-links';
 import { keepIslandColours, xtermTheme } from './terminal-colours';
 import { terminalShortcut, keepTerminalClipboard, trackAppSelection } from './terminal-shortcuts';
 import { createAutoRestart } from './terminal-respawn';
@@ -21,8 +22,10 @@ export function TerminalView({ active, palette, ansi16, fontSize, fail, fontFami
     const terminal = new Terminal({ ...terminalOptions({ fontFamily, scrollback, cursorStyle, cursorBlink }), fontSize,
       // Proposed API only for `terminal.unicode` (the Unicode 11 width table below).
       theme: xtermTheme(palette, ansi16), allowProposedApi: true, allowTransparency: true,
-      // OSC 8 only: replace xterm's blocking confirm/window.open, not TUI mouse handling.
-      linkHandler: { activate: (_event, uri) => { void terminalOpenLink(uri).catch(fail); } } });
+      // OSC 8 links: replace xterm's blocking confirm/window.open. xterm activates a link on every
+      // click, even while the app tracks the mouse; the Hermes TUI then opens the link itself, so
+      // open here only when no app owns the mouse (otherwise every click would open two tabs).
+      linkHandler: { activate: (_event, uri) => { if (shouldOpenTerminalLink(terminal.modes.mouseTrackingMode)) void terminalOpenLink(uri).catch(fail); } } });
     // xterm defaults to Unicode 6 widths (emoji = 1 cell) while the Hermes TUI (Ink/string-width)
     // counts them as 2: every emoji line shifted the TUI's cursor math and left ghost columns.
     terminal.loadAddon(new Unicode11Addon()); terminal.unicode.activeVersion = '11';

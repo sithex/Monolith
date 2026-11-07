@@ -68,6 +68,7 @@ pub enum LayoutAction {
     // Manual game mode on/off (`settings.gameMode`).
     ToggleGameMode {},
     CommandPalette {},
+    LaunchDesktop { desktop_id: String },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, specta::Type)]

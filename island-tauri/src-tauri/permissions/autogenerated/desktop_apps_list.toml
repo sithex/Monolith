@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-apps-list"
+description = "Enables the desktop_apps_list command without any pre-configured scope."
+commands.allow = ["desktop_apps_list"]
+
+[[permission]]
+identifier = "deny-desktop-apps-list"
+description = "Denies the desktop_apps_list command without any pre-configured scope."
+commands.deny = ["desktop_apps_list"]

@@ -4,6 +4,7 @@ import { layoutCommand, layoutGeometry, type LayoutGeometry, type LayoutPreset, 
 import { layoutStore, useLayout } from '../stores/apps';
 import { Icon } from './components/Icon';
 import { DraftRange, Dropdown } from './components/AppPrimitives';
+import { DesktopAppPicker } from './components/DesktopAppPicker';
 import { PRESET_SIZES, presetSize, fitSurface } from './geometry';
 import { ACTION_OPTIONS, actionIcon, actionKey, actionLabel } from './side-actions';
 import type { IconName } from './models';
@@ -111,7 +112,7 @@ export function LayoutEditor() {
             return <motion.div key={b.id} layout={!dragging} className="le-button" data-selected={selected === b.id} data-dragging={dragging}
               style={{ left: b.rect.x, top: b.rect.y, width: b.rect.width, height: b.rect.height, zIndex: dragging ? 5 : 1, x: dragging ? drag.x : 0, y: dragging ? drag.y : 0 }}
               transition={{ type: 'spring', visualDuration: 0.3, bounce: 0.2 }}>
-              <button className="round-button live-side-button" aria-label={`Edit ${model.label ?? actionLabel(model.action)}`} title={actionLabel(model.action)} style={{ cursor: 'grab', touchAction: 'none' }}
+              <button className="round-button live-side-button" aria-label={`Edit ${model.label ?? actionLabel(model.action)}`} title={model.label ?? actionLabel(model.action)} style={{ cursor: 'grab', touchAction: 'none' }}
                 onPointerDown={e => {
                   if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId);
                   const start = { x: e.clientX, y: e.clientY }; let moved = false;
@@ -146,9 +147,10 @@ export function LayoutEditor() {
         initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: .2, ease: [.22, 1, .36, 1] }}
         onAnimationStart={() => setSelectedSettled(false)} onAnimationComplete={() => setSelectedSettled(true)}>
         <div className="settings-row"><span className="label">Button action</span>
-          <Dropdown label="Side button action" value={actionKey(button.action)} options={ACTION_OPTIONS.map(a => ({ value: a.key, label: a.group === 'Quick actions' ? `⚡ ${a.label}` : a.label }))}
+          <Dropdown label="Side button action" value={actionKey(button.action)} options={[...ACTION_OPTIONS.map(a => ({ value: a.key, label: a.group === 'Quick actions' ? `⚡ ${a.label}` : a.label })), ...(button.action.type === 'launchDesktop' ? [{ value: actionKey(button.action), label: button.label ?? 'Desktop app' }] : [])]}
             onChange={v => { const a = ACTION_OPTIONS.find(x => x.key === v); if (a) void send({ type: 'edit', id: button.id, action: a.action, label: null }); }} />
           <button className="link" onClick={() => { void send({ type: 'remove', id: button.id }); setSelected(null); }}>Remove</button></div>
+        <DesktopAppPicker key={button.id} onPick={app => { void send({ type: 'edit', id: button.id, action: { type: 'launchDesktop', desktopId: app.id }, label: Array.from(app.name).slice(0, 32).join('') }); }} />
       </motion.div>}</AnimatePresence>
       <div className="settings-row"><span className="label">Button size</span><DraftRange aria-label="Side button size" min={28} max={56} step={1} value={layout.buttonDiameter} onCommit={v => { void send({ type: 'diameter', diameter: v }); }} /><output>{Math.round(layout.buttonDiameter)}px</output></div>
       <div className="settings-row"><span className="label">Spacing</span><DraftRange aria-label="Side button spacing" min={4} max={24} step={1} value={layout.gap} onCommit={v => { void send({ type: 'gap', gap: v }); }} /><output>{Math.round(layout.gap)}px</output></div>

@@ -475,6 +475,12 @@ fn core_action(action: LayoutAction) -> Result<ButtonAction, IslandError> {
         LayoutAction::Collapse {} => ButtonAction::Collapse,
         LayoutAction::ToggleGameMode {} => ButtonAction::ToggleGameMode,
         LayoutAction::CommandPalette {} => ButtonAction::CommandPalette,
+        LayoutAction::LaunchDesktop { desktop_id } => {
+            if !super::desktop_apps::valid_desktop_id(&desktop_id) {
+                return Err(IslandError::invalid("Invalid desktop application ID"));
+            }
+            ButtonAction::LaunchDesktop { desktop_id }
+        }
     })
 }
 fn project_action(action: &ButtonAction) -> Result<LayoutAction, IslandError> {
@@ -500,6 +506,14 @@ fn project_action(action: &ButtonAction) -> Result<LayoutAction, IslandError> {
         ButtonAction::Collapse => LayoutAction::Collapse {},
         ButtonAction::ToggleGameMode => LayoutAction::ToggleGameMode {},
         ButtonAction::CommandPalette => LayoutAction::CommandPalette {},
+        ButtonAction::LaunchDesktop { desktop_id } => {
+            if !super::desktop_apps::valid_desktop_id(desktop_id) {
+                return Err(IslandError::invalid("Invalid desktop application ID"));
+            }
+            LayoutAction::LaunchDesktop {
+                desktop_id: desktop_id.clone(),
+            }
+        }
         ButtonAction::Command { .. } => {
             return Err(IslandError::invalid(
                 "Generic layout commands are not permitted",
@@ -744,4 +758,65 @@ fn geometry(
         buttons,
         empty_slots,
     })
+}
+
+#[cfg(test)]
+mod desktop_action_tests {
+    use super::*;
+
+    #[test]
+    fn every_action_round_trips_through_contract_core_and_saved_json() {
+        for tag in [
+            "appGrid",
+            "settings",
+            "volume",
+            "nowPlaying",
+            "timer",
+            "playPause",
+            "nextTrack",
+            "previousTrack",
+            "toggleDnd",
+            "micMute",
+            "cyclePowerProfile",
+            "screenshot",
+            "pickColour",
+            "keepAwake",
+            "collapse",
+            "toggleGameMode",
+            "commandPalette",
+        ] {
+            let action: LayoutAction =
+                serde_json::from_value(serde_json::json!({"type": tag})).unwrap();
+            let saved = serde_json::to_value(core_action(action.clone()).unwrap()).unwrap();
+            let core: ButtonAction = serde_json::from_value(saved).unwrap();
+            assert_eq!(project_action(&core).unwrap(), action);
+        }
+        for value in [
+            serde_json::json!({"type":"openApp","view":"quickInfo"}),
+            serde_json::json!({"type":"launchDesktop","desktopId":"org.kde.kate"}),
+        ] {
+            let action: LayoutAction = serde_json::from_value(value.clone()).unwrap();
+            let core = core_action(action.clone()).unwrap();
+            assert!(core.is_valid());
+            let restored: ButtonAction =
+                serde_json::from_value(serde_json::to_value(core).unwrap()).unwrap();
+            assert_eq!(project_action(&restored).unwrap(), action);
+            assert_eq!(serde_json::to_value(action).unwrap(), value);
+        }
+    }
+
+    #[test]
+    fn unsafe_desktop_ids_are_refused_on_edit_and_saved_layout_projection() {
+        for id in ["", "-option", "a/b", "../escape", "a b", "é"] {
+            assert!(core_action(LayoutAction::LaunchDesktop {
+                desktop_id: id.into()
+            })
+            .is_err());
+            let core = ButtonAction::LaunchDesktop {
+                desktop_id: id.into(),
+            };
+            assert!(!core.is_valid());
+            assert!(project_action(&core).is_err());
+        }
+    }
 }

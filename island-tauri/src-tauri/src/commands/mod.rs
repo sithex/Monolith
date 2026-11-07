@@ -8,6 +8,7 @@ pub mod approvals;
 pub mod apps;
 pub mod clipboard;
 pub mod controls;
+pub mod desktop_apps;
 pub mod fonts;
 pub mod frontend;
 pub mod island;

@@ -1,6 +1,6 @@
 // Side-button actions (Nov 2): every app page plus one-tap quick actions.
 // Quick actions reuse existing typed commands only; nothing runs a shell.
-import { appApi, mediaControl, type IslandView, type LayoutAction } from '../ipc/client';
+import { appApi, desktopAppLaunch, mediaControl, type IslandView, type LayoutAction } from '../ipc/client';
 import { currentIslandState, dispatch } from '../ipc/island-state';
 import { appStores } from '../stores/apps';
 import { saveSettings, settingsStore } from '../stores';
@@ -12,7 +12,7 @@ export type ActionOption = { key: string; action: LayoutAction; label: string; i
 const PAGES: IslandView[] = ['launcher', 'terminal', 'settings', 'mixer', 'music', 'timer', 'calendar', 'ai', 'monitor', 'notifications', 'clipboard', 'scratchpad', 'downloads', 'brightness', 'updates', 'agents', 'quickInfo'];
 const pageAction = (view: IslandView): LayoutAction =>
   view === 'launcher' ? { type: 'appGrid' } : view === 'settings' ? { type: 'settings' } : view === 'mixer' ? { type: 'volume' } : view === 'music' ? { type: 'nowPlaying' } : view === 'timer' ? { type: 'timer' } : { type: 'openApp', view };
-const QUICK: { type: QuickAction; label: string; icon: IconName }[] = [
+const QUICK: { type: Exclude<QuickAction, 'launchDesktop'>; label: string; icon: IconName }[] = [
   { type: 'playPause', label: 'Play / pause', icon: 'play' }, { type: 'nextTrack', label: 'Next track', icon: 'next' }, { type: 'previousTrack', label: 'Previous track', icon: 'prev' },
   { type: 'toggleDnd', label: 'Do Not Disturb', icon: 'moon' }, { type: 'micMute', label: 'Mute microphone', icon: 'mic' }, { type: 'cyclePowerProfile', label: 'Cycle power profile', icon: 'power' },
   { type: 'keepAwake', label: 'Keep awake', icon: 'coffee' }, { type: 'screenshot', label: 'Screenshot', icon: 'camera' }, { type: 'pickColour', label: 'Colour picker', icon: 'picker' },
@@ -24,18 +24,20 @@ export const ACTION_OPTIONS: ActionOption[] = [
   ...QUICK.map(q => ({ key: q.type, action: { type: q.type } as LayoutAction, label: q.label, icon: q.icon, group: 'Quick actions' as const })),
 ];
 export function actionKey(action: LayoutAction) {
+  if (action.type === 'launchDesktop') return `desktop:${action.desktopId}`;
   if (isQuickAction(action.type)) return action.type;
   const view = layoutActionView(action);
   return view === 'launcher' ? 'appGrid' : `open:${view}`;
 }
 export const actionOption = (action: LayoutAction) => ACTION_OPTIONS.find(o => o.key === actionKey(action));
 export const actionIcon = (action: LayoutAction): IconName => actionOption(action)?.icon ?? 'spark';
-export const actionLabel = (action: LayoutAction) => actionOption(action)?.label ?? 'Button';
+export const actionLabel = (action: LayoutAction) => action.type === 'launchDesktop' ? 'Launch desktop app' : actionOption(action)?.label ?? 'Button';
 
 /** Run a side button: pages navigate, quick actions fire their command and keep the page. */
 export async function runSideAction(action: LayoutAction, navigate: (view: IslandView) => void) {
   if (!isQuickAction(action.type)) { navigate(layoutActionView(action)); return; }
   switch (action.type) {
+    case 'launchDesktop': return desktopAppLaunch(action.desktopId);
     case 'playPause': return mediaControl({ type: 'playPause' });
     case 'nextTrack': return mediaControl({ type: 'next' });
     case 'previousTrack': return mediaControl({ type: 'previous' });

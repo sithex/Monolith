@@ -91,6 +91,7 @@ pub enum ButtonAction {
     Collapse,
     ToggleGameMode,
     CommandPalette,
+    LaunchDesktop { desktop_id: String },
     Command { id: String },
 }
 
@@ -100,6 +101,9 @@ impl ButtonAction {
         match self {
             ButtonAction::OpenApp { app_id } => valid_id(app_id),
             ButtonAction::Command { id } => valid_id(id),
+            ButtonAction::LaunchDesktop { desktop_id } => {
+                valid_id(desktop_id) && !desktop_id.starts_with(['.', '-'])
+            }
             _ => true,
         }
     }

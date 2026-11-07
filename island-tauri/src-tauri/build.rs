@@ -21,6 +21,8 @@ const COMMANDS: &[&str] = &[
     "settings_defaults",
     "display_outputs",
     "font_families",
+    "desktop_apps_list",
+    "desktop_app_launch",
     "terminal_attach",
     "terminal_input",
     "terminal_copy",

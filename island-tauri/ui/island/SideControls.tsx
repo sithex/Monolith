@@ -51,7 +51,7 @@ function SideBubble({ button, diameter, gap, progress, interactive, navigate, li
       <motion.button ref={face} data-testid={`side-${button.id}`} className="round-button live-side-button" tabIndex={interactive ? 0 : -1} data-quick={quick} data-lit={lit} data-hover={lifted}
         onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}
         data-back={returning}
-        aria-label={returning ? `Back to ${back!.label}` : button.label ?? (button.action.type === 'appGrid' ? 'Open apps' : quick ? actionLabel(button.action) : `Open ${actionLabel(button.action)}`)} aria-pressed={quick ? lit : undefined} aria-disabled={!interactive} title={returning ? `Back to ${back!.label}` : actionLabel(button.action)}
+        aria-label={returning ? `Back to ${back!.label}` : button.label ?? (button.action.type === 'appGrid' ? 'Open apps' : quick ? actionLabel(button.action) : `Open ${actionLabel(button.action)}`)} aria-pressed={quick ? lit : undefined} aria-disabled={!interactive} title={returning ? `Back to ${back!.label}` : button.label ?? actionLabel(button.action)}
         animate={{ scale: lifted ? 1.04 : 1 }} whileTap={interactive ? { scale: .965, opacity: .8 } : {}}
         transition={{ type: 'spring', stiffness: 420, damping: 28 }} onClick={() => { if (!interactive) return; if (returning) back!.go(); else void runSideAction(button.action, navigate).catch(fail); }}>
         <motion.span key={icon} className="side-icon" initial={reducedIcon ? false : { opacity: 0, rotate: returning ? 90 : -90, scale: .6 }} animate={{ opacity: 1, rotate: 0, scale: 1 }}

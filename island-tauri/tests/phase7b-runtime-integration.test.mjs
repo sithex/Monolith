@@ -423,3 +423,36 @@ test('terminal command serializes saves and preserves edits made during an in-fl
   }finally{h.dispose();}
 });
 
+test('desktop picker reads only on explicit opens and ignores a closed picker reply', async()=>{
+  const reads=[],picked=[];
+  const h=driver({'ui/ipc/client.ts':{desktopAppsList:()=>{const d=deferred();reads.push(d);return d.promise;}}});
+  const {DesktopAppPicker}=h.load('ui/island/components/DesktopAppPicker.tsx');
+  const props={onPick:app=>picked.push(app)};
+  try {
+    let tree=h.render(DesktopAppPicker,props); assert.equal(reads.length,0);
+    textButton(tree,'Choose desktop app…').props.onClick();tree=h.render(DesktopAppPicker,props); assert.equal(reads.length,1);
+    textButton(tree,'Cancel app selection').props.onClick();h.render(DesktopAppPicker,props);
+    reads[0].resolve([{id:'late',name:'Late app',glyph:'grid'}]);await tick();
+    tree=h.render(DesktopAppPicker,props);assert.equal(component(tree,'Dropdown'),undefined);
+    textButton(tree,'Choose desktop app…').props.onClick();h.render(DesktopAppPicker,props);assert.equal(reads.length,2);
+    reads[1].resolve([{id:'org.kde.kate',name:'Kate',glyph:'note'}]);await tick();tree=h.render(DesktopAppPicker,props);
+    const picker=component(tree,'Dropdown');assert.deepEqual(picker.props.options,[{value:'org.kde.kate',label:'Kate'}]);
+    picker.props.onChange('org.kde.kate');tree=h.render(DesktopAppPicker,props);
+    assert.equal(picked[0].name,'Kate');assert.equal(component(tree,'Dropdown'),undefined);assert.equal(reads.length,2);
+  } finally {h.dispose();}
+});
+
+test('desktop quick action launches once without navigation and preserves palette/game actions',async()=>{
+  const calls=[];
+  const h=driver({'ui/ipc/client.ts':{desktopAppLaunch:async id=>calls.push(id)},
+    'ui/island/Launcher.tsx':{viewIcons:{},viewLabels:{}},'ui/stores/apps.ts':{},'ui/stores/index.ts':{},'ui/ipc/island-state.ts':{}});
+  const actions=h.load('ui/island/side-actions.ts');
+  const action={type:'launchDesktop',desktopId:'org.kde.kate'};
+  await actions.runSideAction(action,()=>assert.fail('desktop action navigated'));
+  assert.deepEqual(calls,['org.kde.kate']);assert.equal(actions.actionKey(action),'desktop:org.kde.kate');
+  assert.equal(actions.actionLabel(action),'Launch desktop app');
+  assert.ok(actions.ACTION_OPTIONS.some(o=>o.key==='commandPalette'));
+  assert.ok(actions.ACTION_OPTIONS.some(o=>o.key==='toggleGameMode'));
+  assert.equal(load('ui/island/geometry.ts').sideBackFor(action,'launcher',{view:'terminal'}),null);
+});
+

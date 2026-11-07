@@ -7,6 +7,7 @@ pub mod approvals;
 pub mod apps;
 pub mod clipboard;
 pub mod controls;
+pub mod desktop_apps;
 pub mod events;
 pub mod frontend;
 pub mod island;

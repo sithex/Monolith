@@ -63,6 +63,10 @@ export const commands = {
 	 */
 	displayOutputs: () => typedError<string[], IslandError>(__TAURI_INVOKE("display_outputs")),
 	fontFamilies: () => typedError<FontFamily[], IslandError>(__TAURI_INVOKE("font_families")),
+	/**  Enumerate only when the action picker opens; no startup hook, watcher, or polling task. */
+	desktopAppsList: () => typedError<DesktopApp[], IslandError>(__TAURI_INVOKE("desktop_apps_list")),
+	/**  Request an installed application launch, not arbitrary command execution. */
+	desktopAppLaunch: (desktopId: string) => typedError<null, IslandError>(__TAURI_INVOKE("desktop_app_launch", { desktopId })),
 	/**
 	 *  Spawn the PTY on first call; later calls only replace the output channel (idempotent).
 	 *  Returns the snapshot (replay + `seq`); the channel then carries only newer chunks.
@@ -625,6 +629,18 @@ export type DbToolCount = {
 	n: number,
 };
 
+export type DesktopApp = {
+	/**  XDG desktop-file ID without the final `.desktop` suffix. */
+	id: string,
+	/**
+	 *  The entry's unlocalised `Name=`, not `GenericName=` or the desktop-file ID.
+	 *  Untruncated: the layout editor must respect its separate 32-character label limit.
+	 */
+	name: string,
+	/**  An island monochrome glyph inferred from freedesktop `Categories=`. */
+	glyph: string,
+};
+
 export type DiskStats = {
 	total: number,
 	used: number,
@@ -836,7 +852,7 @@ export type LauncherItem = {
 
 export type LauncherOp = { type: "begin" } | { type: "move"; id: string; to: number } | { type: "disable"; id: string } | { type: "enable"; id: string } | { type: "cancel" } | { type: "commit" };
 
-export type LayoutAction = { type: "openApp"; view: IslandView } | { type: "appGrid" } | { type: "settings" } | { type: "volume" } | { type: "nowPlaying" } | { type: "timer" } | { type: "playPause" } | { type: "nextTrack" } | { type: "previousTrack" } | { type: "toggleDnd" } | { type: "micMute" } | { type: "cyclePowerProfile" } | { type: "screenshot" } | { type: "pickColour" } | { type: "keepAwake" } | { type: "collapse" } | { type: "toggleGameMode" } | { type: "commandPalette" };
+export type LayoutAction = { type: "openApp"; view: IslandView } | { type: "appGrid" } | { type: "settings" } | { type: "volume" } | { type: "nowPlaying" } | { type: "timer" } | { type: "playPause" } | { type: "nextTrack" } | { type: "previousTrack" } | { type: "toggleDnd" } | { type: "micMute" } | { type: "cyclePowerProfile" } | { type: "screenshot" } | { type: "pickColour" } | { type: "keepAwake" } | { type: "collapse" } | { type: "toggleGameMode" } | { type: "commandPalette" } | { type: "launchDesktop"; desktopId: string };
 
 export type LayoutButton = {
 	id: string,

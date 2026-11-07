@@ -53,6 +53,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::settings::settings_defaults,
             commands::settings::display_outputs,
             commands::fonts::font_families,
+            commands::desktop_apps::desktop_apps_list,
+            commands::desktop_apps::desktop_app_launch,
             commands::terminal::terminal_attach,
             commands::terminal::terminal_input,
             commands::terminal::terminal_copy,

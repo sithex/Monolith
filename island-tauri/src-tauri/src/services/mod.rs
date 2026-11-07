@@ -5,6 +5,7 @@ pub mod agent_live;
 pub mod ai_usage;
 pub mod approvals;
 pub mod autostart;
+pub mod desktop_apps;
 pub mod frontend;
 pub mod palette;
 pub mod process;

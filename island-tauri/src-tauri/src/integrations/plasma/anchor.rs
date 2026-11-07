@@ -268,7 +268,7 @@ pub const DISCOVERY_SCRIPT: &str = "print(JSON.stringify(panels().map(p=>{var g=
 pub fn discovery_commands() -> [std::process::Command; 2] {
     let mut outputs = std::process::Command::new("kscreen-doctor");
     outputs.arg("-j");
-    let mut panels = std::process::Command::new("qdbus6");
+    let mut panels = std::process::Command::new(super::qdbus::panel_program());
     panels.args([
         "org.kde.plasmashell",
         "/PlasmaShell",
@@ -458,7 +458,7 @@ mod tests {
         let [outputs, panels] = discovery_commands();
         assert_eq!(outputs.get_program(), "kscreen-doctor");
         assert_eq!(outputs.get_args().collect::<Vec<_>>(), ["-j"]);
-        assert_eq!(panels.get_program(), "qdbus6");
+        assert_eq!(panels.get_program(), super::super::qdbus::panel_program());
         assert_eq!(panels.get_args().count(), 4);
         assert!(DISCOVERY_SCRIPT.contains("width:r.width,height:r.height"));
     }

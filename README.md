@@ -33,13 +33,18 @@ Linux only, and really KDE Plasma 6 on Wayland only. Monolith leans on KWin for 
 Plasma for the notch widget, and it reads the desktop through D-Bus, PipeWire and `/proc`. Some parts work on
 X11, but nobody tests that. Windows and macOS would each need a port.
 
+Tested on CachyOS/Arch and Fedora 45 KDE. `scripts/install-deps.sh` installs the dependencies on either one;
+[instructions.md](instructions.md) has the pacman and dnf lines it runs.
+
 ## Getting it running
 
-Short version, after installing the dependencies listed in [instructions.md](instructions.md):
+Short version (the dependencies are listed in [instructions.md](instructions.md)):
 
 ```sh
 git clone https://github.com/sithex/Monolith.git ~/Hermes/Monolith
-cd ~/Hermes/Monolith/island-tauri
+cd ~/Hermes/Monolith
+scripts/install-deps.sh
+cd island-tauri
 npm ci
 ./build.sh
 ./run.sh --overlay

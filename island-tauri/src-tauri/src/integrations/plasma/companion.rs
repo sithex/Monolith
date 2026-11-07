@@ -101,7 +101,7 @@ impl CompanionBus {
 }
 
 fn kwin(arguments: &[&str]) -> Result<String> {
-    let mut command = Command::new("/usr/bin/qdbus6");
+    let mut command = Command::new(super::qdbus::program());
     command.arg("org.kde.KWin").args(arguments);
     let out = run_bounded(command, Duration::from_secs(3), 4096, false)?;
     Ok(String::from_utf8_lossy(&out).trim().to_owned())

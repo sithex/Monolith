@@ -203,13 +203,14 @@ cd src-tauri && cargo test --locked --lib -j4 \
   && cargo clippy --locked --lib --tests -j4 -- -D warnings
 rustfmt --edition 2021 --check <touched .rs files>   # plain `cargo fmt` rewrites unrelated files
 cd ../../island && QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input qmltests
+# Fedora: /usr/lib64/qt6/bin/qmltestrunner (plain `qmltestrunner` there is Qt 5)
 ```
 
 - **QML-only change** (a character's drawing or habits): copy
   `island/plasma-anchor/.` to `~/.local/share/plasma/plasmoids/local.hermes.island.notch3/`,
   then `systemctl --user restart plasma-plasmashell.service`. No build needed. Then
   check that `qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded
-  monolith-companion-gaze` is still `true`.
+  monolith-companion-gaze` is still `true` (`qdbus-qt6` instead of `qdbus6` on Fedora).
 - **Setting, contract or Rust change:** also `./build.sh`, then restart the island (stop
   the pid in `.island-data-overlay/status.json`, relaunch with `systemd-run --user
   --unit=monolith-companion-$(date +%s) --collect island-tauri/run.sh --overlay --ui

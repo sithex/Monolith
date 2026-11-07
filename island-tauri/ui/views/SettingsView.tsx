@@ -16,6 +16,7 @@ import { useNotifications } from '../ipc/notifications';
 import { ShortcutRecorder } from './settings/ShortcutRecorder';
 import { FontPicker } from './settings/FontPicker';
 import { AppRulesEditor } from './settings/AppRulesEditor';
+import { SoundPicker } from './settings/SoundPicker';
 import { rulesSummary } from './settings/app-rules';
 
 const SETTINGS_JUMP_ROWS = new Map(SETTINGS_CARDS.flatMap(card => card.rows.map(row => [row.id, row] as const)));
@@ -229,12 +230,15 @@ export function SettingsView() {
       {toggle('systemNotificationMirror', 'systemNotificationMirror')}
       {toggle('silenceKdePopups', 'silenceKdePopups', true)}
       {toggle('notificationSound', 'notificationSound')}
+      {show('notificationSoundId') && <Row label={rowSpec('notificationSoundId').label} hint={rowSpec('notificationSoundId').hint}>
+        <SoundPicker label="Notification sound" value={settings.notificationSoundId ?? ''} emptyLabel="Each app's own (default)" disabled={settings.notificationSound === false}
+          onChange={id => patch({ notificationSoundId: id })} /></Row>}
       {toggle('approvalsInNotch', 'approvalsInNotch')}
       {toggle('redactBodies', 'redactBodies')}
       {show('deniedApps') && <DeniedApps value={denied} onSave={apps => patch({ notificationDeniedApps: apps })} />}
       {show('appRules') && <Row label={rowSpec('appRules').label} hint={rulesSummary(appRules)}>
         <button className="link" type="button" aria-expanded={rulesOpen} onClick={() => setRulesOpen(!rulesOpen)}>{rulesOpen ? 'Close' : 'Edit'}</button></Row>}
-      {show('appRules') && rulesOpen && <AppRulesEditor rules={appRules} seenApps={seenApps} onSave={rules => saveSettings({ notificationAppRules: rules })} />}
+      {show('appRules') && rulesOpen && <AppRulesEditor rules={appRules} seenApps={seenApps} globalSound={settings.notificationSoundId ?? ''} onSave={rules => saveSettings({ notificationAppRules: rules })} />}
     </>)}
     {section('clock', toggle('showDate', 'showDate'))}
     {isLinux && section('display', show('displayBackend') && <Row label="Display server" hint={`Running on ${runningBackend === 'wayland' ? 'native Wayland' : 'X11 (XWayland)'}${(settings.displayBackend ?? 'wayland') !== runningBackend ? ' · applies when the island restarts' : ''}`}>

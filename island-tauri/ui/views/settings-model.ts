@@ -47,6 +47,7 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
     { id: 'systemNotificationMirror', label: 'Mirror desktop notifications', hint: 'Show other apps\' notifications too', keys: ['systemNotificationMirror'] },
     { id: 'silenceKdePopups', label: 'Silence KDE popups', hint: 'Monolith shows them; KDE keeps history', keys: ['silenceKdePopups'] },
     { id: 'notificationSound', label: 'Notification sound', hint: 'Play a sound for new notifications (per-app rules can mute)', keys: ['notificationSound'] },
+    { id: 'notificationSoundId', label: 'Sound', hint: 'Which sound plays; per-app rules can pick their own', keys: ['notificationSoundId'] },
     { id: 'approvalsInNotch', label: 'Approvals in the notch', hint: 'Approve or deny Hermes requests from the notch hover', keys: ['approvalsInNotch'] },
     { id: 'redactBodies', label: 'Hide message text', hint: 'Only titles are kept', keys: ['redactBodies'] },
     { id: 'deniedApps', label: 'Blocked apps', hint: 'Apps that never notify', keys: ['notificationDeniedApps'] },

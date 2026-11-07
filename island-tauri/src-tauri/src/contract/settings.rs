@@ -148,6 +148,10 @@ pub struct NotificationAppRule {
     /// Play the notification sound.
     pub sound: bool,
     pub urgency: RuleUrgency,
+    /// Sound-theme id for this app ("" = the global choice). Rules saved before this field
+    /// existed load as "".
+    #[serde(default)]
+    pub sound_id: String,
 }
 pub const MAX_NOTIFICATION_APP_RULES: usize = 128;
 
@@ -345,6 +349,9 @@ settings_schema! {
     silence_kde_popups: bool = false, "silenceKdePopups", plain;
     /// The island plays a sound for new notifications (per-app rules can mute).
     notification_sound: bool = true, "notificationSound", plain;
+    /// Sound-theme id played for every notification ("" = the app's own sound, falling back
+    /// to message-new-instant). Per-app rules can pick their own.
+    notification_sound_id: String = String::new(), "notificationSoundId", with(check_sound_id);
     /// Per-app popup/sound/urgency overrides (exact app names, file order kept).
     notification_app_rules: Vec<NotificationAppRule> = Vec::new(), "notificationAppRules", with(check_app_rules);
     /// Hermes approval requests show Approve/Deny in the notch hover notice.
@@ -412,12 +419,30 @@ fn check_app_rules(
                 || app.len() > MAX_NOTIFICATION_APP_BYTES
                 || app.trim() != app
                 || app.chars().any(char::is_control)
+                || !(rule.sound_id.is_empty() || sound_id_ok(&rule.sound_id))
                 || !seen.insert(app)
         })
     {
         return Err(IslandError::invalid("Invalid notificationAppRules"));
     }
     Ok(rules.clone())
+}
+
+/// A freedesktop sound-theme id: never a path, URI or option (canberra `--id`).
+pub fn sound_id_ok(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && !id.starts_with(['.', '-'])
+        && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
+}
+
+#[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`
+fn check_sound_id(id: &String) -> Result<String, IslandError> {
+    if id.is_empty() || sound_id_ok(id) {
+        Ok(id.clone())
+    } else {
+        Err(IslandError::invalid("Invalid notificationSoundId"))
+    }
 }
 
 fn check_registry(
@@ -961,9 +986,10 @@ mod tests {
         expected.sort();
         // 55 keys up to Nov 3 + 14 on Nov 5 (game mode, shortcut, notch states, monitors,
         // motion, terminal options) + 8 on Nov 6 (KDE popups, sound, app rules, approvals,
-        // game-mode extras, palette shortcut). Every key comes from the one `settings_schema!` table.
-        assert_eq!(keys.len(), 77);
-        assert_eq!(SETTINGS_KEYS.len(), 77);
+        // game-mode extras, palette shortcut) + 1 later Nov 6 (notification sound choice).
+        // Every key comes from the one `settings_schema!` table.
+        assert_eq!(keys.len(), 78);
+        assert_eq!(SETTINGS_KEYS.len(), 78);
         let mut table: Vec<_> = SETTINGS_KEYS.iter().map(|k| k.to_string()).collect();
         table.sort();
         assert_eq!(table, keys, "file keys must equal the serde (IPC) keys");

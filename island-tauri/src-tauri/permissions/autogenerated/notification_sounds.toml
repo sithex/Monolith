@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notification-sounds"
+description = "Enables the notification_sounds command without any pre-configured scope."
+commands.allow = ["notification_sounds"]
+
+[[permission]]
+identifier = "deny-notification-sounds"
+description = "Denies the notification_sounds command without any pre-configured scope."
+commands.deny = ["notification_sounds"]

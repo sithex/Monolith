@@ -31,3 +31,16 @@ pub async fn notifications_clear(
     let hub = notifications.hub.clone();
     blocking(move || hub.clear()).await
 }
+
+/// Settings → Notifications: the sound-theme ids installed here, for the sound picker.
+#[tauri::command]
+#[specta::specta]
+pub async fn notification_sounds() -> Result<Vec<String>, IslandError> {
+    blocking(|| Ok(crate::integrations::notifications::effects::installed_sounds())).await
+}
+/// Settings → Notifications: play a sound once so the user can hear a choice ("" = default).
+#[tauri::command]
+#[specta::specta]
+pub async fn notification_sound_preview(id: String) -> Result<(), IslandError> {
+    crate::integrations::notifications::effects::preview(&id)
+}

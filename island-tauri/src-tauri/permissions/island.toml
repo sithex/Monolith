@@ -40,6 +40,8 @@ permissions = [
   "allow-notifications-dismiss",
   "allow-notifications-clear",
   "allow-notification-popup",
+  "allow-notification-sounds",
+  "allow-notification-sound-preview",
   "allow-clipboard-list",
   "allow-clipboard-get",
   "allow-clipboard-copy",

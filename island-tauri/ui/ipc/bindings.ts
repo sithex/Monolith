@@ -116,6 +116,10 @@ export const commands = {
 	notificationsClear: () => typedError<null, IslandError>(__TAURI_INVOKE("notifications_clear")),
 	/**  Popup dismissal is presentation-only. History dismissal remains a separate command. */
 	notificationPopup: (op: PopupOp) => typedError<NotificationPopups, IslandError>(__TAURI_INVOKE("notification_popup", { op })),
+	/**  Settings → Notifications: the sound-theme ids installed here, for the sound picker. */
+	notificationSounds: () => typedError<string[], IslandError>(__TAURI_INVOKE("notification_sounds")),
+	/**  Settings → Notifications: play a sound once so the user can hear a choice ("" = default). */
+	notificationSoundPreview: (id: string) => typedError<null, IslandError>(__TAURI_INVOKE("notification_sound_preview", { id })),
 	clipboardList: (query: string | null, limit: number) => typedError<ClipSummary[], IslandError>(__TAURI_INVOKE("clipboard_list", { query, limit })),
 	clipboardGet: (id: string) => typedError<ClipContent, IslandError>(__TAURI_INVOKE("clipboard_get", { id })),
 	clipboardCopy: (id: string) => typedError<null, IslandError>(__TAURI_INVOKE("clipboard_copy", { id })),
@@ -879,6 +883,11 @@ export type NotificationAppRule = {
 	/**  Play the notification sound. */
 	sound: boolean,
 	urgency: RuleUrgency,
+	/**
+	 *  Sound-theme id for this app ("" = the global choice). Rules saved before this field
+	 *  existed load as "".
+	 */
+	soundId?: string,
 };
 
 export type NotificationClosed = {
@@ -1253,6 +1262,11 @@ export type Settings = {
 	silenceKdePopups: boolean,
 	/**  The island plays a sound for new notifications (per-app rules can mute). */
 	notificationSound: boolean,
+	/**
+	 *  Sound-theme id played for every notification ("" = the app's own sound, falling back
+	 *  to message-new-instant). Per-app rules can pick their own.
+	 */
+	notificationSoundId: string,
 	/**  Per-app popup/sound/urgency overrides (exact app names, file order kept). */
 	notificationAppRules: NotificationAppRule[],
 	/**  Hermes approval requests show Approve/Deny in the notch hover notice. */
@@ -1345,6 +1359,7 @@ export type SettingsPatch = {
 	terminalCursorBlink?: boolean,
 	silenceKdePopups?: boolean,
 	notificationSound?: boolean,
+	notificationSoundId?: string,
 	notificationAppRules?: NotificationAppRule[],
 	approvalsInNotch?: boolean,
 	gameModeDnd?: boolean,

@@ -4,12 +4,15 @@
 import { useId, useMemo, useState } from 'react';
 import type { NotificationAppRule, RuleUrgency } from '../../ipc/bindings';
 import { Dropdown } from '../../island/components/AppPrimitives';
+import { SoundPicker } from './SoundPicker';
 import { addRule, appNameError, appSuggestions, removeRule, updateRule, URGENCY_OPTIONS } from './app-rules';
 
 const message = (e: unknown) => e instanceof Error ? e.message : String(e);
 
-export function AppRulesEditor({ rules, seenApps, onSave }: {
+export function AppRulesEditor({ rules, seenApps, onSave, globalSound = '' }: {
   rules: readonly NotificationAppRule[]; seenApps: readonly string[]; onSave(rules: NotificationAppRule[]): Promise<void>;
+  /** The global sound choice, previewed for "Same as global". */
+  globalSound?: string;
 }) {
   const [name, setName] = useState(''), [error, setError] = useState<string | null>(null), [listOpen, setListOpen] = useState(false), [focus, setFocus] = useState(-1);
   const id = useId();
@@ -29,6 +32,8 @@ export function AppRulesEditor({ rules, seenApps, onSave }: {
           onChange={e => save(updateRule(rules, rule.app, { popup: e.target.checked }))} />Popup</label>
         <label className="app-rule-toggle"><input className="switch" type="checkbox" aria-label={`${rule.app} sound`} checked={rule.sound}
           onChange={e => save(updateRule(rules, rule.app, { sound: e.target.checked }))} />Sound</label>
+        <SoundPicker label={`${rule.app} sound choice`} value={rule.soundId ?? ''} emptyLabel="Same as global" previewEmpty={globalSound} disabled={!rule.sound}
+          onChange={id => save(updateRule(rules, rule.app, { soundId: id }))} />
         <Dropdown label={`${rule.app} urgency`} value={rule.urgency} options={URGENCY_OPTIONS}
           onChange={v => save(updateRule(rules, rule.app, { urgency: v as RuleUrgency }))} />
         <button type="button" className="icon-button app-rule-remove" aria-label={`Remove rule for ${rule.app}`} onClick={() => save(removeRule(rules, rule.app))}>✕</button>

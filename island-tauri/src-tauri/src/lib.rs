@@ -73,6 +73,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::notifications::notifications_dismiss,
             commands::notifications::notifications_clear,
             integrations::notifications::popup_commands::notification_popup,
+            commands::notifications::notification_sounds,
+            commands::notifications::notification_sound_preview,
             commands::clipboard::clipboard_list,
             commands::clipboard::clipboard_get,
             commands::clipboard::clipboard_copy,

@@ -186,6 +186,30 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
         "the card must be part of the island surface"
     );
     assert_not_focused_on_show(&conn, root, window);
+    // Measured alignment (rendered layout, not CSS intent): the close X is centred in its round
+    // target, the target sits on the header row's centre line, and its visible glyph is as far
+    // from the card's right edge as the app icon is from the left edge.
+    // Measure only once the reveal animation has settled (scaled rects skew every offset).
+    wait_for("card animation settles", Duration::from_secs(3), || {
+        (eval(&s, &format!("Math.abs({card}.querySelector('.notification-close').getBoundingClientRect().width-26)<0.2")) == true)
+            .then_some(())
+    });
+    let geo = eval(
+        &s,
+        &format!(
+            "(()=>{{const c={card},b=c.querySelector('.notification-close'),g=b.querySelector('svg'),\
+             i=c.querySelector('.notification-icon'),a=c.querySelector('.notification-app'),\
+             R=e=>e.getBoundingClientRect(),cr=R(c),br=R(b),gr=R(g),ir=R(i),ar=R(a),\
+             mid=r=>r.y+r.height/2,cx=r=>r.x+r.width/2;\
+             return [br.width,br.height,cx(gr)-cx(br),mid(gr)-mid(br),mid(br)-mid(ir),mid(ar)-mid(ir),\
+             (cr.right-gr.right)-(ir.x-cr.x)]}})()"
+        ),
+    );
+    let g: Vec<f64> = geo.as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+    assert!((g[0] - g[1]).abs() < 0.5, "close target is round: {g:?}");
+    assert!(g[2].abs() <= 0.5 && g[3].abs() <= 0.5, "X centred in its target: {g:?}");
+    assert!(g[4].abs() <= 1.0 && g[5].abs() <= 1.0, "header row shares one centre line: {g:?}");
+    assert!(g[6].abs() <= 1.0, "X inset mirrors the icon inset: {g:?}");
     wait_for(
         "card auto-dismisses after its TTL",
         Duration::from_secs(8),

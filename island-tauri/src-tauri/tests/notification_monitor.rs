@@ -37,10 +37,12 @@ fn passive_notify_monitor_correlates_notify_return_closed_and_actions() {
 
     notify(&s, "Private caller", "Monitored arrival");
     until(&s, "notify-send reaches store and actual toast", 8, "window.__TAURI_INTERNALS__.invoke('notifications_list').then(ns=>ns.some(n=>n.title==='Monitored arrival'&&n.body==='Private body'&&!n.canInvokeActions)&&document.querySelector('[data-testid=notification-toast]')?.textContent.includes('Monitored arrival'))");
+    // The notch grows into the card (hover cause = that notification); the popup queue, not a
+    // hover timer, owns its lifetime.
     assert_eq!(
         host::actor_state(&s)["hoverCause"],
-        serde_json::Value::Null,
-        "notifications are popup cards, never a sticky hover preview"
+        serde_json::json!({"type": "notification", "id": "d-1"}),
+        "the card is drawn inside the notch"
     );
     assert_eq!(popups(&s)[0]["notification"]["id"], "d-1");
     assert_eq!(list(&s)[0]["id"], "d-1");

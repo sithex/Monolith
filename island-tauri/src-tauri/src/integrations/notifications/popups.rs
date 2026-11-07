@@ -187,6 +187,7 @@ mod tests {
             popup: false,
             sound: false,
             urgency: RuleUrgency::Critical,
+            sound_id: String::new(),
         });
         assert!(!allowed(&s, "Mail"));
         assert!(allowed(&s, "mail"));

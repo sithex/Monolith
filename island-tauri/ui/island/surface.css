@@ -186,7 +186,9 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-layout { display: flex; gap: 12px; flex: 1; min-height: 0; overflow: hidden; }
 .settings-rail { display: flex; flex-direction: column; gap: 4px; width: 40px; flex: 0 0 40px; padding: 2px 0; position: relative; z-index: 2; }
 .island .settings-rail > button { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 36px; padding: 0; border-radius: var(--radius-lg); background: transparent; color: var(--v-dim); }
-.island .settings-rail > button[aria-current='page'] { color: var(--ui-accent); background: var(--v-fill-hi); }
+.island .settings-rail > button[aria-current='page'] { color: var(--ui-accent); background: color-mix(in srgb, var(--ui-accent) 16%, transparent); }
+/* Accent bar on the selected section (left edge on the rail; underline in the narrow chip row). */
+.island .settings-rail > button[aria-current='page']::before { content: ''; position: absolute; left: -2px; top: 9px; bottom: 9px; width: 3px; border-radius: 2px; background: var(--ui-accent); }
 .island .settings-rail > button:hover { background: var(--v-hover); color: var(--ui-text); }
 .settings-rail svg { width: 20px; height: 20px; flex: none; }
 .settings-rail-name { position: absolute; left: 44px; top: 50%; transform: translateY(-50%); width: max-content; max-width: 220px; box-sizing: border-box; padding: 6px 10px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-md); background: var(--ui-surface); color: var(--ui-text); font-size: var(--fs-sm); pointer-events: none; visibility: hidden; opacity: 0; }
@@ -214,6 +216,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
   .settings-rail { width: auto; flex: none; flex-direction: row; overflow-x: auto; gap: 4px; padding: 2px; }
   .island .settings-rail > button { width: auto; height: 30px; gap: 5px; padding: 0 9px; white-space: nowrap; }
   .settings-rail svg { width: 16px; height: 16px; }
+  .island .settings-rail > button[aria-current='page']::before { left: 9px; right: 9px; top: auto; bottom: 0; width: auto; height: 2px; }
   .settings-rail-name { position: static; transform: none; width: auto; padding: 0; border: 0; background: none; visibility: visible; opacity: 1; }
   .settings-content .settings-row { flex-wrap: wrap; gap: 6px; }
   .settings-content .settings-row > .label { flex-basis: 100%; }

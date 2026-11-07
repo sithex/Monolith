@@ -1,14 +1,14 @@
 import QtQuick
 
-// Sonichu, the fictional Sonic/Pikachu hybrid: a bright blue Sonic-style head
-// with backward quills, Pikachu pointed ears (yellow with black tips), rosy red cheeks,
-// a peach muzzle with a cute cheerful smile, and a lightning-bolt tail visible at the side.
+// Sonichu, the electric-hedgehog Pokemon hybrid: a bright Pikachu-yellow head
+// with Sonic-style quills sweeping back, tall pointed Pikachu ears with black tips,
+// big emerald-green eyes with dark pupils and white glints, rosy red cheeks,
+// a small black nose, cheerful smile, and a signature brown zigzag lightning-bolt tail.
 //
-// Pointer tracking: pupils follow the pointer inside the eye whites and the head
-// shifts 1 px toward the pointer.
-// Hover: closed happy ^^ eyes and a big joyful grin.
-// Idle habit: a ZAP burst of electric spark pixels crackling from the cheek toward
-// the pointer side. Dozing: half-lids over drowsy eyes.
+// Pointer tracking: whole-pixel pupils and subtle head shift follow the pointer.
+// Hover: joyful closed happy ^^ eyes and a big cheerful grin (hoverMark).
+// Idle habit: short ZAP of bright pale-yellow and white spark pixels crackling from
+// the cheek toward the pointer side. Dozing: half-lids over drowsy eyes.
 HabitCharacter {
     id: art
     gazeScale: 1
@@ -16,8 +16,9 @@ HabitCharacter {
     habitInterval: 125
 
     // Pointer tracking: whole-pixel pupils and head shift.
-    readonly property int pupilX: gazePx(gazeX, 0.6, -1, 1)
-    readonly property int pupilY: gazePx(gazeY, 0.7, -1, 1)
+    // Near-left and near-right gaze poses visibly differ from center.
+    readonly property int pupilX: gazePx(gazeX, 1.2, -1, 1)
+    readonly property int pupilY: gazePx(gazeY, 1.0, -1, 1)
     readonly property int headShiftX: gazePx(gazeX, 0.45, -1, 1)
     readonly property int headShiftY: gazePx(gazeY, 0.45, -1, 1)
 
@@ -30,40 +31,38 @@ HabitCharacter {
     onHabitStarted: habitDirection = gazeX < 0 ? -1 : 1
     readonly property bool zapping: !happy && habitFrame > 0
 
-    // Palette:
+    // Palette sampled from reference art:
     readonly property var colors: ({
-        "K": "#111218",
-        "E": "#111218",
-        "Y": "#ffd800",
-        "y": "#cca000",
-        "B": "#245cd8",
-        "b": "#12308c",
-        "H": "#5494ff",
-        "W": "#f8f8fa",
-        "P": "#fcd0a0",
-        "p": "#dca070",
-        "R": "#ea2828",
-        "M": "#e84060",
+        "K": "#121218",
+        "E": "#16181e",
+        "Y": "#feda1a",
+        "y": "#a6780a",
+        "G": "#34a838",
+        "W": "#f8f8fc",
         "T": "#ffffff",
-        "S": "#fff444",
+        "R": "#e82828",
+        "M": "#e64058",
+        "B": "#9c5424",
+        "b": "#6c3412",
+        "S": "#fffca0",
         "s": "#ffffff"
     })
 
     // Lightning-bolt tail: stationary in background at the right.
     PixelSprite {
         objectName: "sonichuTail"
-        x: 16
+        x: 14
         y: 10
         colors: art.colors
         rows: [
-            "...Y",
-            "..YY",
-            "..YY",
-            ".YY.",
-            ".YY.",
-            "YYY.",
-            "yYY.",
-            "yY.."
+            "..BBBB",
+            "...BBB",
+            "...BB.",
+            "..BB..",
+            ".BBB..",
+            ".bB...",
+            "bB....",
+            "bB...."
         ]
     }
 
@@ -79,44 +78,48 @@ HabitCharacter {
             objectName: "sonichuHeadBase"
             colors: art.colors
             rows: [
+                ".KK............KK.",
                 "..KK..........KK..",
-                "..KK..........KK..",
-                "..YY..........YY..",
-                "..YY..bHHHHb..YY..",
-                "..bY.bBBBBBBb.Yb..",
-                ".bBBBBBBBBBBBBBBb.",
-                "bB.WWWWbBBbWWWW.Bb",
-                "bB.WWWWbBBbWWWW.Bb",
-                "bB.WWWWbBBbWWWW.Bb",
-                "bB.WWWWbBBbWWWW.Bb",
-                "bRR.PPPPPPPPPP.RRb",
-                ".RR.PPPKKKKPPP.RR.",
-                "..b.PPPPPPPPPP.b..",
-                ".....PPKKKKPP.....",
-                ".....P.PKKP.P.....",
-                "......PppppP......",
-                ".......bBBb......."
+                "..YY....yy....YY..",
+                ".yYY...yYYy...YYy.",
+                "yYYYY.yYYYYy.YYYYy",
+                ".yYYYYYYYYYYYYYYy.",
+                "yYY.WWWWyyWWWW.YYy",
+                "YYY.WWWWyyWWWW.YYY",
+                "yYY.WWWWyyWWWW.YYy",
+                ".yY.WWWWyyWWWW.Yy.",
+                "yRR.YYYYYYYYYY.RRy",
+                "yRR.YYYyKKyYYY.RRy",
+                ".y..YYYYYYYYYY..y.",
+                ".....yYKKKKYy.....",
+                "......yWMMMy......",
+                ".......yYYy.......",
+                "........yy........"
             ]
         }
 
-        // Eye pupils: 2x2 sliding inside eye whites toward pointer.
+        // Eye pupils: 2x3 emerald iris with dark pupil & glint sliding inside eye whites.
         Repeater {
-            model: [3, 11]
+            model: [4, 10]
             PixelSprite {
                 required property int modelData
                 required property int index
                 objectName: "companionEye" + index
                 visible: !art.eyesShut && !art.happy && !art.dozing
                 x: modelData + 1 + art.pupilX
-                y: 7 + art.pupilY
+                y: 6 + art.pupilY
                 colors: art.colors
-                rows: ["EE", "EE"]
+                rows: [
+                    "TG",
+                    "KE",
+                    "GG"
+                ]
             }
         }
 
         // Doze look: half-lids covering top rows with pupils showing below.
         Repeater {
-            model: [3, 11]
+            model: [4, 10]
             PixelSprite {
                 required property int modelData
                 visible: art.dozing && !art.eyesShut && !art.happy
@@ -124,9 +127,9 @@ HabitCharacter {
                 y: 6
                 colors: art.colors
                 rows: [
-                    "BBBB",
-                    "bbbb",
-                    art.pupilX < 0 ? "EEWW" : art.pupilX > 0 ? "WWEE" : "WEEW",
+                    "YYYY",
+                    "yyyy",
+                    art.pupilX < 0 ? "EKWW" : art.pupilX > 0 ? "WWEK" : "WEKW",
                     "WWWW"
                 ]
             }
@@ -134,7 +137,7 @@ HabitCharacter {
 
         // Shut lids: blink.
         Repeater {
-            model: [3, 11]
+            model: [4, 10]
             PixelSprite {
                 required property int modelData
                 visible: art.eyesShut && !art.happy
@@ -142,17 +145,17 @@ HabitCharacter {
                 y: 6
                 colors: art.colors
                 rows: [
-                    "BBBB",
-                    "bbbb",
-                    "BBBB",
-                    "BBBB"
+                    "YYYY",
+                    "yyyy",
+                    "yYYy",
+                    "YYYY"
                 ]
             }
         }
 
         // Happy closed eyes on hover.
         Repeater {
-            model: [3, 11]
+            model: [4, 10]
             PixelSprite {
                 required property int modelData
                 visible: art.happy
@@ -160,10 +163,10 @@ HabitCharacter {
                 y: 6
                 colors: art.colors
                 rows: [
-                    "....",
-                    ".KK.",
-                    "K..K",
-                    "...."
+                    "YYYY",
+                    "YKKY",
+                    "KYYK",
+                    "YYYY"
                 ]
             }
         }
@@ -176,10 +179,10 @@ HabitCharacter {
             y: 12
             colors: art.colors
             rows: [
-                ".bKKKKKKb.",
-                "bKTTTTTTKb",
-                "bKMMMMMMKb",
-                ".bKKKKKKb."
+                ".yKKKKKKy.",
+                "yKTTTTTTKy",
+                "yKMMMMMMKy",
+                ".yKKKKKKy."
             ]
         }
     }

@@ -87,6 +87,16 @@ export const commands = {
 	 *  ~10 s. Sampled per call, so only while the Monitor view is visible and polling.
 	 */
 	monolithCost: () => typedError<MonolithCost, IslandError>(__TAURI_INVOKE("monolith_cost")),
+	/**
+	 *  Monitor → Processes: every user-visible process with CPU / memory / GPU. CPU and GPU are
+	 *  rates since the previous call, so the tab polls this only while it is shown.
+	 */
+	processList: () => typedError<ProcessList, IslandError>(__TAURI_INVOKE("process_list")),
+	/**
+	 *  End one of the user's processes (SIGTERM, or SIGKILL when forced). `start_ticks` comes
+	 *  from the row; a mismatch means the pid was reused and nothing is signalled.
+	 */
+	processKill: (pid: number, startTicks: number, signal: KillSignal) => typedError<null, IslandError>(__TAURI_INVOKE("process_kill", { pid, startTicks, signal })),
 	/**  Cached 60 s; concurrent callers are coalesced behind one refresh. */
 	aiUsage: () => typedError<AiUsage, IslandError>(__TAURI_INVOKE("ai_usage")),
 	/**  `provider` is an enum allow-list: anything else is rejected before this runs. */
@@ -639,6 +649,12 @@ export type KeepAwakeTile = {
 	remainingMs: number | null,
 };
 
+export type KillSignal = 
+/**  SIGTERM: ask the process to quit. */
+"term" | 
+/**  SIGKILL: end it immediately. */
+"kill";
+
 export type LauncherChanged = {
 	rev: number,
 	items: LauncherItem[],
@@ -1004,6 +1020,41 @@ export type PowerState = {
 	onBattery: boolean | null,
 	timeToEmpty: number | null,
 	timeToFull: number | null,
+};
+
+export type ProcessList = {
+	rows: ProcessRow[],
+	/**  Whether any process exposed GPU engine counters (false: GPU column hidden). */
+	gpuAvailable: boolean,
+	memoryTotal: number,
+	cpuCount: number,
+};
+
+/**
+ *  One process in the Monitor → Processes list. CPU is a percentage of the WHOLE machine
+ *  (all cores = 100) over the interval since the previous `process_list` call; GPU is the
+ *  share of the GPU's render+compute engines (amdgpu/i915/xe `drm-engine-*` fdinfo).
+ *  `null` = unavailable (first sample, another user's process, no DRM client), never zero.
+ */
+export type ProcessRow = {
+	pid: number,
+	ppid: number,
+	/**
+	 *  Process start time in clock ticks since boot; `process_kill` requires it so a
+	 *  recycled pid is never signalled.
+	 */
+	startTicks: number,
+	name: string,
+	command: string,
+	cpu: number | null,
+	/**  Private (anonymous) resident memory in bytes: what the process itself holds. */
+	memoryBytes: number,
+	gpu: number | null,
+	/**  VRAM held by the process's DRM clients, in bytes. */
+	vramBytes: number | null,
+	threads: number,
+	/**  Owned by the current user, so it can be signalled. */
+	own: boolean,
 };
 
 export type ProviderInfo = {

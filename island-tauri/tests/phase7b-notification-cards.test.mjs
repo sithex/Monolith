@@ -13,7 +13,7 @@ const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: {
 const module = { exports: {} };
 const mocks = {
   'framer-motion': { motion: { article: ({ onUpdate, ...props }) => React.createElement('article', props) } },
-  '../../stores': {}, '../../ipc/island-state': {}, '../../ipc/notifications': {}, '../geometry': {}, './notification-cards.css': {},
+  '../../stores': {}, '../../ipc/island-state': {}, '../../ipc/notifications': {}, '../geometry': {}, './notification-cards.css': {}, './notification-hover': {},
 };
 vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename: file.pathname })(name => mocks[name] ?? nativeRequire(name), module, module.exports);
 const { NotificationCard } = module.exports;
@@ -25,6 +25,16 @@ test('normal card escapes text, offers real actions and an honest app-reply fall
   assert.match(html, /Reply in app/); assert.doesNotMatch(html, /<input|<textarea/);
   assert.match(html, /&lt;b&gt;not executable&lt;\/b&gt;/); assert.doesNotMatch(html, /<b>/);
   assert.match(html, /data-island-extension="notification"/); assert.match(html, /Dismiss A message/);
+});
+test('cards drawn inside the notch are part of the surface: no separate input region', () => {
+  const html = card(note, { inNotch: true });
+  assert.doesNotMatch(html, /data-island-extension/); assert.match(html, /data-in-notch="true"/);
+});
+test('the popup stack is no longer a separate floating window', () => {
+  const src = readFileSync(file, 'utf8'), css = readFileSync(new URL('../ui/island/notifications/notification-cards.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /notification-stack/); assert.doesNotMatch(css, /\.notification-stack/);
+  assert.match(src, /export function NotificationCards[\s\S]*return null;/);
+  assert.match(src, /<NotificationCard popup=\{p\} redact=\{settings\.redactBodies\} perform=\{perform\} inNotch \/>/);
 });
 test('critical cards have no timer; redaction never exposes the body; expired actions disappear', () => {
   const html = card({ ...note, urgency: 'critical', canInvokeActions: false }, { redact: true });

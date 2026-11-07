@@ -1,15 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useSettings, runtimeStore } from '../../stores';
+import { useSettings } from '../../stores';
 import { useIslandState, dispatch } from '../../ipc/island-state';
 import { changePopup, listenPopups, usePopups } from '../../ipc/notifications';
 import type { Popup, PopupOp } from '../../ipc/client';
-import { nativePill } from '../geometry';
 import './notification-cards.css';
+import { MAX_STACK, setMeasured, useShownPopups } from './notification-hover';
+export { useNotificationHover } from './notification-hover';
 
 const surfacesChanged = () => window.dispatchEvent(new Event('island-surfaces-changed'));
-export function NotificationCard({ popup, redact = false, perform, changed = surfacesChanged }: {
+export function NotificationCard({ popup, redact = false, perform, changed = surfacesChanged, inNotch = false }: {
   popup: Popup; redact?: boolean; perform(op: PopupOp): void; changed?(): void;
+  /** Drawn inside the island surface: no separate input region, no floating card chrome. */
+  inNotch?: boolean;
 }) {
   const n = popup.notification;
   const [hovered, setHovered] = useState(false), [focused, setFocused] = useState(false);
@@ -26,7 +29,7 @@ export function NotificationCard({ popup, redact = false, perform, changed = sur
   const open = () => perform({ type: 'invoke', id: n.id, key: 'default' });
   const actions = n.actions.filter(a => a.key !== 'default' && a.key !== 'inline-reply');
   const critical = n.urgency === 'critical';
-  return <motion.article className="notification-card" data-island-extension="notification" data-critical={critical}
+  return <motion.article className="notification-card" data-island-extension={inNotch ? undefined : 'notification'} data-in-notch={inNotch} data-critical={critical}
     data-testid="notification-toast" role={critical ? 'alert' : 'status'} onUpdate={changed}
     onPointerEnter={() => { setHovered(true); pause(true); }} onPointerLeave={() => { setHovered(false); pause(focused); }}
     onFocusCapture={() => { setFocused(true); pause(true); }} onBlurCapture={e => {
@@ -49,22 +52,12 @@ export function NotificationCard({ popup, redact = false, perform, changed = sur
       style={{ '--remaining': popup.remainingMs / popup.ttlMs, animationDuration: `${popup.remainingMs}ms`, animationPlayState: hovered || focused || popup.paused ? 'paused' : 'running' } as CSSProperties} /></div>}
   </motion.article>;
 }
-export function NotificationCards({ fail }: { fail(error: unknown): void }) {
-  const settings = useSettings(), state = useIslandState(), snapshot = usePopups();
+/** Popup cards as part of the notch. Hover: the notch grows into the stack (rendered in the
+ *  hover preview slot). Open island: a banner pinned under the topline, inside the surface.
+ *  Never a separate floating window. Mounted once; listens for popup snapshots. */
+export function NotchNotifications({ fail, placement }: { fail(error: unknown): void; placement: 'hover' | 'open' }) {
+  const settings = useSettings(), snapshot = usePopups(), shown = useShownPopups();
   const reduced = useReducedMotion() === true || settings.reduceMotion;
-  const [, resized] = useState(0);
-  const [fixture, setFixture] = useState<Popup[] | null>(null);
-  useEffect(() => {
-    if (!runtimeStore.getSnapshot().testHooks) return;
-    Object.defineProperty(window, '__islandNotificationsTest', { configurable: true, value: (rows: Popup[] | null) => setFixture(rows) });
-    return () => { delete (window as unknown as Record<string, unknown>).__islandNotificationsTest; };
-  }, []);
-  useEffect(() => { void listenPopups().catch(fail); }, []);
-  useEffect(() => { const resize = () => resized(n => n + 1); addEventListener('resize', resize); addEventListener('island-native-pill', resize); return () => { removeEventListener('resize', resize); removeEventListener('island-native-pill', resize); }; }, []);
-  useLayoutEffect(() => { surfacesChanged(); }, [snapshot, fixture, state.mode]);
-  const pill = nativePill();
-  const width = Math.min(390, innerWidth - 24), left = Math.max(12, Math.min(innerWidth - width - 12, (pill ? pill.x + pill.width / 2 : innerWidth / 2) - width / 2));
-  const shown = settings.notificationsEnabled && !state.dnd && !state.gameMode ? (fixture ?? snapshot.items) : [];
   const duration = reduced ? 0 : .18 / Math.max(.25, (settings.animationSpeed ?? 100) / 100);
   const perform = (op: PopupOp) => {
     const popup = 'id' in op ? snapshot.items.find(p => p.notification.id === op.id) : null;
@@ -72,19 +65,37 @@ export function NotificationCards({ fail }: { fail(error: unknown): void }) {
       void dispatch({ type: 'selectView', view: popup?.notification.appName === 'Agents' ? 'agents' : 'notifications' }).then(() => changePopup({ type: 'dismiss', id: op.id })).catch(fail);
     } else void changePopup(op).catch(fail);
   };
-  const visibleCount = Math.max(1, Math.min(3, Math.floor((innerHeight - (pill ? pill.y + pill.height : 30) - 60) / 205)));
+  const visibleCount = placement === 'open' ? 1 : MAX_STACK;
   const hiddenIds = JSON.stringify(snapshot.items.slice(visibleCount).map(p => p.notification.id));
   useEffect(() => {
     const ids = JSON.parse(hiddenIds) as string[];
     for (const id of ids) void changePopup({ type: 'pause', id, paused: true }).catch(fail);
     return () => { for (const id of ids) void changePopup({ type: 'pause', id, paused: false }).catch(fail); };
   }, [hiddenIds]);
-  return <section className="notification-stack" aria-label="Notification popups" style={{ left, top: (pill ? pill.y + pill.height : 30) + 12, width, maxHeight: innerHeight - (pill?.y ?? 0) - 60 }}>
-    <AnimatePresence onExitComplete={surfacesChanged}>
-      {shown.slice(0, visibleCount).map(p => <motion.div key={p.notification.id} initial={{ opacity: 0, y: reduced ? 0 : -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduced ? 0 : -8 }} transition={{ duration }} onUpdate={surfacesChanged}>
-        <NotificationCard popup={p} redact={settings.redactBodies} perform={perform} />
+  const stack = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (placement !== 'hover' || !stack.current) return;
+    const el = stack.current, measure = () => setMeasured(Math.ceil(el.scrollHeight));
+    const ro = new ResizeObserver(measure); ro.observe(el); measure();
+    return () => ro.disconnect();
+  }, [placement]);
+  const more = shown.length - visibleCount;
+  return <section ref={stack} className="notch-notifications" data-placement={placement} aria-label="Notifications">
+    <AnimatePresence initial={false} onExitComplete={surfacesChanged}>
+      {shown.slice(0, visibleCount).map(p => <motion.div key={p.notification.id} layout={!reduced}
+        initial={{ opacity: 0, y: reduced ? 0 : -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: duration * .7 } }} transition={{ duration }}>
+        <NotificationCard popup={p} redact={settings.redactBodies} perform={perform} inNotch />
       </motion.div>)}
     </AnimatePresence>
-    {shown.length > visibleCount && <button className="notification-overflow" data-island-extension="notification" onClick={() => { void dispatch({ type: 'selectView', view: 'notifications' }).catch(fail); }}>+{shown.length - visibleCount} more · Open history</button>}
+    {more > 0 && <button className="notification-overflow" onClick={() => { void dispatch({ type: 'selectView', view: 'notifications' }).catch(fail); }}>+{more} more · Open history</button>}
   </section>;
+}
+
+/** Subscribes to popup snapshots once and keeps the surface geometry in step. Renders nothing:
+ *  the cards themselves live inside the island surface (NotchNotifications). */
+export function NotificationCards({ fail }: { fail(error: unknown): void }) {
+  const state = useIslandState(), snapshot = usePopups();
+  useEffect(() => { void listenPopups().catch(fail); }, []);
+  useLayoutEffect(() => { surfacesChanged(); }, [snapshot, state.mode]);
+  return null;
 }

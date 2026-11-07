@@ -1,8 +1,7 @@
-.notification-stack { position: fixed; z-index: 1000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; color: var(--skin-text, #f3f0e8); font-family: var(--ui-font, system-ui); font-size: 14px; }
 .notification-card { position: relative; pointer-events: auto; overflow: hidden; padding: 14px; border: 1px solid color-mix(in srgb, var(--skin-accent, #d9ee6c) 24%, transparent); border-radius: 18px; background: var(--skin-background, #181b19); box-shadow: 0 10px 28px #0006; }
 .notification-card[data-critical=true] { border-color: var(--skin-error, #ef7777); }
-.notification-card button, .notification-overflow { cursor: pointer; font: inherit; color: inherit; border: 0; }
-.notification-card button:focus-visible, .notification-overflow:focus-visible { outline: 2px solid var(--skin-accent, #d9ee6c); outline-offset: -2px; }
+.notification-card button { cursor: pointer; font: inherit; color: inherit; border: 0; }
+.notification-card button:focus-visible, .notch-notifications .notification-overflow:focus-visible { outline: 2px solid var(--skin-accent, #d9ee6c); outline-offset: -2px; }
 .notification-card-head { display: flex; align-items: center; gap: 8px; height: 28px; }
 .notification-icon { width: 26px; height: 26px; object-fit: contain; flex: none; border-radius: 6px; }
 .notification-monogram { display: grid; place-items: center; color: var(--skin-accent, #d9ee6c); background: color-mix(in srgb, var(--skin-accent, #d9ee6c) 12%, transparent); font-weight: 700; }
@@ -20,4 +19,19 @@
 .notification-timer { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: #ffffff0a; }
 .notification-timer > span { display: block; height: 100%; transform-origin: left; background: var(--skin-accent, #d9ee6c); animation: notification-countdown linear forwards; }
 @keyframes notification-countdown { from { transform: scaleX(var(--remaining, 1)); } to { transform: scaleX(0); } }
-.notification-overflow { pointer-events: auto; align-self: center; border-radius: 12px; padding: 8px 14px; background: var(--skin-background, #181b19); box-shadow: 0 4px 14px #0004; font-size: 12px; }
+
+/* In the notch: the island surface is the card's background and edge (no floating chrome). */
+.notch-notifications { display: flex; flex-direction: column; gap: 6px; color: var(--skin-text, #f3f0e8); font-family: var(--ui-font, system-ui); font-size: 14px; }
+.island .preview:has(> .notch-notifications) { padding: 0 10px 12px; }
+.notification-card[data-in-notch=true] { padding: 10px 12px 12px; border: 0; border-radius: 16px; background: color-mix(in srgb, var(--skin-text, #fff) 5%, transparent); box-shadow: none; }
+.notification-card[data-in-notch=true][data-critical=true] { box-shadow: inset 0 0 0 1px var(--skin-error, #ef7777); }
+.notch-notifications .notification-overflow { align-self: center; border-radius: 12px; padding: 6px 12px; background: transparent; box-shadow: none; color: var(--skin-dim, #a4aaa2); font-size: 12px; cursor: pointer; border: 0; font-family: inherit; }
+.notch-notifications .notification-overflow:hover { color: var(--skin-text, #f3f0e8); }
+/* Open island: one banner card pinned under the topline, inside the surface. */
+.notch-notifications[data-placement=open] { position: absolute; z-index: 30; top: 48px; left: 50%; width: min(420px, calc(100% - 24px)); transform: translateX(-50%); pointer-events: none; }
+.notch-notifications[data-placement=open] > * { pointer-events: auto; }
+.notch-notifications[data-placement=open] .notification-card { background: var(--skin-background, #181b19); box-shadow: 0 8px 24px #0007, inset 0 0 0 .5px color-mix(in srgb, var(--skin-accent, #d9ee6c) 30%, transparent); }
+/* island.css gives every `.preview button` a 20px top margin and full width; reset for the cards. */
+.island .notch-notifications button { margin-top: 0; width: auto; }
+.island .notch-notifications .notification-content { width: 100%; }
+.island .notch-notifications .notification-actions button { margin-top: 0; }

@@ -265,6 +265,7 @@ function surfaceHarness({unchangedSizing=false,maxHeight=1190}={}) {
     'ui/island/geometry.ts':{...load('ui/island/geometry.ts'),nativePill:()=>null},
     'ui/island/components/IslandShell.tsx':{UI_SPRING:{}},
     'ui/island/ApprovalNotice.tsx':{useApprovalHover:()=>({active:false,width:360,height:116})},
+    'ui/island/notifications/notification-hover.ts':{useNotificationHover:()=>({active:false,width:420,height:200})},
   });
   // Animation is a hook-free recording boundary; all sizing and content measurement
   // below still execute the actual IslandSurface component.

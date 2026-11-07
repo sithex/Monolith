@@ -61,6 +61,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::terminal::terminal_ack,
             commands::system::system_stats,
             commands::system::monolith_cost,
+            commands::system::process_list,
+            commands::system::process_kill,
             commands::ai::ai_usage,
             commands::ai::ai_connect,
             commands::voice::voice_command,
@@ -546,6 +548,11 @@ mod tests {
             ("MonolithCost", "wakeups"),
             ("MonolithCost", "plasmashellCpu"),
             ("MonolithCost", "kwinCpu"),
+            // Processes: a rate is unavailable on the first sample; GPU/VRAM are unknown
+            // for processes without a DRM client or owned by another user.
+            ("ProcessRow", "cpu"),
+            ("ProcessRow", "gpu"),
+            ("ProcessRow", "vramBytes"),
         ];
         for declaration in generated.split("export type ").skip(1) {
             let (name, body) = declaration.split_once(" = ").unwrap();

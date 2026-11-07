@@ -3,6 +3,7 @@ import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { useIslandState, dispatch } from '../ipc/island-state';
 import { reportGeometry } from '../ipc/client';
 import { useApprovalHover } from './ApprovalNotice';
+import { useNotificationHover } from './notifications/notification-hover';
 import { useSettings, usePalette } from '../stores';
 import { notchMorphPath } from './notch-profile';
 import { useLayout, useLauncher } from '../stores/apps';
@@ -70,7 +71,9 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
   useLayoutEffect(() => { owner.current?.schedule(!animating.current); }, [state.rev, state.mode, state.view, settings, layout.rev, launcher.rev, contentH]);
   const preset = layout.layout.preset;
   const { width: customWidth, maxHeight: customHeight } = presetSize(preset);
-  const hover = useApprovalHover();
+  const approvalHover = useApprovalHover(), notificationHover = useNotificationHover();
+  // An approval prompt outranks popup cards; otherwise the notch grows into the cards.
+  const hover = approvalHover.active || !notificationHover.active ? approvalHover : notificationHover;
   const width = state.mode === 'still' ? 150 : state.mode === 'hover' ? hover.width : !layout.unchangedSizing ? customWidth : state.view === 'terminal' ? 1040 : 640;
   const baseHeight = state.mode === 'still' ? 42 : state.mode === 'hover' ? hover.height : state.view === 'terminal' ? 672 : state.view === 'monitor' ? 500 : state.view === 'ai' ? 740 : 640;
   // An explicit preset replaces the legacy per-app ceiling; otherwise increasing the

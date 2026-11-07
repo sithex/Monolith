@@ -50,6 +50,11 @@ pub enum Intent {
     Quit,
     NotificationArrived(String),
     NotificationsSync(u32),
+    /// A notification popup card appeared (hub, `popups.rs` queue): grow the closed notch
+    /// into it. Its lifetime belongs to the popup queue, so no toast timer is armed here.
+    PopupShown(String),
+    /// The popup queue emptied: a notification-caused hover closes.
+    PopupsEmpty,
     /// A Hermes approval/clarify request is waiting (its island prompt id): pop the hover
     /// notice. It stays until answered, cleared or dismissed — no toast timer.
     ApprovalShown(String),
@@ -117,6 +122,9 @@ pub struct Machine {
     activities: BTreeMap<String, Activity>,
     presentation: Presentation,
     seen_notifications: std::collections::VecDeque<String>,
+    /// Newest popup card still queued (PopupShown … PopupsEmpty): a hover that ends while
+    /// one is queued falls back to showing it instead of closing.
+    popup: Option<String>,
     /// Last fullscreen report from the KWin focus script (false when unknown/unavailable).
     fullscreen: bool,
 }
@@ -145,6 +153,7 @@ impl Machine {
             activities: BTreeMap::new(),
             presentation: Presentation::default(),
             seen_notifications: Default::default(),
+            popup: None,
             fullscreen: false,
         }
     }
@@ -343,7 +352,21 @@ impl Machine {
                             self.state.hover_cause = self.pending_hover.take();
                             self.schedule(Timer::ToastTtl, 6000, now);
                         }
-                        Timer::LeaveGrace if self.state.mode == IslandMode::Hover => self.still(),
+                        Timer::LeaveGrace if self.state.mode == IslandMode::Hover => {
+                            // A queued popup card is still showing: hand the notch back to it.
+                            let keep = self.popup.clone().filter(|_| {
+                                !self.state.dnd
+                                    && !game_effects.suppress_notifications
+                                    && settings.notifications_enabled
+                            });
+                            match keep {
+                                Some(id) => {
+                                    self.timers.remove(&Timer::ToastTtl);
+                                    self.state.hover_cause = Some(HoverCause::Notification { id });
+                                }
+                                None => self.still(),
+                            }
+                        }
                         Timer::ToastTtl if self.state.mode == IslandMode::Hover => {
                             if self.pointer_inside || self.panel_inside {
                                 self.schedule(Timer::ToastTtl, 6000, now);
@@ -452,6 +475,48 @@ impl Machine {
                     self.state.mode = IslandMode::Hover;
                     self.state.hover_cause = Some(HoverCause::Notification { id });
                     self.schedule(Timer::ToastTtl, settings.toast_ttl_ms as u64, now);
+                }
+            }
+            Intent::PopupShown(id) => {
+                self.popup = Some(id.clone());
+                if !self.state.dnd
+                    && !game_effects.suppress_notifications
+                    && settings.notifications_enabled
+                {
+                    match self.state.mode {
+                        IslandMode::Still => {
+                            self.cancel_all();
+                            self.state.mode = IslandMode::Hover;
+                            self.state.hover_cause = Some(HoverCause::Notification { id });
+                        }
+                        // An approval notice keeps the notch; the card waits in the queue.
+                        IslandMode::Hover
+                            if !matches!(
+                                self.state.hover_cause,
+                                Some(HoverCause::Alert { .. })
+                            ) =>
+                        {
+                            self.timers.remove(&Timer::ToastTtl);
+                            if !self.pointer_inside && !self.panel_inside {
+                                self.state.hover_cause = Some(HoverCause::Notification { id });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Intent::PopupsEmpty => {
+                self.popup = None;
+                if self.state.mode == IslandMode::Hover
+                    && matches!(
+                        self.state.hover_cause,
+                        Some(HoverCause::Notification { .. })
+                    )
+                    && !self.pointer_inside
+                    && !self.panel_inside
+                {
+                    self.cancel_all();
+                    self.still();
                 }
             }
             Intent::UpsertActivity(activity) => {
@@ -661,6 +726,51 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn popup_cards_grow_the_notch_and_own_its_lifetime() {
+        let mut s = Settings::default();
+        let mut m = Machine::new(&s);
+        step(&mut m, Intent::PopupShown("a".into()), &s, 0);
+        assert_eq!(m.state.mode, IslandMode::Hover);
+        assert_eq!(m.state.hover_cause, Some(HoverCause::Notification { id: "a".into() }));
+        assert!(!m.timers.contains_key(&Timer::ToastTtl), "the popup queue owns the lifetime");
+        // Hover the card, leave: the notch returns to the queued card instead of closing.
+        step(&mut m, Intent::PointerEnter, &s, 10);
+        assert_eq!(m.state.hover_cause, Some(HoverCause::Pointer));
+        step(&mut m, Intent::PointerLeave, &s, 20);
+        let generation = m.timers[&Timer::LeaveGrace].generation;
+        step(&mut m, Intent::TimerFired(Timer::LeaveGrace, generation), &s, 400);
+        assert_eq!(m.state.mode, IslandMode::Hover);
+        assert_eq!(m.state.hover_cause, Some(HoverCause::Notification { id: "a".into() }));
+        // A newer card takes over; the emptied queue closes the notch.
+        step(&mut m, Intent::PopupShown("b".into()), &s, 500);
+        assert_eq!(m.state.hover_cause, Some(HoverCause::Notification { id: "b".into() }));
+        step(&mut m, Intent::PopupsEmpty, &s, 600);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        // Leaving after the queue emptied closes as before.
+        step(&mut m, Intent::PointerEnter, &s, 700);
+        m.tick(&s, &Fake(900)).unwrap();
+        step(&mut m, Intent::PointerLeave, &s, 950);
+        let generation = m.timers[&Timer::LeaveGrace].generation;
+        step(&mut m, Intent::TimerFired(Timer::LeaveGrace, generation), &s, 1300);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        // DnD, disabled notifications and an open island never grow the notch.
+        step(&mut m, Intent::SetDnd(true), &s, 1400);
+        step(&mut m, Intent::PopupShown("c".into()), &s, 1401);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        step(&mut m, Intent::SetDnd(false), &s, 1402);
+        s.notifications_enabled = false;
+        step(&mut m, Intent::PopupShown("d".into()), &s, 1403);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        s.notifications_enabled = true;
+        step(&mut m, Intent::Pin, &s, 1404);
+        step(&mut m, Intent::PopupShown("e".into()), &s, 1405);
+        assert_eq!(m.state.mode, IslandMode::Large);
+        // An empty queue never closes an island the user opened.
+        step(&mut m, Intent::PopupsEmpty, &s, 1406);
+        assert_eq!(m.state.mode, IslandMode::Large);
+    }
+
     #[test]
     fn notification_ttl_reading_dnd_disabled_and_large_unread_rows() {
         let mut s = Settings::default();

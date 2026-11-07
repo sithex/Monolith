@@ -312,6 +312,9 @@ impl Hub {
         mut stopped: watch::Receiver<bool>,
     ) -> Result<(), IslandError> {
         let mut state_changes = self.actor.watch();
+        // Popup ids last emitted: a new id grows the notch into the card, an empty queue
+        // lets a notification-caused hover close (popups.rs owns the card lifetimes).
+        let mut popup_ids: Vec<String> = Vec::new();
         loop {
             // Register before inspecting the queue, avoiding lost wakeups between drain/wait.
             let notified = self.wake.notified();
@@ -348,9 +351,22 @@ impl Hub {
                 )
             };
             if let Some(popups) = popup_state {
+                let ids: Vec<String> = popups
+                    .items
+                    .iter()
+                    .map(|p| p.notification.id.clone())
+                    .collect();
+                let fresh = ids.iter().find(|id| !popup_ids.contains(id)).cloned();
+                let emptied = ids.is_empty() && !popup_ids.is_empty();
+                popup_ids = ids;
                 popups
                     .emit_to(&app, ISLAND_LABEL)
                     .map_err(|_| IslandError::internal("Notification popups emit failed"))?;
+                if let Some(id) = fresh {
+                    self.actor.dispatch(Intent::PopupShown(id)).await?;
+                } else if emptied {
+                    self.actor.dispatch(Intent::PopupsEmpty).await?;
+                }
             }
             if let Some(repair) = repair {
                 repair

@@ -28,6 +28,8 @@ permissions = [
   "allow-terminal-ack",
   "allow-system-stats",
   "allow-monolith-cost",
+  "allow-process-list",
+  "allow-process-kill",
   "allow-ai-usage",
   "allow-ai-connect",
   "allow-voice-command",

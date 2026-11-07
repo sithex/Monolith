@@ -131,8 +131,8 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     wait_for("test-control", Duration::from_secs(20), || {
         s.root.join("inst/test-control.sock").exists().then_some(())
     });
-    // Notifications are popup cards in the Island renderer (NotificationCards.tsx): they have
-    // their own lifetime and never move the island into a hover preview.
+    // Notifications are popup cards drawn INSIDE the notch (NotchNotifications): a card grows
+    // the collapsed island into a notification hover, and the popup queue's lifetime closes it.
     wait_for("island page", Duration::from_secs(20), || {
         (eval(&s, "!!document.querySelector('.island')") == true).then_some(())
     });
@@ -177,9 +177,14 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     wait_for("visible real card", Duration::from_secs(8), || {
         (card_text("Auto-dismiss fixture") && covers_card()).then_some(())
     });
-    // Collapsed island: the card is shown and clickable, the island itself stays still.
-    assert_eq!(actor_state(&s)["mode"], "still");
-    assert_eq!(actor_state(&s)["hoverCause"], Value::Null);
+    // The notch grew into the card (no separate window), without taking focus.
+    assert_eq!(actor_state(&s)["mode"], "hover");
+    assert_eq!(actor_state(&s)["hoverCause"]["type"], "notification");
+    assert_eq!(
+        eval(&s, &format!("!!{card}.closest('.island')&&!{card}.hasAttribute('data-island-extension')")),
+        true,
+        "the card must be part of the island surface"
+    );
     assert_not_focused_on_show(&conn, root, window);
     wait_for(
         "card auto-dismisses after its TTL",
@@ -189,7 +194,9 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     wait_for("card input region released", Duration::from_secs(5), || {
         (input_region(&conn, window) == idle).then_some(())
     });
-    assert_eq!(actor_state(&s)["mode"], "still");
+    wait_for("notch closes with the queue", Duration::from_secs(3), || {
+        (actor_state(&s)["mode"] == "still").then_some(())
+    });
     eval(
         &s,
         "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{toastTtlMs:6000}})",

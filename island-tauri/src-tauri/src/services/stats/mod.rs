@@ -2,7 +2,7 @@
 //! platforms answer `unsupported` until their phase (`sysinfo`, Phase 8).
 
 use crate::{
-    contract::system::{MonolithCost, SystemStats},
+    contract::system::{KillSignal, MonolithCost, ProcessList, SystemStats},
     error::IslandError,
 };
 use std::path::PathBuf;
@@ -11,6 +11,8 @@ use std::sync::Mutex;
 
 #[cfg(target_os = "linux")]
 pub mod linux_proc;
+#[cfg(target_os = "linux")]
+pub mod processes;
 pub mod self_cost;
 
 pub struct StatsService {
@@ -20,6 +22,8 @@ pub struct StatsService {
     sampler: Mutex<linux_proc::Sampler>,
     #[cfg(target_os = "linux")]
     cost: Mutex<(self_cost::CostSampler, self_cost::ProcFinder)>,
+    #[cfg(target_os = "linux")]
+    processes: Mutex<processes::Sampler>,
 }
 
 impl StatsService {
@@ -31,6 +35,8 @@ impl StatsService {
             sampler: Mutex::new(linux_proc::Sampler::default()),
             #[cfg(target_os = "linux")]
             cost: Mutex::new(Default::default()),
+            #[cfg(target_os = "linux")]
+            processes: Mutex::new(Default::default()),
         }
     }
 
@@ -59,6 +65,31 @@ impl StatsService {
             &input,
             self_cost::ticks_per_second(),
         ))
+    }
+
+    /// Monitor → Processes table. Reads `/proc` only when called (the tab polls while shown).
+    #[cfg(target_os = "linux")]
+    pub fn processes(&self) -> Result<ProcessList, IslandError> {
+        let mut sampler = self
+            .processes
+            .lock()
+            .map_err(|_| IslandError::internal("process sampler is poisoned"))?;
+        Ok(sampler.sample())
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn kill(&self, pid: u32, start_ticks: f64, signal: KillSignal) -> Result<(), IslandError> {
+        processes::kill(pid, start_ticks, signal)
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn processes(&self) -> Result<ProcessList, IslandError> {
+        Err(IslandError::unsupported("the process list is not implemented on this platform yet"))
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn kill(&self, _pid: u32, _start_ticks: f64, _signal: KillSignal) -> Result<(), IslandError> {
+        Err(IslandError::unsupported("ending processes is not implemented on this platform yet"))
     }
 
     #[cfg(not(target_os = "linux"))]

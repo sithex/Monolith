@@ -29,7 +29,7 @@ const AppsView = memo(AppsViewInner), SettingsView = memo(SettingsViewInner);
 const MonitorView = memo(MonitorViewInner), AiStatsView = memo(AiStatsViewInner);
 if (typeof window !== 'undefined') window.setTimeout(() => { void loadTerminal(); }, 0);
 import { PreviewNotice } from './PreviewNotice';
-import { NotificationCards } from './notifications/NotificationCards';
+import { NotchNotifications, NotificationCards, useNotificationHover } from './notifications/NotificationCards';
 import { ApprovalNotice, useApprovalHover } from './ApprovalNotice';
 import { createClickSound } from './click-sound';
 import './island.css';
@@ -48,7 +48,7 @@ const playClick = createClickSound();
 /** framer's default (tween .3 s) at the chosen speed; undefined at 100 % keeps framer's own defaults. */
 const motionSpeedDefault = (percent: number | undefined) => !percent || percent === 100 ? undefined : { duration: 0.3 * 100 / Math.min(200, Math.max(50, percent)) };
 export function Island() {
-  const state = useIslandState(), settings = useSettings(), palette = usePalette(), appearance = useAppearance(), approvalHover = useApprovalHover();
+  const state = useIslandState(), settings = useSettings(), palette = usePalette(), appearance = useAppearance(), approvalHover = useApprovalHover(), notificationHover = useNotificationHover();
   const launcher = useLauncher(), media = useMedia();
   // Settings → Motion: set before any child builds a spring this render (motion-profile).
   setMotionSpeed(settings.animationSpeed ?? 100);
@@ -150,7 +150,7 @@ export function Island() {
     <CommandPalette fail={fail} onOpenChange={setPaletteOpen} />
     <AnimatePresence>{state.mode === 'hover' && <motion.div key="preview" className="preview island-content" {...reveal}
       exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.9, y: -10, transition: { duration: 0.14, ease: [0.5, 0, 0.9, 0.4] } }}
-      style={{ position: 'absolute', top: 42, left: 0, right: 0 }}>{approvalHover.active ? <ApprovalNotice fail={fail} /> : <PreviewNotice fail={fail} />}</motion.div>}</AnimatePresence>
+      style={{ position: 'absolute', top: 42, left: 0, right: 0 }}>{approvalHover.active ? <ApprovalNotice fail={fail} /> : notificationHover.active ? <NotchNotifications fail={fail} placement="hover" /> : <PreviewNotice fail={fail} />}</motion.div>}</AnimatePresence>
     <motion.div ref={wrap} className="terminal-wrap island-content" hidden={!active && !lingering} aria-hidden={!active} style={closing ?? undefined} {...openMotion}>
       <ViewPager fail={fail} views={views}>
         <IslandShell title={viewLabels[view]} home={view === 'terminal'} intents={{ navigate: () => navigate('terminal') }} back={{ label: viewLabels[previous], go: goBack }}
@@ -170,6 +170,7 @@ export function Island() {
         </IslandShell>
       </ViewPager>
     </motion.div>
+    {active && <NotchNotifications fail={fail} placement="open" />}
     {/* Errors are a short message inside the open island (under its blur, clickable to
         dismiss), not loose text on the desktop below it. */}
     <AnimatePresence>{error && active && <motion.div key="error" className="island-error" role="alert" title="Dismiss" onClick={() => setError('')}

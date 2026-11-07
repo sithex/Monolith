@@ -346,3 +346,47 @@ pub struct MonolithCost {
     pub kwin_cpu: Option<f64>,
     pub window_secs: f64,
 }
+
+/// One process in the Monitor → Processes list. CPU is a percentage of the WHOLE machine
+/// (all cores = 100) over the interval since the previous `process_list` call; GPU is the
+/// share of the GPU's render+compute engines (amdgpu/i915/xe `drm-engine-*` fdinfo).
+/// `null` = unavailable (first sample, another user's process, no DRM client), never zero.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessRow {
+    pub pid: u32,
+    pub ppid: u32,
+    /// Process start time in clock ticks since boot; `process_kill` requires it so a
+    /// recycled pid is never signalled.
+    pub start_ticks: f64,
+    pub name: String,
+    pub command: String,
+    pub cpu: Option<f64>,
+    /// Private (anonymous) resident memory in bytes: what the process itself holds.
+    pub memory_bytes: f64,
+    pub gpu: Option<f64>,
+    /// VRAM held by the process's DRM clients, in bytes.
+    pub vram_bytes: Option<f64>,
+    pub threads: u32,
+    /// Owned by the current user, so it can be signalled.
+    pub own: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessList {
+    pub rows: Vec<ProcessRow>,
+    /// Whether any process exposed GPU engine counters (false: GPU column hidden).
+    pub gpu_available: bool,
+    pub memory_total: f64,
+    pub cpu_count: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum KillSignal {
+    /// SIGTERM: ask the process to quit.
+    Term,
+    /// SIGKILL: end it immediately.
+    Kill,
+}

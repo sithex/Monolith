@@ -7,6 +7,8 @@ import {
   type AiConnectResult,
   type AiProvider,
   type AiUsage,
+  type KillSignal,
+  type ProcessList,
   type AnchorKind,
   type BootstrapSnapshot,
   type ClipSummary,
@@ -134,6 +136,9 @@ export const terminalAck = async (seq: number): Promise<void> => {
 };
 export const systemStats = (): Promise<SystemStats> => unwrap(commands.systemStats());
 export const monolithCost = (): Promise<MonolithCost> => unwrap(commands.monolithCost());
+export const processList = (): Promise<ProcessList> => unwrap(commands.processList());
+export const processKill = (pid: number, startTicks: number, signal: KillSignal): Promise<null> =>
+  unwrap(commands.processKill(pid, startTicks, signal));
 export const aiUsage = (): Promise<AiUsage> => unwrap(commands.aiUsage());
 export const aiConnect = (provider: AiProvider): Promise<AiConnectResult> =>
   unwrap(commands.aiConnect(provider));

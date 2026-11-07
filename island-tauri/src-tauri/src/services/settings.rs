@@ -290,6 +290,7 @@ mod tests {
             "necronoverlord",
             "canoptekscarab",
             "eyeofsauron",
+            "mushroom",
         ] {
             svc.patch(&patch(json!({"companionCharacter": id})))
                 .unwrap();

@@ -460,6 +460,7 @@ mod tests {
             "necronoverlord",
             "canoptekscarab",
             "eyeofsauron",
+            "mushroom",
         ] {
             assert!(companion.contains(&format!("\"{id}\"")));
         }

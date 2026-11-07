@@ -9,7 +9,7 @@ TestCase {
     id: suite
     name: "CompanionPixel"
     width: 220; height: 220; visible: true; when: windowShown
-    readonly property var ids: ["companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron"]
+    readonly property var ids: ["companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom"]
 
     Component {
         id: factory
@@ -114,7 +114,7 @@ TestCase {
     }
 
     function test_directional_habits() {
-        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron"]) {
+        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron", "mushroom"]) {
             const f = createTemporaryObject(factory, suite, { character: id }), a = f.art;
             point(f, 900, 200);
             a.lastHabitAt = 0; a.startHabit();

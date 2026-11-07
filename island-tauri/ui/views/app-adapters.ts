@@ -155,8 +155,10 @@ function tiles(raw: unknown): Omit<TilesChanged, 'rev'> {
 }
 function updates(raw: unknown): Omit<UpdatesChanged, 'rev'> {
   const { r, available, detail } = topic(raw);
-  return { available, detail, count: nullable(r.count, uint), repoCount: nullable(r.repoCount, uint), aurCount: nullable(r.aurCount, uint), needsReboot: bool(r.needsReboot), stale: bool(r.stale), error: optionalText(r.error), ageSecs: nullable(r.ageSecs, nonnegative), nextCheckInSecs: num(r.nextCheckInSecs),
-    items: list(r.items, x => { const p = record(x); return { name: short(p.name), oldVersion: short(p.oldVersion), newVersion: short(p.newVersion), ignored: bool(p.ignored), source: choice(p.source, ['repo', 'aur']) }; }, 20000) };
+  // Snapshots from before the backend field were all pacman; any other value must be a known backend.
+  const backend = r.backend === undefined ? 'pacman' : choice(r.backend, ['pacman', 'dnf', 'unsupported']);
+  return { backend, available, detail, count: nullable(r.count, uint), repoCount: nullable(r.repoCount, uint), aurCount: nullable(r.aurCount, uint), needsReboot: bool(r.needsReboot), stale: bool(r.stale), error: optionalText(r.error), ageSecs: nullable(r.ageSecs, nonnegative), nextCheckInSecs: num(r.nextCheckInSecs),
+    items: list(r.items, x => { const p = record(x); return { name: short(p.name), oldVersion: short(p.oldVersion), newVersion: short(p.newVersion), ignored: bool(p.ignored), source: choice(p.source, ['repo', 'aur', 'dnf']), arch: p.arch === undefined ? null : nullable(p.arch, x => text(x, 32)) }; }, 20000) };
 }
 export function adaptControls(rawToggles: unknown, rawTiles: unknown, rawUpdates: unknown): ControlsModel {
   return { toggles: toggles(rawToggles), tiles: tiles(rawTiles), updates: updates(rawUpdates) };

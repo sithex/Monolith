@@ -16,7 +16,7 @@ TestCase {
         id: factory
         Panel.PanelPill { x: 100; y: 50; width: 144; height: 26; clockText: "11:59 PM"; dateText: "Sun, Nov 1" }
     }
-    readonly property var characters: ["blob", "isaac", "notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron"]
+    readonly property var characters: ["blob", "isaac", "notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "salamander"]
 
     // Every Timer / animation under `item` (and `item` itself) that is running right now.
     function runningThings(item, found) {

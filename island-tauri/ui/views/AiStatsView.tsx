@@ -9,14 +9,17 @@ import { createVisiblePoller } from './visible-poller';
 import { AgentLiveView, AgentLiveUsage } from './AgentLiveView';
 import '../island/ai-stats.css';
 let requestRevision = 0;
+/** Last AI Agents page, kept while the island runs (like Monitor's tab). */
+let lastPage: 'live' | 'usage' = 'live';
 export function AiStatsView({ active }: { active: boolean }) {
   active = useGamePollingActive(active);
-  const [page, setPage] = useState<'live' | 'usage'>('live');
+  const [page, setPageState] = useState<'live' | 'usage'>(lastPage);
+  const setPage = (p: 'live' | 'usage') => { lastPage = p; setPageState(p); };
   const tabs = <div className="segmented ai-stats-tabs" role="tablist" aria-label="AI Agents sections">
     <button role="tab" aria-selected={page === 'live'} aria-pressed={page === 'live'} onClick={() => setPage('live')}>Live</button>
     <button role="tab" aria-selected={page === 'usage'} aria-pressed={page === 'usage'} onClick={() => setPage('usage')}>Usage</button>
   </div>;
-  return <div className="ai-stats" aria-label="AI Agents">
+  return <div className="ai-agents" aria-label="AI Agents">
     {tabs}
     {page === 'live' ? <AgentLiveView active={active}/> : <>
       <AiUsageView active={active}/>

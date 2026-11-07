@@ -310,6 +310,10 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
         ] {
             open(&s, &c, w, &mut e, o, view);
             if view == "ai" {
+                eval(
+                    &s,
+                    "document.querySelector('.ai-stats-tabs [role=tab]:nth-child(2)').click()",
+                );
                 until(
                     &s,
                     "7b AI loaded",

@@ -70,6 +70,7 @@
 .ai-activity-summary dd { text-align: right; font-variant-numeric: tabular-nums; }
 .ai-dashboard .ai-footnote { margin: 0; padding: 0 3px 2px; font-size: var(--fs-2xs); line-height: 13px; color: var(--ui-dim); opacity: .7; }
 .ai-stats { min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.ai-agents { min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .ai-stats-tabs { align-self: flex-start; }
 .ai-stats-list { margin: 6px 0 0; font-size: var(--fs-xs); line-height: 16px; }
 .ai-stat { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }

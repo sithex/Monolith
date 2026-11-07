@@ -155,7 +155,7 @@ test('React text only, clipboard fallback, Live default with a Live | Usage togg
   assert.match(ipc, /agentLiveRaw, agentLiveBlocks.*from '..\/ipc\/client'/);
   assert.doesNotMatch(ipc, /@tauri-apps\/api|invoke</);
   const view = src('ui/views/AiStatsView.tsx');
-  assert.match(view, /useState<'live' \| 'usage'>\('live'\)/); assert.match(view, /<AgentLiveView active=\{active\}\/>/); assert.match(view, /<AgentLiveUsage active=\{active\}\/>/);
+  assert.match(view, /let lastPage: 'live' \| 'usage' = 'live';/); assert.match(view, /useState<'live' \| 'usage'>\(lastPage\)/); assert.match(view, /<AgentLiveView active=\{active\}\/>/); assert.match(view, /<AgentLiveUsage active=\{active\}\/>/);
 });
 
 test('missing plugin is a stable informational empty state, with usage still available', async () => {

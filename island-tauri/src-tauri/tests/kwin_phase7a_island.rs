@@ -418,6 +418,23 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                 );
             }
             if id == "ai" {
+                // AI Agents opens on Live: with no metrics plugin it shows the calm empty state,
+                // then the Usage tab holds the original dashboard. The view reopens on the last
+                // page used, so pick Live explicitly (this loop visits AI more than once).
+                eval(
+                    &s,
+                    "document.querySelector('.ai-stats-tabs [role=tab]:nth-child(1)').click()",
+                );
+                until(
+                    &s,
+                    "7a AI Live page without plugin",
+                    15,
+                    "document.querySelector('.app-pane:not([hidden])').innerText.includes('Live metrics plugin not installed')",
+                );
+                eval(
+                    &s,
+                    "document.querySelector('.ai-stats-tabs [role=tab]:nth-child(2)').click()",
+                );
                 until(
                     &s,
                     "7a real AI adapter completed",

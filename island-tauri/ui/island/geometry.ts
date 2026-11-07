@@ -109,8 +109,22 @@ export function geometryReport(outer: HTMLElement, state: IslandState, settled: 
       return { x: box?.x ?? e.offsetLeft, y: box?.y ?? e.offsetTop, width: box?.width ?? e.offsetWidth, height: box?.height ?? e.offsetHeight, radius: parseFloat(getComputedStyle(e).borderRadius) || 0 };
     });
   return { stateRev: state.rev, mode: state.mode, scale, settled,
-    rects: [{ x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-      radius: parseFloat(getComputedStyle(outer).borderRadius) || 0 }, ...buttons, ...extensions] };
+    rects: clipToWindow([{ x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+      radius: parseFloat(getComputedStyle(outer).borderRadius) || 0 }, ...buttons, ...extensions]) };
+}
+/** Springs can briefly leave the viewport. Clip every input/blur surface before reporting;
+ * Rust still validates the report and logs detailed diagnostics for genuine layout errors. */
+export function clipToWindow<T extends Rect & { radius: number }>(rects: T[]): T[] {
+  const maxW = typeof innerWidth === 'number' && innerWidth > 0 ? innerWidth : Infinity;
+  const maxH = typeof innerHeight === 'number' && innerHeight > 0 ? innerHeight : Infinity;
+  return rects.flatMap(r => {
+    if (![r.x, r.y, r.width, r.height].every(Number.isFinite)) return [];
+    const x = Math.max(0, r.x), y = Math.max(0, r.y);
+    const width = Math.min(maxW, r.x + r.width) - x, height = Math.min(maxH, r.y + r.height) - y;
+    if (width < 1 || height < 1) return [];
+    const radius = Math.min(Number.isFinite(r.radius) ? Math.max(0, r.radius) : 0, 100);
+    return [x === r.x && y === r.y && width === r.width && height === r.height && radius === r.radius ? r : { ...r, x, y, width, height, radius }];
+  });
 }
 /** Single coalesced owner. Side geometry is projected synchronously, never a native round-trip feedback loop. */
 /** How long a closing shell keeps KWin's blur under it (see the reporter's flush). */

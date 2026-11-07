@@ -42,7 +42,12 @@ pub fn shape_rows(
         || rect.radius > 100.
         || !(0.5..=4.).contains(&scale)
     {
-        return Err(IslandError::invalid("Invalid overlay layout"));
+        let error = format!(
+            "Invalid overlay layout: rect x={} y={} w={} h={} r={} scale={scale}",
+            rect.x, rect.y, rect.width, rect.height, rect.radius
+        );
+        tracing::warn!("{error}");
+        return Err(IslandError::invalid(error));
     }
     if native && mode == IslandMode::Still {
         return Ok(vec![]);

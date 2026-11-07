@@ -52,6 +52,8 @@ PlasmoidItem {
     // the slide has finished so it re-reads the notch position; nothing is polled.
     readonly property int displayHints: Plasmoid.containmentDisplayHints
     onDisplayHintsChanged: if (root.online) panelSettled.restart()
+    // Resolution and scale changes can move the notch even without a floatingness change.
+    onScreenGeometryChanged: if (root.online) panelSettled.restart()
     Timer { id: panelSettled; interval: 450; onTriggered: root.requests.enqueue("moved") }
     // Online/offline used to be polled: `anchor-client.py status` every 15 s per notch, i.e. a
     // python start (~13 ms) three times per 15 s on a three-monitor desktop, forever. The island

@@ -108,10 +108,11 @@ test('AI runtime polling never fetches hidden, coalesces flights and refreshes e
     if(name.endsWith('.css'))return {};
     if(name.endsWith('/AiDashboard'))return {AiDashboard};
     if(name.endsWith('/AiInsights'))return {AiInsights};
+    if(name==='./AgentLiveView')return {AgentLiveView:()=>null,AgentLiveUsage:()=>null};
     throw Error(name);
   };
   vm.runInNewContext(`(function(require,module,exports){${js}\n})`,{window:fakeWindow,Date})(require,module,module.exports);
-  const render=active=>{index=0;module.exports.AiStatsView({active});while(effects.length)effects.shift()();};
+  const render=active=>{index=0;module.exports.AiUsageView({active});while(effects.length)effects.shift()();};
   const tick=()=>new Promise(resolve=>setImmediate(resolve));
   try {
     render(false);assert.equal(reads.length,0);assert.equal(timers.size,0);

@@ -6,9 +6,27 @@ import { AiInsights } from '../island/components/AiInsights';
 import { dashboardFromUsage, insightsFromUsage, type AiPeriod } from './adapters';
 import { useGamePollingActive } from './game-polling';
 import { createVisiblePoller } from './visible-poller';
+import { AgentLiveView, AgentLiveUsage } from './AgentLiveView';
 import '../island/ai-stats.css';
 let requestRevision = 0;
 export function AiStatsView({ active }: { active: boolean }) {
+  active = useGamePollingActive(active);
+  const [page, setPage] = useState<'live' | 'usage'>('live');
+  const tabs = <div className="segmented ai-stats-tabs" role="tablist" aria-label="AI Agents sections">
+    <button role="tab" aria-selected={page === 'live'} aria-pressed={page === 'live'} onClick={() => setPage('live')}>Live</button>
+    <button role="tab" aria-selected={page === 'usage'} aria-pressed={page === 'usage'} onClick={() => setPage('usage')}>Usage</button>
+  </div>;
+  return <div className="ai-stats" aria-label="AI Agents">
+    {tabs}
+    {page === 'live' ? <AgentLiveView active={active}/> : <>
+      <AiUsageView active={active}/>
+      <AgentLiveUsage active={active}/>
+    </>}
+  </div>;
+}
+
+/** Nick's existing Overview / Sessions dashboard, unchanged inside Usage. */
+export function AiUsageView({ active }: { active: boolean }) {
   active = useGamePollingActive(active);
   const data = useAi(), [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
   const [period, setPeriod] = useState<AiPeriod>('today');

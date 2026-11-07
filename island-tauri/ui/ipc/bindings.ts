@@ -637,7 +637,7 @@ export type CompanionCharacter =
 /**  A little frog that snaps flies out of the air. */
 "frog" | "necronwarrior" | "necronoverlord" | "canoptekscarab" | "eyeofsauron" | 
 /**  A cute kawaii toadstool with spore puffs. */
-"mushroom";
+"mushroom" | "sonichu";
 
 export type CueKind = "click";
 

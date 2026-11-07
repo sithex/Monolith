@@ -51,11 +51,11 @@ test('companion character picker lists every character and patches the choice',(
  const p=picker({});
  assert.equal(p.props.value,'blob');
  const tiles=children(p.type(p.props)).filter(e=>e.props?.role==='radio');
- assert.deepEqual(tiles.map(e=>e.props['aria-label']),['Blob','Isaac','Null','Companion Cube · Portal','Nurgling','Hollow Knight','Frog','Necron Warrior','Necron Overlord','Canoptek Scarab','Eye of Sauron','Mushroom']);
- assert.deepEqual(tiles.map(e=>e.props['aria-checked']),[true,false,false,false,false,false,false,false,false,false,false,false]);
+ assert.deepEqual(tiles.map(e=>e.props['aria-label']),['Blob','Isaac','Null','Companion Cube · Portal','Nurgling','Hollow Knight','Frog','Necron Warrior','Necron Overlord','Canoptek Scarab','Eye of Sauron','Mushroom','Sonichu']);
+ assert.deepEqual(tiles.map(e=>e.props['aria-checked']),[true,false,false,false,false,false,false,false,false,false,false,false,false]);
  tiles[1].props.onClick();
  assert.deepEqual(calls,[{companionCharacter:'isaac'}]);
- const ids=['blob','isaac','notchmimic','companioncube','nurgling','hollowknight','frog','necronwarrior','necronoverlord','canoptekscarab','eyeofsauron','mushroom'];
+ const ids=['blob','isaac','notchmimic','companioncube','nurgling','hollowknight','frog','necronwarrior','necronoverlord','canoptekscarab','eyeofsauron','mushroom','sonichu'];
  calls.length=0;
  tiles.forEach(t=>t.props.onClick());
  assert.deepEqual(calls,ids.map(companionCharacter=>({companionCharacter})));

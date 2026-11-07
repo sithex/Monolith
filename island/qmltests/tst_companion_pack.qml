@@ -6,7 +6,7 @@ TestCase {
     id: suite
 
     property int strayTicks: 0
-    readonly property var ids: ["notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu"]
+    readonly property var ids: ["notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu", "salamander"]
 
     function test_pack_data() {
         return ids.map((id) => {

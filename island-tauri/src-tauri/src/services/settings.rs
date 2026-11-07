@@ -292,6 +292,7 @@ mod tests {
             "eyeofsauron",
             "mushroom",
             "sonichu",
+            "salamander",
         ] {
             svc.patch(&patch(json!({"companionCharacter": id})))
                 .unwrap();

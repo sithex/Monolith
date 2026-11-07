@@ -63,6 +63,7 @@ pub enum CompanionCharacter {
     /// A cute kawaii toadstool with spore puffs.
     Mushroom,
     Sonichu,
+    Salamander,
 }
 
 // Deserialize the removed ID at the boundary only. A serde alias on Blob makes
@@ -85,6 +86,7 @@ impl<'de> Deserialize<'de> for CompanionCharacter {
             "eyeofsauron" => Ok(Self::Eyeofsauron),
             "mushroom" => Ok(Self::Mushroom),
             "sonichu" => Ok(Self::Sonichu),
+            "salamander" => Ok(Self::Salamander),
             _ => Err(serde::de::Error::unknown_variant(
                 &id,
                 &[
@@ -101,6 +103,7 @@ impl<'de> Deserialize<'de> for CompanionCharacter {
                     "eyeofsauron",
                     "mushroom",
                     "sonichu",
+                    "salamander",
                 ],
             )),
         }

@@ -9,7 +9,7 @@ TestCase {
     id: suite
     name: "CompanionPixel"
     width: 220; height: 220; visible: true; when: windowShown
-    readonly property var ids: ["companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu"]
+    readonly property var ids: ["companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu", "salamander"]
 
     Component {
         id: factory
@@ -114,7 +114,7 @@ TestCase {
     }
 
     function test_directional_habits() {
-        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron", "mushroom", "sonichu"]) {
+        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron", "mushroom", "sonichu", "salamander"]) {
             const f = createTemporaryObject(factory, suite, { character: id }), a = f.art;
             point(f, 900, 200);
             a.lastHabitAt = 0; a.startHabit();
@@ -125,6 +125,18 @@ TestCase {
             compare(a.habitDirection, -1, id + " toward the pointer (left)");
             a.resetHabit();
         }
+    }
+
+    function test_facing_retention() {
+        // Salamander keeps its last horizontal facing when gazeX is near centre.
+        const f = createTemporaryObject(factory, suite, { character: "salamander" });
+        point(f, 900, 0);
+        point(f, 0, 0);
+        const centerFacingRight = picture(f);
+        point(f, -900, 0);
+        point(f, 0, 0);
+        const centerFacingLeft = picture(f);
+        verify(centerFacingRight !== centerFacingLeft, "salamander retains facing when pointer returns to center");
     }
 
     // A gaze target reversed mid-glide must end at the new target (it used to compare

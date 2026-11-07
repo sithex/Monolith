@@ -300,7 +300,7 @@ TestCase {
         const face = findChild(notch, "notchCompanion");
         face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
         tryCompare(face, "opacity", 1);
-        for (const name of ["blob", "isaac", "notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu"]) {
+        for (const name of ["blob", "isaac", "notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu", "salamander"]) {
             notch.companionCharacter = name;
             compare(face.shownCharacter, name);
             notch.waiting = true;

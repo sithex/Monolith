@@ -34,8 +34,30 @@ export function checkedLabel(ageSecs: number | null): string {
 export function groupUpdates(items: PackageUpdate[], query: string) {
   const needle = query.trim().toLocaleLowerCase();
   return ['repo', 'aur', ...new Set(items.map(item => item.source).filter(source => source !== 'repo' && source !== 'aur'))]
-    .map(source => ({ source, items: items.filter(item => item.source === source && `${item.name} ${item.oldVersion} ${item.newVersion} ${item.source}`.toLocaleLowerCase().includes(needle)) }))
+    .map(source => ({ source, items: items.filter(item => item.source === source && `${item.name} ${item.arch ?? ''} ${item.oldVersion} ${item.newVersion} ${item.source}`.toLocaleLowerCase().includes(needle)) }))
     .filter(group => group.items.length > 0);
+}
+
+type Backend = UpdatesChanged['backend'];
+
+// Group heading per update source: `title` + muted `via`, `aria` for the region label.
+export function sourceLabel(source: string): { title: string; via: string; aria: string } {
+  if (source === 'repo') return { title: 'Official repositories', via: 'pacman', aria: 'Official repositories' };
+  if (source === 'aur') return { title: 'AUR', via: 'via paru', aria: 'AUR via paru' };
+  if (source === 'dnf') return { title: 'Fedora repositories', via: 'dnf', aria: 'Fedora repositories · dnf' };
+  return { title: source, via: '', aria: source };
+}
+
+// Commands offered for copying; the island itself never runs them.
+export function updateCommands(backend: Backend): { label: string; command: string }[] {
+  if (backend === 'dnf') return [{ label: 'Fedora repositories · dnf', command: 'sudo dnf upgrade --refresh' }];
+  if (backend === 'unsupported') return [];
+  return [{ label: 'AUR + repositories · paru', command: 'paru -Syu' }, { label: 'Repositories only · pacman', command: 'sudo pacman -Syu' }];
+}
+
+// Multilib (dnf) lists one row per name.arch; show the arch only where a name repeats.
+function displayName(item: PackageUpdate, repeated: Set<string>) {
+  return item.arch && repeated.has(item.name) ? `${item.name}.${item.arch}` : item.name;
 }
 
 function RefreshGlyph() {
@@ -47,6 +69,7 @@ export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; 
   const [query, setQuery] = useState(''), [checking, setChecking] = useState(false), [actionError, setActionError] = useState('');
   const [commandsOpen, setCommandsOpen] = useState(false), [copied, setCopied] = useState('');
   const busy = useRef(false);
+  const backend: Backend = snapshot.backend ?? 'pacman';
   const groups = groupUpdates(snapshot.items, query);
   const healthy = snapshot.available && !snapshot.error && !snapshot.stale && snapshot.count !== null;
   const empty = healthy && snapshot.count === 0;
@@ -66,6 +89,16 @@ export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; 
       await navigator.clipboard.writeText(command); setCopied(command);
     } catch (error) { setActionError(String(error)); }
   }
+  if (backend === 'unsupported') return <section className="updates-app" aria-label="Package updates">
+    <header className="updates-hero"><div className="updates-hero-copy"><span className="updates-eyebrow">Package updates</span>
+      <h2><span>Not supported</span></h2>
+      <p className="updates-status" role="status">Not supported on this distro</p>
+    </div></header>
+    <div className="updates-unknown"><span aria-hidden="true">–</span><h3>Update checks aren’t available here</h3><p>The island reads updates with pacman on Arch-based systems and dnf on Fedora. Nothing is checked on this system.</p></div>
+  </section>;
+  const seen = new Set<string>(), repeated = new Set<string>();
+  for (const item of snapshot.items) (seen.has(item.name) ? repeated : seen).add(item.name);
+  const commands = updateCommands(backend);
   let rowIndex = 0;
   return <section className="updates-app" aria-label="Package updates">
     <header className="updates-hero">
@@ -86,15 +119,16 @@ export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; 
     {snapshot.items.length > 8 && <label className="updates-search"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input type="search" aria-label="Filter packages" placeholder="Find a package…" value={query} onChange={event => setQuery(event.target.value)} /></label>}
     {snapshot.items.length > 0 && <div className="updates-packages" tabIndex={0} role="region" aria-label="Available package updates">
       {groups.map(group => {
-        const knownCount = group.source === 'repo' ? snapshot.repoCount : group.source === 'aur' ? snapshot.aurCount : null;
+        const knownCount = group.source === 'repo' || group.source === 'dnf' ? snapshot.repoCount : group.source === 'aur' ? snapshot.aurCount : null;
         const ignoredCount = group.items.filter(item => item.ignored).length;
-        return <section className="updates-group" key={group.source} aria-label={group.source === 'repo' ? 'Official repositories' : group.source === 'aur' ? 'AUR via paru' : group.source}>
-          <header><h3><span className={`updates-source-icon ${group.source === 'aur' ? 'is-aur' : ''}`} aria-hidden="true">{group.source === 'aur' ? '◇' : '▦'}</span>{group.source === 'repo' ? 'Official repositories' : group.source === 'aur' ? 'AUR' : group.source}<small>{group.source === 'aur' ? 'via paru' : group.source === 'repo' ? 'pacman' : ''}</small></h3><span className="updates-group-count">{query.trim() ? `${group.items.length} shown` : knownCount ?? '?'}{ignoredCount > 0 ? ` · ${ignoredCount} ignored` : ''}</span></header>
+        const label = sourceLabel(group.source);
+        return <section className="updates-group" key={group.source} aria-label={label.aria}>
+          <header><h3><span className={`updates-source-icon ${group.source === 'aur' ? 'is-aur' : ''}`} aria-hidden="true">{group.source === 'aur' ? '◇' : '▦'}</span>{label.title}<small>{label.via}</small></h3><span className="updates-group-count">{query.trim() ? `${group.items.length} shown` : knownCount ?? '?'}{ignoredCount > 0 ? ` · ${ignoredCount} ignored` : ''}</span></header>
           <ul>{group.items.map(item => {
             const difference = versionDifference(item.oldVersion, item.newVersion), bump = versionBump(item.oldVersion, item.newVersion);
             const delay = Math.min(rowIndex++, 8) * .01;
-            return <motion.li className={`updates-row${item.ignored ? ' is-ignored' : ''}`} key={`${item.source}:${item.name}`} initial={reduced ? false : { opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduced ? 0 : .1, delay: reduced ? 0 : delay }}>
-              <div className="updates-package"><strong>{item.name}</strong><span className="updates-versions"><span>{item.oldVersion}</span><span className="updates-arrow" aria-label="to">→</span><span className="updates-new">{difference.common}<mark>{difference.changed}</mark></span></span></div>
+            return <motion.li className={`updates-row${item.ignored ? ' is-ignored' : ''}`} key={`${item.source}:${item.name}.${item.arch ?? ''}`} initial={reduced ? false : { opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduced ? 0 : .1, delay: reduced ? 0 : delay }}>
+              <div className="updates-package"><strong>{displayName(item, repeated)}</strong><span className="updates-versions">{item.oldVersion ? <span>{item.oldVersion}</span> : <span title="Installed version unknown">?</span>}<span className="updates-arrow" aria-label="to">→</span><span className="updates-new">{difference.common}<mark>{difference.changed}</mark></span></span></div>
               {item.ignored ? <span className="updates-bump">Ignored</span> : bump && <span className="updates-bump" title="Numeric version change, not a compatibility guarantee">{bump}</span>}
             </motion.li>;
           })}</ul>
@@ -103,6 +137,6 @@ export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; 
       {groups.length === 0 && <p className="updates-no-results">No packages match “{query}”.</p>}
     </div>}
     <footer className="updates-footer"><span>Review and install in your terminal</span><button type="button" className="updates-action" aria-expanded={commandsOpen} onClick={() => setCommandsOpen(value => !value)}>Update… <span aria-hidden="true">↗</span></button></footer>
-    {commandsOpen && <div className="updates-commands"><p>The island never installs packages. Copy the command for your installed package manager, then review it in a terminal.</p>{[{ label: 'AUR + repositories · paru', command: 'paru -Syu' }, { label: 'Repositories only · pacman', command: 'sudo pacman -Syu' }].map(({ label, command }) => <div className="updates-command" key={command}><div><span>{label}</span><code>{command}</code></div><button type="button" aria-label={`Copy ${command}`} onClick={() => void copy(command)}>{copied === command ? 'Copied ✓' : 'Copy'}</button></div>)}<p role="status">{copied ? 'Command copied. Nothing has been run.' : 'No system changes are made here.'}</p></div>}
+    {commandsOpen && <div className="updates-commands"><p>The island never installs packages. Copy the command for your installed package manager, then review it in a terminal.</p>{commands.map(({ label, command }) => <div className="updates-command" key={command}><div><span>{label}</span><code>{command}</code></div><button type="button" aria-label={`Copy ${command}`} onClick={() => void copy(command)}>{copied === command ? 'Copied ✓' : 'Copy'}</button></div>)}<p role="status">{copied ? 'Command copied. Nothing has been run.' : 'No system changes are made here.'}</p></div>}
   </section>;
 }

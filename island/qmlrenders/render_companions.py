@@ -11,6 +11,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+import qt6_tools
+
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
 parser.add_argument("--output", type=Path, required=True)
@@ -25,5 +27,5 @@ source = source.replace(old, 'readonly property string outputDirectory: ' + json
 with tempfile.TemporaryDirectory(prefix="companion-render-", dir=os.environ["TMPDIR"]) as tmp:
     harness = Path(tmp) / "tst_companion_render.qml"
     harness.write_text(source)
-    subprocess.run(["/usr/lib/qt6/bin/qmltestrunner", "-input", str(harness), "-o", str(out / "render-log.txt") + ",txt"],
+    subprocess.run([qt6_tools.require("qmltestrunner"), "-input", str(harness), "-o", str(out / "render-log.txt") + ",txt"],
                    env={**os.environ, "QT_QPA_PLATFORM":"offscreen", "QT_QUICK_BACKEND":"software"}, check=True)

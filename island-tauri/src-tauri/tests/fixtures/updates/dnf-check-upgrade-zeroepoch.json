@@ -1,0 +1,10 @@
+{
+  "upgrades":[
+    {
+      "name":"mdistro-zeroepoch",
+      "arch":"noarch",
+      "evr":"1.1-1",
+      "repository":"mdistro-local"
+    }
+  ]
+}

@@ -14,6 +14,8 @@ import argparse, json, os, statistics, subprocess, sys, time
 
 HZ = os.sysconf("SC_CLK_TCK")
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "qmlrenders"))
+import qt6_tools  # noqa: E402  (Qt 6 tool lookup shared with qmlrenders)
 
 SCENARIOS = {
     # Pointer parked on DP-1 (warm 70 s so the 1-minute "settled" state is reached).
@@ -58,7 +60,7 @@ def run(ui, scenario, secs):
     env.pop("WAYLAND_DISPLAY", None)
     env.pop("DISPLAY", None)
     url = "file://" + os.path.abspath(ui)
-    cmd = ["/usr/lib/qt6/bin/qml", os.path.join(HERE, "NotchIdleHarness.qml"), "--", url, json.dumps(sc)]
+    cmd = [qt6_tools.require("qml"), os.path.join(HERE, "NotchIdleHarness.qml"), "--", url, json.dumps(sc)]
     p = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     a = b = None
     frames = None

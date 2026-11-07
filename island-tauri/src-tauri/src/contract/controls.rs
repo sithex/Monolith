@@ -164,15 +164,29 @@ pub enum TogglesOp {
 #[serde(rename_all = "camelCase")]
 pub struct PackageUpdate {
     pub name: String,
+    /// Empty when the installed version is unknown (dnf: rpm doesn't list the package).
     pub old_version: String,
     pub new_version: String,
     pub ignored: bool,
+    /// `repo` / `aur` (pacman backend) or `dnf`.
     pub source: String,
+    /// RPM architecture for dnf updates (multilib lists `name.arch` separately); null on pacman.
+    pub arch: Option<String>,
+}
+/// Package manager behind the update badge, chosen once from os-release at service start.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum UpdatesBackend {
+    Pacman,
+    Dnf,
+    /// Image-based or unknown system: nothing is checked.
+    Unsupported,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatesChanged {
     pub rev: u32,
+    pub backend: UpdatesBackend,
     pub available: bool,
     pub detail: String,
     pub count: Option<u32>,

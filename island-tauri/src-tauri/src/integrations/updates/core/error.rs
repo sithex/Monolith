@@ -12,6 +12,8 @@ pub enum UpdatesError {
     CommandFailed,
     /// Every non-blank line present was malformed; zero updates parsed.
     AllMalformed,
+    /// `dnf check-upgrade --json` exited 0 but stdout was not the documented JSON object.
+    InvalidJson,
 }
 
 impl fmt::Display for UpdatesError {
@@ -21,6 +23,7 @@ impl fmt::Display for UpdatesError {
             UpdatesError::TooManyLines => "more than 10 000 lines",
             UpdatesError::CommandFailed => "command reported a failure",
             UpdatesError::AllMalformed => "every line was malformed",
+            UpdatesError::InvalidJson => "output was not the expected JSON",
         };
         write!(f, "{msg}")
     }

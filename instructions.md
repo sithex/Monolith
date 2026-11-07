@@ -1,25 +1,58 @@
 # Setting up Monolith
 
 This covers a fresh install on KDE Plasma 6 (Wayland), day-to-day use, updating, and the problems you're likely
-to hit. The package names are for Arch/CachyOS. Other distros have the same libraries under different names.
+to hit.
+
+Supported: Arch/CachyOS and Fedora KDE (Plasma 6, Wayland). Other distros have the same libraries under
+different names; `scripts/install-deps.sh` lists what to look for when it doesn't know yours.
 
 ## 1. Dependencies
 
+From a clone of the repo (step 2 if you don't have one yet):
+
 ```sh
-sudo pacman -S --needed rust nodejs npm webkit2gtk-4.1 gtk3 gtk-layer-shell base-devel python
+scripts/install-deps.sh --print           # shows the command for your distro, runs nothing
+scripts/install-deps.sh                   # runs it (through sudo)
+scripts/install-deps.sh --with-optional   # also the per-feature tools in the table below
 ```
+
+It reads `/etc/os-release` and uses pacman on Arch and Arch-based distros, dnf on Fedora. It shows the
+command before running it. The same lines by hand:
+
+```sh
+# Arch / CachyOS
+sudo pacman -S --needed rust nodejs npm webkit2gtk-4.1 gtk3 gtk-layer-shell base-devel python \
+  libayatana-appindicator kpackage qt6-tools
+
+# Fedora KDE
+sudo dnf install gcc pkgconf rust cargo nodejs npm webkit2gtk4.1-devel gtk-layer-shell-devel python3 \
+  libayatana-appindicator-gtk3 kf6-kpackage qt6-qttools
+```
+
+The tray icon needs libayatana-appindicator (or the older libappindicator). Without either the island
+quits at start with "Failed to load ayatana-appindicator3 or appindicator3 dynamic library". Fedora KDE
+ships `libappindicator-gtk3` by default, and that works too. `kpackage` gives `kpackagetool6` (step 4) and
+`qt6-tools` gives the Qt 6 `qdbus` the island uses to find the notch: `qdbus6` on Arch, `qdbus-qt6` on
+Fedora.
 
 You also need [Hermes Agent](https://hermes-agent.nousresearch.com) installed and working in a normal
 terminal, since that's what the island runs.
 
-Optional extras, each needed by one feature:
+Optional extras, each needed by one feature (`--with-optional` installs all of them):
 
-| Package | Feature |
-|---|---|
-| `pipewire` / `pipewire-pulse` (`pactl`, `pw-record`) | Volume mixer, mic mute, equalizer |
-| `power-profiles-daemon` | Power profile button |
-| `pacman-contrib` (`checkupdates`), `paru` | Updates app |
-| `bluez` | Bluetooth status |
+| Arch package | Fedora package | Feature |
+|---|---|---|
+| `pipewire`, `pipewire-pulse`, `pipewire-audio`, `libpulse` | `pipewire-utils`, `pulseaudio-utils` | Volume mixer, mic mute, equalizer, timer sound (`pactl`, `pw-record`, `pw-play`, `paplay`) |
+| `libcanberra`, `sound-theme-freedesktop` | `libcanberra-gtk3`, `sound-theme-freedesktop` | Notification and timer sounds |
+| `power-profiles-daemon` | `tuned-ppd` (installed by default) | Power profile button |
+| `pacman-contrib` (`checkupdates`), `paru` | nothing (dnf is built in) | Updates app |
+| `bluez`, `bluez-utils` | `bluez` | Bluetooth status |
+| `libkscreen`, `spectacle`, `fontconfig`, `xdg-utils` | the same names | Screen list for the notch and Settings (`kscreen-doctor`), screenshot tile, font picker (`fc-list`), opening downloads and folders (`xdg-open`). A Plasma desktop usually has these already. |
+
+Updates app: pacman + AUR (paru) on Arch, dnf on Fedora. paru comes from the AUR, so install it yourself.
+
+On Fedora, don't install `power-profiles-daemon`. Fedora KDE uses `tuned-ppd`, which offers the same D-Bus
+API, and the two packages conflict: installing one removes the other.
 
 ## 2. Where to put it
 
@@ -112,7 +145,8 @@ Replace `YOU` with your username. Desktop files don't expand `~`.
   two small voice helpers. See [docs/voice-controls.md](docs/voice-controls.md) for what they are and a
   prompt that has your own Hermes set them up.
 - **Timer** rings when a countdown ends (a short chime for each Pomodoro phase) through PipeWire's
-  `pw-play` (or `paplay`) and the freedesktop sound theme. Dismissing or resetting the timer stops the ring.
+  `pw-play` (or `paplay`) and the freedesktop sound theme. On Fedora those come from `pipewire-utils`
+  and `pulseaudio-utils`. Dismissing or resetting the timer stops the ring.
 - **Lyrics**: on Now Playing, the quote button opens the lyrics beside the artwork. Click a line to jump
   there; scroll by hand and it stops following the song for a few seconds.
 - **Side buttons** are set up in Settings → Layout. A slot only shows up if it fits on the island at its
@@ -173,9 +207,16 @@ npm run test:ui
 Notch widget and helper checks, run from the repo root:
 
 ```sh
-QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input island/qmltests
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input island/qmltests     # Arch
+QT_QPA_PLATFORM=offscreen /usr/lib64/qt6/bin/qmltestrunner -input island/qmltests   # Fedora
 python3 -m unittest discover -s island/tests
 ```
+
+Use the full path (or `qmltestrunner-qt6` on Fedora), not plain `qmltestrunner`: on Fedora that's the Qt 5
+build, and on Arch it's a wrapper that exits without running anything. `scripts/precheck.sh` finds the right
+one by itself. On Fedora the runner is in `qt6-qtdeclarative-devel`, and the widget tests also need
+`kf6-kirigami libplasma plasma-workspace plasma5support` (a Plasma desktop has them). On Arch it's in
+`qt6-declarative`.
 
 For live UI editing, build a debug binary with `--no-default-features`. That drops Tauri's
 `custom-protocol` feature, so the binary loads the page from Vite at `http://localhost:5173` instead of the
@@ -193,11 +234,21 @@ Rust checks, run from `island-tauri/src-tauri`:
 ```sh
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked --lib --test units --test services
+TMPDIR=/tmp cargo test --locked --lib --test units --test services
 ```
 
+Some tests need `TMPDIR` set (the units tests panic without it). The service tests start a private D-Bus
+and PipeWire: `scripts/install-deps.sh --with-test-deps` installs what they need (`dbus python-gobject
+pipewire pipewire-audio wireplumber` on Arch, `dbus-daemon python3-gobject-base pipewire wireplumber
+pipewire-utils` on Fedora).
+
 The `kwin_*`, `xvfb_shape` and `notification_monitor` tests drive a real nested KWin or Xvfb session.
-They're slower and need those installed; `cargo test --locked` runs everything.
+They're slower and need those installed; `cargo test --locked` runs everything. Packages: `kwin xorg-xwayland
+xorg-server-xvfb xfwm4 dbus python-gobject libei` on Arch, `kwin xorg-x11-server-Xwayland
+xorg-x11-server-Xvfb xfwm4 dbus-daemon python3-gobject libei` on Fedora.
+
+`scripts/fedora-container-check.sh` builds the committed tree (`git archive HEAD`) in a fresh Fedora
+container and runs the Rust, TypeScript and UI tests there. It needs Docker.
 
 If you change anything under `src-tauri/src/contract/` or the commands, regenerate the TypeScript bindings:
 

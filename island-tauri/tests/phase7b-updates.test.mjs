@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { load } from './phase7b-loader.mjs';
-const { UpdatesApp, versionDifference, versionBump, checkedLabel, groupUpdates } = load('ui/island/components/UpdatesApp.tsx');
-const snapshot = patch => ({ rev: 1, available: true, detail: 'read-only-checks', count: null, repoCount: null, aurCount: null, needsReboot: false, stale: false, error: null, items: [], ageSecs: null, nextCheckInSecs: 60, ...patch });
-const pkg = patch => ({ name: 'fixture-package', oldVersion: '1.2.3', newVersion: '1.2.4', ignored: false, source: 'repo', ...patch });
+const { UpdatesApp, versionDifference, versionBump, checkedLabel, groupUpdates, updateCommands, sourceLabel } = load('ui/island/components/UpdatesApp.tsx');
+const { ControlsApp } = load('ui/island/components/ControlsApp.tsx');
+const adapters = load('ui/views/app-adapters.ts');
+const snapshot = patch => ({ rev: 1, backend: 'pacman', available: true, detail: 'read-only-checks', count: null, repoCount: null, aurCount: null, needsReboot: false, stale: false, error: null, items: [], ageSecs: null, nextCheckInSecs: 60, ...patch });
+const pkg = patch => ({ name: 'fixture-package', oldVersion: '1.2.3', newVersion: '1.2.4', ignored: false, source: 'repo', arch: null, ...patch });
 const render = patch => renderToStaticMarkup(createElement(UpdatesApp, { snapshot: snapshot(patch), onRefresh: async () => {} }));
 
 test('Updates unknown counts never become zero or a successful empty state', () => {
@@ -57,4 +59,48 @@ test('Updates search appears only for longer lists and upgrades require explicit
   assert.match(html, /Filter packages/); assert.match(html, /Available package updates/);
   assert.match(html, /Update…/); assert.match(html, /Review and install in your terminal/);
   assert.doesNotMatch(html, /Open in terminal|sudo pacman|paru -Syu/);
+});
+
+const dnfPkg = patch => pkg({ source: 'dnf', arch: 'x86_64', oldVersion: '2.44-1.fc45', newVersion: '2.44-2.fc45', ...patch });
+const controls = updates => renderToStaticMarkup(createElement(ControlsApp, { model: { toggles: null, tiles: null, updates }, intents: new Proxy({}, { get: () => () => {} }) }));
+
+test('Updates dnf backend renders Fedora labels, multilib rows and only the dnf command', () => {
+  const items = [dnfPkg({ name: 'glibc' }), dnfPkg({ name: 'glibc', arch: 'i686' }), dnfPkg({ name: 'LibRaw', oldVersion: '0.22.2-1.fc45', newVersion: '0.22.3-1.fc45' }), dnfPkg({ name: 'obsoleter', arch: 'noarch', oldVersion: '' })];
+  const html = render({ backend: 'dnf', count: 4, repoCount: 4, items, needsReboot: true });
+  assert.match(html, /aria-label="Fedora repositories · dnf"/); assert.match(html, /Fedora repositories<small>dnf<\/small>/);
+  assert.match(html, /updates-group-count">4</);
+  assert.match(html, /glibc\.x86_64/); assert.match(html, /glibc\.i686/);
+  assert.match(html, /<strong>LibRaw<\/strong>/, 'arch only where a name repeats');
+  assert.match(html, /title="Installed version unknown">\?</);
+  assert.doesNotMatch(html, /AUR|paru|pacman|Official repositories/);
+  assert.equal(groupUpdates(items, 'i686').flatMap(group => group.items).length, 1);
+  assert.deepEqual(updateCommands('dnf'), [{ label: 'Fedora repositories · dnf', command: 'sudo dnf upgrade --refresh' }]);
+  assert.deepEqual(updateCommands('pacman').map(c => c.command), ['paru -Syu', 'sudo pacman -Syu']);
+  assert.deepEqual(updateCommands('unsupported'), []);
+  assert.deepEqual(sourceLabel('repo'), { title: 'Official repositories', via: 'pacman', aria: 'Official repositories' });
+  assert.match(controls(snapshot({ backend: 'dnf', count: 4, repoCount: 4 })), /4 Fedora repositories · dnf/);
+  assert.doesNotMatch(controls(snapshot({ backend: 'dnf', count: 4, repoCount: 4 })), /AUR/);
+  assert.match(controls(snapshot({ count: 3, repoCount: 2, aurCount: 1 })), /2 repo · 1 AUR/, 'pacman copy unchanged');
+  assert.match(controls(snapshot({ count: 1, repoCount: 1, aurCount: null })), /1 repo · Unknown AUR/, 'no paru: repo count still shown');
+});
+
+test('Updates unsupported backend is a calm empty state without error, count, refresh or commands', () => {
+  const html = render({ backend: 'unsupported', available: false, detail: 'unsupported-system', nextCheckInSecs: 0 });
+  assert.match(html, /Not supported on this distro/); assert.match(html, /Update checks aren’t available here/);
+  assert.doesNotMatch(html, /Couldn|updates-status-error|unsupported-system|updates-total|Check updates|Update…|Stale|sudo|paru/);
+  const card = controls(snapshot({ backend: 'unsupported', available: false, detail: 'unsupported-system' }));
+  assert.match(card, /Not supported on this distro/);
+  assert.doesNotMatch(card, /update-badge|Unknown|unsupported-system|Check updates/);
+});
+
+test('Updates adapter accepts the dnf wire shape and still rejects unknown backends and sources', () => {
+  const raw = { ...snapshot({ backend: 'dnf', count: 1, repoCount: 1, items: [dnfPkg({ name: 'glibc', arch: 'i686' })] }) };
+  const model = adapters.adaptIndependentControls(null, null, raw).updates;
+  assert.equal(model.backend, 'dnf'); assert.equal(model.items[0].arch, 'i686'); assert.equal(model.items[0].source, 'dnf');
+  const { backend, ...legacy } = snapshot({ items: [{ name: 'linux', oldVersion: '1', newVersion: '2', ignored: false, source: 'repo' }] });
+  assert.equal(backend, 'pacman');
+  const old = adapters.adaptIndependentControls(null, null, legacy).updates;
+  assert.equal(old.backend, 'pacman'); assert.equal(old.items[0].arch, null);
+  assert.throws(() => adapters.adaptIndependentControls(null, null, snapshot({ backend: 'apt' })));
+  assert.throws(() => adapters.adaptIndependentControls(null, null, snapshot({ items: [dnfPkg({ source: 'apt' })] })));
 });

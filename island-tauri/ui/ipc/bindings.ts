@@ -952,10 +952,14 @@ export type OutputTile = {
 
 export type PackageUpdate = {
 	name: string,
+	/**  Empty when the installed version is unknown (dnf: rpm doesn't list the package). */
 	oldVersion: string,
 	newVersion: string,
 	ignored: boolean,
+	/**  `repo` / `aur` (pacman backend) or `dnf`. */
 	source: string,
+	/**  RPM architecture for dnf updates (multilib lists `name.arch` separately); null on pacman. */
+	arch: string | null,
 };
 
 export type Palette = {
@@ -1435,8 +1439,14 @@ export type UiKind =
 /**  Phase 7 typed renderer; harness remains the default until Phase 9. */
 "island";
 
+/**  Package manager behind the update badge, chosen once from os-release at service start. */
+export type UpdatesBackend = "pacman" | "dnf" | 
+/**  Image-based or unknown system: nothing is checked. */
+"unsupported";
+
 export type UpdatesChanged = {
 	rev: number,
+	backend: UpdatesBackend,
 	available: boolean,
 	detail: string,
 	count: number | null,

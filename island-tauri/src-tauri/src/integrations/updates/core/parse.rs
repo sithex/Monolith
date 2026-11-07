@@ -106,6 +106,7 @@ fn parse_line(line: &str, source: Source) -> Option<Update> {
         new_version: new_version.to_string(),
         ignored,
         source,
+        arch: None,
     })
 }
 

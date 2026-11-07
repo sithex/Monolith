@@ -81,6 +81,7 @@ fn random_update(lcg: &mut Lcg) -> Update {
         } else {
             Source::Aur
         },
+        arch: None,
     }
 }
 

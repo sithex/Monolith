@@ -193,8 +193,11 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-rail svg { width: 20px; height: 20px; flex: none; }
 .settings-rail-name { position: absolute; left: 44px; top: 50%; transform: translateY(-50%); width: max-content; max-width: 220px; box-sizing: border-box; padding: 6px 10px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-md); background: var(--ui-surface); color: var(--ui-text); font-size: var(--fs-sm); pointer-events: none; visibility: hidden; opacity: 0; }
 .settings-rail button:hover .settings-rail-name, .settings-rail button:focus-visible .settings-rail-name { visibility: visible; opacity: 1; }
-.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 4px 12px; overscroll-behavior: contain; }
-.settings-section-title { font-size: var(--fs-body); font-weight: 600; margin: 0 0 12px; color: var(--ui-text); }
+/* Column with the same 14px card gap as .app-stack had before the rail wrapped the cards. */
+.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 4px 12px; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 14px; }
+.settings-content > * { flex-shrink: 0; }
+.settings-section-title { font-size: var(--fs-body); font-weight: 600; margin: 0; color: var(--ui-text); }
 .settings-panel > .settings-search { flex: none; }
 .settings-results { margin-bottom: 16px; }
 .settings-results h3 { color: var(--ui-accent); font-size: var(--fs-body); margin: 0 0 8px; }

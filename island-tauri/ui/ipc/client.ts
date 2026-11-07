@@ -90,6 +90,7 @@ export const clipboardList = (query: string | null = null, limit = 100): Promise
 export const clipboardGet = (id: string): Promise<ClipContent> => unwrap(commands.clipboardGet(id));
 export const clipboardCopy = (id: string) => unwrap(commands.clipboardCopy(id));
 export type { DesktopApp } from './bindings';
+export const claudeCodeRaw = (req: import('./bindings').ClaudeCodeRequest) => unwrap(commands.claudeCodeRaw(req));
 export const desktopAppsList = () => unwrap(commands.desktopAppsList());
 export const desktopAppLaunch = (desktopId: string) => unwrap(commands.desktopAppLaunch(desktopId));
 export const terminalCopy = (text: string) => unwrap(commands.terminalCopy(text));

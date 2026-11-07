@@ -38,6 +38,7 @@ const COMMANDS: &[&str] = &[
     "ai_connect",
     "agent_live_raw",
     "agent_live_blocks",
+    "claude_code_raw",
     "voice_command",
     "voice_panel",
     "approval_get",

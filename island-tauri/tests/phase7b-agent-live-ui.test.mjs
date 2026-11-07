@@ -246,6 +246,7 @@ test('poll loop: nothing while hidden, idle 5 s cadence, stops on hide, stale ti
     if (name === 'react/jsx-runtime') return { jsx: React.createElement, jsxs: React.createElement };
     if (name === './agent-live-model') return M;
     if (name === './visible-poller') return load('ui/views/visible-poller.ts');
+    if (name === './ClaudeCodeView') return { ClaudeCodeLive: () => null, useClaudeHistory: () => ({ history: null, lead: null }) };
     if (name === './agent-live-ipc') return { agentLiveRaw: req => new Promise(resolve => reads.push({ req, resolve })), agentLiveBlocks: async () => ({ blocks: [] }), copyText: async () => true };
     if (name.endsWith('.css')) return {};
     if (name.endsWith('/AgentLive') || name.endsWith('/AgentLiveUsage')) return { AgentLivePage: () => null, AgentLiveUsageCards: () => null };

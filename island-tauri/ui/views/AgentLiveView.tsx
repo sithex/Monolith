@@ -1,11 +1,12 @@
 // One shared feed retains the log cursor across Live / Usage switches. Both IPC and the
 // display clock use Nick's retained visible poller; hidden pages never start new work.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AgentLiveFeed, nextDelay, type FeedResult, type LivePage } from './agent-live-model';
+import { AgentLiveFeed, nextDelay, type FeedResult, type LiveBlock, type LivePage } from './agent-live-model';
 import { agentLiveBlocks, agentLiveRaw, copyText } from './agent-live-ipc';
 import { createVisiblePoller } from './visible-poller';
 import { AgentLivePage } from '../island/components/AgentLive';
 import { AgentLiveUsageCards } from '../island/components/AgentLiveUsage';
+import { ClaudeCodeLive, useClaudeHistory } from './ClaudeCodeView';
 import '../island/ai-stats.css';
 import '../island/agent-live.css';
 
@@ -81,14 +82,16 @@ function useCopy() {
 
 export function AgentLiveView({ active }: { active: boolean }) {
   const { result, error, now } = useAgentLive(active, 'live'), { note, copy } = useCopy();
-  return <AgentLivePage view={result?.view ?? null} now={now} onCopy={copy} note={note} error={error}/>;
+  return <AgentLivePage view={result?.view ?? null} now={now} onCopy={copy} note={note} error={error} extra={<ClaudeCodeLive active={active} now={now}/>}/>;
 }
 
+const NO_BLOCKS: LiveBlock[] = [];
 export function AgentLiveUsage({ active }: { active: boolean }) {
   const { result, error, now } = useAgentLive(active, 'history'), { note, copy } = useCopy();
   const view = result?.view;
   const ids = (result?.history?.top ?? []).map(t => typeof t?.id === 'string' ? t.id : null);
-  return <AgentLiveUsageCards history={view?.history ?? null} ids={ids} now={now} onCopy={copy} note={note}
+  const cc = useClaudeHistory(active, result?.history ?? null, view?.history ?? null, result ? liveFeed().blocks ?? NO_BLOCKS : NO_BLOCKS);
+  return <AgentLiveUsageCards history={cc.history} lead={cc.lead} ids={ids} now={now} onCopy={copy} note={note}
     error={error || view?.historyError || ''} pluginMissing={view?.sources?.plugin === 'not installed'}
     blocks={result ? liveFeed().blocks ?? [] : []} loaded={!!result}/>;
 }

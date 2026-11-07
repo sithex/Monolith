@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-claude-code-raw"
+description = "Enables the claude_code_raw command without any pre-configured scope."
+commands.allow = ["claude_code_raw"]
+
+[[permission]]
+identifier = "deny-claude-code-raw"
+description = "Denies the claude_code_raw command without any pre-configured scope."
+commands.deny = ["claude_code_raw"]

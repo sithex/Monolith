@@ -5,6 +5,7 @@ pub mod agent_live;
 pub mod ai_usage;
 pub mod approvals;
 pub mod autostart;
+pub mod claude_code;
 pub mod desktop_apps;
 pub mod frontend;
 pub mod palette;
@@ -117,6 +118,8 @@ pub struct Services {
     pub ai: Arc<ai_usage::AiUsageService>,
     /// AI Agents Live page: read-only Hermes home reader (docs/agent-live.md).
     pub agent_live: Arc<agent_live::AgentLiveService>,
+    /// Explicit-poll-only, read-only Claude Code metrics.
+    pub claude_code: Arc<claude_code::ClaudeCodeService>,
     pub stats: Arc<stats::StatsService>,
     pub terminal: Arc<terminal::Terminal>,
     /// Mirrors Hermes' pending approval/clarify prompts (HERMES_TUI_SIDECAR_URL sink).
@@ -180,6 +183,16 @@ impl Services {
                     profile_dir(std::env::var_os("HERMES_HOME"), &cfg.home)
                 },
                 &cfg.data_dir,
+            )),
+            claude_code: Arc::new(claude_code::ClaudeCodeService::new(
+                claude_code::claude_dir(
+                    if cfg.test_instance {
+                        None
+                    } else {
+                        std::env::var_os("CLAUDE_CONFIG_DIR")
+                    },
+                    &cfg.home,
+                ),
             )),
             stats: Arc::new(stats::StatsService::new(cfg.home.clone())),
             terminal: Arc::new(

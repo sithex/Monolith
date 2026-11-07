@@ -114,6 +114,8 @@ export const commands = {
 	agentLiveRaw: (req: AgentLiveRequest) => typedError<AgentLiveRaw, IslandError>(__TAURI_INVOKE("agent_live_raw", { req })),
 	/**  Get / replace the persisted 5-hour block history (newest 200 kept). */
 	agentLiveBlocks: (op: AgentLiveBlocksOp) => typedError<AgentLiveBlocks, IslandError>(__TAURI_INVOKE("agent_live_blocks", { op })),
+	/**  One read-only, bounded poll of Claude Code registry and transcripts. */
+	claudeCodeRaw: (req: ClaudeCodeRequest) => typedError<ClaudeCodeRaw, IslandError>(__TAURI_INVOKE("claude_code_raw", { req })),
 	voiceCommand: (op: VoiceOp) => typedError<VoiceStatus, IslandError>(__TAURI_INVOKE("voice_command", { op })),
 	/**  Hermes page voice picker + TTS mute (optional helpers; missing ones report unavailable). */
 	voicePanel: (op: VoicePanelOp) => typedError<VoicePanel, IslandError>(__TAURI_INVOKE("voice_panel", { op })),
@@ -523,6 +525,66 @@ export type CalendarSource = "local" | "subscription";
 
 /**  Look of a choice button. `Option` is a clarify choice. */
 export type ChoiceStyle = "once" | "session" | "always" | "deny" | "option";
+
+export type ClaudeCodeCursor = {
+	key: string,
+	ino: string,
+	off: number,
+};
+
+export type ClaudeCodeFact = { t: "a"; at: number | null; model: string; key: string; side: boolean; ep: string | null; cwd: string | null; stop: string | null; tool: string | null; chars: number; sig: number; u: ClaudeCodeUsage } | { t: "compact"; at: number | null } | { t: "turnEnd"; at: number | null } | { t: "sys"; at: number | null } | { t: "user"; at: number | null; meta: boolean; interrupt: boolean };
+
+export type ClaudeCodeRaw = {
+	now: number,
+	claudeDir: string | null,
+	folderMissing: boolean,
+	registry: ClaudeRegEntry[],
+	registryError: string | null,
+	files: ClaudeFile[],
+	more: boolean,
+	error: string | null,
+};
+
+export type ClaudeCodeRequest = {
+	cursors: ClaudeCodeCursor[],
+	/**  None = 16 MiB, completing the current line before yielding. */
+	budgetBytes: number | null,
+};
+
+export type ClaudeCodeUsage = {
+	input: number,
+	output: number,
+	cacheRead: number,
+	cacheWrite: number,
+	cw1h: number,
+	fast: boolean,
+};
+
+export type ClaudeFile = {
+	key: string,
+	slug: string,
+	sessionId: string,
+	sub: boolean,
+	ino: string,
+	size: number,
+	mtimeMs: number,
+	reset: boolean,
+	from: number,
+	next: number,
+	facts: ClaudeCodeFact[],
+	skippedHuge: number,
+	badLines: number,
+	error: string | null,
+};
+
+export type ClaudeRegEntry = {
+	file: string,
+	mtimeMs: number,
+	alive: boolean,
+	procStart: string | null,
+	/**  Rust-whitelisted registry metadata only; never arbitrary registry JSON or session titles. */
+	data: JsonValue,
+};
 
 export type ClipContent = { type: "text"; text: string } | { type: "image"; pngDataUrl: string; width: number; height: number } | { type: "files"; uris: string[] };
 

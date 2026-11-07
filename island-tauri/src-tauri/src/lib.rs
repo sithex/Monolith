@@ -70,6 +70,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::ai::ai_connect,
             commands::agent_live::agent_live_raw,
             commands::agent_live::agent_live_blocks,
+            commands::claude_code::claude_code_raw,
             commands::voice::voice_command,
             commands::voice::voice_panel,
             commands::approvals::approval_get,
@@ -552,6 +553,9 @@ mod tests {
             ("IslandNotification", "progress"),
             // docs/agent-live.md: Habby's DbData/HistoryRaw nulls and the optional terminal pid.
             ("AgentLiveRaw", "terminalPid"),
+            // Claude transcript timestamps and optional first-scan budget (unknown ≠ zero).
+            ("ClaudeCodeRequest", "budgetBytes"),
+            ("ClaudeCodeFact", "at"),
             ("DbSession", "cost"),
             ("DbSession", "startedAt"),
             ("DbSession", "endedAt"),

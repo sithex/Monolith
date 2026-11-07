@@ -5,6 +5,7 @@ pub mod agent_live;
 pub mod ai;
 pub mod approvals;
 pub mod apps;
+pub mod claude_code;
 pub mod clipboard;
 pub mod controls;
 pub mod desktop_apps;

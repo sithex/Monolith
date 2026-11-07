@@ -1,5 +1,6 @@
 // AI Agents tab, Usage page additions: Habby's History cards "5-hour windows (peak %)" and
 // "Top sessions this week" (click copies the session id for /resume). Input = buildHistory() output.
+import type { ReactNode } from 'react';
 import { EST_TIP, Header, Prov, clockAt, isNum, pct, usd, type LiveView } from './AgentLiveParts';
 
 // History figures (QA m5): {cost, calls, unpriced, estOut}; "—" = no call has a price
@@ -29,16 +30,18 @@ export function TopSessionsCard({ history, ids, onCopy, loaded }: { history: Liv
     {top.length ? top.map((t, i) => {
       const id = isNum(t.copy) ? ids[t.copy] ?? null : null;
       const name = (t.title || '—') + (t.segments > 1 ? ` (${t.segments} segments)` : '');
+      const src = t.src ? <small className="cc-src">{t.src}</small> : null;
       return id
-        ? <button type="button" className="al-top-row" key={i} title={`Click: copy the session id ${id} (for /resume). $ includes subagents and post-compaction segments.`} onClick={() => onCopy(id)}><span className="al-ell">{name}</span><b>{hCost(t)}</b></button>
-        : <div className="al-top-row" key={i}><span className="al-ell">{name}</span><b>{hCost(t)}</b></div>;
+        ? <button type="button" className="al-top-row" key={i} title={`Click: copy the session id ${id} (for /resume). $ includes subagents and post-compaction segments.`} onClick={() => onCopy(id)}>{src}<span className="al-ell">{name}</span><b>{hCost(t)}</b></button>
+        : <div className="al-top-row" key={i} title={t.src && t.src !== 'Hermes' ? `Claude Code session (${t.src}); $ includes its subagents` : undefined}>{src}<span className="al-ell">{name}</span><b>{hCost(t)}</b></div>;
     }) : <p className="ai-empty">{history ? 'No sessions this week' : loaded ? 'Session history unavailable' : 'Loading…'}</p>}
     {history && <p className="al-note" title={EST_TIP}>cache saved {isNum(history.savings) ? '≈ ' + usd(history.savings) : '—'} · subagent share {pct(history.subShare)}</p>}
   </section>;
 }
 
-export function AgentLiveUsageCards({ history, ids, now, onCopy, note, error, pluginMissing, blocks, loaded }: { history: LiveView | null; ids: (string | null)[]; now: number; onCopy: (id: string) => void; note?: string; error?: string; pluginMissing?: boolean; blocks?: { resetAt: number; peak: number }[]; loaded?: boolean }) {
+export function AgentLiveUsageCards({ history, ids, now, onCopy, note, error, pluginMissing, blocks, loaded, lead }: { history: LiveView | null; ids: (string | null)[]; now: number; onCopy: (id: string) => void; note?: string; error?: string; pluginMissing?: boolean; blocks?: { resetAt: number; peak: number }[]; loaded?: boolean; lead?: ReactNode }) {
   return <div className="ai-dashboard al-usage">
+    {lead}
     <div className="ai-two-columns"><BlocksCard history={history} now={now} blocks={blocks} pluginMissing={pluginMissing}/><TopSessionsCard history={history} ids={ids} onCopy={onCopy} loaded={loaded}/></div>
     {(error || note) && <p className="ai-footnote">{error ? `Hermes history unavailable: ${error}` : ''}{error && note ? ' · ' : ''}{note ?? ''}</p>}
   </div>;

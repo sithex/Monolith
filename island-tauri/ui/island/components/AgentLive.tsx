@@ -1,6 +1,6 @@
 // AI Agents tab, Live page: Habby's Live dock page (app/assets/habby-metrics.js) as React cards in the
 // AiDashboard style. Input = buildView() output from ui/views/agent-live-model.ts; no fetching here.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { DASH, EST_TIP, Dot, Glyph, Header, Kv, Prov, STATUS_TEXT, Spark, Steps, ago, band, dur, isNum, msFine, pct, tok, usd, waitText, type LiveView } from './AgentLiveParts';
 
 const MATCH_TAG: Record<string, string> = {
@@ -178,8 +178,8 @@ export function sourcesLine(v: LiveView): string {
   return `plugin ${s.plugin ?? 'n/a'} · plan ${s.plan ?? 'n/a'} · ${s.db === 'db busy' ? 'db busy (last view)' : 'db ' + (s.db ?? 'n/a')} · log ${s.log ?? 'n/a'}`;
 }
 
-export function AgentLivePage({ view, now, onCopy, note, error }: { view: LiveView | null; now: number; onCopy: (id: string) => void; note?: string; error?: string }) {
-  if (!view) return <div className="ai-dashboard al-live"><section className="ai-card"><Header title="Live" kind="now"/><p className="ai-empty">{error ? `Live data unavailable: ${error}` : 'Loading…'}</p></section></div>;
+export function AgentLivePage({ view, now, onCopy, note, error, extra }: { view: LiveView | null; now: number; onCopy: (id: string) => void; note?: string; error?: string; extra?: ReactNode }) {
+  if (!view) return <div className="ai-dashboard al-live"><section className="ai-card"><Header title="Live" kind="now"/><p className="ai-empty">{error ? `Live data unavailable: ${error}` : 'Loading…'}</p></section>{extra}</div>;
   return <div className="ai-dashboard al-live">
     <LiveHeader v={view} now={now} onCopy={onCopy}/>
     {view.sources?.plugin === 'not installed' && <section className="ai-card al-plugin-empty">
@@ -191,6 +191,7 @@ export function AgentLivePage({ view, now, onCopy, note, error }: { view: LiveVi
     <div className="ai-two-columns"><Context v={view}/><Cache v={view} now={now}/></div>
     <div className="ai-two-columns"><Turn v={view}/><Session v={view}/></div>
     <Agents v={view} now={now}/>
+    {extra}
     <p className="ai-footnote" title={`$ = ${EST_TIP}`}>{sourcesLine(view)}{error ? ` · refresh failed: ${error}` : ''}{note ? ` · ${note}` : ''}</p>
   </div>;
 }

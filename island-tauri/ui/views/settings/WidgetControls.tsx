@@ -3,7 +3,8 @@ import { commands, type GeoPlace } from '../../ipc/bindings';
 import type { Settings, SettingsPatch } from '../../ipc/client';
 import { Dropdown } from '../../island/components/AppPrimitives';
 
-const message = (e: unknown) => e instanceof Error ? e.message : String(e);
+const message = (e: unknown) => e instanceof Error ? e.message
+  : e && typeof e === 'object' && 'message' in e && typeof e.message === 'string' ? e.message : String(e);
 
 /** Explicit save keeps invalid regex drafts out of persisted settings; Rust is authoritative. */
 export function ClipboardPatterns({ value, onSave }: { value: string[]; onSave(patch: SettingsPatch): Promise<unknown> }) {

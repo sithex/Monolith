@@ -160,25 +160,20 @@ fn click(s: &Stack, eis: &mut Wheel, origin: (i32, i32), selector: &str) {
         origin.1 + point[1].as_f64().unwrap() as i32,
     );
 }
-fn settings_tab(s: &Stack, eis: &mut Wheel, origin: (i32, i32), name: &str) {
-    let index = ["General", "Appearance", "Layout"]
-        .iter()
-        .position(|t| *t == name)
-        .unwrap()
-        + 1;
+fn settings_section(s: &Stack, eis: &mut Wheel, origin: (i32, i32), section: &str) {
     click(
         s,
         eis,
         origin,
-        &format!(".settings-tabs [role=tab]:nth-child({index})"),
+        &format!(".settings-rail [data-section={section}]"),
     );
     until(
         s,
-        &format!("7a settings tab {name} selected"),
+        &format!("7a settings section {section} selected"),
         8,
         &format!(
-            "document.querySelector('.settings-tabs [aria-selected=true]')?.textContent==={}",
-            json!(name)
+            "document.querySelector('.settings-rail [aria-current=page]')?.dataset.section==={}",
+            json!(section)
         ),
     );
 }
@@ -385,8 +380,8 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     // iteration is a real change that must persist without a restart.
     for theme in ["neutral", "skin"] {
         view(&s, &conn, window, &mut eis, origin, "settings");
-        // Colour schemes live on the Settings → Appearance tab (SettingsView.tsx).
-        settings_tab(&s, &mut eis, origin, "Appearance");
+        // Colour schemes live in Settings → Look (SettingsView.tsx).
+        settings_section(&s, &mut eis, origin, "look");
         // skin is a standalone row; neutral lives in the Monolith family.
         pick_scheme(&s, &mut eis, origin, theme, "monolith");
         until(
@@ -481,7 +476,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     );
     until(&s, "7a outer surface offset applied event-driven", 8, &format!("(()=>{{const r=document.querySelector('.island').getBoundingClientRect();return Math.abs(r.x-{})<0.1&&Math.abs(r.y-{})<0.1}})()",before.x+24.,before.y+12.));
     settled(&s, &conn, window, IslandMode::Large);
-    settings_tab(&s, &mut eis, origin, "Appearance");
+    settings_section(&s, &mut eis, origin, "look");
     // Leave a non-default choice persisted so the reload below proves it was read back.
     pick_scheme(&s, &mut eis, origin, "neutral", "monolith");
     until(

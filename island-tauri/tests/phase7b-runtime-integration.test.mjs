@@ -1,46 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, statSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { resolve, dirname } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
-import ts from 'typescript';
-import * as React from 'react';
 import { load } from './phase7b-loader.mjs';
+import { driver, nodes, globals, component, labeled, textButton, deferred, tick } from './phase7b-runtime-harness.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
-const native=createRequire(import.meta.url),tick=()=>new Promise(resolve=>setImmediate(resolve));
-const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
-// A deterministic hook/effect driver for production handlers; not a browser/GUI claim.
-function driver(overrides={}, transform=(_path, source)=>source) {
-  const slots=[],effects=[],cache=new Map();let index=0;
-  const hooks={...React,
-    useState(initial){const i=index++;slots[i]??={value:typeof initial==='function'?initial():initial};return [slots[i].value,next=>{slots[i].value=typeof next==='function'?next(slots[i].value):next;}];},
-    useRef(initial){const i=index++;return slots[i]??=( {current:initial} );},
-    useSyncExternalStore(_subscribe,get){index++;return get();},
-    useEffect(effect,deps){const i=index++,previous=slots[i];if(!previous||deps.some((v,n)=>v!==previous.deps[n])){slots[i]={deps};effects.push(()=>{previous?.cleanup?.();slots[i].cleanup=effect();});}},
-    useId(){index++;return 'fixture-id';},
-    useMemo(factory){index++;return factory();},
-  };
-  hooks.useLayoutEffect=hooks.useEffect;
-  function compile(path){const file=resolve(root,path),relative=file.slice(root.length);if(relative in overrides)return overrides[relative];if(cache.has(file))return cache.get(file).exports;
-    const source=transform(relative,readFileSync(file,'utf8')),out=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-    const module={exports:{}};cache.set(file,module);
-    const require=name=>{if(name==='react')return hooks;if(name in overrides)return overrides[name];if(!name.startsWith('.'))return native(name);const base=resolve(dirname(file),name),p=['','.ts','.tsx','.js','/index.ts'].map(ext=>base+ext).find(p=>existsSync(p)&&statSync(p).isFile());assert.ok(p,`Unresolved ${name}`);return compile(p);};
-    vm.runInThisContext(`(function(require,module,exports){${out}\n})`,{filename:file})(require,module,module.exports);return module.exports;
-  }
-  return {load:compile,render(C,props){index=0;const tree=C(props);while(effects.length)effects.shift()();return tree;},dispose(){for(const slot of slots)slot?.cleanup?.();}};
-}
-function nodes(tree){if(!tree||typeof tree!=='object')return [];if(Array.isArray(tree))return tree.flatMap(nodes);return [tree,...nodes(tree.props?.children)];}
-// All globals below are private DOM fixtures, restored after each synchronous test.
-function globals(values, run) {
-  const before=Object.fromEntries(Object.keys(values).map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]));
-  try {for(const [k,v] of Object.entries(values))Object.defineProperty(globalThis,k,{value:v,writable:true,configurable:true});return run();}
-  finally {for(const [k,v] of Object.entries(before))if(v)Object.defineProperty(globalThis,k,v);else delete globalThis[k];}
-}
-const component=(tree,name)=>nodes(tree).find(n=>n.type?.name===name);
-const labeled=(tree,label)=>nodes(tree).find(n=>n.props?.['aria-label']===label);
-const textButton=(tree,text)=>nodes(tree).find(n=>n.type==='button'&&n.props.children===text);
 test('compact notice dismiss is revision-scoped, resume opens existing terminal, agent notice opens agents',()=>{
   const calls=[];let state={mode:'hover',rev:9,terminalStarted:true,hoverCause:{type:'panelPill'}};let items=[];
   const h=driver({'ui/island/preview-notice.css':{},'ui/ipc/island-state.ts':{useIslandState:()=>state,dispatch:async intent=>calls.push(intent)},'ui/ipc/notifications.ts':{useNotifications:()=>items}});
@@ -216,9 +181,10 @@ test('Settings exposes working display backend controls only for desktop Linux a
   for(const ua of ['Mozilla/5.0 (X11; Linux x86_64)','Mozilla/5.0 (Windows NT 10.0)','Mozilla/5.0 (Macintosh; Intel Mac OS X)','Mozilla/5.0 (Linux; Android 14)']) {
     for(const running of ['wayland','x11']) {
       const calls=[],settings={displayBackend:running==='wayland'?'x11':'wayland'};
-      const d=driver({'ui/stores/index.ts':{useSettings:()=>settings,useAppearance:()=> 'green',usePalette:()=>({}),saveSettings:async p=>calls.push(p)}});
+      const d=driver({'ui/stores/index.ts':{useSettings:()=>settings,useAppearance:()=> 'green',usePalette:()=>({}),saveSettings:async p=>calls.push(p)},'ui/ipc/client.ts':{displayOutputs:async()=>[]}});
       try {globals({navigator:{userAgent:ua},document:{documentElement:{dataset:{displayBackend:running}}}},()=>{
-        const tree=d.render(d.load('ui/views/SettingsView.tsx').SettingsView),group=labeled(tree,'Display server');
+        const View=d.load('ui/views/SettingsView.tsx').SettingsView;
+        let tree=d.render(View);labeled(tree,'Notch & companion').props.onClick();tree=d.render(View);const group=labeled(tree,'Display server');
         if(ua.includes('X11; Linux')) {
           assert.ok(group);const wayland=textButton(group,'Wayland'),x11=textButton(group,'X11');
           assert.equal(wayland.props['aria-pressed'],settings.displayBackend==='wayland');assert.equal(x11.props['aria-pressed'],settings.displayBackend==='x11');
@@ -232,16 +198,18 @@ test('Settings exposes working display backend controls only for desktop Linux a
 test('palette setting jumps focus the matching row after the filtered DOM commits',()=>{
   const events=new EventTarget(),log=[];
   const control={focus(){log.push('row-focus');}};
-  const row={dataset:{settingLabel:'Terminal font'},querySelector(){return control;},scrollIntoView(){log.push('row-scroll');}};
-  const d=driver({'ui/stores/index.ts':{useSettings:()=>({}),useAppearance:()=> 'green',usePalette:()=>({}),saveSettings:async()=>{}}});
-  try { globals({window:events,document:{documentElement:{dataset:{displayBackend:'x11'}},querySelectorAll:()=>[row],querySelector:()=>null}},()=>{
+  const row={dataset:{settingId:'terminalFontFamily'},querySelector(){return control;},scrollIntoView(){log.push('row-scroll');},setAttribute(){},removeAttribute(){}};
+  const d=driver({'ui/stores/index.ts':{useSettings:()=>({}),useAppearance:()=> 'green',usePalette:()=>({}),saveSettings:async()=>{}},'ui/ipc/bindings.ts':{commands:{fontFamilies:async()=>({status:'ok',data:[]})}}});
+  try { globals({window:events,document:{documentElement:{dataset:{displayBackend:'x11'}},querySelector:selector=>{assert.equal(selector,'.settings-panel [data-setting-id="terminalFontFamily"]');return row;}}},()=>{
     const C=d.load('ui/views/SettingsView.tsx').SettingsView;
     d.render(C);
     const event=new Event('island-setting-jump');event.detail='not-a-setting';events.dispatchEvent(event);
     // Ignore an unknown id, then use the real model's row id.
     const jump=new Event('island-setting-jump');jump.detail='terminalFontFamily';events.dispatchEvent(jump);
     const tree=d.render(C);
-    assert.equal(labeled(tree,'Search settings').props.value,'Terminal font');
+    assert.equal(labeled(tree,'Search settings').props.value,'');
+    assert.equal(labeled(tree,'Terminal').props['aria-current'],'page');
+    assert.ok(nodes(tree).some(n=>n.props?.id==='terminalFontFamily'));
     assert.deepEqual(log,['row-scroll','row-focus']);
   }); } finally {globals({window:events},()=>d.dispose());}
 });
@@ -326,17 +294,18 @@ test('renderer fit bounds retain large custom preferences and fit the full side-
 
 test('Settings wires the terminal launch preference without restarting or submitting a chat',async()=>{
   const saved=[];
-  const d=driver({'ui/stores/index.ts':{useSettings:()=>({terminalCommand:'hermes --cli'}),useAppearance:()=> 'skin',usePalette:()=>({}),saveSettings:async patch=>saved.push(patch)}});
+  const d=driver({'ui/stores/index.ts':{useSettings:()=>({terminalCommand:'hermes --cli'}),useAppearance:()=> 'skin',usePalette:()=>({}),saveSettings:async patch=>saved.push(patch)},'ui/ipc/bindings.ts':{commands:{fontFamilies:async()=>({status:'ok',data:[]})}}});
   try {globals({navigator:{userAgent:'Linux'},document:{documentElement:{dataset:{displayBackend:'wayland'}}}},()=>{
-    const tree=d.render(d.load('ui/views/SettingsView.tsx').SettingsView),editor=component(tree,'TerminalCommandSettings');
-    assert.ok(editor,'General settings must expose the terminal launch command');
+    const View=d.load('ui/views/SettingsView.tsx').SettingsView;
+    let tree=d.render(View);labeled(tree,'Terminal').props.onClick();tree=d.render(View);const editor=component(tree,'TerminalCommandSettings');
+    assert.ok(editor,'Terminal settings must expose the terminal launch command');
     assert.equal(editor.props.value,'hermes --cli');
     editor.props.onSave('hermes --tui');
     assert.deepEqual(saved,[{terminalCommand:'hermes --tui'}]);
   });}finally{d.dispose();}
 });
 
-test('Settings search shows matching rows from every tab, empty state, Esc clears; card Reset patches Rust defaults after inline confirm',async()=>{
+test('Settings search shows matching results from every section, empty state, Esc clears; card Reset patches Rust defaults after inline confirm', async () => {
   const saved=[],appearances=[];
   const settings={translucent:true,companionEnabled:true,reduceMotion:false,animationSpeed:150,terminalCursorStyle:'bar'};
   const defaults={reduceMotion:false,animationSpeed:100,swipeNavigation:true,stealth:false,clickSounds:true,gameModeAuto:true,gameMode:false,openShortcut:'Meta+`',
@@ -350,20 +319,21 @@ test('Settings search shows matching rows from every tab, empty state, Esc clear
     const View=d.load('ui/views/SettingsView.tsx').SettingsView;
     let tree=d.render(View);
     const rows=t=>nodes(t).filter(n=>typeof n.props?.label==='string'&&n.type?.name==='Row').map(n=>n.props.label);
-    assert.ok(rows(tree).includes('Open shortcut')&&!rows(tree).includes('Terminal cursor'),'General tab only');
+    assert.ok(rows(tree).includes('Open shortcut')&&!rows(tree).includes('Terminal cursor'),'General section only');
     labeled(tree,'Search settings').props.onChange({target:{value:'CURSOR'}});tree=d.render(View);
-    assert.deepEqual(rows(tree),['Terminal cursor','Blinking cursor'],'Appearance rows found from the General tab');
-    assert.equal(nodes(tree).find(n=>n.props?.role==='tablist'),undefined,'tabs hide while searching');
+    assert.deepEqual(nodes(tree).filter(n=>n.props?.className==='settings-result').map(n=>n.props.children[0].props.children),['Terminal cursor','Blinking cursor'],'Terminal results found from General');
+    assert.equal(rows(tree).length,0,'search results navigate instead of rendering controls');
+    assert.ok(labeled(tree,'Settings sections'),'section rail stays reachable while searching');
     labeled(tree,'Search settings').props.onChange({target:{value:'zzz'}});tree=d.render(View);
-    assert.match(nodes(tree).find(n=>n.props?.className==='settings-empty').props.children.join(''),/No settings match/);
+    assert.match([nodes(tree).find(n=>n.props?.className==='settings-empty').props.children].flat().join(''),/No settings match/);
     let prevented=0;labeled(tree,'Search settings').props.onKeyDown({key:'Escape',preventDefault(){prevented++;},stopPropagation(){}});tree=d.render(View);
     assert.equal(prevented,1);assert.equal(labeled(tree,'Search settings').props.value,'');
-    labeled(tree,'Search settings').props.onChange({target:{value:'animation'}});tree=d.render(View);
+    labeled(tree,'Look').props.onClick();tree=d.render(View);
     const motion=nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Motion');
     assert.ok(motion?.props.onReset,'Motion card has a Reset');
     await motion.props.onReset();
     assert.deepEqual(saved,[{reduceMotion:false,animationSpeed:100}]);
-    labeled(tree,'Search settings').props.onChange({target:{value:'colour scheme'}});tree=d.render(View);
+    tree=d.render(View);
     await nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Colour scheme').props.onReset();
     assert.deepEqual(saved[1],{customAccent:'',customBackground:'',customText:'',hermesThemeSync:false,accent:'',background:'',borderColor:''});
     assert.deepEqual(appearances,['skin'],'scheme reset returns to the default scheme');

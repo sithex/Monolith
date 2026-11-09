@@ -21,16 +21,16 @@
 .music-indicator[data-static="true"] i { transition: none; }
 .music-indicator[data-static="true"] i b { animation: none; transform: scaleY(.45); }
 .now-playing .transport { display: flex; justify-content: center; align-items: center; gap: 26px; padding: 2px 0; }
-.island .now-playing .transport button { display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; color: var(--ui-text); background: transparent;
-  transition: background-color .18s ease, transform .28s var(--v-ease), opacity .18s ease, color .18s ease; }
+.island .now-playing .transport button { display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; color: var(--ui-text); background: transparent; }
 .island .now-playing .transport .transport-skip { width: 46px; height: 46px; }
 .island .now-playing .transport .transport-skip svg { width: 25px; height: 25px; }
-.island .now-playing .transport .transport-skip:hover:not(:disabled) { background: var(--v-hover); }
 .island .now-playing .transport .transport-main { position: relative; width: 58px; height: 58px; background: var(--ui-text); color: var(--ui-background);
   box-shadow: 0 6px 18px rgb(0 0 0 / .35); }
-.island .now-playing .transport .transport-main:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-text) 88%, var(--ui-accent)); transform: scale(1.04); }
-.island .now-playing .transport button:active:not(:disabled) { transform: scale(.9); opacity: .85; }
-.now-playing .transport-main svg { grid-area: 1 / 1; width: 28px; height: 28px; transition: opacity .2s ease, transform .32s var(--v-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .island .now-playing .transport .transport-skip:hover:not(:disabled) { background: var(--v-hover); }
+  .island .now-playing .transport .transport-main:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-text) 88%, var(--ui-accent)); }
+}
+.now-playing .transport-main svg { grid-area: 1 / 1; width: 28px; height: 28px; transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
 .now-playing .transport-main .glyph-play { transform: translateX(1px); }
 .now-playing .transport-main[data-playing='true'] .glyph-play, .now-playing .transport-main[data-playing='false'] .glyph-pause { opacity: 0; transform: scale(.55); }
 .island .now-playing .transport button:disabled { opacity: .35; }
@@ -63,15 +63,24 @@
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%); }
 .np-lyrics-scroll::-webkit-scrollbar { display: none; }
 .am-lyrics { list-style: none; margin: 0; padding: 0; }
-.am-lyrics li { margin: 0; }
+/* The line glides independently of the button's shared, fast press feedback. */
+.am-lyrics li { margin: 0; transform: scale(.965); transform-origin: left center; transition: transform .7s cubic-bezier(.2, .9, .25, 1); }
+.am-lyrics li[aria-current='true'] { transform: none; }
 .island .now-playing .am-lyrics button { display: block; width: 100%; padding: 7px 12px; margin: 0; border: 0; border-radius: var(--radius-xl); background: transparent; text-align: left;
   font: 750 clamp(19px, 3.3cqi, 28px)/1.24 var(--ui-font); letter-spacing: -.012em; color: var(--ui-text); white-space: normal; overflow-wrap: anywhere;
-  opacity: .3; filter: blur(calc(var(--d, 2) * .5px)); transform: scale(.965); transform-origin: left center; cursor: pointer;
-  transition: opacity .55s ease, filter .55s ease, transform .7s cubic-bezier(.2, .9, .25, 1), background-color .2s ease; }
-.island .now-playing .am-lyrics li[aria-current='true'] button { opacity: 1; filter: none; transform: none; }
-.island .now-playing .am-lyrics button:hover:not(:disabled) { background: rgb(255 255 255 / .07); filter: none; opacity: .62; }
-.island .now-playing .am-lyrics li[aria-current='true'] button:hover:not(:disabled) { opacity: 1; }
-.island .now-playing .am-lyrics button:active:not(:disabled) { transform: scale(.95); }
+  opacity: .3; filter: blur(calc(var(--d, 2) * .5px)); transform-origin: left center; cursor: pointer;
+  transition: opacity .55s ease, transform var(--dur-press) var(--ease-out), background-color var(--dur-base) var(--ease-out); }
+/* Distant lines retain the same blur, without allocating animated filters. */
+.island .now-playing .am-lyrics li[data-near='true'] button {
+  transition-property: opacity, transform, background-color, filter;
+  transition-duration: .55s, var(--dur-press), var(--dur-base), .55s;
+  transition-timing-function: ease, var(--ease-out), var(--ease-out), ease;
+}
+.island .now-playing .am-lyrics li[aria-current='true'] button { opacity: 1; filter: none; }
+@media (hover: hover) and (pointer: fine) {
+  .island .now-playing .am-lyrics button:hover:not(:disabled) { background: rgb(255 255 255 / .07); filter: none; opacity: .62; }
+  .island .now-playing .am-lyrics li[aria-current='true'] button:hover:not(:disabled) { opacity: 1; }
+}
 .island .now-playing .am-lyrics button:disabled { cursor: default; }
 .island .now-playing .am-lyrics li:not([aria-current='true']) button:disabled { opacity: .3; }
 .am-dots { display: inline-flex; gap: 8px; padding: .3em 0; vertical-align: middle; }
@@ -86,7 +95,9 @@
 .lyrics-consent p { margin: 0; font-size: var(--fs-lg); font-weight: 650; line-height: 1.35; color: var(--ui-text); opacity: .8; max-width: 34ch; }
 .lyrics-credit { display: flex; align-items: center; gap: 10px; padding: 6px 12px 0; font-size: var(--fs-sm); color: var(--ui-dim); }
 .island .now-playing .lyrics-off { margin-left: auto; padding: 3px 8px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--ui-dim); font-size: var(--fs-sm); }
-.island .now-playing .lyrics-off:hover:not(:disabled) { color: var(--ui-text); }
+@media (hover: hover) and (pointer: fine) {
+  .island .now-playing .lyrics-off:hover:not(:disabled) { color: var(--ui-text); }
+}
 @container (max-width: 640px) {
   .now-playing[data-lyrics='true'] { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .now-playing[data-lyrics='true'] .track-header { flex-direction: row; align-items: center; gap: 18px; }

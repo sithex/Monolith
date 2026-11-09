@@ -120,7 +120,8 @@ test('companion previews scale to a crisp integer multiple of any viewBox',()=>{
   if(c.preview().props.shapeRendering) assert.equal(svg.props.shapeRendering,'crispEdges');
  }
  const big=h.find(e=>e.props?.className==='companion-preview companion-preview-large').props.children;
- assert.ok(big.props.width%20===0&&big.props.width>=40);
+ const selSide=Number(h.mod.COMPANION_CHARACTERS.find(c=>c.id==='salamander').preview().props.viewBox.split(' ')[2]);
+ assert.ok(big.props.width%selSide===0&&big.props.width>=2*selSide,'large preview is an integer multiple of the selected viewBox');
 });
 test('companion search matches name, group and franchise case-insensitively',()=>{
  const h=pickerHarness({value:'blob',onPick(){}});

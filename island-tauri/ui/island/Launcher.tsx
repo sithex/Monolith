@@ -1,7 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
+import { motion, LayoutGroup, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { launcherCommand, type LauncherOp, type IslandView, type LauncherItem } from '../ipc/client';
+import { useIslandState } from '../ipc/island-state';
+import { DUR, SPRING, tween } from './motion-profile';
+import { wiggleTiming } from './launcher-motion';
 import { launcherStore, useLauncher } from '../stores/apps';
 import { Icon } from './components/Icon';
 import { useReducedMotionPreference } from './components/motion-preference';
@@ -11,10 +14,10 @@ export const viewIcons: Partial<Record<IslandView,IconName>> = { terminal:'termi
 // Tile tints: music pink, calendar red, timer orange, everything else white .85.
 const tint: Partial<Record<IslandView,string>> = { music:'var(--v-pink)', calendar:'var(--v-red)', timer:'var(--v-orange)', terminal:'var(--ui-accent)' };
 const tone = (view: IslandView | null | undefined) => (view && tint[view]) || 'var(--tile-ink, rgb(255 255 255 / .85))';
-const TILE_SPRING = { type: 'spring' as const, stiffness: 520, damping: 40, mass: 0.9 };
 const LONG_PRESS_MS = 450;
 
 type Drag = { id: string; from: 'shown' | 'hidden'; pointer: number; grabX: number; grabY: number; x: number; y: number; w: number };
+type Landing = { id: string; x: number; y: number; w: number; scale: number };
 const label = (i: LauncherItem) => i.view ? viewLabels[i.view] : i.id;
 /** Only Hermes home is pinned in place. Settings is `locked` (can't be hidden) but moves freely. */
 const fixed = (i: LauncherItem) => i.id === 'terminal';
@@ -26,12 +29,18 @@ function place(list: string[], id: string, index: number) {
 }
 
 export function Launcher({ navigate, fail }: { navigate(view: IslandView): void; fail(error: unknown): void }) {
-  const state = useLauncher(), reduced = useReducedMotionPreference();
+  const state = useLauncher(), island = useIslandState(), reduced = useReducedMotionPreference();
+  const [pageHidden, setPageHidden] = useState(() => document.hidden);
+  const visible = island.mode === 'large' && island.view === 'launcher' && !pageHidden;
+  const keyboard = document.documentElement.dataset.navVia === 'key', quiet = reduced || keyboard;
+  const timings = useRef(new Map<string, ReturnType<typeof wiggleTiming>>());
   const byId = new Map(state.items.map(i => [i.id, i]));
   const serverShown = state.items.filter(i => i.enabled).map(i => i.id), serverHidden = state.items.filter(i => !i.enabled).map(i => i.id);
   // Local arrangement during a drag (iOS-style live reflow); otherwise mirrors the Rust preview.
   const [shown, setShown] = useState(serverShown), [hidden, setHidden] = useState(serverHidden);
   const [drag, setDrag] = useState<Drag | null>(null), [overHidden, setOverHidden] = useState(false);
+  const [landing, setLanding] = useState<Landing | null>(null);
+  const ghostMotion = useAnimationControls();
   const dragRef = useRef<Drag | null>(null); dragRef.current = drag;
   const arrangement = useRef({ shown, hidden }); arrangement.current = { shown, hidden };
   const press = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; id: string; armed: boolean } | null>(null);
@@ -40,6 +49,26 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   const key = JSON.stringify([serverShown, serverHidden]);
   useLayoutEffect(() => { if (!dragRef.current) { setShown(serverShown); setHidden(serverHidden); } }, [key]);
   useEffect(() => () => { if (press.current?.timer) clearTimeout(press.current.timer); }, []);
+  useEffect(() => {
+    const changed = () => setPageHidden(document.hidden);
+    document.addEventListener('visibilitychange', changed);
+    return () => document.removeEventListener('visibilitychange', changed);
+  }, []);
+  useEffect(() => {
+    if (visible) return;
+    if (press.current?.timer) clearTimeout(press.current.timer);
+    press.current = null; setDrag(null); setLanding(null); setOverHidden(false);
+  }, [visible]);
+  useLayoutEffect(() => {
+    if (drag) { ghostMotion.set({ x: drag.x, y: drag.y, scale: 1 }); return; }
+    if (!landing) return;
+    if (quiet || !visible) { setLanding(null); return; }
+    let cancelled = false;
+    void ghostMotion.start({ x: landing.x, y: landing.y, scale: landing.scale, transition: SPRING.ui() }).then(() => {
+      if (!cancelled) setLanding(current => current === landing ? null : current);
+    });
+    return () => { cancelled = true; ghostMotion.stop(); };
+  }, [drag?.x, drag?.y, landing, quiet, visible, ghostMotion]);
 
   const send = (op: LauncherOp) => {
     const run = tail.current.catch(() => undefined).then(async () => { const next = await launcherCommand(op); launcherStore.apply(next, next.rev); });
@@ -58,6 +87,8 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   };
   const pickUp = (id: string, e: { clientX: number; clientY: number; pointerId: number }, target: HTMLElement) => {
     const r = target.getBoundingClientRect();
+    setLanding(null);
+    target.setPointerCapture(e.pointerId);
     const from = arrangement.current.shown.includes(id) ? 'shown' as const : 'hidden' as const;
     setDrag({ id, from, pointer: e.pointerId, grabX: e.clientX - r.left, grabY: e.clientY - r.top, x: r.left, y: r.top, w: r.width });
     suppressClick.current = true;
@@ -88,6 +119,14 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   };
   const drop = async (e: PointerEvent) => {
     const d = dragRef.current; if (!d || e.pointerId !== d.pointer) return;
+    // Layout offsets ignore the neighbours' in-flight reflow transforms. Wiggle lives
+    // on a child, so neither its rotation nor a button press shifts the landing slot.
+    const container = arrangement.current.shown.includes(d.id) ? grid.current : hiddenGrid.current;
+    const slot = [...(container?.querySelectorAll<HTMLElement>('[data-tile]') ?? [])].find(el => el.dataset.tile === d.id);
+    if (slot && container && visible && !quiet) {
+      const r = container.getBoundingClientRect();
+      setLanding({ id: d.id, x: r.left + slot.offsetLeft - container.scrollLeft, y: r.top + slot.offsetTop - container.scrollTop, w: d.w, scale: slot.offsetWidth / d.w });
+    }
     setDrag(null); setOverHidden(false);
     const s = arrangement.current.shown, wasShown = d.from === 'shown', nowShown = s.includes(d.id);
     try {
@@ -126,11 +165,11 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     // The Controls app was retired (Nov 2): its tile stays in the arrangement so
     // Rust's move indices are unchanged, but it is never drawn.
     const item = byId.get(id); if (!item || item.view === 'controls') return null;
-    const view = item.view, name = label(item), dragging = drag?.id === id;
-    const wiggle = state.editing && !reduced && !fixed(item) && !dragging;
-    return <motion.div key={id} layout={!reduced} className="tile-wrap" data-tile={id} data-disabled={zone === 'hidden'} style={{ opacity: dragging ? 0 : 1 }}
-      animate={{ rotate: wiggle ? [-1.6, 1.6] : 0 }}
-      transition={wiggle ? { rotate: { duration: 0.24, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut', delay: (index % 4) * 0.05 }, layout: TILE_SPRING } : TILE_SPRING}>
+    const view = item.view, name = label(item), dragging = drag?.id === id || landing?.id === id;
+    if (!timings.current.has(id)) timings.current.set(id, wiggleTiming(Math.random(), Math.random()));
+    return <motion.div key={id} layout={!quiet} className="tile-wrap" data-tile={id} data-disabled={zone === 'hidden'} style={{ opacity: dragging ? 0 : 1 }}
+      transition={quiet ? { duration: 0 } : SPRING.ui()}>
+      <div className="tile-face" data-wiggle={state.editing && !fixed(item) && !dragging} style={timings.current.get(id) as CSSProperties}>
       <button className="app-tile" style={{ ['--tone' as string]: tone(view) }}
         aria-label={`Open ${name}`} data-testid={zone === 'shown' ? `view-${view ?? id}` : `hidden-${view ?? id}`} aria-disabled={!item.known || zone === 'hidden'} data-locked={item.locked}
         onPointerDown={e => onDown(item, e)} onPointerMove={e => onMove(item, e)} onPointerUp={onUp} onPointerCancel={onUp}
@@ -142,16 +181,17 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
         onClick={() => { if (suppressClick.current) return; if (!state.editing && zone === 'shown' && item.known && view) navigate(view); }}>
         <Icon name={view ? viewIcons[view] ?? 'grid' : 'grid'} /><span>{name}</span>
       </button>
-      <AnimatePresence>{state.editing && !item.locked && <motion.button key="badge" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={{ type: 'spring', visualDuration: 0.25, bounce: 0.3 }}
+      <AnimatePresence>{state.editing && !item.locked && <motion.button key="badge" initial={{ scale: quiet ? 1 : 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: quiet ? 1 : 0.9, opacity: 0 }} transition={tween(keyboard ? 0 : DUR.fast)}
         className={`tile-badge ${zone === 'shown' ? 'remove' : 'add'}`} aria-label={zone === 'shown' ? `Hide ${name}` : `Show ${name}`}
         onPointerDown={e => e.stopPropagation()} onClick={() => { void send(zone === 'shown' ? { type: 'disable', id } : { type: 'enable', id }).catch(() => undefined); }}>{zone === 'shown' ? '−' : '+'}</motion.button>}</AnimatePresence>
       {state.editing && zone === 'shown' && !fixed(item) && <span className="sr-only">
         <button aria-label={`Move ${name} earlier`} disabled={index === 0} onClick={() => { void send({ type: 'move', id, to: index - 1 }).catch(() => undefined); }}>←</button>
         <button aria-label={`Move ${name} later`} disabled={index === shown.length - 1} onClick={() => { void send({ type: 'move', id, to: index + 1 }).catch(() => undefined); }}>→</button></span>}
+      </div>
     </motion.div>;
   };
-  const dragged = drag ? byId.get(drag.id) : undefined;
-  return <div className="launcher" onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (state.editing) void send({ type: 'cancel' }).catch(() => undefined); } }}>
+  const ghost = drag ?? landing, dragged = ghost ? byId.get(ghost.id) : undefined;
+  return <div className="launcher" data-editing={state.editing} data-motion-active={visible && state.editing && !reduced} data-reduced-motion={reduced} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (state.editing) void send({ type: 'cancel' }).catch(() => undefined); } }}>
     <div className="launcher-toolbar"><span className="muted">{state.editing ? 'Drag to arrange · drop in Hidden to hide' : 'Hold an app to arrange'}</span>
       {state.editing && <><button className="pill-button" onClick={() => { void send({ type: 'cancel' }).catch(() => undefined); }}>Cancel</button><button className="pill-button primary" onClick={() => { void send({ type: 'commit' }).catch(() => undefined); }}>Done</button></>}
       {!state.editing && <button className="pill-button" aria-label="Edit apps" onClick={() => { void send({ type: 'begin' }).catch(() => undefined); }}>Edit</button>}
@@ -159,17 +199,17 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     <LayoutGroup>
       <div ref={grid} className="app-grid" aria-label="Apps" data-editing={state.editing}>
         {shown.map((id, i) => tile(id, i, 'shown'))}
-        {!state.editing && <motion.div layout={!reduced} className="tile-wrap"><button className="app-tile" data-testid="view-quickInfo" onClick={() => navigate('quickInfo')}><Icon name="weather" /><span>Quick info</span></button></motion.div>}
+        {!state.editing && <motion.div layout={!quiet} transition={quiet ? { duration: 0 } : SPRING.ui()} className="tile-wrap"><button className="app-tile" data-testid="view-quickInfo" onClick={() => navigate('quickInfo')}><Icon name="weather" /><span>Quick info</span></button></motion.div>}
       </div>
-      <AnimatePresence>{state.editing && <motion.div key="hidden" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.2 }}>
+      <AnimatePresence>{state.editing && <motion.div key="hidden" initial={{ opacity: 0, y: quiet ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: quiet ? 0 : 8 }} transition={tween(keyboard ? 0 : DUR.base)}>
         <div className="app-section-label">Hidden apps</div>
-        <div ref={hiddenGrid} className="app-grid hidden-grid" aria-label="Hidden apps" data-over={overHidden}>{hidden.map((id, i) => tile(id, i, 'hidden'))}</div>
+        <div ref={hiddenGrid} className="app-grid hidden-grid" aria-label="Hidden apps" data-editing={state.editing} data-over={overHidden}>{hidden.map((id, i) => tile(id, i, 'hidden'))}</div>
       </motion.div>}</AnimatePresence>
     </LayoutGroup>
-    {drag && dragged && createPortal(<div className="drag-ghost" style={{ left: drag.x, top: drag.y, width: drag.w }}>
-      <motion.div initial={{ scale: 1 }} animate={{ scale: 1.08 }} transition={{ type: 'spring', visualDuration: 0.2, bounce: 0.3 }}>
+    {ghost && dragged && createPortal(<motion.div key={ghost.id} className="drag-ghost launcher-drag-ghost" initial={{ x: ghost.x, y: ghost.y, scale: 1 }} animate={ghostMotion} style={{ left: 0, top: 0, width: ghost.w, transformOrigin: '0 0' }}>
+      <motion.div initial={false} animate={{ scale: drag && !quiet ? 1.08 : 1 }} transition={quiet ? { duration: 0 } : SPRING.ui()}>
         <div className="app-tile" style={{ ['--tone' as string]: tone(dragged.view) }}><Icon name={dragged.view ? viewIcons[dragged.view] ?? 'grid' : 'grid'} /><span>{label(dragged)}</span></div>
-      </motion.div></div>, document.body)}
+      </motion.div></motion.div>, document.body)}
     <span role="status" className="sr-only">{state.editing ? 'Editing apps' : 'App editing closed'}</span>
   </div>;
 }

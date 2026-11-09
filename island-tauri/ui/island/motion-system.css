@@ -57,3 +57,17 @@ html[data-reduce-motion='true'] .island :is(.fader-fill, .motion-meter-fill, .ai
   .island .fader-fill, .island .ai-meter > .motion-meter-fill,
   .island .ai-share-track > i, .island .monitor-meter > i { transition: none; }
 }
+/* System accessibility preferences (WebKitGTK 2.54 evaluates both queries).
+   Reduce transparency: glass mode becomes the solid island. */
+@media (prefers-reduced-transparency: reduce) {
+  html[data-glass='true'] .island { background: var(--ui-background); }
+  html[data-glass='true'] .live-side-button { background: var(--ui-background); }
+  html[data-glass='true'] .island .card, html[data-glass='true'] .island .settings-card, html[data-glass='true'] .island .app-tile {
+    background: var(--ui-surface); border-color: var(--ui-border);
+  }
+}
+/* Increase contrast: a clearly visible island edge and card/tile outlines. */
+@media (prefers-contrast: more) {
+  .island, .live-side-button { border-color: color-mix(in srgb, var(--ui-text) 55%, transparent); }
+  .island .card, .island .settings-card, .island .app-tile { border-color: color-mix(in srgb, var(--ui-text) 35%, transparent); }
+}

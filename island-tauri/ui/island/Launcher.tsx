@@ -17,7 +17,7 @@ const tone = (view: IslandView | null | undefined) => (view && tint[view]) || 'v
 const LONG_PRESS_MS = 450;
 
 type Drag = { id: string; from: 'shown' | 'hidden'; pointer: number; grabX: number; grabY: number; x: number; y: number; w: number };
-type Landing = { id: string; x: number; y: number; w: number; scale: number };
+type Landing = { id: string; x: number; y: number; w: number; scale: number; vx?: number; vy?: number };
 const label = (i: LauncherItem) => i.view ? viewLabels[i.view] : i.id;
 /** Only Hermes home is pinned in place. Settings is `locked` (can't be hidden) but moves freely. */
 const fixed = (i: LauncherItem) => i.id === 'terminal';
@@ -46,6 +46,8 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   const press = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; id: string; armed: boolean } | null>(null);
   const tail = useRef<Promise<unknown>>(Promise.resolve()), grid = useRef<HTMLDivElement>(null), hiddenGrid = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
+  // Recent pointer velocity (px/s), so a dropped tile leaves the finger at the speed it was moving.
+  const fling = useRef({ x: 0, y: 0, t: 0, vx: 0, vy: 0 });
   const key = JSON.stringify([serverShown, serverHidden]);
   useLayoutEffect(() => { if (!dragRef.current) { setShown(serverShown); setHidden(serverHidden); } }, [key]);
   useEffect(() => () => { if (press.current?.timer) clearTimeout(press.current.timer); }, []);
@@ -64,7 +66,9 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     if (!landing) return;
     if (quiet || !visible) { setLanding(null); return; }
     let cancelled = false;
-    void ghostMotion.start({ x: landing.x, y: landing.y, scale: landing.scale, transition: SPRING.ui() }).then(() => {
+    const spring = SPRING.ui();
+    void ghostMotion.start({ x: landing.x, y: landing.y, scale: landing.scale,
+      transition: { x: { ...spring, velocity: landing.vx ?? 0 }, y: { ...spring, velocity: landing.vy ?? 0 }, scale: spring } }).then(() => {
       if (!cancelled) setLanding(current => current === landing ? null : current);
     });
     return () => { cancelled = true; ghostMotion.stop(); };
@@ -91,6 +95,7 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     target.setPointerCapture(e.pointerId);
     const from = arrangement.current.shown.includes(id) ? 'shown' as const : 'hidden' as const;
     setDrag({ id, from, pointer: e.pointerId, grabX: e.clientX - r.left, grabY: e.clientY - r.top, x: r.left, y: r.top, w: r.width });
+    fling.current = { x: e.clientX, y: e.clientY, t: performance.now(), vx: 0, vy: 0 };
     suppressClick.current = true;
   };
   const inside = (el: HTMLElement | null, x: number, y: number) => { const r = el?.getBoundingClientRect(); return !!r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
@@ -103,6 +108,9 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   const move = (e: PointerEvent) => {
     const d = dragRef.current; if (!d || e.pointerId !== d.pointer) return;
     setDrag({ ...d, x: e.clientX - d.grabX, y: e.clientY - d.grabY });
+    const f = fling.current, now = performance.now(), dt = now - f.t;
+    if (dt > 0) fling.current = { x: e.clientX, y: e.clientY, t: now,
+      vx: .7 * ((e.clientX - f.x) / dt * 1000) + .3 * f.vx, vy: .7 * ((e.clientY - f.y) / dt * 1000) + .3 * f.vy };
     const { shown: s, hidden: h } = arrangement.current;
     if (inside(hiddenGrid.current, e.clientX, e.clientY)) {
       if (byId.get(d.id)?.locked) return;   // Settings can be moved but never hidden
@@ -125,7 +133,10 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     const slot = [...(container?.querySelectorAll<HTMLElement>('[data-tile]') ?? [])].find(el => el.dataset.tile === d.id);
     if (slot && container && visible && !quiet) {
       const r = container.getBoundingClientRect();
-      setLanding({ id: d.id, x: r.left + slot.offsetLeft - container.scrollLeft, y: r.top + slot.offsetTop - container.scrollTop, w: d.w, scale: slot.offsetWidth / d.w });
+      // Held still before letting go: no fling. Capped so a wild flick can't overshoot far.
+      const f = fling.current, still = performance.now() - f.t > 80, cap = (v: number) => Math.max(-3000, Math.min(3000, v));
+      setLanding({ id: d.id, x: r.left + slot.offsetLeft - container.scrollLeft, y: r.top + slot.offsetTop - container.scrollTop, w: d.w, scale: slot.offsetWidth / d.w,
+        vx: still ? 0 : cap(f.vx), vy: still ? 0 : cap(f.vy) });
     }
     setDrag(null); setOverHidden(false);
     const s = arrangement.current.shown, wasShown = d.from === 'shown', nowShown = s.includes(d.id);

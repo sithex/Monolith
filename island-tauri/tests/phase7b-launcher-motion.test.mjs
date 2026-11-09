@@ -3,41 +3,47 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { load } from './phase7b-loader.mjs';
 import { driver, nodes, labeled, deferred, tick } from './phase7b-runtime-harness.mjs';
-const { swipeAxis, swipeDirection, swipeOffset, wiggleTiming } = load('ui/island/launcher-motion.ts');
+const { swipeAxis, swipeDirection, swipeOffset, rubberband, projectDistance, FLICK_VELOCITY, wiggleTiming } = load('ui/island/launcher-motion.ts');
 const { DUR, EASE_OUT, SPRING, setMotionSpeed } = load('ui/island/motion-profile.ts');
 
-test('swipe click slop and vertical intent do not page', () => {
-  assert.equal(swipeAxis(3, 4), 'pending');
-  assert.equal(swipeAxis(6, 0), 'x');
+test('swipe needs ~10 px of slop before picking an axis; vertical intent never pages', () => {
+  assert.equal(swipeAxis(6, 0), 'pending');
+  assert.equal(swipeAxis(9, 4), 'pending');
+  assert.equal(swipeAxis(10, 0), 'x');
   assert.equal(swipeAxis(20, 21), 'y');
   assert.equal(swipeDirection(5, 0, 400, 2, 1, 3), 0);
   assert.equal(swipeDirection(200, 201, 400, 2, 1, 3), 0);
 });
-test('swipe commits beyond 30 percent in either direction, not at the boundary', () => {
-  assert.equal(swipeDirection(-120, 0, 400, 0, 1, 3), 0);
-  assert.equal(swipeDirection(-121, 0, 400, 0, 1, 3), 1);
-  assert.equal(swipeDirection(121, 0, 400, 0, 1, 3), -1);
-  assert.equal(swipeDirection(-90, 0, 300, 0, 1, 3), 0);
-  assert.equal(swipeDirection(-91, 0, 300, 0, 1, 3), 1);
+test('a slow drag commits once the projected landing passes half a page', () => {
+  assert.equal(swipeDirection(-200, 0, 400, 0, 1, 3), 0);
+  assert.equal(swipeDirection(-201, 0, 400, 0, 1, 3), 1);
+  assert.equal(swipeDirection(201, 0, 400, 0, 1, 3), -1);
+  // Momentum below flick speed still counts: 0.29 px/ms coasts ~28.7 px, carrying 180 px past 200.
+  assert.ok(Math.abs(projectDistance(-0.29) + 28.71) < 1e-9);
+  assert.equal(swipeDirection(-180, 0, 400, 0, 1, 3), 0);
+  assert.equal(swipeDirection(-180, 0, 400, -0.29, 1, 3), 1);
+  assert.equal(swipeDirection(-180, 0, 400, 0.29, 1, 3), 0);
   assert.equal(swipeDirection(-200, 0, 0, 0, 1, 3), 0);
 });
-test('a short recent flick commits, including a reversed flick, but cannot wrap at an edge', () => {
-  assert.equal(swipeDirection(-12, 1, 400, -0.45, 1, 3), 0);
-  assert.equal(swipeDirection(-12, 1, 400, -0.46, 1, 3), 1);
-  assert.equal(swipeDirection(12, 1, 400, 0.46, 1, 3), -1);
-  assert.equal(swipeDirection(40, 1, 400, -0.8, 1, 3), 1);
+test('a flick decides by its direction: short flicks page, a flick back against the drag cancels, edges never wrap', () => {
+  assert.equal(swipeDirection(-12, 1, 400, -FLICK_VELOCITY + 0.01, 1, 3), 0);
+  assert.equal(swipeDirection(-12, 1, 400, -FLICK_VELOCITY, 1, 3), 1);
+  assert.equal(swipeDirection(12, 1, 400, 0.5, 1, 3), -1);
+  assert.equal(swipeDirection(-300, 0, 400, 0.5, 1, 3), 0, 'flicked back after a long drag');
   assert.equal(swipeDirection(140, 0, 400, 1, 0, 3), 0);
   assert.equal(swipeDirection(-140, 0, 400, -1, 2, 3), 0);
   assert.equal(swipeDirection(140, 0, 400, 1, 0, 1), 0);
 });
-test('swipe follows 1:1 except for 0.3 resistance beyond the first or last page', () => {
-  assert.equal(swipeOffset(100, 1, 3), 100);
-  assert.equal(swipeOffset(-100, 1, 3), -100);
-  assert.equal(swipeOffset(100, 0, 3), 30);
-  assert.equal(swipeOffset(-100, 0, 3), -100);
-  assert.equal(swipeOffset(-100, 2, 3), -30);
-  assert.equal(swipeOffset(100, 2, 3), 100);
-  assert.equal(swipeOffset(-100, 0, 1), -30);
+test('swipe tracks 1:1 between pages; past an end the resistance grows with the pull', () => {
+  assert.equal(swipeOffset(100, 1, 3, 400), 100);
+  assert.equal(swipeOffset(-100, 1, 3, 400), -100);
+  assert.equal(swipeOffset(-100, 0, 3, 400), -100);
+  const small = swipeOffset(40, 0, 3, 400), big = swipeOffset(400, 0, 3, 400);
+  assert.ok(small > 0 && small < 40);
+  assert.ok(small / 40 > big / 400, 'fraction followed shrinks as the pull grows');
+  assert.ok(big < 400 * 0.55, 'bounded by the rubber-band constant');
+  assert.equal(swipeOffset(-40, 2, 3, 400), -small);
+  assert.equal(rubberband(50, 0), 0);
 });
 test('tile wiggle samples stay within the requested period and always start at a negative phase', () => {
   for (const a of [0, 0.25, 0.5, 0.999]) for (const b of [0, 0.5, 0.999]) {
@@ -133,7 +139,8 @@ test('a dropped tile keeps its ghost until SPRING.ui settles, even for a zero-di
   labeled(f.tree(), 'Open System monitor').props.onClick(); assert.deepEqual(f.navigated, []);
   f.event('pointerup', 248, 220); f.render();
   assert.ok(f.ghost(), 'drop must not remove the moving tile'); assert.equal(f.starts.length, 1);
-  assert.deepEqual(f.starts[0].target, { x: 222, y: 200, scale: 1, transition: SPRING.ui() });
+  const spring = SPRING.ui();
+  assert.deepEqual(f.starts[0].target, { x: 222, y: 200, scale: 1, transition: { x: { ...spring, velocity: 0 }, y: { ...spring, velocity: 0 }, scale: spring } });
   assert.equal(nodes(f.tree()).find(n => n.props?.['data-tile'] === 'monitor').props.style.opacity, 0);
   f.starts[0].resolve(); await tick(); f.render();
   assert.equal(f.ghost(), undefined);

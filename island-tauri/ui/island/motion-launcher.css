@@ -38,3 +38,7 @@ html[data-tone='light'] {
 @media (hover: hover) and (pointer: fine) {
   .island .launcher .tile-badge:hover { filter: brightness(1.15); }
 }
+/* Page swipe (ViewPager): the stage carries the page; the page-in keyframe must not fight it.
+   pan-y leaves vertical scrolling to the browser while horizontal drags page. */
+.island .view-stage { touch-action: pan-y; }
+.island .view-stage[data-swiping='true'] .app-pane > * { animation: none; }

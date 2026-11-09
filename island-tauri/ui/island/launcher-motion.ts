@@ -1,21 +1,45 @@
-/** Decide the gesture once it clears click slop; keep vertical scrolling out of paging. */
+/** Hysteresis before a drag picks an axis (~10 px): small wobbles stay clicks/scrolls. */
+export const SWIPE_SLOP = 10;
+/** Decide the gesture once it clears the slop; keep vertical scrolling out of paging. */
 export function swipeAxis(dx: number, dy: number): 'pending' | 'x' | 'y' {
-  if (Math.hypot(dx, dy) < 6) return 'pending';
+  if (Math.hypot(dx, dy) < SWIPE_SLOP) return 'pending';
   return Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
 }
 
-/** Positive direction advances a page. Velocity is the recent horizontal speed in px/ms. */
+/** Where a release at `velocity` (px/ms) would coast to under exponential decay (`v·d/(1−d)`,
+ *  d per ms). 0.99 is snappier than scroll momentum: sub-flick drifts add at most ~30 px. */
+export function projectDistance(velocity: number, decelerationRate = 0.99): number {
+  return velocity * decelerationRate / (1 - decelerationRate);
+}
+
+/** Speed (px/ms) above which the flick's direction alone decides. */
+export const FLICK_VELOCITY = 0.3;
+
+/** Positive direction advances a page. The flick's sign decides when fast (a flick back
+ *  against the drag cancels); otherwise the projected landing point must pass half a page. */
 export function swipeDirection(dx: number, dy: number, width: number, velocity: number, page: number, count: number): -1 | 0 | 1 {
   if (!(width > 0) || swipeAxis(dx, dy) !== 'x') return 0;
-  const flick = Math.abs(velocity) > 0.45;
-  if (!flick && Math.abs(dx) <= width * 0.3) return 0;
-  const direction = (flick ? velocity : dx) < 0 ? 1 : -1;
+  let travel: number;
+  if (Math.abs(velocity) >= FLICK_VELOCITY) {
+    if (Math.abs(dx) > SWIPE_SLOP && Math.sign(velocity) !== Math.sign(dx)) return 0;
+    travel = velocity;
+  } else {
+    travel = dx + projectDistance(velocity);
+    if (Math.abs(travel) <= width * 0.5) return 0;
+  }
+  const direction = travel < 0 ? 1 : -1;
   return page + direction < 0 || page + direction >= count ? 0 : direction;
 }
 
-/** Track 1:1 between pages, but resist a pull beyond either end. */
-export function swipeOffset(dx: number, page: number, count: number): number {
-  return (dx > 0 && page <= 0) || (dx < 0 && page >= count - 1) ? dx * 0.3 : dx;
+/** Progressive resistance past an edge: the further the pull, the less it follows. */
+export function rubberband(overshoot: number, dimension: number, constant = 0.55): number {
+  if (!(dimension > 0)) return 0;
+  return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
+}
+
+/** Track 1:1 between pages; rubber-band a pull beyond the first or last page. */
+export function swipeOffset(dx: number, page: number, count: number, width: number): number {
+  return (dx > 0 && page <= 0) || (dx < 0 && page >= count - 1) ? rubberband(dx, width) : dx;
 }
 
 /** Sample once per tile, not per render or grid position. */

@@ -2,7 +2,7 @@
 """Render the pixel companions through the real brain and assemble 1x/8x contact sheets.
 
 Usage: render_pixel_companions.py --output DIR [--ids a,b]
-Writes DIR/frames/*.png (true 20x20 captures), DIR/sheet-1x.png and DIR/sheet-8x.png.
+Writes DIR/frames/*.png (true-size captures: each character's own 20-26 px square slot), DIR/sheet-1x.png and DIR/sheet-8x.png.
 """
 import argparse, json, os, subprocess, tempfile
 from pathlib import Path
@@ -34,7 +34,8 @@ for scale in (1, 8):
         rows.append((id_, looks))
         rows.append((id_, hab))
     cols = max(len(r[1]) for r in rows)
-    cell = 20 * scale + (4 if scale == 1 else 8)
+    side = max(Image.open(p).width for p in frames.glob("*.png"))
+    cell = side * scale + (4 if scale == 1 else 8)
     top = 0 if scale == 1 else 14
     sheet = Image.new("RGB", (cols * cell + 4, len(rows) * (cell + top) + 4), "#000000")
     d = ImageDraw.Draw(sheet)
@@ -43,9 +44,9 @@ for scale in (1, 8):
             f = frames / f"{id_}-{n}.png"
             if not f.exists(): continue
             im = Image.open(f).convert("RGB")
-            assert im.size == (20, 20), (f, im.size)
+            assert im.width == im.height and 20 <= im.width <= 26, (f, im.size)
             x, y = 4 + ci * cell, 4 + ri * (cell + top)
             if scale > 1: d.text((x, y), n.replace("look-", "")[:12], fill="#bbbbbb")
-            sheet.paste(im.resize((20 * scale, 20 * scale), Image.NEAREST), (x, y + top))
+            sheet.paste(im.resize((im.width * scale, im.height * scale), Image.NEAREST), (x, y + top))
     sheet.save(out / f"sheet-{scale}x.png")
 print(out / "sheet-8x.png")

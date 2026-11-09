@@ -9,7 +9,12 @@ Item {
     id: art
 
     property Item face
-    readonly property real preferredSize: 20
+    // Side of the square slot in sprite pixels. 20 by default; a detailed character may ask
+    // for up to `maxSlotSize` (the 32 px panel's notch has a 28 px interior, so 26 leaves a
+    // pixel of air above and below). Larger art would be clipped by the pill.
+    property int slotSize: 20
+    readonly property int maxSlotSize: 26
+    readonly property real preferredSize: Math.max(16, Math.min(maxSlotSize, slotSize))
     // How far the brain moves the gaze (see Companion.retarget). Pixel-art characters set
     // 1 and quantise it themselves with `gazePx`.
     property real gazeScale: 0.45

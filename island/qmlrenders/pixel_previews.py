@@ -19,7 +19,7 @@ def svg(path):
                 parts.setdefault("#%02x%02x%02x" % c, []).append(f"M{x} {y}h{e - x}v1h-{e - x}z")
             x = e
     paths = "".join(f'<path d="{"".join(v)}" fill="{k}"/>' for k, v in parts.items())
-    return f'<svg viewBox="0 0 20 20" width="28" height="28" shapeRendering="crispEdges" aria-hidden="true">{paths}</svg>'
+    return f'<svg viewBox="0 0 {im.width} {im.height}" width="28" height="28" shapeRendering="crispEdges" aria-hidden="true">{paths}</svg>'
 
 for id_ in sys.argv[2:]:
     print(f"const {id_} = () => {svg(f'{sys.argv[1]}/{id_}-look-center.png')};")

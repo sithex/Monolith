@@ -19,13 +19,13 @@ TestCase {
         id: factory
         Rectangle {
             property alias face: face
-            width: 20
-            height: 20
+            width: face.preferredSize
+            height: face.preferredSize
             color: "#131313"
             Panel.Companion {
                 id: face
-                width: 20
-                height: 20
+                width: preferredSize
+                height: preferredSize
                 motion: true
                 screenArea: Qt.rect(-1e5, -1e5, 2e5, 2e5)
             }
@@ -33,7 +33,7 @@ TestCase {
     }
 
     function point(face, dx, dy) {
-        const c = face.mapToGlobal(10, 10);
+        const c = face.mapToGlobal(face.width / 2, face.height / 2);
         face.pointerX = c.x + dx;
         face.pointerY = c.y + dy;
         face.pointerAt = Math.max(Date.now(), face.pointerAt + 1);

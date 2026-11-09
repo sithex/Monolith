@@ -23,7 +23,10 @@ TestCase {
         });
         verify(face.art !== null);
         compare(face.shownCharacter, data.id);
-        compare(face.preferredSize, 20);
+        // Pixel characters default to a 20 px slot and may ask for up to 26 px (the 32 px
+        // notch's interior is 28 px); the brain sizes the face from the art's request.
+        compare(face.preferredSize, face.art.preferredSize);
+        verify(face.preferredSize >= 16 && face.preferredSize <= 26, "slot fits the notch: " + face.preferredSize);
         compare(face.art.habitRunning, false);
         const art = face.art;
         const lightEdge = art.edge.toString();

@@ -3,7 +3,7 @@ import QtQuick
 import QtTest
 
 // Pixel-art companions: real pointer input moves
-// the artwork, all drawing stays on whole pixels inside the 20×20 slot in every state,
+// the artwork, all drawing stays on whole pixels inside the character's own square slot (20–26 px) in every state,
 // sub-pixel brain jitter draws nothing, and the hover/habit/sleep looks appear.
 TestCase {
     id: suite
@@ -14,13 +14,13 @@ TestCase {
     Component {
         id: factory
         Panel.Companion {
-            x: 80; y: 80; width: 20; height: 20
+            x: 80; y: 80; width: preferredSize; height: preferredSize
             motion: true
             screenArea: Qt.rect(-2000, -2000, 4000, 4000)
         }
     }
     function point(face, dx, dy) {
-        const c = face.mapToGlobal(10, 10);
+        const c = face.mapToGlobal(face.width / 2, face.height / 2);
         face.pointerX = c.x + dx;
         face.pointerY = c.y + dy;
         face.pointerAt = Math.max(Date.now(), face.pointerAt + 1);
@@ -47,7 +47,8 @@ TestCase {
         for (const r of runs(face.art, face, [])) {
             verify(!r.aa, what + ": pixel art must not antialias");
             for (const v of [r.x0, r.y0, r.x1, r.y1]) compare(v, Math.round(v), what + ": whole pixels " + JSON.stringify(r));
-            verify(r.x0 >= 0 && r.y0 >= 0 && r.x1 <= 20 && r.y1 <= 20, what + ": inside slot " + JSON.stringify(r));
+            const s = face.preferredSize;
+            verify(r.x0 >= 0 && r.y0 >= 0 && r.x1 <= s && r.y1 <= s, what + ": inside slot " + JSON.stringify(r));
         }
     }
 

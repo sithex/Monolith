@@ -44,6 +44,11 @@ at 16–20 px) are drawn as **crisp pixel sprites** instead:
 - Base the character on `characters/HabitCharacter.qml` and draw with
   `characters/PixelSprite.qml`: text rows plus a colour map, one unantialiased
   `Rectangle` per horizontal run. Every pixel lands on a screen pixel at 1×.
+- Slot size: 20×20 by default. A character whose reference needs more detail sets
+  `slotSize` (max 26, `HabitCharacter.maxSlotSize`): the notch is the 32 px panel with a
+  28 px interior, so 26 leaves one pixel above and below. The brain sizes the face from
+  `preferredSize`, the text after it moves right, and tests/renders check bounds against
+  the character's own slot.
 - Design the sprite first as text rows in Python (Pillow, nearest-neighbour preview at
   1× and 8×), iterate until it reads, then paste the rows into QML. Get proportions and
   palette from the real reference sprite.
@@ -174,7 +179,7 @@ while the mouse moved. The same look now costs about 1%.
    drive real pointer positions through the brain and compare a *picture signature*
    (every visible run's rect and colour) — left/right/down must differ from centre,
    sub-pixel jitter and other-monitor moves must not change it, every run stays
-   whole-pixel, unantialiased and inside the 20×20 slot in every gaze × habit × hover
+   whole-pixel, unantialiased and inside the character's own slot (20–26 px square) in every gaze × habit × hover
    state, and a real burst changes the picture then settles back exactly. Testing only
    that a brain offset is clamped does not prove the art follows the mouse.
 2. **Offscreen renders:** `python island/qmlrenders/render_pixel_companions.py --output

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, LayoutGroup, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { launcherCommand, type LauncherOp, type IslandView, type LauncherItem } from '../ipc/client';
@@ -11,8 +11,11 @@ import { useReducedMotionPreference } from './components/motion-preference';
 import type { IconName } from './models';
 export const viewLabels: Record<IslandView,string> = { terminal:'Hermes',monitor:'System monitor',ai:'AI Agents',settings:'Settings',launcher:'Apps',notifications:'Notifications',clipboard:'Clipboard',music:'Now playing',quickInfo:'Quick info',timer:'Timer',calendar:'Calendar',scratchpad:'Scratchpad',downloads:'Downloads',controls:'Controls',mixer:'Volume mixer',brightness:'Brightness',agents:'Agent runs',updates:'Package updates' };
 export const viewIcons: Partial<Record<IslandView,IconName>> = { terminal:'terminal',monitor:'monitor',ai:'spark',settings:'settings',notifications:'bell',clipboard:'clipboard',music:'music',timer:'timer',calendar:'calendar',scratchpad:'note',downloads:'download',controls:'controls',mixer:'volume',brightness:'sun',agents:'spark',updates:'download',quickInfo:'weather',launcher:'grid' };
-// Tile tints: music pink, calendar red, timer orange, everything else white .85.
-const tint: Partial<Record<IslandView,string>> = { music:'var(--v-pink)', calendar:'var(--v-red)', timer:'var(--v-orange)', terminal:'var(--ui-accent)' };
+// Tile tints (Nov 9): every app has its own system colour (motion-launcher.css --app-*);
+// Hermes keeps the theme accent. Tiles stay neutral, only the glyph is coloured.
+const tint: Partial<Record<IslandView,string>> = Object.fromEntries((['monitor','ai','agents','settings','notifications','clipboard','music','timer','calendar',
+  'scratchpad','downloads','updates','controls','mixer','brightness','quickInfo'] as IslandView[]).map(v => [v, `var(--app-${v})`]));
+tint.terminal = 'var(--ui-accent)';
 const tone = (view: IslandView | null | undefined) => (view && tint[view]) || 'var(--tile-ink, rgb(255 255 255 / .85))';
 const LONG_PRESS_MS = 450;
 
@@ -45,6 +48,34 @@ function launchFrom(tile: HTMLElement | undefined) {
   root.style.setProperty('--launch-y', `${Math.round(r.top + r.height / 2 - s.top)}px`);
   lastLaunch = performance.now();
   markLaunch('open');
+}
+
+/** Columns: 5 per row (Nick, Nov 9); fewer only when the island is too narrow for 5,
+ *  or when there are fewer than 5 apps. */
+export function balancedColumns(count: number, fit: number): number {
+  const max = Math.max(1, Math.min(5, Math.floor(fit)));
+  return count > 0 ? Math.min(max, count) : max;
+}
+const TILE_MIN = 76, TILE_GAP = 10;
+function useColumns(grid: RefObject<HTMLDivElement | null>, count: number) {
+  const [fit, setFit] = useState(5);
+  useLayoutEffect(() => {
+    const el = grid.current; if (!el || typeof ResizeObserver !== 'function') return;
+    const measure = () => setFit(Math.floor((el.clientWidth + TILE_GAP) / (TILE_MIN + TILE_GAP)) || 1);
+    measure();
+    const observer = new ResizeObserver(measure); observer.observe(el);
+    return () => observer.disconnect();
+  }, [grid]);
+  return balancedColumns(count, fit);
+}
+
+/** Edit lives in the page title bar so the grid starts right under it. */
+export function LauncherEditButton({ fail }: { fail(error: unknown): void }) {
+  const state = useLauncher();
+  if (state.editing) return null;
+  return <button className="pill-button" aria-label="Edit apps" onClick={() => {
+    void launcherCommand({ type: 'begin' }).then(next => launcherStore.apply(next, next.rev)).catch(fail);
+  }}>Edit</button>;
 }
 
 export function Launcher({ navigate, fail }: { navigate(view: IslandView): void; fail(error: unknown): void }) {
@@ -223,18 +254,19 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     </motion.div>;
   };
   const ghost = drag ?? landing, dragged = ghost ? byId.get(ghost.id) : undefined;
+  const drawn = (ids: string[]) => ids.filter(id => { const it = byId.get(id); return it && it.view !== 'controls'; }).length;
+  const shownCols = useColumns(grid, drawn(shown) + (state.editing ? 0 : 1)), hiddenCols = useColumns(hiddenGrid, Math.max(drawn(hidden), 1));
   return <div className="launcher" data-editing={state.editing} data-motion-active={visible && state.editing && !reduced} data-reduced-motion={reduced} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (state.editing) void send({ type: 'cancel' }).catch(() => undefined); } }}>
     <LayoutGroup>
-      <div ref={grid} className="app-grid" aria-label="Apps" data-editing={state.editing}>
-        <div className="launcher-toolbar"><span>{state.editing ? 'Drag to arrange · drop in Hidden to hide' : 'Hold an app to arrange'}</span>
-          {state.editing && <><button className="pill-button" onClick={() => { void send({ type: 'cancel' }).catch(() => undefined); }}>Cancel</button><button className="pill-button primary" onClick={() => { void send({ type: 'commit' }).catch(() => undefined); }}>Done</button></>}
-          {!state.editing && <button className="pill-button" aria-label="Edit apps" onClick={() => { void send({ type: 'begin' }).catch(() => undefined); }}>Edit</button>}
-        </div>
+      <div ref={grid} className="app-grid" aria-label="Apps" data-editing={state.editing} data-cols={shownCols} style={{ ['--cols' as string]: shownCols }}>
+        {state.editing && <div className="launcher-toolbar"><span>Drag to arrange · drop in Hidden to hide</span>
+          <button className="pill-button" onClick={() => { void send({ type: 'cancel' }).catch(() => undefined); }}>Cancel</button><button className="pill-button primary" onClick={() => { void send({ type: 'commit' }).catch(() => undefined); }}>Done</button>
+        </div>}
         {shown.map((id, i) => tile(id, i, 'shown'))}
-        {!state.editing && <motion.div layout={!quiet} transition={quiet ? { duration: 0 } : SPRING.ui()} className="tile-wrap"><button className="app-tile" data-testid="view-quickInfo" onClick={e => { launchFrom(e?.currentTarget); navigate('quickInfo'); }}><Icon name="weather" /><span>Quick info</span></button></motion.div>}
+        {!state.editing && <motion.div layout={!quiet} transition={quiet ? { duration: 0 } : SPRING.ui()} className="tile-wrap"><button className="app-tile" data-testid="view-quickInfo" style={{ ['--tone' as string]: tone('quickInfo') }} onClick={e => { launchFrom(e?.currentTarget); navigate('quickInfo'); }}><Icon name="weather" /><span>Quick info</span></button></motion.div>}
       </div>
       <AnimatePresence>{state.editing && <motion.div key="hidden" initial={{ opacity: 0, y: quiet ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: quiet ? 0 : 8 }} transition={tween(keyboard ? 0 : DUR.base)}>
-        <div ref={hiddenGrid} className="app-grid hidden-grid" aria-label="Hidden apps" data-editing={state.editing} data-over={overHidden}>
+        <div ref={hiddenGrid} className="app-grid hidden-grid" aria-label="Hidden apps" data-editing={state.editing} data-over={overHidden} data-cols={hiddenCols} style={{ ['--cols' as string]: hiddenCols }}>
           <div className="app-section-label">Hidden apps</div>{hidden.map((id, i) => tile(id, i, 'hidden'))}</div>
       </motion.div>}</AnimatePresence>
     </LayoutGroup>

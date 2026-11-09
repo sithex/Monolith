@@ -7,7 +7,7 @@ import { IslandSurface } from './IslandSurface';
 import { IslandShell } from './components/IslandShell';
 import { Topline } from './Topline';
 import { ViewPager } from './ViewPager';
-import { Launcher, viewLabels } from './Launcher';
+import { Launcher, LauncherEditButton, viewLabels } from './Launcher';
 import { SideControls } from './SideControls';
 import { CommandPalette } from './CommandPalette';
 import { VoiceControls } from './VoiceControls';
@@ -171,7 +171,7 @@ export function Island() {
     <motion.div ref={wrap} className="terminal-wrap island-content" hidden={!active && !lingering} aria-hidden={!active} style={closing ?? undefined} {...openMotion}>
       <ViewPager fail={fail} views={views}>
         <IslandShell title={viewLabels[view]} home={view === 'terminal'} intents={{ navigate: () => navigate('terminal') }} back={{ label: viewLabels[previous], go: goBack }}
-          actions={<VoiceControls shown={view === 'terminal'} active={active && view === 'terminal'} fail={fail} />}>
+          actions={<>{view === 'launcher' && <LauncherEditButton fail={fail} />}<VoiceControls shown={view === 'terminal'} active={active && view === 'terminal'} fail={fail} /></>}>
           <div className="view-pane" data-pane={view}>
             <div className="app-pane" hidden={view !== 'launcher'}>{view === 'launcher' && <Launcher navigate={navigate} fail={fail} />}</div>
             <div className="app-pane terminal-pane" hidden={view !== 'terminal'}>

@@ -153,7 +153,9 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .launcher-toolbar .pill-button.primary { background: var(--ui-accent); color: var(--ui-on-accent); }
 /* More island width adds columns, never oversized tiles. The minimum still
    contracts for exceptionally narrow panes; shown and Hidden grids share it. */
-.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(76px, 100%), 92px)); justify-content: center; gap: 10px; padding: 2px; position: relative; }
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(76px, 100%), 92px)); justify-content: center; gap: 10px; padding: 0; position: relative; }
+/* Launcher measures the width and supplies a balanced count, max 5 per row (Launcher.tsx balancedColumns). */
+.app-grid[data-cols] { grid-template-columns: repeat(var(--cols), minmax(min(76px, 100%), 92px)); }
 /* Header rows span exactly the tile columns, so their edges line up with the tiles. */
 .app-grid > .launcher-toolbar, .app-grid > .app-section-label { grid-column: 1 / -1; }
 .tile-wrap { position: relative; touch-action: none; z-index: 1; }

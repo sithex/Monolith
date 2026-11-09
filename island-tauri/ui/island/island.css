@@ -30,7 +30,7 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .preview { padding: 20px 24px; flex: 1; }
 .preview h2 { font-size: var(--fs-xl); font-weight: 500; }
 .preview button { margin-top: 20px; width: 100%; }
-.terminal-wrap { display: flex; flex: 1; min-height: 0; padding: 0 16px 18px; }
+.terminal-wrap { display: flex; flex: 1; min-height: 0; padding: 0 10px 10px; }
 
 .island[data-morphing='true'] > .terminal-wrap { will-change: transform, opacity, filter; }
 .island[data-state='large'][data-morphing='true'] > .terminal-wrap { position: absolute; top: 42px; left: 50%; margin-left: calc(var(--open-content-width) / -2); width: var(--open-content-width); height: var(--open-content-height); flex: none; }
@@ -42,7 +42,10 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .view-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 /* WebKitGTK overlay scrollbars have a wider hit area than their painted thumb.
    Keep right-edge controls outside that area; xterm retains its separate padding. */
-.app-pane { flex: 1; min-width: 0; min-height: 0; overflow: auto; scrollbar-width: thin; padding: 4px 20px 12px 4px; }
+.app-pane { flex: 1; min-width: 0; min-height: 0; overflow: auto; scrollbar-width: thin; padding: 3px 6px 4px; }
+/* Terminal and Now Playing keep their previous insets (6px wrap delta restored). */
+.app-pane.terminal-pane { padding: 0 6px 8px; }
+.view-pane[data-pane='music'] .app-pane:not([hidden]) { padding: 4px 26px 20px 10px; }
 .card { overflow-wrap: anywhere; }
 .terminal-pane { display: flex; padding: 0; }
 .terminal { flex: 1; min-width: 0; min-height: 0; user-select: text; -webkit-user-select: text; }

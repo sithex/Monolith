@@ -89,7 +89,7 @@ TestCase {
         for (let i = 0; i < 2; i++) {
             const eye = findChild(face, "companionEye" + i);
             if (eye)
-                verify(eye.x >= 0 && eye.y >= 0 && eye.x + eye.width <= 20 && eye.y + eye.height <= 20);
+                verify(eye.x >= 0 && eye.y >= 0 && eye.x + eye.width <= face.preferredSize && eye.y + eye.height <= face.preferredSize);
 
         }
         face.happy = true;

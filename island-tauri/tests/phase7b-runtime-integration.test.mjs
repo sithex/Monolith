@@ -342,14 +342,21 @@ test('Settings search shows matching results from every section, empty state, Es
     assert.equal(nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Backup'),undefined);
   })();}finally{d.dispose();for(const [k,v] of Object.entries(before))if(v)Object.defineProperty(globalThis,k,v);else delete globalThis[k];}
 });
-test('ResetHeader asks inline before resetting',async()=>{
-  const d=driver(),calls=[];
+test('ResetHeader asks inline and waits for the safety arm window before resetting',async t=>{
+  const d=driver(),calls=[];let now=100;
+  t.mock.method(performance,'now',()=>now);
+  t.mock.timers.enable({apis:['setTimeout']});
   const H=d.load('ui/views/SettingsView.tsx').ResetHeader,props={title:'Motion',onReset:async()=>calls.push('reset')};
-  let tree=d.render(H,props);
-  labeled(tree,'Reset Motion').props.onClick();assert.deepEqual(calls,[],'first tap only arms');
-  tree=d.render(H,props);assert.ok(nodes(tree).some(n=>n.type==='small'&&n.props.children==='Reset?'));
-  labeled(tree,'Confirm reset Motion').props.onClick();await tick();assert.deepEqual(calls,['reset']);
-  d.dispose();
+  try {
+    let tree=d.render(H,props);
+    labeled(tree,'Reset Motion').props.onClick();assert.deepEqual(calls,[],'first tap only arms');
+    tree=d.render(H,props);assert.ok(nodes(tree).some(n=>n.type==='small'&&n.props.children==='Reset?'));
+    const early=labeled(tree,'Confirm reset Motion');assert.equal(early.props.disabled,true);
+    early.props.onClick();assert.deepEqual(calls,[],'double-click cannot reset');
+    now+=600;t.mock.timers.tick(600);tree=d.render(H,props);
+    const ready=labeled(tree,'Confirm reset Motion');assert.equal(ready.props.disabled,false);
+    ready.props.onClick();ready.props.onClick();await tick();assert.deepEqual(calls,['reset']);
+  } finally {d.dispose();}
 });
 
 function commandHarness(value='',onSave=async()=>{}) {

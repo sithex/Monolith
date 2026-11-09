@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useTransform, type AnimationPlaybackControls } from 'framer-motion';
 import type { AppViewIntents, TimerSnapshot, TimerTab, CompletedTimerKind } from '../app-presentations';
 import { timerKind } from '../app-presentations';
-import { useReducedMotionPreference } from './motion-preference';
+import { useReducedMotionAll } from './motion-preference';
+import { DUR, SPRING, tween } from '../motion-profile';
 export function duration(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   const hours = Math.floor(seconds / 3600);
@@ -11,13 +12,15 @@ export function duration(ms: number): string {
 
 /** Digits roll vertically when they change (0.3 s). */
 function RollingText({ text, reduced }: { text: string; reduced: boolean }) {
+  const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
+  const still = reduced || keyboard;
   const chars = text.split('');
   return <span aria-hidden="true" style={{ display: 'inline-flex', overflow: 'hidden' }}>{chars.map((c, i) => {
     const slot = chars.length - i;  // keyed from the right so seconds keep their slot when hours appear
     return <span key={slot} style={{ position: 'relative', display: 'inline-block' }}>
       <AnimatePresence initial={false} mode="popLayout">
-        <motion.span key={c} className="digit" initial={reduced ? false : { y: '-70%', opacity: 0, filter: 'blur(2px)' }} animate={{ y: '0%', opacity: 1, filter: 'blur(0px)' }}
-          exit={reduced ? undefined : { y: '70%', opacity: 0, filter: 'blur(2px)' }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>{c}</motion.span>
+        <motion.span key={c} className="digit" initial={still ? { opacity: 0 } : { y: '-70%', opacity: 0 }} animate={still ? { opacity: 1 } : { y: '0%', opacity: 1 }}
+          exit={still ? { opacity: 0 } : { y: '70%', opacity: 0 }} transition={tween(keyboard ? 0 : reduced ? DUR.press : DUR.slow)}>{c}</motion.span>
       </AnimatePresence></span>;
   })}</span>;
 }
@@ -34,13 +37,15 @@ function MinuteWheel({ value, onChange, disabled, reduced }: { value: number; on
   const anim = useRef<AnimationPlaybackControls | null>(null), wheelAcc = useRef(0);
   const toValue = (o: number) => Math.max(MIN, Math.min(MAX, Math.round(-o / TICK) + MIN));
   useMotionValueEvent(offset, 'change', o => { const v = toValue(o); setLive(prev => prev === v ? prev : v); });
-  const settle = (target: number, velocity = 0) => {
+  const settle = (target: number, velocity = 0, instant = false) => {
     anim.current?.stop();
     const clamped = Math.max(MIN, Math.min(MAX, target));
-    anim.current = reduced ? (offset.set(-(clamped - MIN) * TICK), null) : animate(offset, -(clamped - MIN) * TICK, { type: 'spring', stiffness: 420, damping: 42, velocity });
+    anim.current = reduced || instant ? (offset.set(-(clamped - MIN) * TICK), null) : animate(offset, -(clamped - MIN) * TICK, { ...SPRING.ui(), velocity });
     if (clamped !== value) onChange(clamped);
   };
   useEffect(() => { if (!drag.current && toValue(offset.get()) !== value) settle(value); }, [value]);
+  useEffect(() => { if (reduced) { anim.current?.stop(); offset.set(-(value - MIN) * TICK); } }, [reduced]);
+  useEffect(() => () => anim.current?.stop(), []);
   const x = useTransform(offset, o => o);
   return <div className="wheel" role="slider" tabIndex={disabled ? -1 : 0} aria-label="Countdown minutes" aria-valuemin={MIN} aria-valuemax={MAX} aria-valuenow={live} aria-valuetext={`${live} minutes`} aria-disabled={disabled}
     style={{ opacity: disabled ? 0.45 : 1, pointerEvents: disabled ? 'none' : undefined }}
@@ -69,12 +74,12 @@ function MinuteWheel({ value, onChange, disabled, reduced }: { value: number; on
     onWheel={e => {
       wheelAcc.current += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * (e.deltaMode === 1 ? 20 : 1);
       const steps = Math.trunc(wheelAcc.current / 24); if (!steps) return;
-      wheelAcc.current -= steps * 24; settle(toValue(offset.get()) + steps);
+      wheelAcc.current -= steps * 24; settle(toValue(offset.get()) + steps, 0, true);
     }}
     onKeyDown={e => {
       const step = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : e.key === 'PageUp' ? 5 : e.key === 'PageDown' ? -5 : 0;
-      if (e.key === 'Home') { e.preventDefault(); settle(MIN); } else if (e.key === 'End') { e.preventDefault(); settle(MAX); }
-      else if (step) { e.preventDefault(); e.stopPropagation(); settle(live + step); }
+      if (e.key === 'Home') { e.preventDefault(); settle(MIN, 0, true); } else if (e.key === 'End') { e.preventDefault(); settle(MAX, 0, true); }
+      else if (step) { e.preventDefault(); e.stopPropagation(); settle(live + step, 0, true); }
     }}>
     <motion.div className="wheel-track" style={{ x }}>
       {Array.from({ length: MAX - MIN + 1 }, (_, i) => {
@@ -90,7 +95,7 @@ function MinuteWheel({ value, onChange, disabled, reduced }: { value: number; on
 }
 
 export function TimerApp({ snapshot, intents, completedKind = snapshot.countdownStatus === 'finished' ? 'countdown' : null }: { snapshot: TimerSnapshot; intents: Pick<AppViewIntents, 'timer'>; completedKind?: CompletedTimerKind | null }) {
-  const id = useId(), reduced = useReducedMotionPreference();
+  const id = useId(), reduced = useReducedMotionAll();
   const [tab, setTab] = useState<TimerTab>('timer');
   const [minutes, setMinutes] = useState(25);
   const status = tab === 'timer' ? snapshot.countdownStatus : tab === 'pomodoro' ? snapshot.pomodoroStatus : snapshot.stopwatchStatus;

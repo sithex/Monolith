@@ -1,1 +1,59 @@
-/* Nov 9 motion polish, system slice. Uses the tokens in surface.css (--ease-*, --dur-*). */
+/* System controls share motion tokens, but direct manipulation never interpolates. */
+.island .confirmation-action {
+  opacity: 1;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.island .confirmation-action[data-arming='true'] { opacity: .4; cursor: default; }
+
+.island .fader-fill {
+  height: 100%;
+  transform-origin: bottom;
+  will-change: auto;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.island .fader-fill[data-direct='true'],
+html[data-nav-via='key'] .island .fader-fill { transition: none; }
+.island .ai-meter > .motion-meter-fill,
+.island .ai-share-track > i {
+  width: 100%;
+  transform-origin: left;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.island .monitor-meter {
+  width: 100%; height: 7px; margin-top: 3px; overflow: hidden;
+  border-radius: var(--radius-lg); background: var(--ui-border);
+}
+.island .monitor-meter > i {
+  display: block; width: 100%; height: 100%; border-radius: inherit;
+  background: var(--ui-accent); transform-origin: left;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.island .monitor, .island .processes, .island .fader-pct,
+.island .slider-row output, .island .timer-app { font-variant-numeric: tabular-nums; }
+
+/* Rows and underlined tabs already communicate hover/selection without a button slab. */
+.island .processes .process-name:hover:not(:disabled),
+.island .processes .process-head button:hover:not(:disabled),
+.island .timer-app .timer-tabs button:hover:not(:disabled) { background: transparent; }
+@media (hover: hover) and (pointer: fine) {
+  .island .processes .process-actions button:hover:not(:disabled) { background: var(--v-fill-hi); }
+  .island .processes .process-actions .danger:hover:not(:disabled) { background: color-mix(in srgb, var(--v-red, #ff6b6b) 80%, transparent); }
+}
+
+/* JS owns the first-open delay and warm rail; CSS hover must not bypass it. */
+.island .settings-rail button .settings-rail-name {
+  visibility: hidden; opacity: 0; transition: none;
+}
+.island .settings-rail button:focus-visible .settings-rail-name { visibility: visible; opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .island .settings-rail button[data-tooltip-open='true'] .settings-rail-name { visibility: visible; opacity: 1; }
+}
+/* On narrow islands these names are inline labels, not tooltips. */
+@container (max-width: 420px) {
+  .island .settings-rail button .settings-rail-name { visibility: visible; opacity: 1; }
+}
+html[data-reduce-motion='true'] .island :is(.fader-fill, .motion-meter-fill, .ai-share-track > i, .monitor-meter > i) { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .island .fader-fill, .island .ai-meter > .motion-meter-fill,
+  .island .ai-share-track > i, .island .monitor-meter > i { transition: none; }
+}

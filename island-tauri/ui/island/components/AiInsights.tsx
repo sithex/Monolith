@@ -81,7 +81,7 @@ export function AiInsights({ insights, period, onPeriodChange }: { insights: Ser
       <div className="ai-card-header"><h3>Priciest sessions</h3><small>{label}</small></div>
       {d.top.length ? d.top.map((t, i) => <div className={`ai-top-row ai-${t.family}`} key={`${t.startedAt}-${i}`} title={`${t.title}\n${t.project} · ${t.model} · ${sourceName[t.source] ?? t.source}`}>
         <div className="ai-top-line"><strong>{t.title}</strong><span>{money(t.cost)}</span></div>
-        <div className="ai-share-track"><i style={{ width: `${Math.max(3, (t.cost ?? 0) / topPeak * 100)}%` }}/></div>
+        <div className="ai-share-track"><i style={{ width: '100%', transform: `scaleX(${Math.max(0.03, (t.cost ?? 0) / topPeak)})` }}/></div>
         <p>{t.model}{t.subagent ? ' · subagent' : ''} · {compact(t.prompt)} in · {compact(t.output)} out · {t.calls ?? '—'} calls · {span(t.duration)}</p>
       </div>) : <p className="ai-empty">No priced sessions</p>}
     </section>
@@ -89,7 +89,7 @@ export function AiInsights({ insights, period, onPeriodChange }: { insights: Ser
       <div className="ai-card-header"><h3>Where sessions run</h3><small>sessions · API value</small></div>
       {d.sources.length ? d.sources.map(s => <div className="ai-share" key={s.name}>
         <span>{sourceName[s.name] ?? s.name}</span>
-        <div className="ai-share-track"><i style={{ width: `${Math.max(3, s.sessions / sourcePeak * 44)}px` }}/></div>
+        <div className="ai-share-track"><i style={{ width: '100%', transform: `scaleX(${Math.max(3 / 44, s.sessions / sourcePeak)})` }}/></div>
         <small className="ai-source-count">{s.sessions}</small><small>{money(s.cost)}</small>
       </div>) : <p className="ai-empty">No recorded activity</p>}
     </section>

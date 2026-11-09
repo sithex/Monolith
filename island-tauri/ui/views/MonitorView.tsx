@@ -13,7 +13,7 @@ let lastTab: 'overview' | 'processes' = 'overview';
 function Gauge({ label, value, hint }: { label: string; value: number | null; hint: string }) {
   const percent = value !== null && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
   return <section className="card gauge"><h3>{label}<strong>{percent === null ? 'Unavailable' : `${percent.toFixed(1)}%`}</strong></h3>
-    {percent !== null && <progress aria-label={`${label} usage`} value={percent} max={100} />}<p className="muted">{hint}</p></section>;
+    {percent !== null && <div className="monitor-meter" role="progressbar" aria-label={`${label} usage`} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><i style={{ transform: `scaleX(${percent / 100})` }} /></div>}<p className="muted">{hint}</p></section>;
 }
 const bytes = (n: number | null | undefined) => n == null ? 'Unavailable' : formatSize(n);
 export function MonitorView({ active }: { active: boolean }) {

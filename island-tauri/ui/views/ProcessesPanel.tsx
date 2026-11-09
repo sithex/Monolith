@@ -3,6 +3,7 @@ import type { KillSignal, ProcessList } from '../ipc/bindings';
 import { processKill, processList } from '../ipc/client';
 import { formatSize } from '../island/components/AppPrimitives';
 import { createVisiblePoller } from './visible-poller';
+import { useConfirmationGuard } from './settings/use-confirmation-guard';
 import { groupByApp, matches, percent, sortGroups, type ProcessGroup, type ProcessSort } from './process-table';
 
 const COLUMNS: { id: ProcessSort; label: string }[] = [
@@ -16,7 +17,8 @@ export function ProcessesPanel({ active }: { active: boolean }) {
   const [list, setList] = useState<ProcessList | null>(null), [error, setError] = useState('');
   const [sort, setSort] = useState<ProcessSort>('cpu'), [query, setQuery] = useState('');
   const [grouped, setGrouped] = useState(true), [open, setOpen] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<{ key: string; signal: KillSignal } | null>(null);
+  const confirmation = useConfirmationGuard<{ key: string; signal: KillSignal }>();
+  const confirm = confirmation.pending;
   const [notice, setNotice] = useState('');
   const [poller] = useState(() => createVisiblePoller(processList, value => { setList(value); setError(''); },
     e => setError(String(e)), cb => setTimeout(cb, 2000)));
@@ -32,7 +34,7 @@ export function ProcessesPanel({ active }: { active: boolean }) {
   }, [list, query, grouped, sort]);
 
   async function end(group: ProcessGroup, signal: KillSignal) {
-    setConfirm(null);
+    if (!confirmation.accept()) return;
     // End children first so a parent that respawns helpers does not race the group kill.
     const targets = [...group.members].filter(m => m.own).sort((a, b) => b.pid - a.pid);
     const failures: string[] = [];
@@ -70,10 +72,10 @@ export function ProcessesPanel({ active }: { active: boolean }) {
           {showGpu && <span role="cell" className="num" title={g.vram ? `${formatSize(g.vram)} VRAM` : undefined} data-hot={(g.gpu ?? 0) >= 25}>{g.gpu === null && g.vram === null ? '–' : percent(g.gpu ?? 0)}</span>}
           <span role="cell" className="process-actions">
             {asking
-              ? <><button onClick={() => setConfirm(null)}>Keep</button>
-                  <button className="danger" onClick={() => void end(g, confirm!.signal)}>{confirm!.signal === 'kill' ? 'Force kill' : 'End'}</button></>
-              : own && <><button title="Ask it to quit (SIGTERM)" onClick={() => setConfirm({ key: g.key, signal: 'term' })}>End</button>
-                  <button className="danger-soft" title="Kill immediately (SIGKILL); unsaved work is lost" onClick={() => setConfirm({ key: g.key, signal: 'kill' })}>Kill</button></>}
+              ? <><button onClick={confirmation.disarm}>Keep</button>
+                  <button className="danger confirmation-action" data-arming={!confirmation.ready} disabled={!confirmation.ready} onClick={() => void end(g, confirm!.signal)}>{confirm!.signal === 'kill' ? 'Force kill' : 'End'}</button></>
+              : own && <><button title="Ask it to quit (SIGTERM)" onClick={() => confirmation.arm({ key: g.key, signal: 'term' })}>End</button>
+                  <button className="danger-soft" title="Kill immediately (SIGKILL); unsaved work is lost" onClick={() => confirmation.arm({ key: g.key, signal: 'kill' })}>Kill</button></>}
           </span>
           {expanded && <div className="process-detail" role="cell">
             <code>{g.lead.command}</code>

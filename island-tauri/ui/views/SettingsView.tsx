@@ -21,6 +21,8 @@ import { rulesSummary } from './settings/app-rules';
 import { ClipboardPatterns, DisplayChoice, WeatherLocation } from './settings/WidgetControls';
 import { takePendingSettingJump } from './settings/SettingsLink';
 import { SectionIcon } from './settings/SectionIcon';
+import { useConfirmationGuard } from './settings/use-confirmation-guard';
+import { useRailTooltip } from './settings/use-rail-tooltip';
 
 const message = (e: unknown) => e instanceof Error ? e.message : String(e);
 function Row({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
@@ -31,13 +33,12 @@ export function Card({ title, children }: { title?: string; children: ReactNode 
 }
 /** Inline two-tap reset, never a modal. */
 export function ResetHeader({ title, onReset }: { title: string; onReset?(): Promise<void> }) {
-  const [armed, setArmed] = useState(false), [busy, setBusy] = useState(false);
-  useEffect(() => { if (!armed) return; const t = setTimeout(() => setArmed(false), 4000); return () => clearTimeout(t); }, [armed]);
-  return <header onPointerLeave={() => setArmed(false)}><h3>{title}</h3>
-    {onReset && (armed
-      ? <><small>Reset?</small><button type="button" className="link" data-armed="true" aria-label={`Confirm reset ${title}`} disabled={busy}
-          onClick={() => { setBusy(true); void onReset().finally(() => { setBusy(false); setArmed(false); }); }}>Confirm</button></>
-      : <button type="button" className="link" aria-label={`Reset ${title}`} onClick={() => setArmed(true)}>Reset</button>)}
+  const confirmation = useConfirmationGuard<boolean>(), [busy, setBusy] = useState(false);
+  return <header onPointerLeave={confirmation.disarm}><h3>{title}</h3>
+    {onReset && (confirmation.pending
+      ? <><small>Reset?</small><button type="button" className="link confirmation-action" data-armed="true" data-arming={!confirmation.ready} aria-label={`Confirm reset ${title}`} disabled={busy || !confirmation.ready}
+          onClick={() => { if (!confirmation.accept()) return; setBusy(true); void onReset().finally(() => setBusy(false)); }}>Confirm</button></>
+      : <button type="button" className="link" aria-label={`Reset ${title}`} disabled={busy} onClick={() => confirmation.arm(true)}>Reset</button>)}
   </header>;
 }
 function DeniedApps({ value, onSave }: { value: string; onSave(apps: string[]): void }) {
@@ -120,6 +121,7 @@ export function SettingsView() {
   const [outputs, setOutputs] = useState<string[] | null>(null), [jumpTarget, setJumpTarget] = useState<string | null>(null), [highlight, setHighlight] = useState<string | null>(null);
   const [fonts, setFonts] = useState<FontFamily[] | null>(null), [fontError, setFontError] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const railTooltip = useRailTooltip();
   const notifications = useNotifications();
   const jumpTo = (id: string) => { const target = settingLocation(id); if (target) { setTab(target.card.tab); setQuery(''); setJumpTarget(id); } };
   useEffect(() => { try { localStorage.setItem(SECTION_STORAGE_KEY, tab); } catch { /* Storage may be unavailable. */ } }, [tab]);
@@ -219,7 +221,8 @@ export function SettingsView() {
     </div>
     {error && <p role="alert">{error}</p>}
     <div className="settings-layout">
-      <nav className="settings-rail" aria-label="Settings sections">{SETTINGS_SECTIONS.map(section => <button key={section.id} type="button" data-section={section.id}
+      <nav className="settings-rail" aria-label="Settings sections" onPointerLeave={railTooltip.reset}>{SETTINGS_SECTIONS.map(section => <button key={section.id} type="button" data-section={section.id}
+        data-tooltip-open={railTooltip.shown === section.id} onPointerEnter={() => railTooltip.enter(section.id)} onPointerLeave={railTooltip.leave}
         aria-label={section.name} aria-current={tab === section.id ? 'page' : undefined} onClick={() => { setTab(section.id); setQuery(''); }}>
         <SectionIcon section={section.id} /><span className="settings-rail-name" role="tooltip">{section.name}</span>
       </button>)}</nav>

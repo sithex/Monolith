@@ -7,17 +7,17 @@ import { Icon } from './Icon';
 /**
  * Vertical capsule fader: 28 px track, no knob, filled from the bottom.
  * Dragging follows the pointer directly with a local draft and throttled commits;
- * external changes ease over 0.22 s.
+ * external changes ease with the shared base duration.
  */
 function Fader({ value, label, muted, onCommit }: { value: number; label: string; muted: boolean; onCommit(v: number): void }) {
-  const [draft, setDraft] = useState(value), [dragging, setDragging] = useState(false);
+  const [draft, setDraft] = useState(value), [dragging, setDragging] = useState(false), [direct, setDirect] = useState(false);
   const track = useRef<HTMLDivElement>(null), last = useRef(0), pending = useRef<number | null>(null), timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commit = useRef(onCommit); commit.current = onCommit;
-  useEffect(() => { if (!dragging) setDraft(value); }, [value, dragging]);
+  useEffect(() => { if (!dragging) { setDraft(value); setDirect(false); } }, [value, dragging]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   const flush = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } if (pending.current !== null) { commit.current(pending.current); pending.current = null; last.current = performance.now(); } };
   const set = (v: number) => {
-    v = Math.max(0, Math.min(100, Math.round(v))); setDraft(v); pending.current = v;
+    v = Math.max(0, Math.min(100, Math.round(v))); setDirect(true); setDraft(v); pending.current = v;
     const wait = 60 - (performance.now() - last.current);
     if (wait <= 0) flush(); else if (!timer.current) timer.current = setTimeout(flush, wait);
   };
@@ -32,7 +32,7 @@ function Fader({ value, label, muted, onCommit }: { value: number; label: string
       if (step) { e.preventDefault(); e.stopPropagation(); set(draft + step); }
     }}>
     <div className="fader-track" ref={track}>
-      <div className="fader-fill" style={{ height: `${draft}%`, transition: dragging ? 'none' : 'height .22s cubic-bezier(.33,1,.68,1)' }} />
+      <div className="fader-fill" data-direct={dragging || direct} style={{ transform: `scaleY(${draft / 100})` }} />
       <svg className="fader-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
         style={{ color: draft > 12 ? 'rgb(0 0 0 / .55)' : 'var(--fader-ink, rgb(255 255 255 / .6))' }}><path d="M4 9h4l5-5v16l-5-5H4z" /></svg>
     </div>

@@ -26,5 +26,5 @@ test('Monitor has a Processes tab wired to the guarded kill command', () => {
   assert.match(view, /<ProcessesPanel active=\{active\} \/>/);
   assert.match(panel, /processKill\(t\.pid, t\.startTicks, signal\)/);
   assert.match(panel, /filter\(m => m\.own\)/, 'only the user\'s own processes are signalled');
-  assert.match(panel, /setConfirm\(\{ key: g\.key, signal: 'kill' \}\)/, 'kill needs a confirm step');
+  assert.match(panel, /confirmation\.arm\(\{ key: g\.key, signal: 'kill' \}\)/, 'kill needs a confirm step');
 });

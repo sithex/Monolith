@@ -85,11 +85,11 @@ TestCase {
         face.pointerY = 900;
         face.pointerAt = Date.now();
         wait(200);
-        verify(Math.abs(face.shownX) <= face.maxX * 20 && Math.abs(face.shownY) <= face.maxY * 20);
+        verify(Math.abs(face.shownX) <= face.maxX * face.preferredSize && Math.abs(face.shownY) <= face.maxY * face.preferredSize);
         for (let i = 0; i < 2; i++) {
             const eye = findChild(face, "companionEye" + i);
             if (eye)
-                verify(eye.x >= 0 && eye.y >= 0 && eye.x + eye.width <= 20 && eye.y + eye.height <= 20);
+                verify(eye.x >= 0 && eye.y >= 0 && eye.x + eye.width <= face.preferredSize && eye.y + eye.height <= face.preferredSize);
 
         }
         face.happy = true;
@@ -167,7 +167,7 @@ TestCase {
         id: pillFactory
 
         Panel.PanelPill {
-            width: 144
+            width: 160
             height: 26
             companion: true
             clockText: "11:59 PM"

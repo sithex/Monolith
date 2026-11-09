@@ -108,7 +108,8 @@ test('dropdown direction/origins and picker reveals use transform/opacity, never
   assert.match(css, /font-picker\[data-up='true'\] \.font-menu[\s\S]*?transform-origin: right bottom/);
   assert.match(css, /scheme-variants, \.island \.scheme-custom \{ transform-origin: left top/);
   const scheme = src('ui/island/SchemePicker.tsx');
-  assert.doesNotMatch(scheme, /height: (0|'auto')/);
+  // Accordion rows push siblings, so height animates there (controller decision, Nov 9); never under reduced motion.
+  assert.match(scheme, /const expand = keyboard \|\| reduced \? \{ duration: 0 \}/);
   assert.match(scheme, /key="custom"[^>]*exit="closed"[^>]*variants=\{variants\}/);
   for (const file of ['SchemePicker.tsx', 'CommandPalette.tsx', 'ApprovalNotice.tsx', 'components/ColorField.tsx', 'components/AppPrimitives.tsx'])
     assert.doesNotMatch(src(`ui/island/${file}`), /scale:\s*0(?:\s*[,}])/);

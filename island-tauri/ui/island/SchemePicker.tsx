@@ -27,11 +27,12 @@ export function SchemePicker({ value, onPick, settings, patch }: {
   const list = useRef<HTMLDivElement>(null);
   const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
   const fade = { ...tween(DUR.base), duration: Math.min(.3, tween(DUR.base).duration) };
-  const expand = keyboard ? { duration: 0 } : fade;
+  const expand = keyboard || reduced ? { duration: 0 } : fade;
   const glide = reduced || keyboard ? { duration: 0 } : SPRING.ui();
-  const hidden = { opacity: 0, scale: reduced || keyboard ? 1 : .97 };
-  const variants = { closed: ({ keyboard, reduced }: { keyboard: boolean; reduced: boolean }) => ({
-    opacity: 0, scale: reduced || keyboard ? 1 : .97, transition: keyboard ? { duration: 0 } : fade,
+  // Accordion rows push the list below, so height animates (rare, user-initiated) to avoid a jump.
+  const hidden = { opacity: 0, height: 0 };
+  const variants = { closed: ({ keyboard }: { keyboard: boolean; reduced: boolean }) => ({
+    opacity: 0, height: 0, transition: keyboard ? { duration: 0 } : fade,
   }) };
 
   const look = (s: Scheme): { dots: readonly string[]; note: string } => s.id === 'custom' ? { dots: [custom.surface, custom.accent, custom.text], note: `accent ${custom.accent}` }
@@ -68,7 +69,7 @@ export function SchemePicker({ value, onPick, settings, patch }: {
         <span className="scheme-name">{s.name}</span>
         <span className="scheme-note">{note}</span>
       </button>
-      <AnimatePresence initial={false} custom={{ keyboard, reduced }}>{s.id === 'custom' && on && <motion.div key="custom" className="scheme-custom" initial={hidden} animate={{ opacity: 1, scale: 1 }} exit="closed" variants={variants} transition={expand}>
+      <AnimatePresence initial={false} custom={{ keyboard, reduced }}>{s.id === 'custom' && on && <motion.div key="custom" className="scheme-custom" initial={hidden} animate={{ opacity: 1, height: 'auto' }} exit="closed" variants={variants} transition={expand}>
         {SEEDS.map(([key, label, role]) => <div key={key} className="scheme-seed">
           <ColorSwatch id={`scheme-${key}`} label={`Custom ${label.toLowerCase()} colour`} value={custom[role]} onPick={hex => patch({ [key]: hex })} />
           <span>{label}</span><code>{custom[role]}</code>
@@ -93,7 +94,7 @@ export function SchemePicker({ value, onPick, settings, patch }: {
       </button>
       <AnimatePresence initial={false} custom={{ keyboard, reduced }}>
         {isOpen && <motion.div key="variants" id={`scheme-family-${f.id}`} className="scheme-variants" role="group" aria-label={`${f.name} variants`}
-          initial={hidden} animate={{ opacity: 1, scale: 1 }} exit="closed" variants={variants} transition={expand}>
+          initial={hidden} animate={{ opacity: 1, height: 'auto' }} exit="closed" variants={variants} transition={expand}>
           {f.schemes.map(s => radio(s, true))}
         </motion.div>}
       </AnimatePresence>

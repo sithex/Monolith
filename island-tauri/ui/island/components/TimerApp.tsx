@@ -12,15 +12,15 @@ export function duration(ms: number): string {
 
 /** Digits roll vertically when they change (0.3 s). */
 function RollingText({ text, reduced }: { text: string; reduced: boolean }) {
-  const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
-  const still = reduced || keyboard;
+  // Ambient (once a second): never tied to the last input modality.
+  const still = reduced;
   const chars = text.split('');
   return <span aria-hidden="true" style={{ display: 'inline-flex', overflow: 'hidden' }}>{chars.map((c, i) => {
     const slot = chars.length - i;  // keyed from the right so seconds keep their slot when hours appear
     return <span key={slot} style={{ position: 'relative', display: 'inline-block' }}>
       <AnimatePresence initial={false} mode="popLayout">
         <motion.span key={c} className="digit" initial={still ? { opacity: 0 } : { y: '-70%', opacity: 0 }} animate={still ? { opacity: 1 } : { y: '0%', opacity: 1 }}
-          exit={still ? { opacity: 0 } : { y: '70%', opacity: 0 }} transition={tween(keyboard ? 0 : reduced ? DUR.press : DUR.slow)}>{c}</motion.span>
+          exit={still ? { opacity: 0 } : { y: '70%', opacity: 0 }} transition={tween(reduced ? DUR.press : DUR.slow)}>{c}</motion.span>
       </AnimatePresence></span>;
   })}</span>;
 }

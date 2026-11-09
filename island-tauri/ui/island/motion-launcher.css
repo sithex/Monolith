@@ -11,9 +11,7 @@
   50% { transform: rotate(1.5deg); }
 }
 
-html[data-nav-via='key'] .launcher .tile-face,
 .launcher[data-reduced-motion='true'] .tile-face { animation: none; }
-html[data-nav-via='key'] .launcher[data-editing='true'] .app-tile,
 .launcher[data-reduced-motion='true'][data-editing='true'] .app-tile { outline: 1px dashed var(--v-stroke-hi); outline-offset: -3px; }
 @media (prefers-reduced-motion: reduce) {
   .launcher .tile-face { animation: none; }

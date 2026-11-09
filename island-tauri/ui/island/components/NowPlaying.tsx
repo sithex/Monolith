@@ -77,11 +77,10 @@ export function NowPlaying({ model, intents, mixer = null, onStreamVolume, lyric
 
 /** Keep both covers in the fixed artwork box during the crossfade. */
 export function ArtworkCrossfade({ src, alt, reduced }: { src: string | null; alt: string; reduced: boolean }) {
-  const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
   return <AnimatePresence initial={false}>
     <motion.div key={src ?? 'no-artwork'} className="np-artwork-layer"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      transition={tween(keyboard ? 0 : reduced ? DUR.press : DUR.base)}>
+      transition={tween(reduced ? DUR.press : DUR.base)}>
       <SafeImage src={src} alt={alt}/>
     </motion.div>
   </AnimatePresence>;
@@ -99,13 +98,13 @@ export function LyricsStage({ model, track, reduced, enabled, onEnabled, seek }:
   const list = useRef<HTMLDivElement>(null), userUntil = useRef(0);
   const { lyrics } = model, active = lyrics.activeIndex;
   const ready = enabled && (lyrics.status === 'synced' || !!lyrics.plain);
-  const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
+  // Lyrics follow playback (ambient), so typing elsewhere must not switch their motion off.
   useEffect(() => {
     const box = list.current, line = box?.querySelector<HTMLElement>('[aria-current="true"]');
     if (!box || !line || Date.now() < userUntil.current) return;
     // Keep the current line about a third of the way down, like Apple Music.
-    box.scrollTo({ top: Math.max(0, line.offsetTop - box.clientHeight * 0.3), behavior: reduced || keyboard ? 'instant' : 'smooth' });
-  }, [active, lyrics.lines, reduced, keyboard]);
+    box.scrollTo({ top: Math.max(0, line.offsetTop - box.clientHeight * 0.3), behavior: reduced ? 'instant' : 'smooth' });
+  }, [active, lyrics.lines, reduced]);
   // Scrolling by hand pauses the follow for a few seconds.
   const hold = () => { userUntil.current = Date.now() + 3500; };
   let body;
@@ -125,8 +124,8 @@ export function LyricsStage({ model, track, reduced, enabled, onEnabled, seek }:
   return <section className="np-lyrics" aria-label="Lyrics" data-reduced={reduced}>
     <div ref={list} className="np-lyrics-scroll" onWheel={hold} onPointerDown={hold}>
       <motion.div key={`${track.busName}:${track.trackId ?? track.title}:${ready}`} className="np-lyrics-content"
-        initial={ready && !keyboard ? { opacity: 0 } : false}
-        animate={{ opacity: 1 }} transition={tween(keyboard ? 0 : reduced ? DUR.press : DUR.slow)}>{body}</motion.div>
+        initial={ready ? { opacity: 0 } : false}
+        animate={{ opacity: 1 }} transition={tween(reduced ? DUR.press : DUR.slow)}>{body}</motion.div>
     </div>
     {enabled && <div className="lyrics-credit"><small>Lyrics from LRCLIB</small><button type="button" className="lyrics-off" onClick={() => onEnabled?.(false)}>Turn off</button></div>}
   </section>;

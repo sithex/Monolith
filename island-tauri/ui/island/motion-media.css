@@ -9,6 +9,4 @@
   transition: opacity var(--dur-press) var(--ease-out), background-color var(--dur-base) var(--ease-out);
 }
 .now-playing[data-reduced='true'] .transport-main svg { transition: opacity var(--dur-press) var(--ease-out); }
-html[data-nav-via='key'] .island .now-playing .am-lyrics li,
-html[data-nav-via='key'] .island .now-playing .am-lyrics li button,
-html[data-nav-via='key'] .island .now-playing .transport-main svg { transition: none; }
+

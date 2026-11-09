@@ -96,7 +96,7 @@ test('sweeping an unopened rail cancels pending tips and touch never schedules t
     } finally { d.dispose(); }
   });
 });
-test('timer reduced-motion digits fade without transforms and keyboard changes do not animate', () => {
+test('timer reduced-motion digits fade without transforms; the ambient roll ignores keyboard modality', () => {
   const d = driver({}, (path, source) => path === 'ui/island/components/TimerApp.tsx' ? `${source}\nexport { RollingText, MinuteWheel };` : source);
   try {
     const { RollingText } = d.load('ui/island/components/TimerApp.tsx');
@@ -108,7 +108,7 @@ test('timer reduced-motion digits fade without transforms and keyboard changes d
     }
     globals({ document: { documentElement: { dataset: { navVia: 'key' } } } }, () => {
       const digit = nodes(RollingText({ text: '2', reduced: false })).find(n => n.props?.className === 'digit');
-      assert.equal(digit.props.transition.duration, 0); assert.deepEqual(digit.props.animate, { opacity: 1 });
+      assert.ok(digit.props.transition.duration > 0);
     });
   } finally { d.dispose(); }
 });

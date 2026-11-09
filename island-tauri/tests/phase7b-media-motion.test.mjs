@@ -103,15 +103,16 @@ test('reduced motion keeps short opacity fades and removes lyric scale and anima
   assert.equal(stage.props.transition.duration, DUR.press);
   assert.match(motionCss, /\[data-reduced='true'\] \.am-lyrics li \{ transform: none; transition: none; \}/);
   assert.match(motionCss, /\[data-reduced='true'\] \.am-lyrics li button \{\s*filter: none;\s*transition: opacity var\(--dur-press\)/);
-  assert.match(readFileSync(new URL('../ui/island/components/NowPlaying.tsx', import.meta.url), 'utf8'), /behavior: reduced \|\| keyboard \? 'instant' : 'smooth'/);
+  assert.match(readFileSync(new URL('../ui/island/components/NowPlaying.tsx', import.meta.url), 'utf8'), /behavior: reduced \? 'instant' : 'smooth'/);
 });
 
-test('keyboard-triggered artwork and lyric changes are instant', () => {
+// Controller decision (Nov 9): artwork/lyrics follow playback (ambient), so the last input
+// modality must not switch their fades off.
+test('artwork and lyric fades are ambient: unaffected by keyboard modality', () => {
   withKeyboard(() => {
-    assert.equal(ArtworkCrossfade({ src: null, alt: '', reduced: false }).props.children.props.transition.duration, 0);
+    assert.equal(ArtworkCrossfade({ src: null, alt: '', reduced: false }).props.children.props.transition.duration, DUR.base);
     const stage = content(props());
-    assert.equal(stage.props.initial, false);
-    assert.equal(stage.props.transition.duration, 0);
+    assert.equal(stage.props.transition.duration, DUR.slow);
   });
 });
 

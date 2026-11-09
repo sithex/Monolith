@@ -1,170 +1,119 @@
 import QtQuick
 
-// A cute little toadstool, kawaii style: a red-to-crimson domed cap with white spots
-// over a short cream stem with a tiny face — two dark bead eyes with a sparkling highlight,
-// pink blush cheeks and a small mouth.
-//
-// Pointer tracking: pupils follow (whole pixels); the cap leans 1 px toward the pointer.
-// Hover: happy closed-arc eyes (^^), brighter blush, a little smile.
-// Idle habit (one-off burst from blinked(resting)): a tiny puff of 2–3 spore pixels released
-// from the cap drifting upward and vanishing, settling back exactly.
-// Doze: lids half closed per the brain's mood handling (no new timers).
+// Nick's approved 26 px rendition: low, lopsided spotted dome and a wide peach body.
+// An idle blink starts eight 200 ms reference-style bob steps, never a continuous loop.
 HabitCharacter {
     id: art
+    slotSize: 26
     gazeScale: 1
-    habitFrames: 6
-    habitInterval: 140
+    habitFrames: 8
+    habitInterval: 200
 
     readonly property int pupilX: gazePx(gazeX, 0.55, -1, 1)
     readonly property int pupilY: gazePx(gazeY, 0.8, -1, 1)
-    readonly property int lean: gazePx(gazeX, 0.35, -1, 1)
     readonly property real open: face ? face.blink * face.lid : 1
-    readonly property bool eyesShut: open < 0.3
+    readonly property bool eyesShut: open < 0.3 || habitFrame === 8
     readonly property bool dozing: asleep || (face ? face.lid < 0.6 : false)
-
-    // Spore direction: chosen when the burst starts.
-    property int habitDirection: 1
-    onHabitStarted: habitDirection = gazeX < 0 ? -1 : 1
+    readonly property int dip: [0, 1, 1, 1, 0, 0, 1, 0, 0][habitFrame]
+    readonly property bool squashed: habitFrame === 2 || habitFrame === 3 || habitFrame === 6
 
     readonly property var colors: ({
-        "C": "#e82c2c",
-        "c": "#cd1e1e",
-        "D": "#911212",
-        "d": "#460e0e",
-        "W": "#ffffff",
-        "S": "#fcf5e6",
-        "s": "#e1d4c0",
-        "E": "#141216",
-        "H": "#ffffff",
-        "P": "#ff91aa",
-        "p": "#ff4b7d",
-        "M": "#91303c",
-        "m": "#c3233c"
+        "K": "#3b1410", "R": "#ef4b31", "r": "#cf3523", "d": "#a8261b",
+        "O": "#ff8a5c", "o": "#ffb48c", "W": "#fffaf0", "w": "#ffd2c2",
+        "P": "#ff9a86", "p": "#f27a66", "U": "#7e1d14", "B": "#ffe6c2",
+        "L": "#fff5e2", "b": "#ffcc94", "n": "#f2a05a", "N": "#d97c3c",
+        "E": "#1e1414", "H": "#ffffff", "M": "#e86a5c"
     })
 
-    // Cap: red domed body with white spots, crimson rim and underside.
-    // Leans 1 px toward the pointer.
+    // The settled cap and body are pixel-for-pixel the controller's approved concept.
     PixelSprite {
         objectName: "mushroomCap"
-        x: 2 + art.lean
-        y: 2
+        y: art.dip
         colors: art.colors
         rows: [
-            "....CCCCCCCC....",
-            "..CCCCCCCCCCCC..",
-            ".CCCWCCCCCCWCCC.",
-            "CCCCWCCCCCCWCCCC",
-            "CCCCCCCCCCCCCCCC",
-            "CCCCCWWCCCCWCCCC",
-            "cDDDDDDDDDDDDDDc",
-            ".dddddddddddddd."
+            "..........KKKKKK..........",
+            "........KKooooRRKK........",
+            "......KKOoooRRWWRKK.......",
+            ".....KOOooOORRWWWRRK......",
+            "....KOOooOOORRRWWRRRK.....",
+            "...KROOOOOORRRRRRRRRRK....",
+            "..KRROOOOORRRRRRRRWWRRRK..",
+            "..KRRRRRRRRRRRRRRWWWRRRK..",
+            ".KRRPPPRRRRRRRRRRRWWRRRRK.",
+            ".KRPPPPPRRRRRRRRRRRRRRRrK.",
+            "KRRPPPPPRRRRRRRRRRRRRWWrrK",
+            "KRRRPPPRRRRRRRRRRPPRRWWrrK",
+            "KrRRRRRRRRRRRRRRPPPPRRRrrK",
+            "KrrRRRRRRRRRRRRRRPPRRRrrrK",
+            ".KdrrrrrRRRRRRRRRRRRrrrdK.",
+            "..KKdUUUUUUUUUUUUUUUUdKK.."
         ]
     }
 
-    // Stem: ivory cream column.
-    PixelSprite {
-        objectName: "mushroomStem"
-        x: 6
-        y: 10
-        colors: art.colors
-        rows: [
-            "SSSSSSSS",
-            "SSSSSSSS",
-            "SSSSSSSS",
-            "SSSSSSSS",
-            "SSSSSSSS",
-            "sSSSSSSs",
-            ".ssssss."
-        ]
-    }
-
-    // Normal blush: pink cheeks on the stem.
-    PixelSprite {
-        objectName: "mushroomBlush"
-        visible: !art.happy
-        x: 6
-        y: 13
-        colors: art.colors
-        rows: ["P......P"]
-    }
-
-    // Normal mouth: tiny line, follows down tilt.
-    PixelSprite {
-        objectName: "mushroomMouth"
-        visible: !art.happy
-        x: 9
-        y: 13 + (art.pupilY > 0 ? 1 : 0)
-        colors: art.colors
-        rows: ["MM"]
-    }
-
-    // Eyes: 2x2 dark beads with 1 px highlight that track the pointer.
-    // When dozing, top half becomes a droopy half-lid.
-    Repeater {
-        model: [7, 11]
-        PixelSprite {
-            required property int modelData
-            required property int index
-            objectName: "companionEye" + index
-            visible: !art.eyesShut && !art.happy
-            x: modelData + art.pupilX
-            y: 11 + art.pupilY
-            colors: art.colors
-            rows: art.dozing ? ["ss", "EE"] : (art.pupilX > 0 ? ["EH", "EE"] : ["HE", "EE"])
-        }
-    }
-
-    // Blink lids: closed flat line when blinking.
-    Repeater {
-        model: [7, 11]
-        PixelSprite {
-            required property int modelData
-            visible: art.eyesShut && !art.happy
-            x: modelData
-            y: 12
-            colors: art.colors
-            rows: ["EE"]
-        }
-    }
-
-    // Hover reaction: happy closed-arc eyes (^^), brighter blush, cute smile.
-    PixelSprite {
-        objectName: "hoverMark"
-        visible: art.happy
-        x: 6
-        y: 11
-        colors: art.colors
-        rows: [
-            "..E...E.",
-            ".E.E.E.E",
-            "p..mm..p"
-        ]
-    }
-
-    // Spore puff: tiny puff of 2–3 spores released from the cap during a habit burst.
-    // Drifts upward and vanishes, mirrored if looking left.
     Item {
-        objectName: "mushroomSpores"
-        visible: !art.happy && art.habitFrame > 0
-        width: 20
-        height: 20
-        transform: Scale { origin.x: 10; xScale: art.habitDirection < 0 ? -1 : 1 }
+        id: body
+        objectName: "mushroomBody"
+        y: 16 + art.dip
+        width: 26
+        height: art.squashed ? 8 : 9
+
+        PixelSprite {
+            objectName: "mushroomSkin"
+            colors: art.colors
+            readonly property var settledRows: [
+                "...KBLLBBBBBBBBBBBBBBbK...",
+                "..KBLLBBBBBBBBBBBBBBBbnK..",
+                "..KBLBBBBBBBBBBBBBBBbbnK..",
+                "..KBBBBBBBBBBBBBBBBBbbnK..",
+                "..KBBBBBBBBBBBBBBBBBbbnK..",
+                "..KbBBBBBBBBBBBBBBBbbnNK..",
+                "...KbBBBBBBBBBBBBbbbnNK...",
+                "....KKbbbbbbbbbbbbnnKK....",
+                "......KKKKKKKKKKKKKK......"
+            ]
+            // Remove one plain belly row and duplicate two central columns, not a Scale:
+            // every outline/shading run remains an integer pixel; width grows on both sides.
+            rows: art.squashed ? settledRows.filter((r, i) => i !== 3).map(
+                r => r.slice(1, 13) + r.slice(12, 14) + r.slice(13, 25)) : settledRows
+        }
+
         Repeater {
-            model: art.habitFrame === 1 ? [{"x": 14, "y": 3}, {"x": 15, "y": 2}]
-                 : art.habitFrame === 2 ? [{"x": 14, "y": 1}, {"x": 15, "y": 1}, {"x": 16, "y": 2}]
-                 : art.habitFrame === 3 ? [{"x": 15, "y": 0}, {"x": 16, "y": 1}, {"x": 17, "y": 1}]
-                 : art.habitFrame === 4 ? [{"x": 16, "y": 0}, {"x": 17, "y": 0}]
-                 : art.habitFrame === 5 ? [{"x": 17, "y": 0}]
-                 : []
-            Rectangle {
-                required property var modelData
-                x: modelData.x
-                y: modelData.y
-                width: 1
-                height: 1
-                antialiasing: false
-                color: "#fff8dc"
+            model: [7, 17]
+            PixelSprite {
+                required property int modelData
+                required property int index
+                objectName: "companionEye" + index
+                visible: !art.happy
+                x: modelData + art.pupilX
+                y: 1 + art.pupilY + (art.eyesShut ? 1 : 0)
+                colors: art.colors
+                rows: art.eyesShut ? ["EE"] : art.dozing ? ["bb", "EE", "EE"]
+                    : ["EH", "EE", "EE"]
             }
+        }
+
+        PixelSprite {
+            objectName: "mushroomMouth"
+            visible: !art.happy
+            x: 11
+            y: art.squashed ? 3 : 4
+            colors: art.colors
+            rows: ["M.M.M", ".M.M."]
+        }
+
+        PixelSprite {
+            objectName: "hoverMark"
+            visible: art.happy
+            x: 5
+            y: 1
+            colors: art.colors
+            rows: [
+                "..E.........E...",
+                ".E.E.......E.E..",
+                "pp............pp",
+                ".....M.....M....",
+                "......MMMMM....."
+            ]
         }
     }
 }

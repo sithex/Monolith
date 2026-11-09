@@ -115,7 +115,8 @@ TestCase {
     }
 
     function test_directional_habits() {
-        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron", "mushroom", "sonichu", "salamander"]) {
+        // Mushroom's reference bob is vertical, not the old pointer-directed spore puff.
+        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron", "sonichu", "salamander"]) {
             const f = createTemporaryObject(factory, suite, { character: id }), a = f.art;
             point(f, 900, 200);
             a.lastHabitAt = 0; a.startHabit();
@@ -126,6 +127,43 @@ TestCase {
             compare(a.habitDirection, -1, id + " toward the pointer (left)");
             a.resetHabit();
         }
+    }
+
+    function test_mushroom_reference_bob() {
+        const f = createTemporaryObject(factory, suite, { character: "mushroom" }), a = f.art;
+        point(f, 0, 0);
+        compare(f.preferredSize, 26);
+        compare(a.habitFrames, 8);
+        compare(a.habitInterval, 200);
+        const cap = findChild(a, "mushroomCap"), body = findChild(a, "mushroomBody");
+        const skin = findChild(a, "mushroomSkin"), eye = findChild(a, "companionEye0");
+        const settled = picture(f);
+        compare(JSON.stringify(eye.rows), JSON.stringify(["EH", "EE", "EE"]));
+        point(f, 0, -900);
+        const up = picture(f);
+        point(f, 0, 900);
+        verify(picture(f) !== up, "mushroom up and down gaze differ");
+        point(f, 0, 0);
+        a.habitFrame = 1;
+        compare(cap.y, 1); compare(body.y, 17);
+        compare(skin.rows.length, 9);
+        a.habitFrame = 2;
+        compare(cap.y, 1); compare(body.y, 17);
+        compare(skin.rows.length, 8);
+        compare(skin.rows[1].indexOf("K"), skin.settledRows[1].indexOf("K") - 1);
+        compare(skin.rows[1].lastIndexOf("K"), skin.settledRows[1].lastIndexOf("K") + 1);
+        a.habitFrame = 4;
+        compare(cap.y, 0); compare(body.y, 16);
+        compare(picture(f), settled, "spring returns to approved settled pixels");
+        a.habitFrame = 8;
+        compare(JSON.stringify(eye.rows), JSON.stringify(["EE"]), "reference last-frame blink");
+        a.resetHabit();
+        compare(picture(f), settled, "bob settles exactly to frame zero");
+        f.blink = 0.08;
+        compare(JSON.stringify(eye.rows), JSON.stringify(["EE"]), "brain blink is a two-pixel line");
+        f.blink = 1;
+        f.sleepy = true; f.lid = 0.42;
+        compare(JSON.stringify(eye.rows), JSON.stringify(["bb", "EE", "EE"]), "half-closed doze lids");
     }
 
     function test_facing_retention() {

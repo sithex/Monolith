@@ -141,7 +141,8 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
   let stillSince = -Infinity;
   let glideTimer: ReturnType<typeof setTimeout> | null = null;
   const root = outer.ownerDocument?.documentElement;
-  const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Same answer as motion-preference.ts prefersReducedMotion (kept inline: this module loads standalone in tests).
+  const reducedMotion = () => root?.dataset?.reduceMotion === 'true' || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const startGlide = (kind: 'move' | 'in' | 'out') => {
     if (!root || reducedMotion()) return;
     const ms = kind === 'in' ? 340 : 460;

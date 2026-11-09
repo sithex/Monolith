@@ -1,4 +1,8 @@
-export const WITHDRAW_SECONDS = 0.16;
+/** Side circles pull back into their edge in this long (ease-out, Nov 9: was .16 s ease-in). */
+export const WITHDRAW_SECONDS = 0.11;
+/** The shell starts shrinking this long after close, while the circles finish withdrawing,
+ *  instead of waiting for them (pairs with `.island[data-withdrawing]` in surface.css). */
+export const WITHDRAW_LEAD = 0.07;
 
 /**
  * Global animation speed (Settings → Motion → Animation speed, Nov 5): 1 = as designed,
@@ -17,6 +21,27 @@ export const motionSpeed = () => speed;
 export const scaled = (time: number) => time / speed;
 /** A UI spring (framer `visualDuration` form) at the current speed. */
 export const uiSpring = (visualDuration: number, bounce: number) => ({ type: 'spring' as const, visualDuration: visualDuration / speed, bounce });
+
+/* ---- Shared motion tokens (mirrored in CSS as --ease-* / --dur-* in surface.css) ----------
+ * One curve per intent: EASE_OUT for anything entering, exiting or responding to a press;
+ * EASE_IN_OUT for things that move across the screen; EASE_DRAWER for sheet-like panels.
+ * Durations in seconds, scaled by the Animation speed setting through tween()/SPRING. */
+export type Bezier = [number, number, number, number];
+export const EASE_OUT: Bezier = [0.23, 1, 0.32, 1];
+export const EASE_IN_OUT: Bezier = [0.77, 0, 0.175, 1];
+export const EASE_DRAWER: Bezier = [0.32, 0.72, 0, 1];
+export const DUR = { press: 0.12, fast: 0.15, base: 0.2, slow: 0.28 } as const;
+/** A duration-based transition at the current speed (default curve: EASE_OUT). */
+export const tween = (duration: number, ease: Bezier = EASE_OUT) => ({ duration: scaled(duration), ease });
+/** Named UI springs at the current speed. Call them (speed can change at runtime). */
+export const SPRING = {
+  /** Press/hover feedback: quick, no overshoot. */
+  snappy: () => uiSpring(0.2, 0),
+  /** Selection pills, tiles, wheels settling. */
+  ui: () => uiSpring(0.28, 0.12),
+  /** Rare, playful moments (edit-mode badges). */
+  playful: () => uiSpring(0.25, 0.25),
+};
 type Axis = 'width' | 'height';
 type Size = { width: number; height: number };
 export type PhysicalSpring = { type: 'spring'; mass: number; stiffness: number; damping: number; restDelta: number; restSpeed: number };
@@ -24,7 +49,7 @@ export type PhysicalSpring = { type: 'spring'; mass: number; stiffness: number; 
 export function axisSpring(from: number, to: number, axis: Axis): PhysicalSpring {
   const growing = to > from;
   const duration = (axis === 'width' ? (growing ? .44 : .30) : (growing ? .38 : .26)) / speed;
-  let ratio = growing ? (axis === 'width' ? .75 : .78) : 1;
+  let ratio = growing ? .85 : 1; // open bounce ≈ .15 (was .25/.22), Nov 9
   const travel = Math.abs(to - from);
   if (growing && travel > 12) {
     const log = Math.log(12 / travel);

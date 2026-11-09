@@ -87,14 +87,15 @@
 /* Icon wrapper (spins between the page icon and Back). It fills the button so the icon's
    percentage size (surface.css: 46% of the button) still resolves against the button. */
 .live-side-button .side-icon { display: grid; place-items: center; width: 100%; height: 100%; line-height: 0; }
-.live-side-button[data-quick='true'] svg { transition: transform .3s var(--v-ease); }
-.live-side-button[data-quick='true']:active svg { transform: scale(.85); }
+/* Side buttons press once (framer whileTap on the button); the icon itself no longer shrinks. */
 
 /* ---- Fluidity ----------------------------------------------------------- */
 /* Pages cross-fade with a short lift instead of popping; scrolling is smooth with momentum-like easing. */
 .island .app-pane { scroll-behavior: smooth; overscroll-behavior: contain; }
-.island .app-pane:not(.terminal-pane):not([hidden]) > * { animation: page-in .26s var(--v-ease) both; }
-@keyframes page-in { from { opacity: 0; transform: translateY(6px) scale(.992); } to { opacity: 1; transform: none; } }
+.island .app-pane:not(.terminal-pane):not([hidden]) > * { animation: page-in var(--dur-base) var(--ease-out) both; }
+/* Keyboard-driven paging/palette jumps change page instantly. */
+html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; }
+@keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .island .settings-card, .island .card { transition: background-color .2s ease, border-color .2s ease, box-shadow .2s ease; }
 .island .icon-button:hover:not(:disabled) { color: var(--ui-text); }
 .title-row h2 { transition: opacity .18s ease; }
@@ -171,9 +172,15 @@ html[data-theme='album'] {
 }
 @media (prefers-reduced-motion: reduce) { html[data-theme='album'] { transition-duration: 0s; } }
 /* Settings → Motion → Reduce motion: the same as the OS preference for CSS keyframes. */
-html[data-reduce-motion='true'] .island *, html[data-reduce-motion='true'] .island *::before, html[data-reduce-motion='true'] .island *::after {
+/* Informational progress (the notification countdown bar) is exempt: it shows real time left. */
+html[data-reduce-motion='true'] .island *:not(.notification-timer > span), html[data-reduce-motion='true'] .island *::before, html[data-reduce-motion='true'] .island *::after {
   animation-duration: .001ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; scroll-behavior: auto !important;
 }
+/* Reduced motion (OS or setting) keeps colour/opacity fades but drops movement. */
+html[data-reduce-motion='true'] { --dur-slow: 0ms; }
+@media (prefers-reduced-motion: reduce) { :root { --dur-slow: 0ms; } }
+html[data-reduce-motion='true'] .island button:active:not(:disabled) { transform: none; }
+@media (prefers-reduced-motion: reduce) { .island button:active:not(:disabled) { transform: none; } }
 html[data-theme='album'][data-reduce-motion='true'] { transition-duration: 0s; }
 
 /* Settings search, per-card reset, backup (Nov 5). */

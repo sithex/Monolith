@@ -89,7 +89,7 @@ test('large shell growth has bounded overshoot and buttons wait for arrival', ()
   assert.ok(delay > .2 && delay < .6);
   for (const axis of ['width', 'height']) assert.ok(springProgress(axisSpring(from[axis], to[axis], axis), delay) >= .99);
   assert.equal(arrivalTime(to, to), 0);
-  assert.equal(WITHDRAW_SECONDS, .16);
+  assert.equal(WITHDRAW_SECONDS, .11);
 });
 
 test('side circles withdraw only into their own edge, preserving their row', () => {

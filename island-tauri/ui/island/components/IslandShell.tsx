@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useReducedMotionAll } from './motion-preference';
 import type { IslandIntents } from '../models';
 import { Icon } from './Icon';
 export const UI_SPRING = { stiffness: 350, damping: 32, mass: 0.8 };
@@ -11,7 +12,7 @@ export function IslandShell({ title, children, intents, home = false, back, acti
   title: string; children: ReactNode; intents: IslandIntents; home?: boolean;
   back?: { label: string; go(): void }; actions?: ReactNode;
 }) {
-  const id = useId(), reduced = useReducedMotion();
+  const id = useId(), reduced = useReducedMotionAll();
   return <section className="island-shell" aria-labelledby={id}>
     <header className="title-row">
       <button className="icon-button" aria-label={home ? 'Hermes home' : back ? `Back to ${back.label}` : 'Back to Hermes'} title={home ? undefined : back ? `Back to ${back.label}` : 'Back'}

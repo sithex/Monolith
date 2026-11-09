@@ -170,7 +170,7 @@ test('animation speed scales springs centrally; withdraw/blur contracts stay fix
     assert.ok(Math.abs(fast - base / 2) < .02, `${fast} vs ${base}/2`);
     assert.equal(motion.scaled(.45), .225);
     assert.deepEqual(motion.uiSpring(.3, .15), { type: 'spring', visualDuration: .15, bounce: .15 });
-    assert.equal(motion.WITHDRAW_SECONDS, .16);
+    assert.equal(motion.WITHDRAW_SECONDS, .11);
     motion.setMotionSpeed(10); assert.equal(motion.motionSpeed(), .5, 'clamped to 50 %');
     motion.setMotionSpeed(NaN); assert.equal(motion.motionSpeed(), 1);
   } finally { motion.setMotionSpeed(100); }

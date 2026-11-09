@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { useReducedMotionAll } from './motion-preference';
 import type { PackageUpdate, UpdatesChanged } from '../../ipc/bindings';
 
 // Browser-only CSS import also leaves this component usable by the Node SSR checks.
@@ -65,7 +66,7 @@ function RefreshGlyph() {
 }
 
 export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; onRefresh: () => Promise<unknown> }) {
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotionAll();
   const [query, setQuery] = useState(''), [checking, setChecking] = useState(false), [actionError, setActionError] = useState('');
   const [commandsOpen, setCommandsOpen] = useState(false), [copied, setCopied] = useState('');
   const busy = useRef(false);

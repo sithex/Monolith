@@ -10,7 +10,17 @@
   --v-track: rgb(255 255 255 / .14);
   --v-dim: rgb(255 255 255 / .55);
   --v-orange: #ff9f0a; --v-pink: #ff375f; --v-red: #ff453a; --v-yellow: #ffd60a;
-  --v-ease: cubic-bezier(.22, 1, .36, 1);
+  /* Motion tokens (mirrored by EASE_OUT/EASE_IN_OUT/EASE_DRAWER/DUR in motion-profile.ts).
+     --motion-speed is written by Island.tsx from Settings → Motion → Animation speed. */
+  --motion-speed: 1;
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+  --ease-in-out: cubic-bezier(.77, 0, .175, 1);
+  --ease-drawer: cubic-bezier(.32, .72, 0, 1);
+  --v-ease: var(--ease-out);
+  --dur-press: calc(120ms / var(--motion-speed));
+  --dur-fast: calc(150ms / var(--motion-speed));
+  --dur-base: calc(200ms / var(--motion-speed));
+  --dur-slow: calc(280ms / var(--motion-speed));
   --ui-card-radius: 16px; --ui-tile-radius: 16px;
 }
 html[data-glass='true'] { --v-fill: var(--v-fill-soft); }
@@ -94,9 +104,10 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .island-content { display: flex; flex-direction: column; flex: 1; min-height: 0; transform-origin: 50% 0; }
 
 /* ---- Generic controls --------------------------------------------------- */
-.island button { transition: background-color .18s ease, transform .28s var(--v-ease), opacity .18s ease; }
-.island button:hover:not(:disabled) { background: var(--v-hover); }
-.island button:active:not(:disabled) { transform: scale(.965); opacity: .8; }
+/* One press language (Nov 9): in at --dur-press, back out a little slower; 0.97, no opacity dip. */
+.island button { transition: background-color var(--dur-fast) ease, transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) ease; }
+@media (hover: hover) and (pointer: fine) { .island button:hover:not(:disabled) { background: var(--v-hover); } }
+.island button:active:not(:disabled) { transform: scale(.97); transition-duration: var(--dur-fast), var(--dur-press), var(--dur-fast); }
 .island button:disabled { opacity: .4; }
 .island .card, .island .app-banner { background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: var(--radius-3xl); }
 .island .primary { background: var(--ui-accent); color: var(--ui-on-accent); }
@@ -297,10 +308,10 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
    restart a delayed CSS size transition on every JS spring frame, holding the
    rendered shell open until it snaps to the pill after the spring finishes. */
 .island { transition-property: transform; }
-html[data-glide='move'] .island { transition: transform .46s var(--v-ease); }
+html[data-glide='move'] .island { transition: transform .46s var(--ease-in-out); }
 html[data-glide='out'] .island { transition: transform .46s var(--v-ease); }
-html[data-glide='in'] .island { transition: transform .3s cubic-bezier(.5, 0, .85, .4); }
-.island[data-withdrawing='true'] { transition-delay: .16s; }
+html[data-glide='in'] .island { transition: transform .3s var(--ease-out); }
+.island[data-withdrawing='true'] { transition-delay: .07s; } /* = WITHDRAW_LEAD */
 .side-anchor { z-index: 5; }
 .side-emergence { width: 100%; height: 100%; border-radius: inherit; will-change: transform, opacity; }
 .side-anchor[data-interactive='true'] .side-emergence { will-change: auto; }

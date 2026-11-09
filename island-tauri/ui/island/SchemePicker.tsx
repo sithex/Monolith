@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useReducedMotionAll } from './components/motion-preference';
 import type { Appearance, Settings, SettingsPatch } from '../ipc/client';
 import { customPalette, initialOpenFamily, navTarget, schemeFamilies, type Family, type Scheme } from './tokens/schemes';
 import { ColorSwatch } from './components/ColorField';
@@ -22,7 +23,7 @@ export function SchemePicker({ value, onPick, settings, patch }: {
   const custom = customPalette(settings), album = useAlbumPreview();
   const families = useMemo(() => schemeFamilies(), []);
   const [open, setOpen] = useState<string | null>(() => initialOpenFamily(value, families));
-  const reduced = useReducedMotion() === true || settings.reduceMotion === true;
+  const reduced = useReducedMotionAll() || settings.reduceMotion === true;
   const list = useRef<HTMLDivElement>(null);
   const expand = reduced ? { duration: 0 } : { duration: scaled(.24), ease: [.22, 1, .36, 1] as const };
   const glide = reduced ? { duration: 0 } : uiSpring(.28, .12);

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
+import { motion, useAnimationControls } from 'framer-motion';
+import { useReducedMotionAll } from './components/motion-preference';
 import { useIslandState, dispatch } from '../ipc/island-state';
 import { reportGeometry } from '../ipc/client';
 import { useApprovalHover } from './ApprovalNotice';
@@ -10,7 +11,7 @@ import { useLayout, useLauncher } from '../stores/apps';
 import { UI_SPRING } from './components/IslandShell';
 import { createGeometryReporter, fitSurface, effectiveLayout, visibleLayout, nativePill, presetSize } from './geometry';
 import { pointerIntent } from './navigation';
-import { arrivalTime, axisSpring, motionSpeed, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, surfaceRadius, WITHDRAW_SECONDS } from './motion-profile';
+import { arrivalTime, axisSpring, motionSpeed, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, surfaceRadius, WITHDRAW_LEAD } from './motion-profile';
 export { UI_SPRING };
 /** The shell has handed the notch back: invisible, out of every morph rule. */
 function arrive(root: HTMLElement) {
@@ -19,7 +20,7 @@ function arrive(root: HTMLElement) {
 export function IslandSurface({ children, fail, paletteOpen = false }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean }) {
   const state = useIslandState(), settings = useSettings();
   // Settings → Motion → Reduce motion forces the same path as the OS preference.
-  const reduced = useReducedMotion() === true || settings.reduceMotion === true;
+  const reduced = useReducedMotionAll() || settings.reduceMotion === true;
   const layout = useLayout(), launcher = useLauncher(), pill = nativePill(), palette = usePalette();
   const notchPath = useRef<SVGPathElement | null>(null);
   const outer = useRef<HTMLElement | null>(null), current = useRef(state), config = useRef(settings);
@@ -91,16 +92,18 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
   const limit = fitSurface(Infinity, Infinity, viewport, state.mode === 'large' ? visible : undefined);
   liveLayout.current = effectiveLayout(visible, fit.buttonScale);
   const targetW = state.mode === 'still' && pill ? pill.width : fit.width, targetH = state.mode === 'still' && pill ? pill.height : fit.height;
-  const previousMode = useRef(state.mode);
+  const previousMode = useRef(state.mode), previousPalette = useRef(paletteOpen);
   const morph = useMemo(() => {
     const drawn = outer.current?.getBoundingClientRect() ?? { width: targetW, height: targetH };
     const withdrawing = previousMode.current === 'large' && state.mode !== 'large'; previousMode.current = state.mode;
-    const delay = !reduced && withdrawing ? WITHDRAW_SECONDS : 0;
+    const delay = !reduced && withdrawing ? WITHDRAW_LEAD : 0;
+    // Opening/closing the command palette is keyboard-driven: its height floor applies at once.
+    const paletteOnly = previousPalette.current !== paletteOpen && state.mode === 'large' && !withdrawing; previousPalette.current = paletteOpen;
     const width = { ...axisSpring(drawn.width, targetW, 'width'), delay };
     const height = { ...axisSpring(drawn.height, targetH, 'height'), delay };
     return { sideDelay: reduced ? 0 : arrivalTime(drawn, { width: targetW, height: targetH }), withdrawing,
-      transition: reduced ? { duration: 0 } : { width, height, left: width, top: height, borderRadius: height, default: height } };
-  }, [targetW, targetH, state.mode, reduced, motionSpeed()]);
+      transition: reduced || paletteOnly ? { duration: 0 } : { width, height, left: width, top: height, borderRadius: height, default: height } };
+  }, [targetW, targetH, state.mode, reduced, paletteOpen, motionSpeed()]);
   const radius = state.mode === 'still' ? (pill ? 0 : 20) : Math.min(28, Math.round(targetH * .34));
   const left = pill ? (state.mode === 'still' ? pill.x : pill.x + pill.width / 2 - fit.width / 2) : undefined, top = pill?.y;
   // Arrival under the notch is a pure function of the drawn size (onUpdate/onAnimationComplete),

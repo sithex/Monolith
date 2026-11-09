@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { animate, motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from 'framer-motion';
+import { animate, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion';
+import { useReducedMotionAll } from './components/motion-preference';
 import { type LayoutModel, type IslandView } from '../ipc/client';
 type LayoutButton = LayoutModel['buttons'][number];
 import { useIslandState } from '../ipc/island-state';
@@ -9,7 +10,7 @@ import { visibleLayout, isQuickAction, sideBackFor } from './geometry';
 import { actionIcon, actionLabel, quickActive, runSideAction } from './side-actions';
 import { useSettings } from '../stores';
 import { useApp, useMedia } from '../stores/apps';
-import { sideDropPath, WITHDRAW_SECONDS } from './motion-profile';
+import { DUR, EASE_OUT, SPRING, sideDropPath, tween, WITHDRAW_SECONDS } from './motion-profile';
 
 /** Where a side button's Back goes: the page you came from (Island's back history). */
 export type SideBack = { view: IslandView; label: string; go(): void };
@@ -43,25 +44,25 @@ function SideBubble({ button, diameter, gap, progress, interactive, navigate, li
       document.removeEventListener('pointerover', elsewhere, true); document.documentElement.removeEventListener('pointerleave', clear); };
   }, [hovered]);
   const lifted = hovered && interactive;
-  const reducedIcon = useReducedMotion();
+  const reducedIcon = useReducedMotionAll();
   return <motion.div data-side-button={button.id} data-interactive={interactive} className="side-anchor" aria-hidden={!interactive}
     style={{ position: 'fixed', width: diameter, height: diameter, borderRadius: diameter / 2, visibility, pointerEvents: interactive ? 'auto' : 'none' }}>
     <svg className="side-neck" aria-hidden="true" width={diameter} height={diameter}><motion.path d={neck} style={{ opacity }} /></svg>
     <motion.div className="side-emergence" style={{ x, y, scale, opacity }}>
       <motion.button ref={face} data-testid={`side-${button.id}`} className="round-button live-side-button" tabIndex={interactive ? 0 : -1} data-quick={quick} data-lit={lit} data-hover={lifted}
-        onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}
+        onPointerEnter={e => { if (e.pointerType === 'mouse') setHovered(true); }} onPointerLeave={() => setHovered(false)}
         data-back={returning}
         aria-label={returning ? `Back to ${back!.label}` : button.label ?? (button.action.type === 'appGrid' ? 'Open apps' : quick ? actionLabel(button.action) : `Open ${actionLabel(button.action)}`)} aria-pressed={quick ? lit : undefined} aria-disabled={!interactive} title={returning ? `Back to ${back!.label}` : button.label ?? actionLabel(button.action)}
-        animate={{ scale: lifted ? 1.04 : 1 }} whileTap={interactive ? { scale: .965, opacity: .8 } : {}}
-        transition={{ type: 'spring', stiffness: 420, damping: 28 }} onClick={() => { if (!interactive) return; if (returning) back!.go(); else void runSideAction(button.action, navigate).catch(fail); }}>
-        <motion.span key={icon} className="side-icon" initial={reducedIcon ? false : { opacity: 0, rotate: returning ? 90 : -90, scale: .6 }} animate={{ opacity: 1, rotate: 0, scale: 1 }}
-          transition={{ type: 'spring', stiffness: 520, damping: 32 }}><Icon name={icon}/></motion.span></motion.button>
+        animate={{ scale: lifted ? 1.04 : 1 }} whileTap={interactive && !reducedIcon ? { scale: .97 } : {}}
+        transition={SPRING.snappy()} onClick={() => { if (!interactive) return; if (returning) back!.go(); else void runSideAction(button.action, navigate).catch(fail); }}>
+        <motion.span key={icon} className="side-icon" initial={reducedIcon ? { opacity: 0 } : { opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }}
+          transition={tween(DUR.fast)}><Icon name={icon}/></motion.span></motion.button>
     </motion.div>
   </motion.div>;
 }
 
 export function SideControls({ navigate, fail, view, back }: { navigate(view: IslandView): void; fail(error: unknown): void; view?: IslandView; back?: SideBack | null }) {
-  const layout = useLayout(), state = useIslandState(), launcher = useLauncher(), reduced = useReducedMotion();
+  const layout = useLayout(), state = useIslandState(), launcher = useLauncher(), reduced = useReducedMotionAll();
   const settings = useSettings(), toggles = useApp('toggles'), tiles = useApp('tiles'), media = useMedia();
   const live = { dnd: settings.dnd, micMuted: toggles?.micMuted, awake: tiles?.keepAwake.on, playing: !!media?.nowPlaying?.playing, gameMode: state.gameMode };
   const model = visibleLayout(layout.layout, launcher.items.filter(i => i.enabled && i.known && i.view).map(i => i.view!));
@@ -86,7 +87,7 @@ export function SideControls({ navigate, fail, view, back }: { navigate(view: Is
     const controls = animate(progress, active ? 1 : 0, active
       ? { type: 'spring', stiffness: omega ** 2, damping: 2 * .88 * omega, delay, restDelta: .001, restSpeed: .01,
           onComplete: () => { if (generation.current === token) setReady(true); } }
-      : { duration: WITHDRAW_SECONDS, ease: 'easeIn' });
+      : { duration: WITHDRAW_SECONDS, ease: EASE_OUT });
     return () => { generation.current++; unsubscribe(); controls.stop(); };
   }, [active, reduced, progress]);
   useLayoutEffect(() => { window.dispatchEvent(new Event('island-surfaces-changed')); }, [ready, active, layout.rev, launcher.rev]);

@@ -1,21 +1,23 @@
 import QtQuick
 
 // A cute fire salamander (Salamandra salamandra), as crisp 1× pixel art (side view):
-// rounded chibi head facing the pointer, one big eye tracking with whole-pixel pupils,
-// slate-charcoal body visible on dark notch backgrounds,
-// vibrant fire-yellow and orange parotoid blotches and dorsal spots,
-// sweet smile and rosy blush cheek, four grounded stubby legs,
-// and a thick curling tail.
+// long low body with a rounded head, clear neck, four splayed little legs with toe dots,
+// and a long tapering tail that curls slightly.
+// Glossy black body lightened to charcoal-blue so it reads on near-black (#0b0b0c),
+// with a 1 px lighter top highlight, bold yellow-orange fire blotches in two deliberate rows down the back,
+// and a parotoid bulge behind the eye.
+// Big round friendly eye (black with white glint) and a small smile.
 //
-// Pointer tracking: whole sprite mirrors horizontally (whole-pixel column flip, no scale transforms)
+// Pointer tracking: mirrors horizontally (whole-pixel column reversal, no scale transforms)
 // to face the pointer side; keeps last facing when gazeX is near centre.
-// Pupil moves by whole pixels inside eye white for up/down/forward/back so all poses differ.
-// Hover (hoverMark): happy ^ eye arc, brighter blush, tiny pink tongue.
-// Idle habit: tongue flick burst out the front (2-3 px pink) then a tail wag (tail tip moves
-// 1 px up/down over a few frames), settling back exactly to the rest frame.
-// Doze: half lid (top row of eye white dark); blink: 1 px dark line.
+// Eye and head tilt up/down by 1 px with pointer Y.
+// Pupil glint moves with pointer X for whole-pixel gaze tracking.
+// Hover (hoverMark): happy ^^ eye arc, rosy cheek blush, and tiny pink tongue flick.
+// Idle habit: short stepped burst — tail wag, stepping feet, and tongue flick — settling exactly.
+// Blink: closed eye slit; doze: curled up resting pose with closed eye.
 HabitCharacter {
     id: art
+    slotSize: 26
     gazeScale: 1
     habitFrames: 6
     habitInterval: 125
@@ -53,104 +55,127 @@ HabitCharacter {
     }
 
     readonly property var colors: ({
-        "O": "#15171c",
-        "B": "#4a5263",
-        "Y": "#ffd21a",
-        "A": "#ff8a1a",
-        "W": "#f4f6fc",
-        "E": "#0b0c10",
-        "P": "#f48ca0",
-        "T": "#f05472",
-        "M": "#1a1d24"
+        "O": "#10141c",
+        "D": "#1c222e",
+        "B": "#344054",
+        "H": "#607494",
+        "Y": "#ffd718",
+        "A": "#ff8814",
+        "E": "#0a0c10",
+        "W": "#ffffff",
+        "M": "#10141c",
+        "P": "#f888a0",
+        "T": "#f04c6c"
     })
 
-    // Base sprite template (facing right, 20x20 slot)
+    // Base sprite template (facing right, 26x26 slot)
     readonly property var baseRows: [
-        "....................",
-        "....................",
-        "....................",
-        "....................",
-        "...........OOOOO....",
-        "..........OBWWWBO...",
-        ".........OBWWWWWBO..",
-        "..O....OOOBWWWWWBO..",
-        ".OYO.OOBYYBWWWBBBBO.",
-        ".OAOOBBBBYBBBBBBBBO.",
-        ".OYOBYYBBBBBYYBBPBO.",
-        "..OOBBYBBBBBBYBBBMO.",
-        "..OYBBBBBBBBBBBMMO..",
-        "..OOOBBYYBBBBBBOO...",
-        "....OOBBBBBBBBOO....",
-        "....OBOOOOOOBOBO....",
-        "...OBBO....OBBOBBO..",
-        "...OOO.....OOO.OOO..",
-        "....................",
-        "...................."
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..................OO......",
+        ".OO..............OYYO.OO..",
+        "OYYO....OOOOOOOO.OAYAOEWEO",
+        "OAYBBO.OHYYHBOYABBOBOOEEO.",
+        ".OBYYABOYAABBOYAABBBBOOBBO",
+        "..OBBAAYBBBBBBBBBBBBBOOBMO",
+        "..OOBBBBBBBBBBBBBBBBBBOOO.",
+        "...OBBBBBBBBBBBBBBBBBBO...",
+        "...OBBO..ODDO..OBBO..ODD..",
+        "..OBBBO..ODO..OBBBO..ODO..",
+        "..OO.OO..OO...OO.OO..OO...",
+        "..........................",
+        "..........................",
+        ".........................."
     ]
 
     readonly property var currentBodyRows: {
         const r = baseRows.map(row => row.split(""));
 
-        if (eyesShut) {
-            // Blink: 1 px dark line on row 6
-            for (let x = 12; x <= 14; x++) r[5][x] = "B";
-            for (let x = 11; x <= 15; x++) r[6][x] = "O";
-            for (let x = 11; x <= 15; x++) r[7][x] = "B";
-            for (let x = 12; x <= 14; x++) r[8][x] = "B";
-        } else if (happy) {
-            // Happy ^ eye arc
-            for (let x = 12; x <= 14; x++) r[5][x] = "B";
-            for (let x = 11; x <= 15; x++) r[6][x] = "B";
-            for (let x = 11; x <= 15; x++) r[7][x] = "B";
-            for (let x = 12; x <= 14; x++) r[8][x] = "B";
-            r[5][13] = "O";
-            r[6][12] = "O";
-            r[6][14] = "O";
-        } else if (dozing) {
-            // Half lid: top row of eye white dark (row 5)
-            for (let x = 12; x <= 14; x++) r[5][x] = "B";
-            const px = 13 + pupilDx;
-            const py = 6 + pupilDy;
-            for (let dy = 0; dy < 2; dy++) {
-                for (let dx = 0; dx < 2; dx++) {
-                    const y = py + dy, x = px + dx;
-                    if (y >= 0 && y < 20 && x >= 0 && x < 20 && r[y][x] === "W")
-                        r[y][x] = "E";
-                }
-            }
-        } else {
-            // Normal open eye: pupil slides by whole pixels inside eye white
-            const px = 13 + pupilDx;
-            const py = 6 + pupilDy;
-            for (let dy = 0; dy < 2; dy++) {
-                for (let dx = 0; dx < 2; dx++) {
-                    const y = py + dy, x = px + dx;
-                    if (y >= 0 && y < 20 && x >= 0 && x < 20 && r[y][x] === "W")
-                        r[y][x] = "E";
-                }
-            }
-        }
-
-        // Habit frames: tongue flick out front (1-2) then tail wag (3-5), settling back (6)
+        // Habit frames: tail wag, stepping feet, tongue flick
         if (!happy && habitFrame > 0) {
             if (habitFrame === 1) {
-                r[11][17] = "P";
-                r[11][18] = "T";
+                r[11][1] = "O"; r[11][2] = "O";
+                r[12][0] = "O"; r[12][1] = "Y"; r[12][2] = "Y"; r[12][3] = "O";
+                r[13][1] = "O"; r[13][2] = "A"; r[13][3] = "B";
+                r[22][18] = "."; r[22][19] = "."; r[22][20] = ".";
+                r[21][18] = "O"; r[21][19] = "B"; r[21][20] = "O";
             } else if (habitFrame === 2) {
-                r[11][17] = "P";
-                r[11][18] = "T";
-                r[11][19] = "T";
-            } else if (habitFrame === 3 || habitFrame === 5) {
-                r[6][2] = "O";
-                r[7][2] = "Y";
+                r[11][2] = "O"; r[11][3] = "O";
+                r[12][1] = "O"; r[12][2] = "Y"; r[12][3] = "Y";
+                r[17][25] = "T";
+            } else if (habitFrame === 3) {
+                r[12][1] = "."; r[12][2] = ".";
+                r[13][0] = "O"; r[13][1] = "Y"; r[13][2] = "Y";
+                r[14][1] = "O"; r[14][2] = "A";
+                r[22][8] = "."; r[22][9] = "."; r[22][10] = ".";
+                r[21][8] = "O"; r[21][9] = "B"; r[21][10] = "O";
             } else if (habitFrame === 4) {
-                r[7][2] = ".";
-                r[8][1] = "O";
-                r[8][2] = "O";
+                r[13][1] = "O"; r[13][2] = "Y";
+                r[14][0] = "O"; r[14][1] = "A"; r[14][2] = "Y";
+            } else if (habitFrame === 5) {
+                r[12][1] = "O"; r[12][2] = "O";
+                r[13][0] = "."; r[13][1] = "Y"; r[13][2] = "Y";
+            }
+        } else if (dozing) {
+            // Curled up sleeping pose:
+            // Tail curled in slightly, eye closed, head resting
+            r[14][23] = "B"; r[14][24] = "B";
+            r[15][23] = "O"; r[15][24] = "O";
+            r[12][1] = "."; r[12][2] = ".";
+            r[13][1] = "O"; r[13][2] = "O";
+            r[14][0] = "O"; r[14][1] = "Y"; r[14][2] = "Y"; r[14][3] = "O";
+        } else {
+            // Head tilts up/down with rawGazeY
+            if (rawGazeY < 0) {
+                for (let y = 11; y <= 19; y++) {
+                    for (let x = 17; x <= 25; x++) {
+                        r[y][x] = baseRows[y + 1][x];
+                    }
+                }
+                for (let x = 17; x <= 25; x++) {
+                    r[20][x] = (baseRows[20][x] === "O" || baseRows[20][x] === "B") ? "." : baseRows[20][x];
+                }
+            } else if (rawGazeY > 0) {
+                for (let y = 20; y >= 13; y--) {
+                    for (let x = 17; x <= 25; x++) {
+                        r[y][x] = baseRows[y - 1][x];
+                    }
+                }
+                for (let x = 17; x <= 25; x++) {
+                    r[12][x] = ".";
+                }
+            }
+
+            const headShift = rawGazeY < 0 ? -1 : (rawGazeY > 0 ? 1 : 0);
+            const ey = 14 + headShift;
+
+            if (eyesShut) {
+                r[ey][23] = "B"; r[ey][24] = "B";
+                r[ey + 1][23] = "O"; r[ey + 1][24] = "O";
+            } else if (happy) {
+                r[ey][23] = "O"; r[ey][24] = "B";
+                r[ey + 1][23] = "B"; r[ey + 1][24] = "O";
+            } else {
+                if (pupilDx > 0) {
+                    r[ey][23] = "E"; r[ey][24] = "W";
+                    r[ey + 1][23] = "E"; r[ey + 1][24] = "E";
+                } else {
+                    r[ey][23] = "W"; r[ey][24] = "E";
+                    r[ey + 1][23] = "E"; r[ey + 1][24] = "E";
+                }
             }
         }
 
-        // Horizontal flip via whole-pixel column reversal (no transforms/scaling)
         if (facing < 0) {
             return r.map(row => row.reverse().join(""));
         }
@@ -159,22 +184,12 @@ HabitCharacter {
 
     Item {
         objectName: "salamanderBody"
-        width: 20
-        height: 20
+        width: 26
+        height: 26
 
         PixelSprite {
             colors: art.colors
             rows: art.currentBodyRows
-        }
-
-        // Bounding box target for companionEye0
-        Item {
-            objectName: "companionEye0"
-            x: art.facing > 0 ? (13 + art.pupilDx) : (19 - (13 + art.pupilDx) - 1)
-            y: 6 + art.pupilDy
-            width: 2
-            height: 2
-            visible: !art.eyesShut && !art.happy
         }
 
         // Hover reaction: happy cheek blush + tiny pink tongue
@@ -183,31 +198,59 @@ HabitCharacter {
             visible: art.happy
             colors: art.colors
             rows: art.facing > 0 ? [
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "................PP..",
-                "..................T."
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                ".....................PP...",
+                ".........................T",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                ".........................."
             ] : [
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "....................",
-                "..PP................",
-                ".T.................."
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "...PP.....................",
+                "T.........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                "..........................",
+                ".........................."
             ]
         }
     }

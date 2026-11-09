@@ -85,7 +85,7 @@ TestCase {
         face.pointerY = 900;
         face.pointerAt = Date.now();
         wait(200);
-        verify(Math.abs(face.shownX) <= face.maxX * 20 && Math.abs(face.shownY) <= face.maxY * 20);
+        verify(Math.abs(face.shownX) <= face.maxX * face.preferredSize && Math.abs(face.shownY) <= face.maxY * face.preferredSize);
         for (let i = 0; i < 2; i++) {
             const eye = findChild(face, "companionEye" + i);
             if (eye)

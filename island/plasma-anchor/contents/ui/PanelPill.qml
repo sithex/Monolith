@@ -173,6 +173,9 @@ Item {
     }
     Column {
         anchors.centerIn: parent
+        // A detailed companion adds up to 6 px before the mic mark. Give the clock
+        // the same extra clearance; default 20 px companions retain their layout.
+        anchors.horizontalCenterOffset: pill.companionShown ? Math.max(0, companionFace.preferredSize - 20) : 0
         spacing: -1
         opacity: pill.peeking ? 0 : 1
         visible: opacity > 0

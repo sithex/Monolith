@@ -20,8 +20,8 @@ html[data-nav-via='key'] .island .fader-fill { transition: none; }
   transition: transform var(--dur-slow) var(--ease-out);
 }
 .island .monitor-meter {
-  width: 100%; height: 7px; margin-top: 3px; overflow: hidden;
-  border-radius: var(--radius-lg); background: var(--ui-border);
+  width: 100%; height: 7px; margin-top: 4px; overflow: hidden;
+  border-radius: var(--radius-lg); background: var(--v-fill-hi);
 }
 .island .monitor-meter > i {
   display: block; width: 100%; height: 100%; border-radius: inherit;

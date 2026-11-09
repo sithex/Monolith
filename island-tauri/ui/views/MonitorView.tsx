@@ -39,7 +39,7 @@ export function MonitorView({ active }: { active: boolean }) {
     <div className="dashboard-grid"><Gauge label="CPU" value={stats?.cpu ?? null} hint={stats?.uptime == null ? 'Uptime unavailable' : `Uptime ${Math.floor(stats.uptime / 3600)}h ${Math.floor(stats.uptime / 60) % 60}m`} />
       <Gauge label="Memory" value={stats?.memPct ?? null} hint={`${bytes(stats?.memUsed)} of ${bytes(stats?.memTotal)}`} /></div>
     <Gauge label="Disk" value={stats?.disk?.percent ?? null} hint={stats?.disk ? `${bytes(stats.disk.used)} used · ${bytes(stats.disk.available)} available · ${stats.disk.path}` : 'Disk unavailable'} />
-    <div className="card"><h3>Load · 1 / 5 / 15 min</h3><p>{stats?.loadAverage?.map(n => n.toFixed(2)).join(' / ') ?? 'Unavailable'}</p><h3>Network · receive / send</h3><p>{stats?.network ? `↓ ${bytes(stats.network.rxBytesPerSecond)}/s · ↑ ${bytes(stats.network.txBytesPerSecond)}/s` : 'Unavailable'}</p><p className="muted">All non-loopback interfaces, including virtual adapters.</p></div>
+    <div className="card stat-groups"><h3>Load · 1 / 5 / 15 min</h3><p>{stats?.loadAverage?.map(n => n.toFixed(2)).join(' / ') ?? 'Unavailable'}</p><h3>Network · receive / send</h3><p>{stats?.network ? `↓ ${bytes(stats.network.rxBytesPerSecond)}/s · ↑ ${bytes(stats.network.txBytesPerSecond)}/s` : 'Unavailable'}</p><p className="muted">All non-loopback interfaces, including virtual adapters.</p></div>
     <MonolithCostCard active={active} />
   </div>;
 }

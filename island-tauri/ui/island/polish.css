@@ -54,7 +54,7 @@
 .le-chips { display: flex; flex-direction: column; gap: 6px; margin: 10px 2px 2px; }
 .le-chip-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .le-chip-side { width: 52px; flex: none; font-size: var(--fs-sm); color: var(--v-dim); text-transform: uppercase; letter-spacing: .06em; }
-.island .le-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 7px; border-radius: 999px; font-size: var(--fs-md);
+.island .le-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; font-size: var(--fs-md);
   background: rgb(255 255 255 / .05); border: .5px solid var(--v-stroke-hi); color: var(--ui-text); cursor: pointer; }
 .island .le-chip svg { width: 14px; height: 14px; color: var(--ui-accent); }
 .island .le-chip:hover:not(:disabled) { background: var(--v-hover); }
@@ -65,7 +65,7 @@
   color: var(--ui-accent); background: color-mix(in srgb, var(--ui-background) 80%, var(--ui-accent) 20%); border: 1.5px solid var(--ui-accent); box-shadow: 0 2px 10px rgb(0 0 0 / .45); }
 .le-resize svg { width: 13px; height: 13px; }
 .island .le-resize:hover:not(:disabled) { transform: scale(1.12); background: color-mix(in srgb, var(--ui-background) 65%, var(--ui-accent) 35%); }
-.le-size-badge { position: absolute; right: 10px; bottom: 10px; padding: 3px 9px; border-radius: var(--radius-lg); font: 600 var(--fs-sm) var(--ui-mono); background: var(--ui-accent); color: var(--ui-on-accent); }
+.le-size-badge { position: absolute; right: 10px; bottom: 10px; padding: 4px 8px; border-radius: var(--radius-lg); font: 600 var(--fs-sm) var(--ui-mono); background: var(--ui-accent); color: var(--ui-on-accent); }
 .le-hint { font-size: var(--fs-sm); margin: 8px 2px 4px; }
 /* Clip only while the panel expands/collapses: once open, the action Dropdown's menu must be
    able to extend past it (it was clipped to nothing, so "Button action" showed no options). */
@@ -75,7 +75,7 @@
 .island .topline .topline-title { appearance: none; border: 0; padding: 2px 6px; margin: -2px -6px; border-radius: var(--radius-md); background: transparent; font: inherit; color: inherit; cursor: pointer; }
 .island .topline .topline-title:hover:not(:disabled) { background: var(--v-hover); color: var(--ui-text); }
 .le-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 6px 0 8px; }
-.le-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; height: 82px; padding: 8px 4px; border-radius: var(--radius-2xl);
+.le-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 82px; padding: 8px 4px; border-radius: var(--radius-2xl);
   background: rgb(255 255 255 / .05); border: 1px solid rgb(255 255 255 / .07); color: var(--ui-text); font-size: var(--fs-md); font-weight: 500; }
 .le-tile svg { width: 20px; height: 20px; }
 .le-tile small { font: var(--fs-xs) var(--ui-mono); color: var(--v-dim); }
@@ -116,7 +116,7 @@ html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; 
 .terminal-command .link { color: var(--ui-accent); font-size: var(--fs-md); }
 
 /* ---- In-island colour picker (replaces the native GTK chooser, which Wayland stacks behind the island) ---- */
-.island .color-swatch { width: 36px; height: 26px; padding: 3px; border-radius: var(--radius-md); border: 1px solid var(--ui-border); background: transparent; cursor: pointer; flex: none; }
+.island .color-swatch { width: 36px; height: 26px; padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--ui-border); background: transparent; cursor: pointer; flex: none; }
 .island .color-swatch > span { display: block; width: 100%; height: 100%; border-radius: var(--radius-sm); background: var(--swatch); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
 .island .color-swatch[data-open='true'] { border-color: var(--ui-accent); box-shadow: 0 0 0 1px var(--ui-accent); }
 .scheme-seed .color-swatch { width: 30px; height: 24px; }
@@ -132,7 +132,7 @@ html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; 
 .color-pop-sv { position: relative; height: 138px; flex: none; border-radius: var(--radius-xl); cursor: crosshair; touch-action: none;
   background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent) !important; background-blend-mode: normal; }
 .color-pop-sv { box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .12); }
-.color-pop-sv i, .color-pop-hue i { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 .5px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .45); pointer-events: none; }
+.color-pop-sv i, .color-pop-hue i { position: absolute; width: 14px; height: 14px; margin: -8px 0 0 -8px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 .5px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .45); pointer-events: none; }
 .color-pop-hue { position: relative; height: 12px; flex: none; border-radius: var(--radius-sm); cursor: ew-resize; touch-action: none;
   background: linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00); }
 .color-pop-hue i { top: 50%; }
@@ -187,6 +187,9 @@ html[data-theme='album'][data-reduce-motion='true'] { transition-duration: 0s; }
 .settings-search { position: relative; display: flex; align-items: center; }
 .settings-search input { width: 100%; box-sizing: border-box; padding: 8px 34px 8px 12px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-xl); background: var(--v-fill); color: var(--ui-text); font: var(--fs-md)/1.4 var(--ui-font); }
 .settings-search input::placeholder { color: var(--v-dim); }
+.island .app-pane input[type='search']:not(.settings-search input) { width: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--v-stroke-hi); border-radius: var(--radius-xl); background: var(--v-fill); color: var(--ui-text); font: var(--fs-md)/1.4 var(--ui-font); -webkit-appearance: none; appearance: none; }
+.island .app-pane input[type='search']::placeholder { color: var(--v-dim); }
+.island .app-pane input[type='search']:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 .settings-search input:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 .settings-search button { position: absolute; right: 6px; padding: 2px 6px; color: var(--v-dim); background: none; font-size: var(--fs-md); }
 .settings-card > header { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 2px; }

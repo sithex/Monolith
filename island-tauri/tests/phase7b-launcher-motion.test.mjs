@@ -203,13 +203,13 @@ test('launcher badge and tile springs use the animation-speed tokens', () => {
 });
 test('launcher shows 5 apps per row, fewer only when narrow', () => {
   const tsx = readFileSync(new URL('../ui/island/Launcher.tsx', import.meta.url), 'utf8');
-  const body = /export function balancedColumns\(count: number, fit: number\): number \{([\s\S]*?)\n\}/.exec(tsx)[1];
+  const body = /export function balancedColumns\(_?count: number, fit: number\): number \{([\s\S]*?)\n\}/.exec(tsx)[1];
   const balancedColumns = new Function('count', 'fit', body);
   assert.equal(balancedColumns(16, 8), 5);
   assert.equal(balancedColumns(40, 12), 5);
   assert.equal(balancedColumns(16, 3), 3);
-  assert.equal(balancedColumns(3, 8), 3);
+  assert.equal(balancedColumns(3, 8), 5); // short lists keep full-size columns (tiles stretch)
   assert.equal(balancedColumns(0, 8), 5);
   const css = readFileSync(new URL('../ui/island/surface.css', import.meta.url), 'utf8');
-  assert.match(css, /\.app-grid\[data-cols\] \{ grid-template-columns: repeat\(var\(--cols\)/);
+  assert.match(css, /\.app-grid\[data-cols\] \{ grid-template-columns: repeat\(var\(--cols\), minmax\(0, 1fr\)\)/);
 });

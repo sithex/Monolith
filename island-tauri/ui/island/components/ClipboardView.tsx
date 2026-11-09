@@ -6,7 +6,7 @@ export function ClipboardView({ model, intents }: { model: ClipboardModel; inten
   // Defense in depth. Rust rejects sensitive offers before a summary exists.
   const items = model.items.filter(item => !('concealed' in item && item.concealed === true));
   return <div className="app-stack clipboard-view" data-testid="clipboard-runtime"><div className="app-toolbar"><span className="muted">Private history</span><span className="title-spacer"/><button disabled={model.status === null || model.status?.enabled === false || model.status?.available === false} aria-pressed={model.paused} onClick={() => intents.clipboard({ type: 'pause', paused: !model.paused })}>{model.paused ? 'Resume capture' : 'Pause capture'}</button></div>
-    {model.query !== undefined && <input aria-label="Search clipboard history" type="search" maxLength={4096} value={model.query} onChange={e => intents.clipboard({ type: 'search', query: e.target.value })}/>}
+    {model.query !== undefined && <input aria-label="Search clipboard history" placeholder="Search clipboard" type="search" maxLength={4096} value={model.query} onChange={e => intents.clipboard({ type: 'search', query: e.target.value })}/>}
     {model.status === null ? <p role="status">Clipboard status unavailable</p> : model.status && (!model.status.available || !model.status.enabled) && <p role="status" className="unavailable">{!model.status.enabled ? 'Capture disabled' : 'Capture unavailable'} · {model.status.detail}</p>}
     {model.loading && <p role="status">Loading history…</p>}{model.error && <p role="alert">{model.error}</p>}
     {model.paused && <p role="status" className="app-banner">Capture paused · Existing history is still available</p>}

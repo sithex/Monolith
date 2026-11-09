@@ -35,14 +35,19 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .island[data-morphing='true'] > .terminal-wrap { will-change: transform, opacity, filter; }
 .island[data-state='large'][data-morphing='true'] > .terminal-wrap { position: absolute; top: 42px; left: 50%; margin-left: calc(var(--open-content-width) / -2); width: var(--open-content-width); height: var(--open-content-height); flex: none; }
 .view-stage { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; }
-.view-tabs { display: flex; min-height: 36px; align-items: center; gap: 5px; border-bottom: 1px solid var(--ui-border); font-size: var(--fs-md); }
+.view-tabs { display: flex; min-height: 36px; align-items: center; gap: 4px; border-bottom: 1px solid var(--ui-border); font-size: var(--fs-md); }
 .view-tabs button[aria-current='page'] { color: var(--ui-accent); background: var(--ui-surface); }
 .island-shell { border: 0; box-shadow: none; flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .shell-content { flex: 1; min-height: 0; padding: 0; display: flex; }
 .view-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 /* WebKitGTK overlay scrollbars have a wider hit area than their painted thumb.
    Keep right-edge controls outside that area; xterm retains its separate padding. */
-.app-pane { flex: 1; min-width: 0; min-height: 0; overflow: auto; scrollbar-width: thin; padding: 3px 6px 4px; }
+.app-pane { flex: 1; min-width: 0; min-height: 0; overflow: auto; scrollbar-width: thin; padding: 4px 6px; }
+/* Pages: the scroller reaches 6px further out on both sides and pads 12px, so content keeps its
+   x (aligned under the Back chevron, equal left/right margins) and the overlay scrollbar paints
+   in the right padding instead of over the cards' right edges. */
+.app-pane:not(.terminal-pane) { margin-inline: -6px; padding-inline: 12px; }
+.view-pane[data-pane='music'] .app-pane { margin-inline: 0; }
 /* Terminal and Now Playing keep their previous insets (6px wrap delta restored). */
 .app-pane.terminal-pane { padding: 0 6px 8px; }
 .view-pane[data-pane='music'] .app-pane:not([hidden]) { padding: 4px 26px 20px 10px; }
@@ -60,8 +65,12 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 legend { margin: 8px 0; font-weight: 600; }
 .gauge h3 strong { margin-left: auto; font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
 .gauge progress { --tone: var(--ui-accent); }
+/* Two labelled stats in one card: the gap between groups is wider than label-to-value. */
+.card.stat-groups h3 { margin: 0 0 4px; }
+.card.stat-groups p { margin: 0; }
+.card.stat-groups p + h3 { margin-top: 16px; }
 .cost-rows { margin: 8px 0 0; display: flex; flex-direction: column; }
-.cost-rows > div { display: flex; align-items: baseline; gap: 12px; padding: 5px 0; border-top: 1px solid var(--ui-border); }
+.cost-rows > div { display: flex; align-items: baseline; gap: 12px; padding: 4px 0; border-top: 1px solid var(--ui-border); }
 .cost-rows > div:first-child { border-top: 0; }
 .cost-rows dt { font-size: var(--fs-md); }
 .cost-rows dt small { display: block; color: var(--ui-dim); font-size: var(--fs-sm); }

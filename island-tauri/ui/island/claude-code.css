@@ -2,7 +2,7 @@
 .ai-dashboard .cc-src { flex-shrink: 0; border-radius: 4px; padding: 0 4px; font-size: 8.5px; line-height: 13px; color: var(--ui-dim, #929292); background: rgba(255,255,255,.07); white-space: nowrap; }
 .cc-card .cc-empty { margin: 2px 0 0; }
 .cc-row .al-chip { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
-.cc-row .ai-meter { height: 5px; margin: 2px 0 3px; }
+.cc-row .ai-meter { height: 5px; margin: 2px 0 4px; }
 .al-toggle.cc-chips { margin: 0; }
 .cc-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
 .cc-tile { display: flex; flex-direction: column; gap: 1px; min-width: 0; }

@@ -58,6 +58,9 @@ html[data-launch='return']:not([data-nav-via='key']) .island .app-pane:not(.term
 html[data-launch='open']:not([data-nav-via='key']) .island .terminal-pane:not([hidden]) {
   animation: launch-fade calc(180ms / var(--motion-speed, 1)) var(--ease-out) both;
 }
+/* After the launch keyframe: no keyframe at all until the next page change, so the page
+   doesn't fade in a second time (removing the flag would restart page-in). */
+html[data-launch='settled'] .island .app-pane:not([hidden]) > *, html[data-launch='settled'] .island .terminal-pane:not([hidden]) { animation: none; }
 @keyframes launch-open { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: none; } }
 @keyframes launch-return { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
 @keyframes launch-fade { from { opacity: 0; } to { opacity: 1; } }

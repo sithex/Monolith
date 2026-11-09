@@ -76,8 +76,11 @@ export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): v
       if (isOpen.current || settingJump.current) return;
       const pane = document.querySelector<HTMLElement>(`[data-pane="${state.view}"] .app-pane:not([hidden])`);
       if (pane?.contains(document.activeElement)) return;
-      const target = pane?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled), textarea, [tabindex="0"]');
-      if (target) target.focus(); else if (pane) { pane.tabIndex = -1; pane.focus(); }
+      // Keyboard navigation lands on the first control (its ring shows where you are). A click or
+      // swipe focuses the page itself, which draws no ring: one Tab still reaches the first control.
+      const target = document.documentElement.dataset.navVia === 'key'
+        ? pane?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled), textarea, [tabindex="0"]') : null;
+      if (target) target.focus(); else if (pane) { pane.tabIndex = -1; pane.focus({ preventScroll: true }); }
     });
     return () => cancelAnimationFrame(frame);
   }, [state.mode, state.view]);

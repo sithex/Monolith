@@ -153,18 +153,19 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .launcher-toolbar .pill-button.primary { background: var(--ui-accent); color: var(--ui-on-accent); }
 /* More island width adds columns, never oversized tiles. The minimum still
    contracts for exceptionally narrow panes; shown and Hidden grids share it. */
-.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(76px, 100%), 92px)); justify-content: center; gap: 10px; padding: 0; position: relative; }
-/* Launcher measures the width and supplies a balanced count, max 5 per row (Launcher.tsx balancedColumns). */
-.app-grid[data-cols] { grid-template-columns: repeat(var(--cols), minmax(min(76px, 100%), 92px)); }
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(76px, 100%), 1fr)); gap: 8px; padding: 0; position: relative; }
+/* Launcher measures the width and supplies the count, max 5 per row (Launcher.tsx balancedColumns).
+   Columns share the full page width (Nick's reference, Nov 9): no dead gutters beside the grid. */
+.app-grid[data-cols] { grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
 /* Header rows span exactly the tile columns, so their edges line up with the tiles. */
 .app-grid > .launcher-toolbar, .app-grid > .app-section-label { grid-column: 1 / -1; }
 .tile-wrap { position: relative; touch-action: none; z-index: 1; }
 .tile-wrap[data-dragging='true'] { z-index: 10; }
-.app-tile { width: 100%; height: auto; aspect-ratio: 1; min-height: 0; padding: 8px 4px 6px; gap: 6px; border-radius: var(--radius-3xl); display: flex; flex-direction: column; align-items: center; justify-content: center;
+.app-tile { width: 100%; height: 88px; aspect-ratio: auto; min-height: 0; padding: 12px 8px; gap: 8px; border-radius: var(--radius-xl); display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: var(--v-fill); border: 1px solid var(--launcher-tile-border, rgb(255 255 255 / .07)); font-size: var(--fs-sm); font-weight: 500; line-height: 1.2; color: var(--ui-text); }
 .app-tile svg { width: 24px; height: 24px; flex: none; color: var(--tone, rgb(255 255 255 / .85)); }
 .app-tile { font-size: var(--fs-md); }
-.app-tile span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; min-height: 2.4em; }
+.app-tile span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 @media (hover: hover) and (pointer: fine) { .app-tile:hover:not(:disabled) { background: var(--v-fill-hi) !important; border-color: rgb(255 255 255 / .14); } }
 .app-grid[data-editing='true'] .app-tile { padding-bottom: 8px; cursor: grab; }
 .tile-wrap[data-dragging='true'] .app-tile { cursor: grabbing; background: var(--v-fill-hi); box-shadow: 0 12px 30px rgb(0 0 0 / .45); }
@@ -176,10 +177,10 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .tile-badge:hover { filter: brightness(1.15); }
 .app-section-label { font-size: var(--fs-sm); font-weight: 600; color: var(--v-dim); text-transform: uppercase; letter-spacing: .4px; margin: 4px 0 0; display: flex; align-items: center; gap: 8px; }
 .app-section-label::after { content: ''; flex: 1; height: 1px; background: var(--v-stroke-hi); }
-.hidden-grid { min-height: 94px; border-radius: var(--radius-4xl); padding: 6px; background: rgb(255 255 255 / .025); outline: 1px dashed transparent; transition: outline-color .2s, background-color .2s; }
+.hidden-grid { min-height: 104px; border-radius: var(--radius-3xl); padding: 8px; background: rgb(255 255 255 / .025); outline: 1px dashed transparent; transition: outline-color .2s, background-color .2s; }
 .hidden-grid[data-over='true'] { outline-color: rgb(255 255 255 / .35); background: rgb(255 255 255 / .06); }
 .hidden-grid:empty::before { content: 'Drag apps here to hide them'; grid-column: 1 / -1; align-self: center; text-align: center; color: var(--v-dim); font-size: var(--fs-sm); }
-.drag-ghost { position: fixed; pointer-events: none; z-index: 100; width: 92px; }
+.drag-ghost { position: fixed; pointer-events: none; z-index: 100; width: 176px; }
 .drag-ghost .app-tile { box-shadow: 0 16px 40px rgb(0 0 0 / .5); background: color-mix(in srgb, var(--ui-background) 70%, #333); }
 
 /* ---- Timer: ruler wheel ------------------------------------------------- */
@@ -235,7 +236,9 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-rail-name { position: absolute; left: 44px; top: 50%; transform: translateY(-50%); width: max-content; max-width: 220px; box-sizing: border-box; padding: 6px 10px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-md); background: var(--ui-surface); color: var(--ui-text); font-size: var(--fs-sm); pointer-events: none; visibility: hidden; opacity: 0; }
 .settings-rail button:hover .settings-rail-name, .settings-rail button:focus-visible .settings-rail-name { visibility: visible; opacity: 1; }
 /* Column with the same 14px card gap as .app-stack had before the rail wrapped the cards. */
-.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 4px 12px; overscroll-behavior: contain;
+/* Reaches into the page's 12px right padding so its scrollbar paints there, not on the cards;
+   the cards' right edge lines up with the search field above. */
+.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 12px 12px 4px; margin-right: -12px; overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: 14px; }
 .settings-content > * { flex-shrink: 0; }
 .settings-section-title { font-size: var(--fs-body); font-weight: 600; margin: 0; color: var(--ui-text); }
@@ -243,7 +246,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-results { margin-bottom: 16px; }
 .settings-results h3 { color: var(--ui-accent); font-size: var(--fs-body); margin: 0 0 8px; }
 .settings-results h4 { color: var(--v-dim); font-size: var(--fs-sm); margin: 12px 0 4px; }
-.island .settings-result { display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: 3px; width: 100%; padding: 9px 10px; background: transparent; border-radius: var(--radius-md); color: var(--ui-text); }
+.island .settings-result { display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: 4px; width: 100%; padding: 8px 10px; background: transparent; border-radius: var(--radius-md); color: var(--ui-text); }
 .island .settings-result:hover { background: var(--v-hover); }
 .settings-result small { color: var(--v-dim); font-size: var(--fs-sm); }
 .settings-panel [data-setting-id] { scroll-margin: 12px; border-radius: var(--radius-md); }
@@ -258,7 +261,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 @container (max-width: 420px) {
   .settings-layout { flex-direction: column; gap: 8px; }
   .settings-rail { width: auto; flex: none; flex-direction: row; overflow-x: auto; gap: 4px; padding: 2px; }
-  .island .settings-rail > button { width: auto; height: 30px; gap: 5px; padding: 0 9px; white-space: nowrap; }
+  .island .settings-rail > button { width: auto; height: 30px; gap: 4px; padding: 0 8px; white-space: nowrap; }
   .settings-rail svg { width: 16px; height: 16px; }
   .island .settings-rail > button[aria-current='page']::before { left: 9px; right: 9px; top: auto; bottom: 0; width: auto; height: 2px; }
   .settings-rail-name { position: static; transform: none; width: auto; padding: 0; border: 0; background: none; visibility: visible; opacity: 1; }
@@ -271,7 +274,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-card { background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: var(--radius-3xl); padding: 4px 14px; }
 .settings-card > h3 { font-size: var(--fs-sm); font-weight: 600; color: var(--v-dim); text-transform: uppercase; letter-spacing: .4px; margin: 10px 0 2px; }
 .settings-row { display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: var(--fs-body); }
-.settings-row + .settings-row { border-top: .5px solid var(--v-stroke-hi); }
+.settings-row + .settings-row { border-top: 1px solid var(--v-stroke); }
 .settings-row > .label { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .settings-row > .label small { color: var(--v-dim); font-size: var(--fs-sm); line-height: 1.3; }
 .settings-row input[type='range'] { width: 46%; max-width: 220px; }
@@ -287,6 +290,8 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 
 /* Apps that size with the island */
 .app-pane { container-type: inline-size; }
+/* The page container takes focus on open so keys reach it; it is not a control, so no ring. */
+.island .app-pane:focus, .island .app-pane:focus-visible { outline: none; }
 /* Content-fit: panes report their natural height, so nothing may stretch to fill. */
 .fader { height: 160px; flex: none; }
 @container (max-width: 420px) {
@@ -340,7 +345,7 @@ html[data-glide='in'] .island { transition: transform .3s var(--ease-out); }
 .dropdown-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dropdown-chevron { width: 14px; height: 14px; flex: none; color: var(--v-dim); transition: transform .25s var(--v-ease); }
 .dropdown[data-open='true'] .dropdown-chevron { transform: rotate(180deg); }
-.dropdown-menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30; margin: 0; padding: 5px; list-style: none; max-height: 250px; overflow-y: auto;
+.dropdown-menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30; margin: 0; padding: 4px; list-style: none; max-height: 250px; overflow-y: auto;
   background: color-mix(in srgb, var(--ui-background) 94%, white 6%); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-xl);
   box-shadow: 0 16px 40px rgb(0 0 0 / .55); transform-origin: 50% 0; animation: dropdown-in .18s var(--v-ease); }
 .dropdown[data-up='true'] .dropdown-menu { top: auto; bottom: calc(100% + 6px); transform-origin: 50% 100%; }
@@ -360,10 +365,11 @@ html[data-glide='in'] .island { transition: transform .3s var(--ease-out); }
 .calendar-sub-head small, .calendar-sub-text small { color: var(--v-dim); font-size: var(--fs-sm); }
 .calendar-sub > p { margin: 0; font-size: var(--fs-md); line-height: 1.45; }
 .calendar-sub .segmented { align-self: flex-start; }
-.calendar-sub-steps { color: var(--ui-text); background: rgb(0 0 0 / .2); border-radius: var(--radius-lg); padding: 8px 10px 8px 28px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+/* A plain numbered list inside the card: no second box inside the card's box. */
+.calendar-sub-steps { color: var(--ui-text); background: none; border-radius: 0; padding: 0 0 0 20px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .calendar-sub-steps li { line-height: 1.4; }
 .calendar-sub-form { display: flex; gap: 8px; }
-.calendar-sub-form input { flex: 1; min-width: 0; background: rgb(0 0 0 / .25); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); padding: 7px 10px; font-size: var(--fs-md); outline: none; }
+.calendar-sub-form input { flex: 1; min-width: 0; background: rgb(0 0 0 / .25); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); padding: 8px 10px; font-size: var(--fs-md); outline: none; }
 .calendar-sub-form input:focus { border-color: color-mix(in srgb, var(--ui-accent) 70%, transparent); }
 .calendar-sub-form button { border-radius: var(--radius-lg); padding: 6px 14px; font-size: var(--fs-md); font-weight: 600; background: var(--v-fill); }
 .calendar-sub-form button.primary { background: var(--ui-accent); color: var(--ui-on-accent); }

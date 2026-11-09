@@ -22,7 +22,7 @@
 .island .command-results { overflow-y: auto; min-height: 0; padding: 2px 8px; flex: 1 1 auto; }
 .island .command-results button {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 9px 10px; text-align: left; border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+  padding: 8px 10px; text-align: left; border: 1px solid transparent; border-radius: 8px; cursor: pointer;
   background: transparent; color: var(--skin-text); font: inherit;
   transition: background-color 0s, transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) var(--ease-out), border-color 0s;
 }
@@ -31,7 +31,7 @@
 }
 html[data-nav-via='key'] .island .command-results button { transition: none; }
 .island .command-results button[aria-selected="true"] { background: color-mix(in srgb, var(--skin-accent) 14%, var(--skin-surface)); border-color: color-mix(in srgb, var(--skin-accent) 45%, transparent); }
-.island .command-result-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.island .command-result-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .island .command-result-copy strong { font-size: 13px; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .island .command-result-copy small { color: var(--skin-dim); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .island .command-group { color: var(--skin-dim); font-size: 10px; white-space: nowrap; flex: none; }

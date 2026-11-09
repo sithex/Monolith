@@ -39,7 +39,9 @@ function markLaunch(kind: 'open' | 'return') {
   const root = document.documentElement;
   root.dataset.launch = kind;
   clearTimeout(launchClear);
-  launchClear = setTimeout(() => { delete root.dataset.launch; }, 600);
+  // Never just delete the flag: the page would fall back to the page-in keyframe and fade in a
+  // second time. 'settled' switches the keyframe off; ViewPager clears it on the next view change.
+  launchClear = setTimeout(() => { root.dataset.launch = 'settled'; }, 600);
 }
 function launchFrom(tile: HTMLElement | undefined) {
   const stage = tile?.closest?.('.view-stage'); if (!tile || !stage) return;
@@ -50,11 +52,11 @@ function launchFrom(tile: HTMLElement | undefined) {
   markLaunch('open');
 }
 
-/** Columns: 5 per row (Nick, Nov 9); fewer only when the island is too narrow for 5,
- *  or when there are fewer than 5 apps. */
-export function balancedColumns(count: number, fit: number): number {
-  const max = Math.max(1, Math.min(5, Math.floor(fit)));
-  return count > 0 ? Math.min(max, count) : max;
+/** Columns: 5 per row (Nick, Nov 9); fewer only when the island is too narrow for 5.
+ *  Tiles stretch to fill their column, so the count never shrinks for a short list: a row of
+ *  2 hidden apps keeps the same tile size and leaves the rest of the row empty. */
+export function balancedColumns(_count: number, fit: number): number {
+  return Math.max(1, Math.min(5, Math.floor(fit)));
 }
 const TILE_MIN = 76, TILE_GAP = 10;
 function useColumns(grid: RefObject<HTMLDivElement | null>, count: number) {

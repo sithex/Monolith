@@ -42,6 +42,8 @@ export function ViewPager({ children, fail, views }: { children: ReactNode; fail
 
   useLayoutEffect(() => {
     const f = flight.current, el = stage.current;
+    // A finished tile launch keeps its keyframe off until the page changes (Launcher markLaunch).
+    if (document.documentElement.dataset.launch === 'settled') delete document.documentElement.dataset.launch;
     // A view change the swipe didn't cause: give the page-in fade back.
     if (!f) { if (el && !start.current && !settle.current) delete el.dataset.swiping; return; }
     // The island switched view: hand the slide over to the incoming page.

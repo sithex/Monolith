@@ -16,13 +16,13 @@
 .row-content small { display: block; color: var(--ui-dim); }
 .row-actions { display: flex; gap: 4px; font-size: var(--fs-sm); }
 .bounded-image { display: block; max-width: 100%; width: auto; max-height: 180px; object-fit: contain; border-radius: var(--radius-xl); margin-top: 10px; }
-.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--ui-border); border-radius: var(--radius-3xl); overflow: hidden; }
-.weekday { padding: 9px 2px; text-align: center; font-size: var(--fs-xs); color: var(--ui-dim); background: var(--ui-surface); }
-.month-day { min-height: 88px; padding: 5px 3px; border-top: 1px solid var(--ui-border); min-width: 0; }
+.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--v-stroke-hi); border-radius: var(--radius-3xl); overflow: hidden; }
+.weekday { padding: 8px 2px; text-align: center; font-size: var(--fs-xs); color: var(--ui-dim); background: var(--ui-surface); }
+.month-day { min-height: 88px; padding: 4px; border-top: 1px solid var(--v-stroke); min-width: 0; }
 .month-day>span { font-size: var(--fs-sm); display: block; padding-left: 4px; }
 .month-day[data-outside='true']>span { color: var(--ui-dim); }
 .month-day[data-today='true']>span { color: var(--ui-accent); font-weight: 700; }
-.calendar-event { display: block; width: 100%; text-align: left; background: var(--ui-surface); border-left: 2px solid var(--ui-blue); border-radius: var(--radius-md); padding: 9px 10px; }
+.calendar-event { display: block; width: 100%; text-align: left; background: var(--ui-surface); border-left: 2px solid var(--ui-blue); border-radius: var(--radius-md); padding: 8px 10px; }
 .calendar-event strong, .calendar-event small { display: block; overflow-wrap: anywhere; }
 .calendar-event strong { font-size: var(--fs-md); font-weight: 500; }
 .calendar-event small { font-size: var(--fs-xs); color: var(--ui-dim); }
@@ -36,7 +36,7 @@
 .note-list button[aria-current='true'] { outline: 1px solid var(--ui-accent); }
 .note-list strong, .note-list small { display: block; overflow-wrap: anywhere; }
 .note-list strong { font-size: var(--fs-md); font-weight: 500; }
-.note-list small { color: var(--ui-dim); margin-top: 3px; }
+.note-list small { color: var(--ui-dim); margin-top: 4px; }
 .note-editor { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .note-editor label { font-weight: 500; font-size: var(--fs-body); }
 .note-editor textarea { width: 100%; min-height: 250px; resize: vertical; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--radius-2xl); padding: 14px; font: inherit; color: var(--ui-text); }
@@ -46,7 +46,7 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .kind-icon { color: var(--ui-accent); display: grid; place-items: center; flex-shrink: 0; }
 .notification-card .app-toolbar { align-items: start; }
 .notification-card .app-toolbar strong { padding-top: 6px; overflow-wrap: anywhere; }
-.notification-icon { width: 28px; height: 28px; margin-top: 3px; border-radius: var(--radius-md); }
+.notification-icon { width: 28px; height: 28px; margin-top: 4px; border-radius: var(--radius-md); }
 .notification-body, .clip-preview { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-md); }
 .notification-body { margin-bottom: 10px; }
 .clip-preview { max-height: 130px; overflow: auto; padding: 10px 0; }
@@ -58,7 +58,7 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .track-progress { --tone: var(--ui-accent); }
 .transport { display: flex; align-items: center; justify-content: center; gap: 18px; }
 .transport button { min-width: 48px; min-height: 40px; font-size: var(--fs-xl); }
-.equalizer { height: 50px; display: flex; align-items: end; gap: 5px; padding: 0 22px; }
+.equalizer { height: 50px; display: flex; align-items: end; gap: 4px; padding: 0 22px; }
 .equalizer i { flex: 1; background: var(--ui-accent); border-radius: var(--radius-xs); min-height: 2px; }
 .lyrics { max-height: 230px; overflow: auto; }
 .lyrics li { padding: 3px 0; color: var(--ui-dim); }

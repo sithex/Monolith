@@ -167,7 +167,7 @@ TestCase {
         id: pillFactory
 
         Panel.PanelPill {
-            width: 160
+            width: 144
             height: 26
             companion: true
             clockText: "11:59 PM"

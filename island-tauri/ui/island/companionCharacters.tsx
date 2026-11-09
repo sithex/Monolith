@@ -1,10 +1,18 @@
-import type { ReactElement } from 'react';
+import { cloneElement, useRef, useState } from 'react';
+import type { KeyboardEvent, ReactElement } from 'react';
 import type { CompanionCharacter } from '../ipc/bindings';
 
-// The notch companion's characters, in picker order. Adding one: a variant of
-// `CompanionCharacter` (settings contract), a drawing in the notch widget's characters/
-// folder (listed in Companion.qml) and an entry here with a small preview.
-export type CompanionChoice = { id: CompanionCharacter; name: string; preview(): ReactElement };
+// The notch companion's characters. Adding one: a variant of `CompanionCharacter` (settings
+// contract), a drawing in the notch widget's characters/ folder (listed in Companion.qml), a
+// small preview constant below (any square viewBox; 20 or 26 px pixel art is typical) and ONE
+// line in COMPANION_CHARACTERS: `{ id, name, group, source?, preview }`. `group` must be one of
+// COMPANION_GROUPS (the picker's section/filter order); `source` is the optional franchise and
+// is searchable. The picker, its filter chips, counts and search pick the entry up by itself.
+export const COMPANION_GROUPS = ['Originals', 'Games', 'Warhammer 40K', 'Fantasy'] as const;
+export type CompanionGroup = typeof COMPANION_GROUPS[number];
+export type CompanionChoice = {
+  id: CompanionCharacter; name: string; group: CompanionGroup; source?: string; preview(): ReactElement;
+};
 
 const blob = () => <svg viewBox="0 0 16 16" width="28" height="28" aria-hidden="true">
   <circle cx="8" cy="8.5" r="7" fill="currentColor" />
@@ -40,29 +48,112 @@ const sonichu = () => <svg viewBox="0 0 20 20" width="28" height="28" shapeRende
 const salamander = () => <svg viewBox="0 0 20 20" width="28" height="28" shapeRendering="crispEdges" aria-hidden="true"><path d="M11 4h5v1h-5zM10 5h1v1h-1zM16 5h1v1h-1zM9 6h1v1h-1zM17 6h1v1h-1zM2 7h1v1h-1zM7 7h3v1h-3zM17 7h1v1h-1zM1 8h1v1h-1zM3 8h1v1h-1zM5 8h2v1h-2zM18 8h1v1h-1zM1 9h1v1h-1zM3 9h2v1h-2zM18 9h1v1h-1zM1 10h1v1h-1zM3 10h1v1h-1zM18 10h1v1h-1zM2 11h2v1h-2zM18 11h1v1h-1zM2 12h1v1h-1zM17 12h1v1h-1zM2 13h3v1h-3zM15 13h2v1h-2zM4 14h2v1h-2zM14 14h2v1h-2zM4 15h1v1h-1zM6 15h6v1h-6zM13 15h1v1h-1zM15 15h1v1h-1zM3 16h1v1h-1zM6 16h1v1h-1zM11 16h1v1h-1zM14 16h1v1h-1zM17 16h1v1h-1zM3 17h3v1h-3zM11 17h3v1h-3zM15 17h3v1h-3z" fill="#15171c"/><path d="M11 5h1v1h-1zM15 5h1v1h-1zM10 6h1v1h-1zM16 6h1v1h-1zM10 7h1v1h-1zM16 7h1v1h-1zM7 8h1v1h-1zM10 8h1v1h-1zM14 8h4v1h-4zM5 9h4v1h-4zM10 9h8v1h-8zM4 10h1v1h-1zM7 10h5v1h-5zM14 10h2v1h-2zM17 10h1v1h-1zM4 11h2v1h-2zM7 11h6v1h-6zM14 11h3v1h-3zM4 12h11v1h-11zM5 13h2v1h-2zM9 13h6v1h-6zM6 14h8v1h-8zM5 15h1v1h-1zM12 15h1v1h-1zM14 15h1v1h-1zM4 16h2v1h-2zM12 16h2v1h-2zM15 16h2v1h-2z" fill="#4a5263"/><path d="M12 5h3v1h-3zM11 6h2v1h-2zM15 6h1v1h-1zM11 7h2v1h-2zM15 7h1v1h-1zM11 8h3v1h-3z" fill="#f4f6fc"/><path d="M13 6h2v1h-2zM13 7h2v1h-2z" fill="#0b0c10"/><path d="M2 8h1v1h-1zM8 8h2v1h-2zM9 9h1v1h-1zM2 10h1v1h-1zM5 10h2v1h-2zM12 10h2v1h-2zM6 11h1v1h-1zM13 11h1v1h-1zM3 12h1v1h-1zM7 13h2v1h-2z" fill="#ffd21a"/><path d="M2 9h1v1h-1z" fill="#ff8a1a"/><path d="M16 10h1v1h-1z" fill="#f48ca0"/><path d="M17 11h1v1h-1zM15 12h2v1h-2z" fill="#1a1d24"/></svg>;
 
 export const COMPANION_CHARACTERS: readonly CompanionChoice[] = [
-  { id: 'blob', name: 'Blob', preview: blob },
-  { id: 'isaac', name: 'Isaac', preview: isaac },
-  { id: 'notchmimic', name: 'Null', preview: notchmimic },
-  { id: 'companioncube', name: 'Companion Cube · Portal', preview: companioncube },
-  { id: 'nurgling', name: 'Nurgling', preview: nurgling },
-  { id: 'hollowknight', name: 'Hollow Knight', preview: hollowknight },
-  { id: 'frog', name: 'Frog', preview: frog },
-  { id: 'necronwarrior', name: 'Necron Warrior', preview: necronwarrior },
-  { id: 'necronoverlord', name: 'Necron Overlord', preview: necronoverlord },
-  { id: 'canoptekscarab', name: 'Canoptek Scarab', preview: canoptekscarab },
-  { id: 'eyeofsauron', name: 'Eye of Sauron', preview: eyeofsauron },
-  { id: 'mushroom', name: 'Mushroom', preview: mushroom },
-  { id: 'sonichu', name: 'Sonichu', preview: sonichu },
-  { id: 'salamander', name: 'Salamander', preview: salamander },
+  { id: 'blob', name: 'Blob', group: 'Originals', preview: blob },
+  { id: 'isaac', name: 'Isaac', group: 'Games', source: 'The Binding of Isaac', preview: isaac },
+  { id: 'notchmimic', name: 'Null', group: 'Originals', preview: notchmimic },
+  { id: 'companioncube', name: 'Companion Cube · Portal', group: 'Games', source: 'Portal', preview: companioncube },
+  { id: 'nurgling', name: 'Nurgling', group: 'Warhammer 40K', source: 'Chaos', preview: nurgling },
+  { id: 'hollowknight', name: 'Hollow Knight', group: 'Games', source: 'Hollow Knight', preview: hollowknight },
+  { id: 'frog', name: 'Frog', group: 'Originals', preview: frog },
+  { id: 'necronwarrior', name: 'Necron Warrior', group: 'Warhammer 40K', source: 'Necrons', preview: necronwarrior },
+  { id: 'necronoverlord', name: 'Necron Overlord', group: 'Warhammer 40K', source: 'Necrons', preview: necronoverlord },
+  { id: 'canoptekscarab', name: 'Canoptek Scarab', group: 'Warhammer 40K', source: 'Necrons', preview: canoptekscarab },
+  { id: 'eyeofsauron', name: 'Eye of Sauron', group: 'Fantasy', source: 'The Lord of the Rings', preview: eyeofsauron },
+  { id: 'mushroom', name: 'Mushroom', group: 'Games', source: 'MapleStory', preview: mushroom },
+  { id: 'sonichu', name: 'Sonichu', group: 'Games', preview: sonichu },
+  { id: 'salamander', name: 'Salamander', group: 'Originals', preview: salamander },
 ];
+
+type Filter = 'All' | CompanionGroup;
+type Rect = { top: number; left: number };
+
+/** Case-insensitive match on name, group and franchise. */
+export function matchesCompanion(c: CompanionChoice, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  return !q || [c.name, c.group, c.source ?? ''].some(text => text.toLowerCase().includes(q));
+}
+
+/** Index to focus after `key` across tiles laid out at `rects` (DOM order); null = not a nav key. */
+export function companionFocusTarget(key: string, index: number, rects: readonly Rect[]): number | null {
+  const last = rects.length - 1;
+  if (last < 0) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return last;
+  if (key === 'ArrowLeft') return Math.max(0, index - 1);
+  if (key === 'ArrowRight') return Math.min(last, index + 1);
+  if (key !== 'ArrowUp' && key !== 'ArrowDown') return null;
+  const here = rects[index];
+  if (!here) return null;
+  const dir = key === 'ArrowUp' ? -1 : 1;
+  const rows = rects.filter(r => (r.top - here.top) * dir > 0).map(r => r.top);
+  if (!rows.length) return index;
+  const row = dir < 0 ? Math.max(...rows) : Math.min(...rows);
+  let best = index, gap = Infinity;
+  rects.forEach((r, i) => { const d = Math.abs(r.left - here.left); if (r.top === row && d < gap) { best = i; gap = d; } });
+  return best;
+}
+
+// Previews keep their own width/height; the picker re-sizes them to an integer multiple of the
+// viewBox so pixel art stays crisp whatever its grid (16/18/20/26).
+function scaled(c: CompanionChoice, box: number): ReactElement {
+  const svg = c.preview() as ReactElement<{ viewBox?: string; width?: number; height?: number }>;
+  const side = Number(String(svg.props.viewBox ?? '').split(/\s+/)[2]) || 20;
+  const px = side * Math.max(1, Math.floor(box / side));
+  return cloneElement(svg, { width: px, height: px });
+}
 
 export function CompanionPicker({ value, onPick, disabled }: {
   value: CompanionCharacter; onPick(id: CompanionCharacter): void; disabled?: boolean;
 }) {
-  return <div className="companion-picker" role="radiogroup" aria-label="Companion character">
-    {COMPANION_CHARACTERS.map(c => <button key={c.id} type="button" role="radio" aria-checked={value === c.id}
-      aria-label={c.name} disabled={disabled} onClick={() => onPick(c.id)}>
-      <span className="companion-preview">{c.preview()}</span><span>{c.name}</span>
-    </button>)}
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<Filter>('All');
+  const [focusId, setFocusId] = useState<CompanionCharacter | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const searched = COMPANION_CHARACTERS.filter(c => matchesCompanion(c, query));
+  const sections = COMPANION_GROUPS.map(group => ({ group, items: searched.filter(c => c.group === group) }))
+    .filter(s => (filter === 'All' || s.group === filter) && s.items.length);
+  const visible = sections.flatMap(s => s.items);
+  const headings = filter === 'All' && !query.trim();
+  const selected = COMPANION_CHARACTERS.find(c => c.id === value) ?? COMPANION_CHARACTERS[0] as CompanionChoice;
+  const tabId = [focusId, value].find(id => visible.some(c => c.id === id)) ?? visible[0]?.id;
+  const chips: { key: Filter; count: number }[] = [{ key: 'All', count: searched.length },
+    ...COMPANION_GROUPS.map(group => ({ key: group as Filter, count: searched.filter(c => c.group === group).length }))];
+  const onKey = (e: KeyboardEvent<HTMLButtonElement>, id: CompanionCharacter) => {
+    const nodes = Array.from(gridRef.current?.querySelectorAll<HTMLElement>('[role="radio"]') ?? []);
+    const at = visible.findIndex(c => c.id === id);
+    if (nodes.length !== visible.length || at < 0) return;
+    const to = companionFocusTarget(e.key, at, nodes.map(n => ({ top: n.offsetTop, left: n.offsetLeft })));
+    if (to === null) return;
+    e.preventDefault();
+    setFocusId(visible[to]?.id ?? null);
+    nodes[to]?.focus();
+  };
+  const tiles = (items: readonly CompanionChoice[]) => items.map(c => <button key={c.id} type="button" role="radio"
+    aria-checked={value === c.id} aria-label={c.name} tabIndex={c.id === tabId ? 0 : -1} disabled={disabled}
+    onClick={() => { setFocusId(c.id); onPick(c.id); }} onKeyDown={e => onKey(e, c.id)}>
+    <span className="companion-preview">{scaled(c, 52)}</span><span className="companion-name">{c.name}</span>
+  </button>);
+  return <div className="companion-picker">
+    <div className="companion-current">
+      <span className="companion-preview companion-preview-large">{scaled(selected, 88)}</span>
+      <span className="companion-current-text">
+        <strong>{selected.name}</strong>
+        <small>{selected.source ? `${selected.group} · ${selected.source}` : selected.group}</small>
+      </span>
+    </div>
+    <div className="companion-tools">
+      <input type="search" className="companion-search" placeholder="Search companions" aria-label="Search companions"
+        value={query} disabled={disabled} onChange={e => setQuery(e.target.value)} />
+      <div className="companion-chips" role="group" aria-label="Companion group filter">
+        {chips.map(({ key, count }) => <button key={key} type="button" className="companion-chip" aria-pressed={filter === key}
+          disabled={disabled} onClick={() => setFilter(key)}>{key}<span className="companion-count">{count}</span></button>)}
+      </div>
+    </div>
+    {visible.length === 0 && <p className="companion-empty" role="status">No companions match</p>}
+    <div className="companion-grid" role="radiogroup" aria-label="Companion character" ref={gridRef} hidden={visible.length === 0}>
+      {sections.flatMap(s => headings
+        ? [<div key={`h-${s.group}`} className="companion-group-title" aria-hidden="true">{s.group}</div>, ...tiles(s.items)]
+        : tiles(s.items))}
+    </div>
   </div>;
 }

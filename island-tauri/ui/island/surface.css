@@ -24,12 +24,38 @@ html[data-glass='true'] { --v-fill: var(--v-fill-soft); }
 .notch-color-control { display: flex; gap: 10px; align-items: center; }
 .notch-color-control input[type='color'] { width: 36px; height: 28px; padding: 2px; border: 1px solid var(--ui-border); border-radius: 8px; background: transparent; cursor: pointer; }
 .notch-color-control .link { font: 11px var(--ui-mono); }
-/* Notch companion character tiles (Settings → Notch): room for more, they wrap. */
-.companion-picker { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.companion-picker button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; padding: 8px 10px 6px;
+/* Notch companion picker (Settings → Notch): full-width under the row label; header with a big
+   preview, search + group chips, then a responsive tile grid grouped under small headings. */
+.settings-row[data-setting-id='companionCharacter'] { flex-wrap: wrap; align-items: flex-start; padding: 10px 0; }
+.settings-row[data-setting-id='companionCharacter'] > .label { flex-basis: 100%; }
+.companion-picker { flex: 1 1 100%; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.companion-current { display: flex; align-items: center; gap: 14px; }
+.companion-current-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.companion-current-text strong { color: var(--ui-text); font-size: var(--fs-body); font-weight: 600; }
+.companion-current-text small { color: var(--v-dim); font-size: var(--fs-sm); }
+.companion-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.companion-search { flex: 1 1 160px; min-width: 0; padding: 6px 10px; border-radius: var(--radius-lg); background: var(--v-fill);
+  border: 1px solid var(--v-stroke-hi); color: var(--ui-text); font-size: var(--fs-body); }
+.companion-search:focus-visible { outline: none; border-color: var(--ui-accent, currentColor); }
+.companion-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.companion-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--v-fill);
+  border: 1px solid transparent; color: var(--v-dim); font-size: var(--fs-sm); cursor: pointer; }
+.companion-chip[aria-pressed='true'] { background: var(--v-fill-hi); border-color: var(--ui-accent, currentColor); color: var(--ui-text); }
+.companion-count { font-variant-numeric: tabular-nums; opacity: .7; }
+.companion-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.companion-grid[hidden] { display: none; }
+.companion-group-title { grid-column: 1 / -1; margin-top: 4px; color: var(--v-dim); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
+.companion-group-title:first-child { margin-top: 0; }
+.companion-grid button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px 6px; min-width: 0;
   border-radius: var(--radius-lg); background: var(--v-fill); border: 1px solid transparent; color: var(--v-dim); font-size: var(--fs-sm); cursor: pointer; }
-.companion-picker button[aria-checked='true'] { background: var(--v-fill-hi); border-color: var(--ui-accent, currentColor); color: var(--ui-text); }
-.companion-preview { display: grid; place-items: center; width: 40px; height: 28px; border-radius: var(--radius-lg); background: #000; color: #f1ede4; }
+.companion-grid button[aria-checked='true'] { background: var(--v-fill-hi); border-color: var(--ui-accent, currentColor); color: var(--ui-text); }
+.companion-grid button:focus-visible, .companion-chip:focus-visible { outline: 2px solid var(--ui-accent, currentColor); outline-offset: 1px; }
+.companion-grid button:disabled, .companion-chip:disabled, .companion-search:disabled { opacity: .5; cursor: default; }
+.companion-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.companion-empty { margin: 0; padding: 12px 0; color: var(--v-dim); font-size: var(--fs-sm); }
+.companion-preview { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--radius-lg); background: #000; color: #f1ede4; }
+.companion-preview-large { width: 96px; height: 96px; }
+.companion-preview svg { image-rendering: pixelated; }
 /* Translucent: opaque across the top strip (matches the panel pill), then eases to the
    chosen glass strength (`--glass-strength`, Settings → Glass strength, default .55) over
    36 px so KWin's blur-behind shows through the body. `--glass-open` (IslandSurface,

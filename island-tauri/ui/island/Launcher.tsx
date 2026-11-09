@@ -58,12 +58,12 @@ function launchFrom(tile: HTMLElement | undefined) {
 export function balancedColumns(_count: number, fit: number): number {
   return Math.max(1, Math.min(5, Math.floor(fit)));
 }
-const TILE_MIN = 76, TILE_GAP = 10;
+const TILE_MIN = 100, TILE_GAP = 8; // fixed 100px tiles (surface.css .app-grid)
 function useColumns(grid: RefObject<HTMLDivElement | null>, count: number) {
   const [fit, setFit] = useState(5);
   useLayoutEffect(() => {
     const el = grid.current; if (!el || typeof ResizeObserver !== 'function') return;
-    const measure = () => setFit(Math.floor((el.clientWidth + TILE_GAP) / (TILE_MIN + TILE_GAP)) || 1);
+    const measure = () => setFit(Math.floor((el.clientWidth + TILE_GAP + 1) / (TILE_MIN + TILE_GAP)) || 1);
     measure();
     const observer = new ResizeObserver(measure); observer.observe(el);
     return () => observer.disconnect();

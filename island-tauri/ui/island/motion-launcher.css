@@ -26,6 +26,7 @@
 }
 html[data-tone='light'] {
   --launcher-tile-border: color-mix(in srgb, var(--ui-text) 8%, transparent);
+  --launcher-tile-fill: color-mix(in srgb, var(--ui-text) 3.5%, transparent);
   --launcher-glass-fill: color-mix(in srgb, var(--ui-text) 6%, transparent);
   --launcher-glass-border: color-mix(in srgb, var(--ui-text) 8%, transparent);
 }

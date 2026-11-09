@@ -153,18 +153,20 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .launcher-toolbar .pill-button.primary { background: var(--ui-accent); color: var(--ui-on-accent); }
 /* More island width adds columns, never oversized tiles. The minimum still
    contracts for exceptionally narrow panes; shown and Hidden grids share it. */
-.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(76px, 100%), 1fr)); gap: 8px; padding: 0; position: relative; }
-/* Launcher measures the width and supplies the count, max 5 per row (Launcher.tsx balancedColumns).
-   Columns share the full page width (Nick's reference, Nov 9): no dead gutters beside the grid. */
-.app-grid[data-cols] { grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, 100px); justify-content: center; gap: 8px; padding: 0; position: relative; }
+/* Nick's reference (Nov 9), measured: fixed 100x86 tiles, 8px gaps, 5 per row (Launcher.tsx
+   balancedColumns), and the island narrows to the grid on this page (IslandSurface LAUNCHER_WIDTH)
+   so there are no side gutters: 14px page margin each side. */
+.app-grid[data-cols] { grid-template-columns: repeat(var(--cols), 100px); }
+.view-pane[data-pane='launcher'] .app-pane:not([hidden]) { padding-inline: 9px; }
 /* Header rows span exactly the tile columns, so their edges line up with the tiles. */
 .app-grid > .launcher-toolbar, .app-grid > .app-section-label { grid-column: 1 / -1; }
 .tile-wrap { position: relative; touch-action: none; z-index: 1; }
 .tile-wrap[data-dragging='true'] { z-index: 10; }
-.app-tile { width: 100%; height: 88px; aspect-ratio: auto; min-height: 0; padding: 12px 8px; gap: 8px; border-radius: var(--radius-xl); display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: var(--v-fill); border: 1px solid var(--launcher-tile-border, rgb(255 255 255 / .07)); font-size: var(--fs-sm); font-weight: 500; line-height: 1.2; color: var(--ui-text); }
+.app-tile { width: 100px; height: 86px; aspect-ratio: auto; min-height: 0; padding: 8px 4px; gap: 10px; border-radius: var(--radius-xl); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--launcher-tile-fill, rgb(255 255 255 / .035)); border: 1px solid var(--launcher-tile-border, rgb(255 255 255 / .07)); font-size: var(--fs-sm); font-weight: 500; line-height: 1.2; color: var(--ui-text); }
 .app-tile svg { width: 24px; height: 24px; flex: none; color: var(--tone, rgb(255 255 255 / .85)); }
-.app-tile { font-size: var(--fs-md); }
+.app-tile { font-size: var(--fs-sm); } /* 11px: the reference's label size; long names fit 92px */
 .app-tile span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 @media (hover: hover) and (pointer: fine) { .app-tile:hover:not(:disabled) { background: var(--v-fill-hi) !important; border-color: rgb(255 255 255 / .14); } }
 .app-grid[data-editing='true'] .app-tile { padding-bottom: 8px; cursor: grab; }
@@ -177,10 +179,10 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .tile-badge:hover { filter: brightness(1.15); }
 .app-section-label { font-size: var(--fs-sm); font-weight: 600; color: var(--v-dim); text-transform: uppercase; letter-spacing: .4px; margin: 4px 0 0; display: flex; align-items: center; gap: 8px; }
 .app-section-label::after { content: ''; flex: 1; height: 1px; background: var(--v-stroke-hi); }
-.hidden-grid { min-height: 104px; border-radius: var(--radius-3xl); padding: 8px; background: rgb(255 255 255 / .025); outline: 1px dashed transparent; transition: outline-color .2s, background-color .2s; }
+.hidden-grid { min-height: 102px; border-radius: var(--radius-3xl); padding: 8px 0; background: rgb(255 255 255 / .025); outline: 1px dashed transparent; transition: outline-color .2s, background-color .2s; }
 .hidden-grid[data-over='true'] { outline-color: rgb(255 255 255 / .35); background: rgb(255 255 255 / .06); }
 .hidden-grid:empty::before { content: 'Drag apps here to hide them'; grid-column: 1 / -1; align-self: center; text-align: center; color: var(--v-dim); font-size: var(--fs-sm); }
-.drag-ghost { position: fixed; pointer-events: none; z-index: 100; width: 176px; }
+.drag-ghost { position: fixed; pointer-events: none; z-index: 100; width: 100px; }
 .drag-ghost .app-tile { box-shadow: 0 16px 40px rgb(0 0 0 / .5); background: color-mix(in srgb, var(--ui-background) 70%, #333); }
 
 /* ---- Timer: ruler wheel ------------------------------------------------- */

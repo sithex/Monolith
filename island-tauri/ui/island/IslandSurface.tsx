@@ -17,6 +17,8 @@ export { UI_SPRING };
 function arrive(root: HTMLElement) {
   root.style.opacity = '0'; root.dataset.arrived = 'true'; root.dataset.morphing = 'false';
 }
+/** Island width while the Apps page is open (see the width rule in IslandSurface). */
+export const LAUNCHER_WIDTH = 560;
 export function IslandSurface({ children, fail, paletteOpen = false }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean }) {
   const state = useIslandState(), settings = useSettings();
   // Settings → Motion → Reduce motion forces the same path as the OS preference.
@@ -79,7 +81,9 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
   const approvalHover = useApprovalHover(), notificationHover = useNotificationHover();
   // An approval prompt outranks popup cards; otherwise the notch grows into the cards.
   const hover = approvalHover.active || !notificationHover.active ? approvalHover : notificationHover;
-  const width = state.mode === 'still' ? 150 : state.mode === 'hover' ? hover.width : !layout.unchangedSizing ? customWidth : state.view === 'terminal' ? 1040 : 640;
+  // Apps page (Nick's reference, Nov 9): the island hugs the 5-column grid of 100px tiles
+  // (5 x 100 + 4 x 8 gaps + 14px margins = 560), whatever the island size setting is.
+  const width = state.mode === 'still' ? 150 : state.mode === 'hover' ? hover.width : state.view === 'launcher' ? LAUNCHER_WIDTH : !layout.unchangedSizing ? customWidth : state.view === 'terminal' ? 1040 : 640;
   const baseHeight = state.mode === 'still' ? 42 : state.mode === 'hover' ? hover.height : state.view === 'terminal' ? 672 : state.view === 'monitor' ? 500 : state.view === 'ai' ? 740 : 640;
   // An explicit preset replaces the legacy per-app ceiling; otherwise increasing the
   // height slider never grows the terminal past 672px (or Settings past 640px).

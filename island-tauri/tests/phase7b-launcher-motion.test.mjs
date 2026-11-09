@@ -211,5 +211,5 @@ test('launcher shows 5 apps per row, fewer only when narrow', () => {
   assert.equal(balancedColumns(3, 8), 5); // short lists keep full-size columns (tiles stretch)
   assert.equal(balancedColumns(0, 8), 5);
   const css = readFileSync(new URL('../ui/island/surface.css', import.meta.url), 'utf8');
-  assert.match(css, /\.app-grid\[data-cols\] \{ grid-template-columns: repeat\(var\(--cols\), minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.app-grid\[data-cols\] \{ grid-template-columns: repeat\(var\(--cols\), 100px\)/);
 });

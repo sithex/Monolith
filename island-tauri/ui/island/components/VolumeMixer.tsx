@@ -57,7 +57,7 @@ export function VolumeMixer({ model, intents }: { model: Service<MixerModel>; in
     const master = value.sinks.find(s => s.name === value.defaultSink);
     return <div className="mixer">
       <div className="select-label"><span>Output</span><Dropdown label="Mixer output" value={value.defaultSink} placeholder="Unknown output" options={value.sinks.map(o => ({ value: o.name, label: o.description }))} onChange={name => intents.mixer({ type: 'defaultSink', name })} /></div>
-      <div className="mixer-strip">
+      <div className="mixer-strip" data-fit-width="">
         {master ? <Column master channel={{ ...master, label: 'Output' }} intents={intents} /> : <p className="unavailable">Master volume unavailable</p>}
         <div className="mixer-divider" />
         {value.streams.length ? value.streams.map(stream => <Column key={stream.index} channel={{ ...stream, label: stream.appName, name: null }} intents={intents} />) : <Empty icon="volume">No apps playing</Empty>}

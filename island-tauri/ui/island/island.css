@@ -27,6 +27,15 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 /* Closing: the native notch's own text colour (the Hermes skin), so the hand-off is exact. */
 .island[data-state='still'] .topline[data-notch-clock='true'] .clock { color: var(--notch-text, var(--ui-text)); }
 .collapse { margin-left: auto; font-size: var(--fs-xl); width: 32px; padding: 0; }
+/* Under the notch, one top bar (Nick's reference, Nov 9): the page's Back/title/actions row rises
+   into the clock row instead of stacking a second 36px row under it. The row lets clicks through
+   its empty space, so the clock (home) and the empty bar (minimise) still work underneath, and it
+   stops short of the "−" button. The topline's own "Hermes" label gives way to the page title. */
+/* Any state, so the row doesn't drop 42px while the content fades out on close. */
+.island:has(> .topline[data-notch-clock='true']) .island-shell > .title-row {
+  margin-top: -42px; height: 42px; padding: 0 58px 0 10px; position: relative; z-index: 1; pointer-events: none; }
+.island:has(> .topline[data-notch-clock='true']) .island-shell > .title-row > * { pointer-events: auto; }
+.island:not([data-state='hover']) .topline[data-notch-clock='true'] .topline-title { visibility: hidden; }
 .preview { padding: 20px 24px; flex: 1; }
 .preview h2 { font-size: var(--fs-xl); font-weight: 500; }
 .preview button { margin-top: 20px; width: 100%; }

@@ -213,3 +213,16 @@ test('launcher shows 5 apps per row, fewer only when narrow', () => {
   const css = readFileSync(new URL('../ui/island/surface.css', import.meta.url), 'utf8');
   assert.match(css, /\.app-grid\[data-cols\] \{ grid-template-columns: repeat\(var\(--cols\), 100px\)/);
 });
+
+test('compact pages: one top bar under the notch, small pages hug their content (Nick, Nov 9)', () => {
+  const css = readFileSync(new URL('../ui/island/island.css', import.meta.url), 'utf8');
+  assert.match(css, /\.island:has\(> \.topline\[data-notch-clock='true'\]\) \.island-shell > \.title-row \{\s*margin-top: -42px; height: 42px;/);
+  assert.match(css, /title-row \{[^}]*pointer-events: none/);
+  const tsx = readFileSync(new URL('../ui/island/IslandSurface.tsx', import.meta.url), 'utf8');
+  for (const view of ['launcher', 'agents', 'mixer']) assert.match(tsx, new RegExp(`COMPACT_VIEWS[^\\n]*'${view}'`));
+  assert.match(tsx, /export const LAUNCHER_WIDTH = 560;/);
+  // The fit-width measurement must not read the island's live (springing) width.
+  assert.doesNotMatch(tsx, /wantW = Math\.ceil\(root\.offsetWidth/);
+  const mixer = readFileSync(new URL('../ui/island/components/VolumeMixer.tsx', import.meta.url), 'utf8');
+  assert.match(mixer, /className="mixer-strip" data-fit-width=""/);
+});

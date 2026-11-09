@@ -11,6 +11,7 @@ import { useLayout, useLauncher } from '../stores/apps';
 import { UI_SPRING } from './components/IslandShell';
 import { createGeometryReporter, fitSurface, effectiveLayout, visibleLayout, nativePill, presetSize } from './geometry';
 import { pointerIntent } from './navigation';
+import type { IslandView } from '../ipc/bindings';
 import { arrivalTime, axisSpring, motionSpeed, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, surfaceRadius, WITHDRAW_LEAD } from './motion-profile';
 export { UI_SPRING };
 /** The shell has handed the notch back: invisible, out of every morph rule. */
@@ -19,6 +20,12 @@ function arrive(root: HTMLElement) {
 }
 /** Island width while the Apps page is open (see the width rule in IslandSurface). */
 export const LAUNCHER_WIDTH = 560;
+/** Pages with little content open at the Apps page's width instead of the island size setting
+ *  (Nick, Nov 9: no dead space). Each still grows to fit wider content (a `[data-fit-width]` row,
+ *  e.g. the mixer's faders) up to the size setting; height always follows the content. */
+export const COMPACT_VIEWS: ReadonlySet<IslandView> = new Set<IslandView>(['launcher', 'agents', 'mixer', 'brightness', 'timer', 'quickInfo', 'downloads', 'clipboard', 'notifications', 'scratchpad', 'controls']);
+/** Lowest open height for content-fitted pages: top bar + one line of content. */
+export const MIN_FIT_HEIGHT = 80;
 export function IslandSurface({ children, fail, paletteOpen = false }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean }) {
   const state = useIslandState(), settings = useSettings();
   // Settings → Motion → Reduce motion forces the same path as the OS preference.
@@ -47,11 +54,11 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
     window.addEventListener('resize', resize);
     return () => { owner.current?.dispose(); owner.current = null; window.removeEventListener('resize', resize); };
   }, []);
-  const [contentH, setContentH] = useState<number | null>(null);
+  const [contentH, setContentH] = useState<number | null>(null), [contentW, setContentW] = useState<number | null>(null);
   const fitsContent = state.mode === 'large' && state.view !== 'terminal';
   useLayoutEffect(() => {
     const root = outer.current;
-    if (!fitsContent || !root) { setContentH(null); return; }
+    if (!fitsContent || !root) { setContentH(null); setContentW(null); return; }
     let frame = 0, watched: Element | null = null;
     const ro = new ResizeObserver(() => schedule());
     const measure = () => {
@@ -68,6 +75,18 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
       const hidden = scroller ? Math.max(0, scroller.scrollHeight - scroller.clientHeight) : 0;
       const want = Math.ceil(chrome + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + child.offsetHeight + hidden);
       setContentH(h => h !== null && Math.abs(h - want) < 2 ? h : want);
+      // Width a row needs unclipped: its children's extent, plus everything around the row.
+      const row = child.querySelector<HTMLElement>('[data-fit-width]');
+      let wantW: number | null = null;
+      if (row && row.children.length) {
+        // Measured against the page and the content wrap, never the island's live width: while the
+        // island springs, the wrap already has the TARGET width (morph rule), and mixing the two
+        // made the target chase itself. Assumes the row's right inset mirrors its left one.
+        const r = row.getBoundingClientRect(), p = pane.getBoundingClientRect(), rs = getComputedStyle(row);
+        const extent = Math.max(...Array.from(row.children, c => c.getBoundingClientRect().right)) - r.left + row.scrollLeft + parseFloat(rs.paddingRight);
+        wantW = Math.ceil((wrap?.offsetWidth ?? root.offsetWidth - 2) + 2 - p.width + 2 * (r.left - p.left) + extent);
+      }
+      setContentW(w => w !== null && wantW !== null && Math.abs(w - wantW) < 2 ? w : wantW);
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };
     const mo = new MutationObserver(schedule);
@@ -75,7 +94,7 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
     schedule();
     return () => { ro.disconnect(); mo.disconnect(); if (frame) cancelAnimationFrame(frame); };
   }, [fitsContent, state.view]);
-  useLayoutEffect(() => { owner.current?.schedule(!animating.current); }, [state.rev, state.mode, state.view, settings, layout.rev, launcher.rev, contentH]);
+  useLayoutEffect(() => { owner.current?.schedule(!animating.current);  }, [state.rev, state.mode, state.view, settings, layout.rev, launcher.rev, contentH, contentW]);
   const preset = layout.layout.preset;
   const { width: customWidth, maxHeight: customHeight } = presetSize(preset);
   const approvalHover = useApprovalHover(), notificationHover = useNotificationHover();
@@ -83,7 +102,11 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
   const hover = approvalHover.active || !notificationHover.active ? approvalHover : notificationHover;
   // Apps page (Nick's reference, Nov 9): the island hugs the 5-column grid of 100px tiles
   // (5 x 100 + 4 x 8 gaps + 14px margins = 560), whatever the island size setting is.
-  const width = state.mode === 'still' ? 150 : state.mode === 'hover' ? hover.width : state.view === 'launcher' ? LAUNCHER_WIDTH : !layout.unchangedSizing ? customWidth : state.view === 'terminal' ? 1040 : 640;
+  // Other compact pages share that width and widen only for content that needs it.
+  const sized = !layout.unchangedSizing ? customWidth : state.view === 'terminal' ? 1040 : 640;
+  const compact = state.view === 'launcher' ? LAUNCHER_WIDTH
+    : COMPACT_VIEWS.has(state.view) ? Math.min(Math.max(sized, LAUNCHER_WIDTH), Math.max(LAUNCHER_WIDTH, contentW ?? 0)) : null;
+  const width = state.mode === 'still' ? 150 : state.mode === 'hover' ? hover.width : compact ?? sized;
   const baseHeight = state.mode === 'still' ? 42 : state.mode === 'hover' ? hover.height : state.view === 'terminal' ? 672 : state.view === 'monitor' ? 500 : state.view === 'ai' ? 740 : 640;
   // An explicit preset replaces the legacy per-app ceiling; otherwise increasing the
   // height slider never grows the terminal past 672px (or Settings past 640px).
@@ -91,7 +114,7 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
   const maxHeight = state.mode === 'large' && !layout.unchangedSizing ? customHeight : baseHeight;
   // The palette needs a usable list even above a short content-fitted settings page.
   // Keep the user's explicit height ceiling and viewport constraints authoritative.
-  const height = fitsContent && contentH !== null ? Math.min(maxHeight, Math.max(paletteOpen ? 560 : 200, contentH)) : maxHeight;
+  const height = fitsContent && contentH !== null ? Math.min(maxHeight, Math.max(paletteOpen ? 560 : MIN_FIT_HEIGHT, contentH)) : maxHeight;
   const fit = fitSurface(width, height, viewport, state.mode === 'large' ? visible : undefined);
   const limit = fitSurface(Infinity, Infinity, viewport, state.mode === 'large' ? visible : undefined);
   liveLayout.current = effectiveLayout(visible, fit.buttonScale);

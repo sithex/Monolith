@@ -20,18 +20,18 @@
 
 /* Resting tile colours let the touch reset follow the current tone and glass setting. */
 :root {
-  --launcher-tile-border: rgb(255 255 255 / .04);
+  --launcher-tile-border: rgb(255 255 255 / .07);
   --launcher-glass-fill: rgb(255 255 255 / .06);
   --launcher-glass-border: rgb(255 255 255 / .08);
 }
 html[data-tone='light'] {
-  --launcher-tile-border: color-mix(in srgb, var(--ui-text) 4%, transparent);
+  --launcher-tile-border: color-mix(in srgb, var(--ui-text) 8%, transparent);
   --launcher-glass-fill: color-mix(in srgb, var(--ui-text) 6%, transparent);
   --launcher-glass-border: color-mix(in srgb, var(--ui-text) 8%, transparent);
 }
 /* Remove legacy hover effects on touch; a held tile uses the shared press only. */
 @media (hover: none), (pointer: coarse) {
-  .island .launcher .app-tile:hover:not(:disabled) { background: var(--v-fill-soft) !important; border-color: var(--launcher-tile-border); }
+  .island .launcher .app-tile:hover:not(:disabled) { background: var(--v-fill) !important; border-color: var(--launcher-tile-border); }
   html[data-glass='true'] .island .launcher .app-tile:hover:not(:disabled) { background: var(--launcher-glass-fill) !important; border-color: var(--launcher-glass-border); }
 }
 .island .launcher .tile-badge:hover { filter: none; }
@@ -42,3 +42,22 @@ html[data-tone='light'] {
    pan-y leaves vertical scrolling to the browser while horizontal drags page. */
 .island .view-stage { touch-action: pan-y; }
 .island .view-stage[data-swiping='true'] .app-pane > * { animation: none; }
+/* Spatial launch: an app grows out of the tile that opened it; Back lets the grid settle
+   toward that tile again. Pointer-only (keyboard paging stays instant); reduced motion
+   collapses it via the global animation-duration rule. Origin is in stage coordinates. */
+html[data-launch]:not([data-nav-via='key']) .island .app-pane:not(.terminal-pane):not([hidden]) > * {
+  transform-origin: var(--launch-x, 50%) var(--launch-y, 0);
+}
+html[data-launch='open']:not([data-nav-via='key']) .island .app-pane:not(.terminal-pane):not([hidden]) > * {
+  animation: launch-open calc(260ms / var(--motion-speed, 1)) var(--ease-out) both;
+}
+html[data-launch='return']:not([data-nav-via='key']) .island .app-pane:not(.terminal-pane):not([hidden]) > * {
+  animation: launch-return calc(220ms / var(--motion-speed, 1)) var(--ease-out) both;
+}
+/* The terminal pane is never keyframed (xterm sizing); it only gets the fade. */
+html[data-launch='open']:not([data-nav-via='key']) .island .terminal-pane:not([hidden]) {
+  animation: launch-fade calc(180ms / var(--motion-speed, 1)) var(--ease-out) both;
+}
+@keyframes launch-open { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: none; } }
+@keyframes launch-return { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+@keyframes launch-fade { from { opacity: 0; } to { opacity: 1; } }

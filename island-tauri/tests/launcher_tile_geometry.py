@@ -64,9 +64,9 @@ window.destroy()
 assert result, 'WebKit did not return layout measurements'
 print(json.dumps(result, indent=2))
 for row in result:
-    assert row['tileWidth'] <= 110.5, f'Tile expands with island width: {row}'
-    assert row['tileHeight'] <= 104, f'Tile height exceeds compact maximum: {row}'
-    assert row['icon'] <= 28.5, f'Icon expands with island width: {row}'
+    assert row['tileWidth'] <= 92.5, f'Tile expands with island width: {row}'
+    assert row['tileHeight'] <= 92.5, f'Tile height exceeds compact maximum: {row}'
+    assert row['icon'] <= 24.5, f'Icon expands with island width: {row}'
     assert row['font'] <= 12, f'Label expands with island width: {row}'
     assert row['fits'], f'Tiles overflow narrow grid: {row}'
 for hidden in [False, True]:

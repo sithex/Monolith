@@ -28,6 +28,25 @@ function place(list: string[], id: string, index: number) {
   return next;
 }
 
+/** Apps open out of the tile that launched them and Back settles the grid toward it again
+ *  (motion-launcher.css). Origin is stored relative to the page stage; the flag is short-lived. */
+let launchClear: ReturnType<typeof setTimeout> | undefined;
+let lastLaunch = 0;
+function markLaunch(kind: 'open' | 'return') {
+  const root = document.documentElement;
+  root.dataset.launch = kind;
+  clearTimeout(launchClear);
+  launchClear = setTimeout(() => { delete root.dataset.launch; }, 600);
+}
+function launchFrom(tile: HTMLElement | undefined) {
+  const stage = tile?.closest?.('.view-stage'); if (!tile || !stage) return;
+  const s = stage.getBoundingClientRect(), r = tile.getBoundingClientRect(), root = document.documentElement;
+  root.style.setProperty('--launch-x', `${Math.round(r.left + r.width / 2 - s.left)}px`);
+  root.style.setProperty('--launch-y', `${Math.round(r.top + r.height / 2 - s.top)}px`);
+  lastLaunch = performance.now();
+  markLaunch('open');
+}
+
 export function Launcher({ navigate, fail }: { navigate(view: IslandView): void; fail(error: unknown): void }) {
   const state = useLauncher(), island = useIslandState(), reduced = useReducedMotionPreference();
   const [pageHidden, setPageHidden] = useState(() => document.hidden);
@@ -51,6 +70,8 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   const key = JSON.stringify([serverShown, serverHidden]);
   useLayoutEffect(() => { if (!dragRef.current) { setShown(serverShown); setHidden(serverHidden); } }, [key]);
   useEffect(() => () => { if (press.current?.timer) clearTimeout(press.current.timer); }, []);
+  // Coming back from an app this grid launched: settle toward its tile (before first paint).
+  useLayoutEffect(() => { if (lastLaunch) { lastLaunch = 0; markLaunch('return'); } }, []);
   useEffect(() => {
     const changed = () => setPageHidden(document.hidden);
     document.addEventListener('visibilitychange', changed);
@@ -189,7 +210,7 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
           const to = e.key === 'ArrowLeft' ? index - 1 : e.key === 'ArrowRight' ? index + 1 : -1;
           if (to >= 0) { e.preventDefault(); void send({ type: 'move', id, to }); }
         }}
-        onClick={() => { if (suppressClick.current) return; if (!state.editing && zone === 'shown' && item.known && view) navigate(view); }}>
+        onClick={e => { if (suppressClick.current) return; if (!state.editing && zone === 'shown' && item.known && view) { launchFrom(e?.currentTarget); navigate(view); } }}>
         <Icon name={view ? viewIcons[view] ?? 'grid' : 'grid'} /><span>{name}</span>
       </button>
       <AnimatePresence>{state.editing && !item.locked && <motion.button key="badge" initial={{ scale: quiet ? 1 : 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: quiet ? 1 : 0.9, opacity: 0 }} transition={tween(keyboard ? 0 : DUR.fast)}
@@ -203,18 +224,18 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   };
   const ghost = drag ?? landing, dragged = ghost ? byId.get(ghost.id) : undefined;
   return <div className="launcher" data-editing={state.editing} data-motion-active={visible && state.editing && !reduced} data-reduced-motion={reduced} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (state.editing) void send({ type: 'cancel' }).catch(() => undefined); } }}>
-    <div className="launcher-toolbar"><span className="muted">{state.editing ? 'Drag to arrange · drop in Hidden to hide' : 'Hold an app to arrange'}</span>
-      {state.editing && <><button className="pill-button" onClick={() => { void send({ type: 'cancel' }).catch(() => undefined); }}>Cancel</button><button className="pill-button primary" onClick={() => { void send({ type: 'commit' }).catch(() => undefined); }}>Done</button></>}
-      {!state.editing && <button className="pill-button" aria-label="Edit apps" onClick={() => { void send({ type: 'begin' }).catch(() => undefined); }}>Edit</button>}
-    </div>
     <LayoutGroup>
       <div ref={grid} className="app-grid" aria-label="Apps" data-editing={state.editing}>
+        <div className="launcher-toolbar"><span>{state.editing ? 'Drag to arrange · drop in Hidden to hide' : 'Hold an app to arrange'}</span>
+          {state.editing && <><button className="pill-button" onClick={() => { void send({ type: 'cancel' }).catch(() => undefined); }}>Cancel</button><button className="pill-button primary" onClick={() => { void send({ type: 'commit' }).catch(() => undefined); }}>Done</button></>}
+          {!state.editing && <button className="pill-button" aria-label="Edit apps" onClick={() => { void send({ type: 'begin' }).catch(() => undefined); }}>Edit</button>}
+        </div>
         {shown.map((id, i) => tile(id, i, 'shown'))}
-        {!state.editing && <motion.div layout={!quiet} transition={quiet ? { duration: 0 } : SPRING.ui()} className="tile-wrap"><button className="app-tile" data-testid="view-quickInfo" onClick={() => navigate('quickInfo')}><Icon name="weather" /><span>Quick info</span></button></motion.div>}
+        {!state.editing && <motion.div layout={!quiet} transition={quiet ? { duration: 0 } : SPRING.ui()} className="tile-wrap"><button className="app-tile" data-testid="view-quickInfo" onClick={e => { launchFrom(e?.currentTarget); navigate('quickInfo'); }}><Icon name="weather" /><span>Quick info</span></button></motion.div>}
       </div>
       <AnimatePresence>{state.editing && <motion.div key="hidden" initial={{ opacity: 0, y: quiet ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: quiet ? 0 : 8 }} transition={tween(keyboard ? 0 : DUR.base)}>
-        <div className="app-section-label">Hidden apps</div>
-        <div ref={hiddenGrid} className="app-grid hidden-grid" aria-label="Hidden apps" data-editing={state.editing} data-over={overHidden}>{hidden.map((id, i) => tile(id, i, 'hidden'))}</div>
+        <div ref={hiddenGrid} className="app-grid hidden-grid" aria-label="Hidden apps" data-editing={state.editing} data-over={overHidden}>
+          <div className="app-section-label">Hidden apps</div>{hidden.map((id, i) => tile(id, i, 'hidden'))}</div>
       </motion.div>}</AnimatePresence>
     </LayoutGroup>
     {ghost && dragged && createPortal(<motion.div key={ghost.id} className="drag-ghost launcher-drag-ghost" initial={{ x: ghost.x, y: ghost.y, scale: 1 }} animate={ghostMotion} style={{ left: 0, top: 0, width: ghost.w, transformOrigin: '0 0' }}>

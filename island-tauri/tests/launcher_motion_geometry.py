@@ -31,7 +31,7 @@ script = r"""
   const reference=[...document.querySelectorAll('.reference .app-tile')].map(e=>e.getBoundingClientRect());
   for(const grid of grids) {
    const boxes=[...grid.querySelectorAll('.app-tile')].map(e=>e.getBoundingClientRect());
-   check(boxes.every(r=>r.width<=110.5&&r.height<=104),'tile cap at '+width);
+   check(boxes.every(r=>r.width<=92.5&&r.height<=92.5),'tile cap at '+width);
    check(boxes.every((r,i)=>Math.abs(r.width-reference[i].width)<.01&&Math.abs(r.height-reference[i].height)<.01),'wrapper changes tile size at '+width);
    const icon=grid.querySelector('svg').getBoundingClientRect();
    check(icon.width<=28.5,'icon cap at '+width);
@@ -49,7 +49,7 @@ script = r"""
  check(style().transform==='none','reduced motion rotates');
  check(getComputedStyle(face.querySelector('button')).outlineStyle==='dashed','missing static edit cue');
  launcher.dataset.reducedMotion='false'; document.documentElement.dataset.navVia='key'; await wait(30);
- check(style().transform==='none','keyboard wiggle');
+ check(style().transform!=='none','wiggle is ambient: keeps running after keyboard input');
  delete document.documentElement.dataset.navVia;
  root.style.setProperty('--motion-speed','2'); await wait(30);
  check(Math.abs(parseFloat(style().animationDuration)-.12)<.001,'wiggle ignores animation speed');

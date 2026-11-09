@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useIslandState } from '../../ipc/island-state';
+import { useReducedMotionAll } from './motion-preference';
+import { DUR, tween } from '../motion-profile';
 
 /**
  * In-island colour picker. On Wayland the native GTK colour chooser that `<input type=color>`
@@ -9,7 +11,7 @@ import { useIslandState } from '../../ipc/island-state';
  * (outside its right edge and side buttons when there is room), and joins the input/blur
  * region through `[data-island-extension]` in `geometryReport`.
  */
-type Request = { id: string; label: string; value: string; anchorY: number; onPick(hex: string): void; onReset?(): void; resetLabel?: string };
+type Request = { id: string; label: string; value: string; anchorX: number; anchorY: number; onPick(hex: string): void; onReset?(): void; resetLabel?: string };
 let active: Request | null = null;
 const listeners = new Set<() => void>();
 const emit = () => { for (const l of listeners) l(); window.dispatchEvent(new Event('island-surfaces-changed')); };
@@ -49,7 +51,7 @@ export function ColorSwatch({ id, label, value, onPick, onReset, resetLabel, cla
     onClick={() => {
       if (open) { colorPicker.close(); return; }
       const r = ref.current?.getBoundingClientRect();
-      colorPicker.open({ id, label, value, anchorY: r ? r.top + r.height / 2 : innerHeight / 3, onPick, onReset, resetLabel });
+      colorPicker.open({ id, label, value, anchorX: r ? r.left + r.width / 2 : innerWidth / 2, anchorY: r ? r.top + r.height / 2 : innerHeight / 3, onPick, onReset, resetLabel });
     }}><span /></button>;
 }
 
@@ -88,6 +90,8 @@ function useDrag(onMove: (fx: number, fy: number) => void, onEnd: () => void) {
 export function ColorPickerPanel() {
   const request = useSyncExternalStore(colorPicker.subscribe, colorPicker.get);
   const state = useIslandState();
+  const reduced = useReducedMotionAll();
+  const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
   const [hsv, setHsv] = useState<Hsv>({ h: 0, s: 0, v: 0 });
   const [text, setText] = useState('');
   const [pos, setPos] = useState<ReturnType<typeof dock> | null>(null);
@@ -121,11 +125,16 @@ export function ColorPickerPanel() {
   const presets = ['accent', 'text', 'background', 'surface', 'dim'].map(r => root?.getPropertyValue(`--skin-${r}`).trim() ?? '').filter(isHex)
     .concat(['#ffffff', '#000000', '#ffd60a', '#80ff36', '#30d5c8', '#5e9eff', '#bf5af2', '#ff453a']).map(c => c.toLowerCase()).filter((c, i, a) => a.indexOf(c) === i).slice(0, 12);
   // Re-report once the exit animation has removed the panel, or its blur/input rect lingers.
-  return <AnimatePresence onExitComplete={() => window.dispatchEvent(new Event('island-surfaces-changed'))}>{request && pos && <motion.div key={request.id} className="color-pop" data-island-extension="color-picker" data-dock={pos.side}
+  return <AnimatePresence custom={{ keyboard, reduced }} onExitComplete={() => window.dispatchEvent(new Event('island-surfaces-changed'))}>{request && pos && <motion.div key={request.id} className="color-pop" data-island-extension="color-picker" data-dock={pos.side}
     role="dialog" aria-label={`${request.label} picker`}
-    style={{ position: 'fixed', left: pos.x, top: pos.y, width: PANEL_W, height: PANEL_H }}
-    initial={{ opacity: 0, x: pos.side === 'left' ? 12 : -12, scale: .97 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: pos.side === 'left' ? 8 : -8, scale: .98 }}
-    transition={{ type: 'spring', visualDuration: .26, bounce: .14 }}>
+    style={{ position: 'fixed', left: pos.x, top: pos.y, width: PANEL_W, height: PANEL_H,
+      transformOrigin: `${Math.max(0, Math.min(PANEL_W, request.anchorX - pos.x))}px ${Math.max(0, Math.min(PANEL_H, request.anchorY - pos.y))}px` }}
+    initial={{ opacity: 0, x: reduced || keyboard ? 0 : pos.side === 'left' ? 12 : -12, scale: reduced || keyboard ? 1 : .97 }} animate={{ opacity: 1, x: 0, scale: 1 }}
+    exit="closed" variants={{ closed: ({ keyboard, reduced }: { keyboard: boolean; reduced: boolean }) => ({
+      opacity: 0, x: reduced || keyboard ? 0 : pos.side === 'left' ? 8 : -8, scale: reduced || keyboard ? 1 : .98,
+      transition: keyboard ? { duration: 0 } : tween(DUR.fast),
+    }) }}
+    transition={keyboard ? { duration: 0 } : tween(DUR.fast)}>
     <div className="color-pop-head"><span className="color-pop-dot" style={{ background: hex }} /><strong>{request.label}</strong>
       <button type="button" className="color-pop-x" aria-label="Close colour picker" onClick={() => colorPicker.close()}>×</button></div>
     <div className="color-pop-sv" style={{ background: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider"

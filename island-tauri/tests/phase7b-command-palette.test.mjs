@@ -27,7 +27,7 @@ test('palette keyboard selection wraps, Home/End and empty lists are safe', () =
   assert.equal(nextSelection(1, 'End', 3), 2);
   assert.equal(nextSelection(0, 'ArrowDown', 0), 0);
 });
-function harness() {
+function harness({ reduced = false } = {}) {
   const slots = [], effects = [], frames = [], actions = [], io = [], events = new EventTarget();
   let index = 0, tree, current = { mode: 'large', view: 'terminal' };
   const hooks = { ...React,
@@ -38,13 +38,14 @@ function harness() {
   };
   let activeElement = { isConnected: true, closest: () => null, focus() { io.push('restore'); } };
   const fakeInput = { focus() { activeElement = fakeInput; io.push('search-focus'); } };
-  const fakeDocument = { get activeElement() { return activeElement; }, querySelector: () => null };
+  const fakeDocument = { documentElement: { dataset: {} }, get activeElement() { return activeElement; }, querySelector: () => null };
   const source = readFileSync(new URL('../ui/island/CommandPalette.tsx', import.meta.url), 'utf8');
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const module = { exports: {} };
   const require = name => {
     if (name === 'react') return hooks;
-    if (name === 'react/jsx-runtime') return { jsx: React.createElement, jsxs: React.createElement };
+    if (name === 'react/jsx-runtime') return { jsx: (type, props, key) => React.createElement(type, { ...props, key }), jsxs: (type, props, key) => React.createElement(type, { ...props, key }) };
+    if (name === 'framer-motion') return { motion: { div: 'div' }, AnimatePresence: 'presence', useReducedMotion: () => reduced };
     if (name === '@tauri-apps/api/event') return { listen: async () => () => {} };
     if (name === '../ipc/island-state') return { useIslandState: () => current, dispatch: async intent => { actions.push(intent); if (intent.type === 'selectView') current = { ...current, view: intent.view }; } };
     if (name === '../stores') return { useSettings: () => ({ clipboardHistory: true }) };
@@ -65,8 +66,45 @@ function harness() {
   const key = (key, extra = {}) => { const event = new Event('keydown', { cancelable: true }); Object.assign(event, { key, ...extra }); events.dispatchEvent(event); return event; };
   const query = value => { walk(tree).find(n => n.type === 'input').props.onChange({ target: { value } }); render(); };
   render();
-  return { render, key, query, actions, io, events, walk: () => walk(tree), frames, collapse() { current = { ...current, mode: 'still' }; render(); }, dispose() { slots.forEach(s => s?.cleanup?.()); } };
+  return { render, key, query, actions, io, events, document: fakeDocument, walk: () => walk(tree), frames, collapse() { current = { ...current, mode: 'still' }; render(); }, dispose() { slots.forEach(s => s?.cleanup?.()); } };
 }
+test('palette motion is mount-only, fast for pointers and instant for keyboard selection/exit', () => {
+  const h = harness();
+  try {
+    h.events.dispatchEvent(new Event('island-command-palette')); h.render();
+    const shade = h.walk().find(n => n.props?.className === 'command-palette-shade');
+    const dialog = h.walk().find(n => n.props?.role === 'dialog');
+    assert.equal(dialog.props.initial.scale, .98); assert.ok(dialog.props.transition.duration <= .15);
+    const key = dialog.key;
+    h.key('ArrowDown'); h.render();
+    assert.equal(h.document.documentElement.dataset.navVia, 'key');
+    assert.equal(h.walk().find(n => n.props?.role === 'dialog').key, key, 'selection never remounts the palette');
+    const keyboardDialog = h.walk().find(n => n.props?.role === 'dialog');
+    assert.equal(keyboardDialog.props.transition.duration, 0);
+    assert.ok(keyboardDialog.props.variants.closed({ keyboard: false, reduced: false }).transition.duration > 0, 'pointer exits after keyboard selection retain their fade');
+    const row = h.walk().find(n => n.props?.role === 'option'); row.props.onPointerMove(); h.render();
+    assert.equal(h.document.documentElement.dataset.navVia, 'pointer');
+    h.key('Escape'); h.render();
+    const mode = h.walk()[0].props.custom;
+    assert.equal(mode.keyboard, true);
+    assert.equal(shade.props.variants.closed(mode).transition.duration, 0, 'an exiting child receives current keyboard modality');
+    assert.equal(dialog.props.variants.closed(mode).scale, 1);
+    assert.equal(h.walk().find(n => n.props?.role === 'dialog'), undefined, 'Escape removes the palette');
+    const css = readFileSync(new URL('../ui/island/command-palette.css', import.meta.url), 'utf8');
+    assert.match(css, /data-nav-via='key'\] \.island \.command-results button \{ transition: none;/);
+    assert.match(css, /@media \(hover: hover\) and \(pointer: fine\)/);
+  } finally { h.dispose(); }
+});
+test('palette reduced motion removes scale but retains a short opacity fade', () => {
+  const h = harness({ reduced: true });
+  try {
+    h.events.dispatchEvent(new Event('island-command-palette')); h.render();
+    const dialog = h.walk().find(n => n.props?.role === 'dialog');
+    assert.equal(dialog.props.initial.scale, 1);
+    assert.equal(dialog.props.variants.closed({ keyboard: false, reduced: true }).scale, 1);
+    assert.ok(dialog.props.transition.duration > 0 && dialog.props.transition.duration <= .15);
+  } finally { h.dispose(); }
+});
 const drain = () => new Promise(resolve => setImmediate(resolve));
 test('palette captures Ctrl+K, focuses search, runs filtered clipboard/settings and Esc does not collapse', async () => {
   const h = harness();

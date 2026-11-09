@@ -5,7 +5,7 @@ import type { Appearance, Settings, SettingsPatch } from '../ipc/client';
 import { customPalette, initialOpenFamily, navTarget, schemeFamilies, type Family, type Scheme } from './tokens/schemes';
 import { ColorSwatch } from './components/ColorField';
 import { useAlbumPreview } from './album-scheme';
-import { scaled, uiSpring } from './motion-profile';
+import { DUR, SPRING, tween } from './motion-profile';
 
 type SeedKey = 'customAccent' | 'customBackground' | 'customText';
 const SEEDS: [SeedKey, string, 'accent' | 'background' | 'text'][] = [
@@ -25,8 +25,14 @@ export function SchemePicker({ value, onPick, settings, patch }: {
   const [open, setOpen] = useState<string | null>(() => initialOpenFamily(value, families));
   const reduced = useReducedMotionAll() || settings.reduceMotion === true;
   const list = useRef<HTMLDivElement>(null);
-  const expand = reduced ? { duration: 0 } : { duration: scaled(.24), ease: [.22, 1, .36, 1] as const };
-  const glide = reduced ? { duration: 0 } : uiSpring(.28, .12);
+  const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
+  const fade = { ...tween(DUR.base), duration: Math.min(.3, tween(DUR.base).duration) };
+  const expand = keyboard ? { duration: 0 } : fade;
+  const glide = reduced || keyboard ? { duration: 0 } : SPRING.ui();
+  const hidden = { opacity: 0, scale: reduced || keyboard ? 1 : .97 };
+  const variants = { closed: ({ keyboard, reduced }: { keyboard: boolean; reduced: boolean }) => ({
+    opacity: 0, scale: reduced || keyboard ? 1 : .97, transition: keyboard ? { duration: 0 } : fade,
+  }) };
 
   const look = (s: Scheme): { dots: readonly string[]; note: string } => s.id === 'custom' ? { dots: [custom.surface, custom.accent, custom.text], note: `accent ${custom.accent}` }
     : s.id === 'album' ? { dots: album ? [album.surface, album.accent, album.text] : s.dots, note: album ? `accent ${album.accent} · from artwork` : 'no artwork · follows Hermes skin' }
@@ -62,13 +68,13 @@ export function SchemePicker({ value, onPick, settings, patch }: {
         <span className="scheme-name">{s.name}</span>
         <span className="scheme-note">{note}</span>
       </button>
-      {s.id === 'custom' && on && <motion.div className="scheme-custom" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={expand}>
+      <AnimatePresence initial={false} custom={{ keyboard, reduced }}>{s.id === 'custom' && on && <motion.div key="custom" className="scheme-custom" initial={hidden} animate={{ opacity: 1, scale: 1 }} exit="closed" variants={variants} transition={expand}>
         {SEEDS.map(([key, label, role]) => <div key={key} className="scheme-seed">
           <ColorSwatch id={`scheme-${key}`} label={`Custom ${label.toLowerCase()} colour`} value={custom[role]} onPick={hex => patch({ [key]: hex })} />
           <span>{label}</span><code>{custom[role]}</code>
         </div>)}
         <button className="link" type="button" onClick={() => patch({ customAccent: '', customBackground: '', customText: '' })}>Reset</button>
-      </motion.div>}
+      </motion.div>}</AnimatePresence>
     </div>;
   };
 
@@ -85,9 +91,9 @@ export function SchemePicker({ value, onPick, settings, patch }: {
         <span className="scheme-note">{active ? shown.name : `${f.schemes.length} ${f.id === 'monolith' ? 'schemes' : 'flavours'}`}</span>
         <svg className="scheme-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2.5 7.5 6 4 9.5" /></svg>
       </button>
-      <AnimatePresence initial={false}>
+      <AnimatePresence initial={false} custom={{ keyboard, reduced }}>
         {isOpen && <motion.div key="variants" id={`scheme-family-${f.id}`} className="scheme-variants" role="group" aria-label={`${f.name} variants`}
-          initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={expand}>
+          initial={hidden} animate={{ opacity: 1, scale: 1 }} exit="closed" variants={variants} transition={expand}>
           {f.schemes.map(s => radio(s, true))}
         </motion.div>}
       </AnimatePresence>

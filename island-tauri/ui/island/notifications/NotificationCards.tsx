@@ -59,8 +59,11 @@ export function NotificationCard({ popup, redact = false, perform, changed = sur
  *  Never a separate floating window. Mounted once; listens for popup snapshots. */
 export function NotchNotifications({ fail, placement }: { fail(error: unknown): void; placement: 'hover' | 'open' }) {
   const settings = useSettings(), snapshot = usePopups(), shown = useShownPopups();
-  const reduced = useReducedMotion() === true || settings.reduceMotion;
-  const duration = reduced ? 0 : .18 / Math.max(.25, (settings.animationSpeed ?? 100) / 100);
+  // This module is also loaded standalone by the node card tests.
+  const reduced = useReducedMotion() === true || settings.reduceMotion || (typeof document !== 'undefined' && document.documentElement.dataset.reduceMotion === 'true')
+    || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const duration = .15 / Math.min(2, Math.max(.5, (settings.animationSpeed ?? 100) / 100));
+  const transition = { duration, ease: [.23, 1, .32, 1] as const };
   const perform = (op: PopupOp) => {
     const popup = 'id' in op ? snapshot.items.find(p => p.notification.id === op.id) : null;
     if (op.type === 'invoke' && popup && popup.notification.source !== 'system') {
@@ -85,7 +88,8 @@ export function NotchNotifications({ fail, placement }: { fail(error: unknown): 
   return <section ref={stack} className="notch-notifications" data-placement={placement} aria-label="Notifications">
     <AnimatePresence initial={false} onExitComplete={surfacesChanged}>
       {shown.slice(0, visibleCount).map(p => <motion.div key={p.notification.id} layout={!reduced}
-        initial={{ opacity: 0, y: reduced ? 0 : -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: duration * .7 } }} transition={{ duration }}>
+        initial={{ opacity: 0, y: reduced ? 0 : -8, scale: reduced ? 1 : .97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: reduced ? 0 : -8, scale: reduced ? 1 : .97 }} transition={transition}>
         <NotificationCard popup={p} redact={settings.redactBodies} perform={perform} inNotch />
       </motion.div>)}
     </AnimatePresence>

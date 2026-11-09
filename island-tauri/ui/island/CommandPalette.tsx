@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { appApi, clipboardCopy, clipboardList, type ClipSummary, type IslandView } from '../ipc/client';
 import { dispatch, useIslandState } from '../ipc/island-state';
 import { useSettings } from '../stores';
@@ -13,6 +14,12 @@ import './command-palette.css';
 export const openCommandPalette = () => window.dispatchEvent(new Event('island-command-palette'));
 export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): void; onOpenChange?(open: boolean): void }) {
   const state = useIslandState(), settings = useSettings(), launcher = useLauncher(), calendar = useApp('calendar');
+  // Standalone node tests need no new relative imports; match the fast/ease-out tokens.
+  const reduced = useReducedMotion() === true || settings.reduceMotion || document.documentElement.dataset.reduceMotion === 'true'
+    || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const keyboard = document.documentElement.dataset.navVia === 'key';
+  const duration = Math.min(.15, .15 / Math.min(2, Math.max(.5, (settings.animationSpeed ?? 100) / 100)));
+  const transition = { duration: keyboard ? 0 : duration, ease: [.23, 1, .32, 1] as const };
   const [open, setOpen] = useState(false), [query, setQuery] = useState(''), [selection, setSelection] = useState(0);
   const [clips, setClips] = useState<ClipSummary[]>([]), [notice, setNotice] = useState('');
   const input = useRef<HTMLInputElement>(null), dialog = useRef<HTMLDivElement>(null), previous = useRef<HTMLElement | null>(null);
@@ -36,6 +43,7 @@ export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): v
     const chord = (event: KeyboardEvent) => {
       if (!event.isComposing && event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
         // Capture before xterm receives Ctrl+K (otherwise it deletes the TUI's line).
+        document.documentElement.dataset.navVia = 'key';
         event.preventDefault(); event.stopImmediatePropagation();
         if (isOpen.current) close(); else show();
       }
@@ -108,6 +116,7 @@ export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): v
     if (!open) return;
     const key = (event: KeyboardEvent) => {
       if (event.isComposing) return;
+      document.documentElement.dataset.navVia = 'key';
       if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); close(); }
       else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { event.preventDefault(); event.stopImmediatePropagation(); setSelection(nextSelection(selected, event.key, results.length)); }
       else if (event.key === 'Enter') { event.preventDefault(); event.stopImmediatePropagation(); void run(results[selected]); }
@@ -117,16 +126,21 @@ export function CommandPalette({ fail, onOpenChange }: { fail(error: unknown): v
     return () => window.removeEventListener('keydown', key, true);
   }, [open, results, selected]);
   useEffect(() => { dialog.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected, query]);
-  if (!open || state.mode !== 'large') return null;
-  return <div className="command-palette-shade" data-command-palette="" onPointerDown={event => { if (event.target === event.currentTarget) close(); }}>
-    <div className="command-palette" role="dialog" aria-modal="true" aria-label="Command palette" ref={dialog}>
+  // Presence retains the last child on removal; custom carries the closing input modality.
+  return <AnimatePresence custom={{ keyboard, reduced }}>{open && state.mode === 'large' && <motion.div key="palette" className="command-palette-shade" data-command-palette=""
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit="closed" transition={transition}
+    variants={{ closed: ({ keyboard }: { keyboard: boolean }) => ({ opacity: 0, pointerEvents: 'none' as const, transition: { ...transition, duration: keyboard ? 0 : duration } }) }}
+    onPointerDown={event => { if (event.target === event.currentTarget) close(); }}>
+    <motion.div className="command-palette" role="dialog" aria-modal="true" aria-label="Command palette" ref={dialog}
+      initial={{ scale: reduced || keyboard ? 1 : .98 }} animate={{ scale: 1 }} exit="closed" transition={transition}
+      variants={{ closed: ({ keyboard, reduced }: { keyboard: boolean; reduced: boolean }) => ({ scale: reduced || keyboard ? 1 : .98, transition: { ...transition, duration: keyboard ? 0 : duration } }) }}>
       <header><span>Command palette</span><button type="button" aria-label="Close command palette" onClick={() => close()}>Esc</button></header>
       <input ref={input} type="search" role="combobox" aria-label="Search commands" aria-autocomplete="list" aria-expanded="true" aria-controls="command-results" aria-activedescendant={results[selected] ? `command-result-${selected}` : undefined}
         placeholder="Search pages, settings, actions…" value={query} autoComplete="off" spellCheck={false} maxLength={120} onChange={event => { setQuery(event.target.value); setSelection(0); }} />
-      <div className="command-results" id="command-results" role="listbox" aria-label="Commands">{results.map((item, i) => <button type="button" tabIndex={-1} key={item.id} id={`command-result-${i}`} role="option" aria-selected={i === selected} onPointerMove={() => setSelection(i)} onClick={() => { void run(item); }}>
+      <div className="command-results" id="command-results" role="listbox" aria-label="Commands">{results.map((item, i) => <button type="button" tabIndex={-1} key={item.id} id={`command-result-${i}`} role="option" aria-selected={i === selected} onPointerMove={() => { document.documentElement.dataset.navVia = 'pointer'; if (selected !== i) setSelection(i); }} onClick={() => { void run(item); }}>
         <span className="command-result-copy"><strong>{item.label}</strong>{item.detail && <small>{item.detail}</small>}</span><span className="command-group">{item.group}</span>
       </button>)}{!results.length && <p className="command-empty">No matching commands</p>}</div>
       <footer><span>{notice || '↑ ↓ Navigate · Enter Run · Esc Close'}</span><span>{results.length} shown</span></footer>
-    </div>
-  </div>;
+    </motion.div>
+  </motion.div>}</AnimatePresence>;
 }

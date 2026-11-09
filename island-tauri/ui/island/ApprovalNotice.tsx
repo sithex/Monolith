@@ -28,11 +28,17 @@ export function useApprovalHover(): { active: boolean; width: number; height: nu
  *  the user: buttons are explicit pointer clicks and Rust re-checks every guard per answer. */
 export function ApprovalNotice({ fail }: { fail(error: unknown): void }) {
   const state = useIslandState(), change = useApproval(), view = noticeFor(change);
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState(false), [armedId, setArmedId] = useState<string | null>(null);
   const shownId = view?.kind === 'prompt' ? view.prompt.id : null;
   const armedAt = useRef(0);
   useExpansionTick();
-  useEffect(() => { armedAt.current = performance.now() + ARM_DELAY_MS; setPending(false); }, [shownId]);
+  useEffect(() => {
+    armedAt.current = performance.now() + ARM_DELAY_MS; setPending(false); setArmedId(null);
+    if (shownId === null) return;
+    // Mirror the guard's deadline; a replaced prompt must never inherit a bright button.
+    const timer = setTimeout(() => setArmedId(shownId), Math.max(0, Math.ceil(armedAt.current - performance.now())));
+    return () => clearTimeout(timer);
+  }, [shownId]);
   // Esc closes the notice (presentation only, like the × button); no key ever answers.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); void dispatch({ type: 'dismissPreview', rev: state.rev }).catch(fail); } };
@@ -51,11 +57,11 @@ export function ApprovalNotice({ fail }: { fail(error: unknown): void }) {
     <p className="approval-note">This prompt can only be answered in the terminal.</p>
     <div className="approval-actions">{openTerminal}</div>
   </div>;
-  return <Prompt view={view} pending={pending} armedAt={armedAt} setPending={setPending} dismiss={dismiss} openTerminal={openTerminal} fail={fail} />;
+  return <Prompt view={view} pending={pending} armed={armedId === shownId} armedAt={armedAt} setPending={setPending} dismiss={dismiss} openTerminal={openTerminal} fail={fail} />;
 }
 
-function Prompt({ view, pending, armedAt, setPending, dismiss, openTerminal, fail }: {
-  view: Extract<NoticeView, { kind: 'prompt' }>; pending: boolean; armedAt: { current: number };
+function Prompt({ view, pending, armed, armedAt, setPending, dismiss, openTerminal, fail }: {
+  view: Extract<NoticeView, { kind: 'prompt' }>; pending: boolean; armed: boolean; armedAt: { current: number };
   setPending(v: boolean): void; dismiss: ReactElement; openTerminal: ReactElement; fail(error: unknown): void;
 }) {
   const p = view.prompt, expanded = expandedFor === p.id, long = needsExpand(p.text);
@@ -71,8 +77,8 @@ function Prompt({ view, pending, armedAt, setPending, dismiss, openTerminal, fai
     {(long || p.textTruncated) && <button className="approval-expand" onClick={() => setExpanded(expanded ? null : p.id)}>{expanded ? 'Show less' : 'Show all'}</button>}
     {p.description && <p className="approval-desc">{p.description}</p>}
     {p.answerable
-      ? <div className={`approval-actions choices-${p.kind}`} role="group" aria-label="Answer">
-          {p.choices.map(c => <button key={c.id} className={`approval-choice style-${c.style}`} data-testid={`approval-${c.id}`} title={CHOICE_HINT[c.id] ?? c.label} disabled={pending}
+      ? <div className={`approval-actions choices-${p.kind}`} role="group" aria-label="Answer" data-armed={armed}>
+          {p.choices.map(c => <button key={c.id} className={`approval-choice style-${c.style}`} data-testid={`approval-${c.id}`} title={CHOICE_HINT[c.id] ?? c.label} disabled={pending} aria-disabled={!armed || pending}
             onClick={e => press(e, c.id, c.style)}>{c.label}</button>)}
         </div>
       : <div className="approval-actions">

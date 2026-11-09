@@ -1,74 +1,35 @@
 import QtQuick
 
-// A cute fire salamander (Salamandra salamandra), as crisp 1× pixel art (side view):
-// long low body with a rounded head, clear neck, four splayed little legs with toe dots,
-// and a long tapering tail that curls slightly.
-// Glossy black body lightened to charcoal-blue so it reads on near-black (#0b0b0c),
-// with a 1 px lighter top highlight, bold yellow-orange fire blotches in two deliberate rows down the back,
-// and a parotoid bulge behind the eye.
-// Big round friendly eye (black with white glint) and a small smile.
-//
-// Pointer tracking: mirrors horizontally (whole-pixel column reversal, no scale transforms)
-// to face the pointer side; keeps last facing when gazeX is near centre.
-// Eye and head tilt up/down by 1 px with pointer Y.
-// Pupil glint moves with pointer X for whole-pixel gaze tracking.
-// Hover (hoverMark): happy ^^ eye arc, rosy cheek blush, and tiny pink tongue flick.
-// Idle habit: short stepped burst — tail wag, stepping feet, and tongue flick — settling exactly.
-// Blink: closed eye slit; doze: curled up resting pose with closed eye.
+// The controller's exact 26 px rest pose. Head tilt, glint and tail wag use whole pixels;
+// the left-facing picture is a row mirror, never a transformed/scaled sprite.
 HabitCharacter {
     id: art
     slotSize: 26
     gazeScale: 1
     habitFrames: 6
     habitInterval: 125
+    habitCooldown: 14000
 
-    // Whole-pixel pointer tracking
-    readonly property int rawGazeX: gazePx(gazeX, 0.65, -1, 1)
-    readonly property int rawGazeY: gazePx(gazeY, 0.75, -1, 1)
-
-    // Facing: 1 = right, -1 = left. When gazeX is near centre, keep the last facing.
-    property int facing: 1
-    onGazeXChanged: {
-        if (gazeX > 0.3)
-            facing = 1;
-        else if (gazeX < -0.3)
-            facing = -1;
-    }
-
-    // Pupil relative to facing: forward (+1), center (0), back (-1)
-    readonly property int pupilDx: facing * rawGazeX
-    readonly property int pupilDy: rawGazeY
-
-    // Eye states
+    readonly property int rawGazeX: gazePx(gazeX, 0.55, -1, 1)
+    readonly property int rawGazeY: gazePx(gazeY, 0.8, -1, 1)
     readonly property real open: face ? face.blink * face.lid : 1
-    readonly property bool eyesShut: asleep || open < 0.35
-    readonly property bool dozing: !eyesShut && (asleep || open < 0.75)
+    readonly property bool eyesShut: open < 0.35
+    readonly property bool dozing: asleep || (open >= 0.35 && open < 0.75)
+    property int lastFacing: 1
+    readonly property int facing: !happy && habitFrame > 0 ? habitDirection : lastFacing
 
-    // Habit direction matches pointer side
-    property int habitDirection: 1
-    onHabitStarted: {
-        habitDirection = gazeX < 0 ? -1 : 1;
-        if (gazeX < -0.3)
-            facing = -1;
-        else if (gazeX > 0.3)
-            facing = 1;
+    onRawGazeXChanged: {
+        if (rawGazeX !== 0) lastFacing = rawGazeX;
     }
+    property int habitDirection: 1
+    onHabitStarted: habitDirection = rawGazeX < 0 ? -1 : rawGazeX > 0 ? 1 : lastFacing
 
+    // Exact controller concept palette; P is used only for the hover blush.
     readonly property var colors: ({
-        "O": "#10141c",
-        "D": "#1c222e",
-        "B": "#344054",
-        "H": "#607494",
-        "Y": "#ffd718",
-        "A": "#ff8814",
-        "E": "#0a0c10",
-        "W": "#ffffff",
-        "M": "#10141c",
-        "P": "#f888a0",
-        "T": "#f04c6c"
+        "K": "#0f1219", "B": "#323c52", "b": "#262e40", "h": "#56637f",
+        "Y": "#ffc81e", "O": "#ff8f1f", "E": "#06070a", "H": "#ffffff",
+        "P": "#f888a0"
     })
-
-    // Base sprite template (facing right, 26x26 slot)
     readonly property var baseRows: [
         "..........................",
         "..........................",
@@ -78,21 +39,21 @@ HabitCharacter {
         "..........................",
         "..........................",
         "..........................",
+        "....................hhh...",
+        "...................hEEHh..",
+        "..........hhhhhh..hBEEEYh.",
+        "Y........hBYYBBBhhYYBBBBBh",
+        "Bh......hBYYBBBBBYYYBBBBBB",
+        "bBh...hhBBBBBBYYBBBBBBBKKb",
+        ".bBhhhBBYYBBBBYYBBBBBbbbb.",
+        "..bbBBBBYYBBBBBBBBBbb.....",
+        "....bbbbbBBb...bbBBb......",
+        "........bBBb.....bBBb.....",
+        "......bbb.bb.....bbb.b....",
         "..........................",
         "..........................",
         "..........................",
         "..........................",
-        "..................OO......",
-        ".OO..............OYYO.OO..",
-        "OYYO....OOOOOOOO.OAYAOEWEO",
-        "OAYBBO.OHYYHBOYABBOBOOEEO.",
-        ".OBYYABOYAABBOYAABBBBOOBBO",
-        "..OBBAAYBBBBBBBBBBBBBOOBMO",
-        "..OOBBBBBBBBBBBBBBBBBBOOO.",
-        "...OBBBBBBBBBBBBBBBBBBO...",
-        "...OBBO..ODDO..OBBO..ODD..",
-        "..OBBBO..ODO..OBBBO..ODO..",
-        "..OO.OO..OO...OO.OO..OO...",
         "..........................",
         "..........................",
         ".........................."
@@ -100,158 +61,73 @@ HabitCharacter {
 
     readonly property var currentBodyRows: {
         const r = baseRows.map(row => row.split(""));
-
-        // Habit frames: tail wag, stepping feet, tongue flick
-        if (!happy && habitFrame > 0) {
-            if (habitFrame === 1) {
-                r[11][1] = "O"; r[11][2] = "O";
-                r[12][0] = "O"; r[12][1] = "Y"; r[12][2] = "Y"; r[12][3] = "O";
-                r[13][1] = "O"; r[13][2] = "A"; r[13][3] = "B";
-                r[22][18] = "."; r[22][19] = "."; r[22][20] = ".";
-                r[21][18] = "O"; r[21][19] = "B"; r[21][20] = "O";
-            } else if (habitFrame === 2) {
-                r[11][2] = "O"; r[11][3] = "O";
-                r[12][1] = "O"; r[12][2] = "Y"; r[12][3] = "Y";
-                r[17][25] = "T";
-            } else if (habitFrame === 3) {
-                r[12][1] = "."; r[12][2] = ".";
-                r[13][0] = "O"; r[13][1] = "Y"; r[13][2] = "Y";
-                r[14][1] = "O"; r[14][2] = "A";
-                r[22][8] = "."; r[22][9] = "."; r[22][10] = ".";
-                r[21][8] = "O"; r[21][9] = "B"; r[21][10] = "O";
-            } else if (habitFrame === 4) {
-                r[13][1] = "O"; r[13][2] = "Y";
-                r[14][0] = "O"; r[14][1] = "A"; r[14][2] = "Y";
-            } else if (habitFrame === 5) {
-                r[12][1] = "O"; r[12][2] = "O";
-                r[13][0] = "."; r[13][1] = "Y"; r[13][2] = "Y";
+        // Move the complete raised head one pixel, not just a detached pupil.
+        const headShift = dozing ? 1 : rawGazeY;
+        for (let y = 8; y <= 15; y++)
+            for (let x = 18; x < 26; x++) r[y][x] = ".";
+        for (let y = 8; y <= 15; y++) {
+            for (let x = 18; x < 26; x++) {
+                if (baseRows[y][x] !== ".") r[y + headShift][x] = baseRows[y][x];
             }
-        } else if (dozing) {
-            // Curled up sleeping pose:
-            // Tail curled in slightly, eye closed, head resting
-            r[14][23] = "B"; r[14][24] = "B";
-            r[15][23] = "O"; r[15][24] = "O";
-            r[12][1] = "."; r[12][2] = ".";
-            r[13][1] = "O"; r[13][2] = "O";
-            r[14][0] = "O"; r[14][1] = "Y"; r[14][2] = "Y"; r[14][3] = "O";
-        } else {
-            // Head tilts up/down with rawGazeY
-            if (rawGazeY < 0) {
-                for (let y = 11; y <= 19; y++) {
-                    for (let x = 17; x <= 25; x++) {
-                        r[y][x] = baseRows[y + 1][x];
-                    }
-                }
-                for (let x = 17; x <= 25; x++) {
-                    r[20][x] = (baseRows[20][x] === "O" || baseRows[20][x] === "B") ? "." : baseRows[20][x];
-                }
-            } else if (rawGazeY > 0) {
-                for (let y = 20; y >= 13; y--) {
-                    for (let x = 17; x <= 25; x++) {
-                        r[y][x] = baseRows[y - 1][x];
-                    }
-                }
-                for (let x = 17; x <= 25; x++) {
-                    r[12][x] = ".";
-                }
+        }
+        const ey = 9 + headShift;
+        if (eyesShut || dozing) {
+            for (let x = 20; x <= 22; x++) {
+                r[ey][x] = "B";
+                r[ey + 1][x] = "E";
             }
+        } else if (happy) {
+            // Friendly ^ eye, still framed by the dark head ring.
+            r[ey][20] = "B"; r[ey][21] = "E"; r[ey][22] = "B";
+            r[ey + 1][20] = "E"; r[ey + 1][21] = "B"; r[ey + 1][22] = "E";
+        } else if (rawGazeY > 0) {
+            r[ey][22] = "E";
+            r[ey + 1][22] = "H";
+        } else if (rawGazeX === 0 && rawGazeY === 0) {
+            // Neutral gaze lowers the glint; looking toward the facing side restores
+            // the controller's exact rest pose. The black 2x2 block stays intact.
+            r[ey][22] = "E";
+            r[ey + 1][22] = "H";
+        }
 
-            const headShift = rawGazeY < 0 ? -1 : (rawGazeY > 0 ? 1 : 0);
-            const ey = 14 + headShift;
-
-            if (eyesShut) {
-                r[ey][23] = "B"; r[ey][24] = "B";
-                r[ey + 1][23] = "O"; r[ey + 1][24] = "O";
-            } else if (happy) {
-                r[ey][23] = "O"; r[ey][24] = "B";
-                r[ey + 1][23] = "B"; r[ey + 1][24] = "O";
-            } else {
-                if (pupilDx > 0) {
-                    r[ey][23] = "E"; r[ey][24] = "W";
-                    r[ey + 1][23] = "E"; r[ey + 1][24] = "E";
-                } else {
-                    r[ey][23] = "W"; r[ey][24] = "E";
-                    r[ey + 1][23] = "E"; r[ey + 1][24] = "E";
+        if (dozing) {
+            // Curl the tail inward and tuck the splayed toes under the body.
+            for (let y = 11; y <= 16; y++)
+                for (let x = 0; x < 8; x++) r[y][x] = ".";
+            r[12][5] = "Y"; r[12][6] = "h";
+            r[13][4] = "h"; r[13][5] = "B"; r[13][6] = "b";
+            r[14][4] = "B"; r[14][5] = "b";
+            r[15][5] = "B"; r[15][6] = "B"; r[15][7] = "B";
+            r[16][6] = "b"; r[16][7] = "b";
+            for (let x = 0; x < 26; x++) r[18][x] = ".";
+        } else if (!happy && habitFrame > 0) {
+            // A bounded tail wag; the thicker root remains attached to the body.
+            const wag = [0, -1, -1, 0, 1, 1, 0][habitFrame];
+            for (let y = 10; y <= 17; y++) {
+                for (let x = 0; x < 5; x++) {
+                    const sourceY = y - wag;
+                    r[y][x] = sourceY >= 11 && sourceY <= 16 ? baseRows[sourceY][x] : ".";
                 }
             }
         }
-
-        if (facing < 0) {
-            return r.map(row => row.reverse().join(""));
-        }
-        return r.map(row => row.join(""));
+        return r.map(row => (facing < 0 ? row.reverse() : row).join(""));
     }
 
     Item {
         objectName: "salamanderBody"
         width: 26
         height: 26
-
         PixelSprite {
             colors: art.colors
             rows: art.currentBodyRows
         }
-
-        // Hover reaction: happy cheek blush + tiny pink tongue
         PixelSprite {
             objectName: "hoverMark"
             visible: art.happy
+            x: art.facing > 0 ? 23 : 1
+            y: 12 + art.rawGazeY
             colors: art.colors
-            rows: art.facing > 0 ? [
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                ".....................PP...",
-                ".........................T",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                ".........................."
-            ] : [
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "...PP.....................",
-                "T.........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                "..........................",
-                ".........................."
-            ]
+            rows: ["PP"]
         }
     }
 }

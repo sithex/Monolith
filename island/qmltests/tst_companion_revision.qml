@@ -128,6 +128,43 @@ TestCase {
         }
     }
 
+    function test_salamander_controller_concept() {
+        const f = createTemporaryObject(factory, suite, { character: "salamander" }), a = f.art;
+        const blank = "..........................";
+        const expected = Array(8).fill(blank).concat([
+            "....................hhh...",
+            "...................hEEHh..",
+            "..........hhhhhh..hBEEEYh.",
+            "Y........hBYYBBBhhYYBBBBBh",
+            "Bh......hBYYBBBBBYYYBBBBBB",
+            "bBh...hhBBBBBBYYBBBBBBBKKb",
+            ".bBhhhBBYYBBBBYYBBBBBbbbb.",
+            "..bbBBBBYYBBBBBBBBBbb.....",
+            "....bbbbbBBb...bbBBb......",
+            "........bBBb.....bBBb.....",
+            "......bbb.bb.....bbb.b...."
+        ], Array(7).fill(blank));
+        point(f, 900, 0);
+        compare(JSON.stringify(a.currentBodyRows), JSON.stringify(expected), "approved right pose, pixel for pixel");
+        const palette = { K: "#0f1219", B: "#323c52", b: "#262e40", h: "#56637f",
+            Y: "#ffc81e", O: "#ff8f1f", E: "#06070a", H: "#ffffff" };
+        for (const key of Object.keys(palette)) compare(a.colors[key], palette[key]);
+        point(f, -900, 0);
+        compare(JSON.stringify(a.currentBodyRows), JSON.stringify(expected.map(row => row.split("").reverse().join(""))), "exact left mirror");
+        point(f, 900, -900);
+        compare(a.currentBodyRows[8][22], "H", "raised eye and glint");
+        point(f, 900, 900);
+        compare(a.currentBodyRows[11][22], "H", "glint follows downward pointer within lowered eye");
+        f.blink = 0.08;
+        verify(a.currentBodyRows.join("").indexOf("H") < 0, "blink closes eye");
+        f.blink = 1;
+        f.sleepy = true; f.lid = 0.42;
+        verify(a.dozing, "sleep branch is reachable with lowered lids");
+        verify(a.currentBodyRows.join("").indexOf("H") < 0, "sleep has no eye glint");
+        compare(a.currentBodyRows[11][0], ".", "tail coils inward");
+        checkBounds(f, "controller concept sleep");
+    }
+
     function test_facing_retention() {
         // Salamander keeps its last horizontal facing when gazeX is near centre.
         const f = createTemporaryObject(factory, suite, { character: "salamander" });

@@ -167,10 +167,13 @@ impl Services {
                 ui: cfg.ui,
             },
             settings: settings.clone(),
-            palette: Arc::new(palette::PaletteService::new(
-                cfg.repo_root.clone(),
-                cfg.home.clone(),
-            )),
+            palette: Arc::new(
+                palette::PaletteService::new(cfg.repo_root.clone(), cfg.home.clone())
+                    .with_theme_sync({
+                        let settings = settings.clone();
+                        move || settings.get().map(|s| s.hermes_theme_sync).unwrap_or(false)
+                    }),
+            ),
             voice: Arc::new(voice::VoiceService::isolated(&cfg.home, cfg.test_instance)),
             ai: Arc::new(ai_usage::AiUsageService::new(
                 cfg.repo_root.clone(),

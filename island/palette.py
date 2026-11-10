@@ -16,8 +16,11 @@ config = load_config_readonly() or {}
 # "Hermes skin" scheme must keep following the skin the user had BEFORE that, which the
 # generated file remembers as `ripple_island_base`; otherwise picking any island theme would
 # make "Hermes skin" mirror the island's own colours and lose the user's real skin.
+# Only while theme sync is ON (the island passes --theme-sync): with sync off, an active
+# `ripple-island` skin is one the user picked (e.g. carried over from another machine), and
+# swapping it for its remembered base showed a different skin's colours (always necron green).
 display = config.get("display") if isinstance(config, dict) else None
-if isinstance(display, dict) and display.get("skin") == "ripple-island":
+if "--theme-sync" in sys.argv[2:] and isinstance(display, dict) and display.get("skin") == "ripple-island":
     try:
         from hermes_constants import get_hermes_home
         home = Path(get_hermes_home())

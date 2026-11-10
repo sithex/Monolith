@@ -47,6 +47,7 @@ impl IslandSink {
 
 impl Sink for IslandSink {
     fn apply(&mut self, effects: &[Effect], snapshot: &Snapshot) -> Result<(), IslandError> {
+        crate::window::focus::note_mode(snapshot.state.mode);
         // Release independently of event emission: an emit failure must not retain focus.
         if crate::window::focus::plan(snapshot.state.mode, effects.contains(&Effect::RequestFocus))
             == crate::window::focus::FocusPlan::Release

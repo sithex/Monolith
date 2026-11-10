@@ -134,6 +134,15 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
   fail: (error: unknown) => void, layout?: () => LayoutModel) {
   let frame: number | null = null, settled = false, last = '', surfaceKey = '', disposed = false;
   let inFlight = false, pending: GeometryReport | null = null;
+  // whenApplied(): callbacks run once every scheduled report has been measured AND Rust has
+  // finished applying it (input + KWin blur region committed), i.e. the native region matches
+  // the page. Frame/ack based, so it holds at any refresh rate or GPU speed.
+  let waiters: Array<() => void> = [];
+  const release = () => {
+    if (inFlight || pending || frame !== null || disposed || !waiters.length) return;
+    const ready = waiters; waiters = [];
+    for (const waiter of ready) waiter();
+  };
 
   // Translation glide: offset changes and open/close travel to/from the pill animate via a CSS
   // transform transition instead of jumping (a dragged offset slider used to teleport the island).
@@ -164,7 +173,7 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
     try {
       if (report.stateRev === current().rev && report.mode === current().mode) await send(report);
     } catch (error) { fail(error); }
-    finally { inFlight = false; if (pending) void drain(); }
+    finally { inFlight = false; if (pending) void drain(); else release(); }
   }
   const flush = () => {
     frame = null;
@@ -212,6 +221,7 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
     // Follow a running translation glide every frame so ShapeInput tracks the moving surface,
     // and keep reporting through the blur hold so the final settled report is sent.
     if (performance.now() < glideUntil || blurHeld) schedule();
+    release();
   };
   const schedule = (complete?: boolean) => {
     if (disposed) return;
@@ -222,8 +232,9 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
   const resize = () => schedule();
   window.addEventListener('resize', resize); window.addEventListener('island-surfaces-changed', resize);
   schedule();
-  return { schedule, dispose() {
-    disposed = true; pending = null;
+  const whenApplied = (callback: () => void) => { waiters.push(callback); release(); };
+  return { schedule, whenApplied, dispose() {
+    disposed = true; pending = null; waiters = [];
 
     if (glideTimer) clearTimeout(glideTimer);
     if (root) delete root.dataset.glide;

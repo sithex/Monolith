@@ -12,8 +12,10 @@ import { UI_SPRING } from './components/IslandShell';
 import { createGeometryReporter, fitSurface, effectiveLayout, visibleLayout, nativePill, presetSize } from './geometry';
 import { pointerIntent } from './navigation';
 import type { IslandView } from '../ipc/bindings';
-import { arrivalTime, axisSpring, motionSpeed, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, surfaceRadius, WITHDRAW_LEAD } from './motion-profile';
+import { arrivalTime, axisSpring, motionSpeed, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, scaled, surfaceRadius, WITHDRAW_LEAD } from './motion-profile';
 export { UI_SPRING };
+/** Glass fully shut whatever the drawn height (glassOpenness clamps to 0). */
+const GLASS_SHUT = { solidHeight: Infinity, range: 1 };
 /** The shell has handed the notch back: invisible, out of every morph rule. */
 function arrive(root: HTMLElement) {
   root.style.opacity = '0'; root.dataset.arrived = 'true'; root.dataset.morphing = 'false';
@@ -155,12 +157,40 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
     if ((value === glassNow.current || (Math.abs(value - glassNow.current) < .002 && value > 0 && value < 1)) && root.style.getPropertyValue('--glass-open') !== '') return;
     glassNow.current = value; root.style.setProperty('--glass-open', String(+value.toFixed(3)));
   };
+  // Frost after settle (Nov 10, laptop ghosting): KWin's blur region follows the page through
+  // async geometry reports, so while the shell grows the blur trails the painted edge by a
+  // frame or two. At 240 Hz that is ~4-8 ms and invisible; at 120/60 Hz on an iGPU the
+  // translucent rim showed sharp, unblurred desktop around the growing island, worst at high
+  // glass strength. So opening out of the notch or a hover preview stays solid for the whole
+  // morph, and the glass fades in only after Rust has applied the settled region
+  // (whenApplied) plus two presented frames. Page-to-page resizes keep the old height ramp.
+  const frost = useRef({ token: 0, waiting: false }), glassMode = useRef(state.mode);
+  const frostIn = (token: number) => {
+    const root = outer.current;
+    if (!root || frost.current.token !== token) return;
+    const from = glassNow.current, start = performance.now(), duration = scaled(.18) * 1000;
+    const step = (now: number) => {
+      if (frost.current.token !== token || !outer.current) return;
+      const t = Math.min(1, (now - start) / duration), eased = 1 - (1 - t) ** 3;
+      setGlass(outer.current, from + (1 - from) * eased);
+      if (t < 1) requestAnimationFrame(step); else glassFade.current = GLASS_OPEN;
+    };
+    requestAnimationFrame(step);
+  };
   useLayoutEffect(() => {
     const root = outer.current;
     if (root) {
-      const start = root.getBoundingClientRect().height;
-      glassFade.current = glassFadePlan(start, targetH, state.mode !== 'still', glassNow.current);
-      setGlass(root, glassOpenness(glassFade.current, start));
+      const drawn = root.getBoundingClientRect(), start = drawn.height;
+      const entering = glassMode.current !== state.mode && state.mode !== 'still'; glassMode.current = state.mode;
+      frost.current.token++;
+      if (entering && !reduced && (targetH - start > 2 || targetW - drawn.width > 2)) {
+        glassFade.current = GLASS_SHUT; frost.current.waiting = true; setGlass(root, 0);
+      } else {
+        // Re-targeted while still waiting to frost (e.g. content height settling): stay solid.
+        if (frost.current.waiting && state.mode !== 'still') glassFade.current = GLASS_SHUT;
+        else { frost.current.waiting = false; glassFade.current = glassFadePlan(start, targetH, state.mode !== 'still', glassNow.current); }
+        setGlass(root, glassOpenness(glassFade.current, start));
+      }
     }
     animation.stop();
     void animation.start({ width: targetW, height: targetH, ...(pill ? {} : { borderRadius: radius }),
@@ -205,6 +235,11 @@ export function IslandSurface({ children, fail, paletteOpen = false }: { childre
       const root = outer.current;
       if (root) { root.dataset.morphing = 'false'; if (pill && current.current.mode === 'still') arrive(root); }
       owner.current?.schedule(true);
+      if (frost.current.waiting && current.current.mode !== 'still') {
+        frost.current.waiting = false;
+        const token = frost.current.token;
+        owner.current?.whenApplied(() => requestAnimationFrame(() => requestAnimationFrame(() => frostIn(token))));
+      }
     }}
     onMouseEnter={() => { if (!pill || current.current.mode !== 'still') void pointerIntent(true, dispatch).catch(fail); }}
     onMouseLeave={() => { void pointerIntent(false, dispatch).catch(fail); }}

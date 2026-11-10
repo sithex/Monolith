@@ -66,6 +66,10 @@ pub struct PaletteService {
     cache: Mutex<Option<Palette>>,
     /// Serializes Hermes skin writes (`sync_hermes_theme`).
     theme: Mutex<()>,
+    /// Is Hermes theme sync on? Only then is an active `ripple-island` skin the island's own
+    /// generated copy (follow the skin remembered under it); with sync off a `ripple-island`
+    /// skin was chosen by the user (e.g. copied from another machine) and is followed as-is.
+    theme_sync: Box<dyn Fn() -> bool + Send + Sync>,
 }
 
 /// Bound for `island/hermes-theme.py`: it may run the Hermes CLI (`hermes skin use`) once.
@@ -78,7 +82,14 @@ impl PaletteService {
             home,
             cache: Mutex::new(None),
             theme: Mutex::new(()),
+            theme_sync: Box::new(|| false),
         }
+    }
+
+    /// Live source of the `hermesThemeSync` setting (see `theme_sync`).
+    pub fn with_theme_sync(mut self, theme_sync: impl Fn() -> bool + Send + Sync + 'static) -> Self {
+        self.theme_sync = Box::new(theme_sync);
+        self
     }
 
     /// Nov 2 Hermes theme sync: `Some` writes the island scheme as the `ripple-island` skin and
@@ -136,6 +147,9 @@ impl PaletteService {
             .args(["-I", "-B"])
             .arg(self.root.join("island/palette.py"))
             .arg(self.home.join(".hermes/hermes-agent"));
+        if (self.theme_sync)() {
+            command.arg("--theme-sync");
+        }
         command.env("PYTHONDONTWRITEBYTECODE", "1");
         parse_palette(&run_bounded(command, Duration::from_secs(3), 16384, false)?)
     }

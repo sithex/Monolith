@@ -15,6 +15,8 @@ pub mod shape;
 pub mod spike;
 #[cfg(target_os = "linux")]
 pub mod wayland;
+#[cfg(target_os = "linux")]
+pub mod zoom_guard;
 
 use crate::{
     cli::Cli,
@@ -143,6 +145,8 @@ fn apply_platform_hooks(
     // "the underlying handle is not available" during setup.
     gtk_window.realize();
     frame_clock::install(&gtk_window);
+    // A pinch / Ctrl+wheel over the page must not rescale the island inside its overlay.
+    zoom_guard::install();
     // WebKitGTK does not turn the X11 LeaveNotify into DOM pointer events when the pointer
     // leaves the island straight onto another surface (another monitor, the panel), so a
     // hovered side button stayed highlighted. Forward the real crossing to the page.

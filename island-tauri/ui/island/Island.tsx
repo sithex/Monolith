@@ -162,7 +162,7 @@ export function Island() {
   // still fades); otherwise the OS preference. Default transitions follow the speed setting.
   return <MotionConfig reducedMotion={settings.reduceMotion ? 'always' : 'user'} transition={motionSpeedDefault(settings.animationSpeed)}><main onClickCapture={event => {
     if ((event.target as HTMLElement).closest('button:not(:disabled)')) playClick(settings.clickSounds);
-  }}><NotificationCards fail={fail} /><IslandSurface fail={fail} paletteOpen={paletteOpen}>
+  }}><NotificationCards fail={fail} /><IslandSurface fail={fail} paletteOpen={paletteOpen} scheme={scheme ?? undefined}>
     <Topline fail={fail} />
     <CommandPalette fail={fail} onOpenChange={setPaletteOpen} />
     <AnimatePresence>{state.mode === 'hover' && <motion.div key="preview" className="preview island-content" {...reveal}

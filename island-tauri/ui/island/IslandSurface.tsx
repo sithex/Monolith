@@ -28,11 +28,14 @@ export const LAUNCHER_WIDTH = 560;
 export const COMPACT_VIEWS: ReadonlySet<IslandView> = new Set<IslandView>(['launcher', 'agents', 'mixer', 'brightness', 'timer', 'quickInfo', 'downloads', 'clipboard', 'notifications', 'scratchpad', 'controls']);
 /** Lowest open height for content-fitted pages: top bar + one line of content. */
 export const MIN_FIT_HEIGHT = 80;
-export function IslandSurface({ children, fail, paletteOpen = false }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean }) {
+export function IslandSurface({ children, fail, paletteOpen = false, scheme }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean;
+  /** The colour scheme the page and the native notch use; the raw skin palette can be a different skin (theme sync keeps the base). */
+  scheme?: { surface?: string; accent?: string } }) {
   const state = useIslandState(), settings = useSettings();
   // Settings → Motion → Reduce motion forces the same path as the OS preference.
   const reduced = useReducedMotionAll() || settings.reduceMotion === true;
-  const layout = useLayout(), launcher = useLauncher(), pill = nativePill(), palette = usePalette();
+  const layout = useLayout(), launcher = useLauncher(), pill = nativePill(), skinPalette = usePalette();
+  const palette = { surface: scheme?.surface || skinPalette.surface, accent: scheme?.accent || skinPalette.accent };
   const notchPath = useRef<SVGPathElement | null>(null);
   const outer = useRef<HTMLElement | null>(null), current = useRef(state), config = useRef(settings);
   const owner = useRef<ReturnType<typeof createGeometryReporter> | null>(null), animating = useRef(false);

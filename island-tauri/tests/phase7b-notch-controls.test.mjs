@@ -98,6 +98,19 @@ function pickerHarness(props){
   chips:()=>h.nodes().filter(e=>e.props?.className==='companion-chip')};
  h.render();return h;
 }
+test('island clock offset mirrors each plasmoid companion slot (open/close clock hand-off)',()=>{
+ const { companionNotchSlot, COMPANION_CHARACTERS }=pickerHarness({value:'blob',onPick(){}}).mod;
+ const qml=`${root}/../../island/plasma-anchor/contents/ui`;
+ const files=Object.fromEntries([...readFileSync(`${qml}/Companion.qml`,'utf8').matchAll(/(\w+): "characters\/(\w+)\.qml"/g)].map(m=>[m[1],m[2]]));
+ for (const { id } of COMPANION_CHARACTERS) {
+  const src=readFileSync(`${qml}/characters/${files[id]}.qml`,'utf8');
+  const fixed=src.match(/preferredSize: (\d+)\s*$/m), slot=src.match(/slotSize: (\d+)/);
+  const expected=fixed?+fixed[1]:Math.max(16,Math.min(26,slot?+slot[1]:20));
+  assert.equal(companionNotchSlot(id),expected,id);
+ }
+ assert.equal(companionNotchSlot(''),16);
+ assert.equal(companionNotchSlot('nope'),16);
+});
 const ALL_IDS=['blob','isaac','notchmimic','companioncube','nurgling','hollowknight','frog','necronwarrior','necronoverlord','canoptekscarab','eyeofsauron','mushroom','sonichu','salamander'];
 const NAMES=['Blob','Null','Frog','Salamander','Isaac','Companion Cube · Portal','Hollow Knight','Mushroom','Sonichu','Nurgling','Necron Warrior','Necron Overlord','Canoptek Scarab','Eye of Sauron'];
 test('every companion appears once, in a known group, with grouped headings',()=>{

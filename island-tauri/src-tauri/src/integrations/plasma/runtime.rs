@@ -267,10 +267,17 @@ fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
         .native_pill
         .lock()
         .map_err(|_| anyhow::anyhow!("Native pill poisoned"))? = Some(pill);
+    *runtime
+        .native_output
+        .lock()
+        .map_err(|_| anyhow::anyhow!("Native output poisoned"))? = Some(anchor.output.clone());
     let window = app
         .get_webview_window(ISLAND_LABEL)
         .context("Missing island window")?;
-    window.eval(crate::window::native_pill_script(&pill))?;
+    window.eval(crate::window::native_pill_script(
+        &pill,
+        Some(&anchor.output),
+    ))?;
     Ok(json!({"x":target.x,"y":target.y,"width":target.width,"height":target.height}))
 }
 

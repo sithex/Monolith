@@ -54,6 +54,9 @@ pub struct IslandRuntime {
     /// re-applies this one; otherwise a reload after a relocation draws the island at the
     /// startup position (e.g. 8 px low once a maximized window docked the floating panel).
     pub native_pill: Mutex<Option<RoundedRect>>,
+    /// Output name of the notch the island sits under (published with the pill, so the page
+    /// can mirror per-monitor notch layout such as the companion's clock shift).
+    pub native_output: Mutex<Option<String>>,
 }
 
 /// JS that publishes `pill` as the `--native-pill-*` CSS variables and tells the island
@@ -73,9 +76,20 @@ fn top_bleed() -> f64 {
 fn top_bleed() -> f64 {
     0.
 }
-pub fn native_pill_script(pill: &RoundedRect) -> String {
+/// JS statement that publishes the notch's output name as `<html data-native-pill-output>`.
+fn native_output_js(output: Option<&str>) -> String {
+    match output {
+        Some(name) => format!(
+            "document.documentElement.dataset.nativePillOutput={};",
+            serde_json::json!(name)
+        ),
+        None => "delete document.documentElement.dataset.nativePillOutput;".into(),
+    }
+}
+pub fn native_pill_script(pill: &RoundedRect, output: Option<&str>) -> String {
     let values = serde_json::json!({ "x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius });
-    format!("(()=>{{const v={values};for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');window.dispatchEvent(new Event('island-native-pill'));window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('island-surfaces-changed'));}})()")
+    let output = native_output_js(output);
+    format!("(()=>{{const v={values};for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');{output}window.dispatchEvent(new Event('island-native-pill'));window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('island-surfaces-changed'));}})()")
 }
 
 /// The page the window loads for `--ui` (`harness` is `index.html` from the config).
@@ -200,6 +214,7 @@ pub fn create_island_window(
     }
     let mut config = config.clone();
     let mut overlap_pill = None;
+    let mut overlap_output: Option<String> = None;
     if cli.ui == UiKind::Island && cli.overlay && cli.spike.is_none() {
         if let Some(anchor) = app.try_state::<crate::integrations::plasma::anchor::PlasmaAnchor>() {
             if let Some(anchor) = anchor.0.as_ref().filter(|a| a.native) {
@@ -216,6 +231,7 @@ pub fn create_island_window(
                     height: anchor.pill.height,
                     radius: anchor.pill_radius,
                 });
+                overlap_output = Some(anchor.output.clone());
             }
         }
     }
@@ -256,18 +272,19 @@ pub fn create_island_window(
         // Geometry-only CSS configuration, installed before the island module/first paint.
         // No IPC type or duplicate state authority; native input uses this exact same snapshot.
         let values = serde_json::json!({ "x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius });
-        builder = builder.initialization_script(format!(r#"(()=>{{const values={values};const apply=()=>{{if(!document.documentElement)return false;for(const [k,v] of Object.entries(values))document.documentElement.style.setProperty('--native-pill-'+k,v+'px');return true;}};if(!apply()){{const observer=new MutationObserver(()=>{{if(apply())observer.disconnect();}});observer.observe(document,{{childList:true}});}}}})();"#));
+        let output = native_output_js(overlap_output.as_deref());
+        builder = builder.initialization_script(format!(r#"(()=>{{const values={values};const apply=()=>{{if(!document.documentElement)return false;for(const [k,v] of Object.entries(values))document.documentElement.style.setProperty('--native-pill-'+k,v+'px');{output}return true;}};if(!apply()){{const observer=new MutationObserver(()=>{{if(apply())observer.disconnect();}});observer.observe(document,{{childList:true}});}}}})();"#));
     }
     if overlap_pill.is_some() {
         builder = builder.on_page_load(|window, payload| {
             if payload.event() != tauri::webview::PageLoadEvent::Finished {
                 return;
             }
-            let current = window
-                .try_state::<IslandRuntime>()
-                .and_then(|runtime| runtime.native_pill.lock().ok().and_then(|pill| *pill));
+            let Some(runtime) = window.try_state::<IslandRuntime>() else { return };
+            let current = runtime.native_pill.lock().ok().and_then(|pill| *pill);
+            let output = runtime.native_output.lock().ok().and_then(|o| o.clone());
             if let Some(pill) = current {
-                if let Err(error) = window.eval(native_pill_script(&pill)) {
+                if let Err(error) = window.eval(native_pill_script(&pill, output.as_deref())) {
                     tracing::warn!(%error, "Could not re-apply the notch position after a page load");
                 }
             }
@@ -322,6 +339,7 @@ pub fn create_island_window(
         placement: Mutex::new((origin.x, origin.y, config.width, config.height)),
         wayland: on_wayland,
         native_pill: Mutex::new(overlap_pill),
+        native_output: Mutex::new(overlap_output),
     });
 
     window
@@ -336,13 +354,31 @@ mod tests {
 
     #[test]
     fn native_pill_script_publishes_every_css_variable_and_remeasures() {
-        let script = native_pill_script(&RoundedRect {
-            x: 1050.0,
-            y: 0.0,
-            width: 200.0,
-            height: 32.0,
-            radius: 16.0,
-        });
+        let script = native_pill_script(
+            &RoundedRect {
+                x: 1050.0,
+                y: 0.0,
+                width: 200.0,
+                height: 32.0,
+                radius: 16.0,
+            },
+            Some("DP-1"),
+        );
+        assert!(
+            script.contains("dataset.nativePillOutput=\"DP-1\""),
+            "{script}"
+        );
+        assert!(native_pill_script(
+            &RoundedRect {
+                x: 0.,
+                y: 0.,
+                width: 1.,
+                height: 1.,
+                radius: 0.
+            },
+            None
+        )
+        .contains("delete document.documentElement.dataset.nativePillOutput"));
         for (key, value) in [
             ("x", "1050"),
             ("y", "0"),

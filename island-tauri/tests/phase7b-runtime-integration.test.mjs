@@ -242,14 +242,14 @@ function surfaceHarness({unchangedSizing=false,maxHeight=1190}={}) {
 }
 
 test('explicit custom preset terminal height can exceed the old 672px per-view default',()=>{
-  globals({innerWidth:1920,innerHeight:1440,addEventListener(){},removeEventListener(){}},()=>{
+  globals({innerWidth:1920,innerHeight:1440,window:{addEventListener(){},removeEventListener(){}},addEventListener(){},removeEventListener(){}},()=>{
     for(const maxHeight of [1190,1280]) {
       const h=surfaceHarness({maxHeight});try {const tree=h.renderSurface();assert.equal(tree.props.initial.height,maxHeight);assert.equal(h.starts.at(-1).height,maxHeight);assert.equal(tree.props.style['--open-content-height'],`${maxHeight-44}px`);}finally{h.dispose();}
     }
   });
 });
 test('unchanged sizing retains the original terminal height even with a larger stored custom preset',()=>{
-  globals({innerWidth:1920,innerHeight:1440,addEventListener(){},removeEventListener(){}},()=>{
+  globals({innerWidth:1920,innerHeight:1440,window:{addEventListener(){},removeEventListener(){}},addEventListener(){},removeEventListener(){}},()=>{
     const h=surfaceHarness({unchangedSizing:true});try {assert.equal(h.renderSurface().props.initial.height,672);}finally{h.dispose();}
   });
 });
@@ -257,7 +257,7 @@ test('unchanged sizing retains the original terminal height even with a larger s
 test('content-fitted Settings honors the explicit height cap without forcing empty expansion',()=>{
   const frames=[];
   class Observer {observe(){} unobserve(){} disconnect(){}}
-  globals({innerWidth:1920,innerHeight:1440,addEventListener(){},removeEventListener(){},ResizeObserver:Observer,MutationObserver:Observer,
+  globals({innerWidth:1920,innerHeight:1440,window:{addEventListener(){},removeEventListener(){}},addEventListener(){},removeEventListener(){},ResizeObserver:Observer,MutationObserver:Observer,
     requestAnimationFrame:cb=>{frames.push(cb);return frames.length;},cancelAnimationFrame(){},getComputedStyle:()=>({paddingTop:'0',paddingBottom:'0'})},()=>{
     // [visible child height, height hidden inside a [data-fit-scroll] scroller (null: none), expected]
     for(const [childHeight,hidden,expected] of [[300,null,344],[900,null,944],[2000,null,1190],[374,0,418],[374,600,1018],[374,2000,1190]]) {

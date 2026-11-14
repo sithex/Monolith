@@ -7,7 +7,7 @@ export const WITHDRAW_LEAD = 0.07;
 /**
  * Global animation speed (Settings → Motion → Animation speed, Nov 5): 1 = as designed,
  * 2 = twice as fast, .5 = half speed. The island root sets it from `animationSpeed` (50..200 %)
- * before children render; every spring/duration built here divides its time by it, so the
+ * in a layout effect and re-renders before paint; every spring/duration divides by it, so the
  * shell morph, `arrivalTime` (side-button hand-off) and the content reveal stay in step.
  * WITHDRAW_SECONDS and BLUR_RELEASE_MS are deliberately NOT scaled: they pair with CSS
  * (`.island[data-withdrawing]` .16s) and the KWin blur region, not with spring length.

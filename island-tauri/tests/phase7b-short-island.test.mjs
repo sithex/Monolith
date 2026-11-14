@@ -68,7 +68,7 @@ function openShort(h, frames, drawn) {
   while (frames.length) frames.shift()();
   return { root, tree: h.renderSurface() };
 }
-const env = frames => ({ innerWidth: 2560, innerHeight: 1440, addEventListener() {}, removeEventListener() {},
+const env = frames => ({ window: { addEventListener() {}, removeEventListener() {} }, innerWidth: 2560, innerHeight: 1440, addEventListener() {}, removeEventListener() {},
   ResizeObserver: class { observe() {} unobserve() {} disconnect() {} }, MutationObserver: class { observe() {} disconnect() {} },
   requestAnimationFrame: cb => { frames.push(cb); return frames.length; }, cancelAnimationFrame() {},
   getComputedStyle: () => ({ paddingTop: '0', paddingBottom: '0', borderRadius: '0' }), performance: { now: () => 0 } });

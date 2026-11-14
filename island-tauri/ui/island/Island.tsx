@@ -55,8 +55,13 @@ const motionSpeedDefault = (percent: number | undefined) => !percent || percent 
 export function Island() {
   const state = useIslandState(), settings = useSettings(), palette = usePalette(), appearance = useAppearance(), approvalHover = useApprovalHover(), notificationHover = useNotificationHover();
   const launcher = useLauncher(), media = useMedia();
-  // Settings → Motion: set before any child builds a spring this render (motion-profile).
-  setMotionSpeed(settings.animationSpeed ?? 100);
+  // Publish only committed settings. Re-render before paint so children rebuild their
+  // transitions at the new speed, including on the first mount.
+  const [, refreshMotion] = useState(0);
+  useLayoutEffect(() => {
+    setMotionSpeed(settings.animationSpeed ?? 100);
+    refreshMotion(rev => rev + 1);
+  }, [settings.animationSpeed]);
   const [error, setError] = useState(''), [paletteOpen, setPaletteOpen] = useState(false);
   const fail = useCallback((error: unknown) => setError(error instanceof Error ? error.message : String(error)), []);
   // An error is news, not state: it used to stay on screen until the island reloaded.
@@ -117,10 +122,13 @@ export function Island() {
   const navigate = (view: IslandView) => { void dispatch({ type:'selectView',view }).catch(fail); };
   // Back history: every view change pushes the page you left; Back pops it.
   const history = useRef<IslandView[]>([]), shownView = useRef(view), goingBack = useRef(false);
-  if (shownView.current !== view) {
+  const [, refreshHistory] = useState(0);
+  useLayoutEffect(() => {
+    if (shownView.current === view) return;
     if (!goingBack.current) { history.current.push(shownView.current); if (history.current.length > 24) history.current.shift(); }
     goingBack.current = false; shownView.current = view;
-  }
+    refreshHistory(rev => rev + 1);
+  }, [view]);
   const previous = (() => { for (let i = history.current.length - 1; i >= 0; i--) if (history.current[i] !== view) return history.current[i]!; return 'terminal' as IslandView; })();
   const goBack = () => {
     while (history.current.length && history.current[history.current.length - 1] === view) history.current.pop();
@@ -168,7 +176,7 @@ export function Island() {
     <AnimatePresence>{state.mode === 'hover' && <motion.div key="preview" className="preview island-content" {...reveal}
       exit={reduced ? { opacity: 0, transition: fadeOnly } : { opacity: 0, scale: 0.96, y: -6, transition: tween(DUR.fast) }}
       style={{ position: 'absolute', top: 42, left: 0, right: 0 }}>{approvalHover.active ? <ApprovalNotice fail={fail} /> : notificationHover.active ? <NotchNotifications fail={fail} placement="hover" /> : <PreviewNotice fail={fail} />}</motion.div>}</AnimatePresence>
-    <motion.div ref={wrap} className="terminal-wrap island-content" hidden={!active && !lingering} aria-hidden={!active} style={closing ?? undefined} {...openMotion}>
+    <motion.div ref={wrap} className="terminal-wrap island-content" hidden={!active && !lingering} aria-hidden={!active} inert={!active} style={closing ?? undefined} {...openMotion}>
       <ViewPager fail={fail} views={views}>
         <IslandShell title={viewLabels[view]} home={view === 'terminal'} intents={{ navigate: () => navigate('terminal') }} back={{ label: viewLabels[previous], go: goBack }}
           actions={<>{view === 'launcher' && <LauncherEditButton fail={fail} />}<VoiceControls shown={view === 'terminal'} active={active && view === 'terminal'} fail={fail} /></>}>

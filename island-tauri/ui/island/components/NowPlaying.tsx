@@ -30,11 +30,31 @@ export function NowPlaying({ model, intents, mixer = null, onStreamVolume, lyric
   // The lyrics stage is open by default once lyrics are enabled; the quote button folds it
   // away (Apple Music style) without turning the LRCLIB lookups off.
   const [showLyrics, setShowLyrics] = useState(lyricsEnabled);
+  if (!track) return <Empty icon="music">No player · Your music appears here</Empty>;
+  const stream = playerStream(track, mixer?.available ? mixer.streams : []);
+  const mprisVolume = track.volumeWritable && track.volumePercent != null;
+  const volume = mprisVolume ? track.volumePercent : stream?.volumePercent ?? null;
+  return <div ref={root} className="now-playing" data-lyrics={showLyrics} data-reduced={reduced}>
+    {showLyrics && <div className="np-backdrop" aria-hidden="true"><SafeImage src={track.artUrl} alt="" /></div>}
+    <div className="np-player app-stack">
+      <div className="track-header"><div className="artwork"><Icon name="music"/><ArtworkCrossfade src={track.artUrl} alt={`${track.title} artwork`} reduced={reduced}/></div><div className="track-description"><div className="track-source"><small className="muted">{track.player}</small><span className="music-indicator" role="img" aria-label={track.playing ? 'Playing indicator' : 'Paused indicator'} data-playing={track.playing} data-static={reduced}>{[0,1,2,3,4].map(i => <i key={i}><b/></i>)}</span><span className="music-settings-links"><SettingsLink rowId="lyricsEnabled" label="Lyrics settings"/><SettingsLink rowId="equalizerEnabled" label="Equalizer settings"/></span></div><h2>{track.title || 'Unknown title'}</h2><p>{track.artist || 'Unknown artist'}</p><small className="muted">{track.album}</small></div></div>
+      <TrackProgress track={track} root={root} />
+      <div className="transport"><button className="transport-skip" aria-label="Previous track" disabled={!track.canControl || !track.canGoPrevious} onClick={() => intents.media({ type: 'previous' })}><TransportGlyph kind="previous" /></button><button className="transport-main" aria-label={track.playing ? 'Pause' : 'Play'} data-playing={track.playing} disabled={!track.canControl} onClick={() => intents.media({ type: 'playPause' })}><TransportGlyph kind="play" /><TransportGlyph kind="pause" /></button><button className="transport-skip" aria-label="Next track" disabled={!track.canControl || !track.canGoNext} onClick={() => intents.media({ type: 'next' })}><TransportGlyph kind="next" /></button></div>
+      <div className="player-volume"><span className="muted">Volume</span>{volume !== null ? <DraftRange aria-label="Player volume" min={0} max={100} step={1} value={Math.min(100, Math.max(0, volume))} onCommit={percent => mprisVolume ? intents.media({ type:'volume',percent }) : stream && onStreamVolume?.(stream.index,percent)} /> : <span className="muted">Unavailable for this player</span>}<small className="muted">{volume === null ? '' : `${Math.round(volume)}%`}</small>
+        <button type="button" className="lyrics-toggle" aria-label={showLyrics ? 'Hide lyrics' : 'Show lyrics'} aria-pressed={showLyrics} title="Lyrics" onClick={() => setShowLyrics(on => !on)}><Icon name="quote" /></button></div>
+    </div>
+    {showLyrics && <LyricsStage model={model} track={track} reduced={reduced} enabled={lyricsEnabled} onEnabled={onLyricsEnabled}
+      seek={track.canControl && track.canSeek ? positionMs => intents.media({ type: 'seek', positionMs }) : null} />}
+  </div>;
+}
+
+/** Only the playhead needs a local clock; lyrics and artwork follow host samples. */
+export function TrackProgress({ track, root }: { track: Track; root: { current: HTMLDivElement | null } }) {
   // The epoch sample crosses IPC; elapsed time after mounting uses a monotonic
   // clock so a wall-clock adjustment cannot send the playhead backwards.
   const [nowMs, setNowMs] = useState<number | null>(null);
   useEffect(() => {
-    if (!root.current || !track?.playing || track.status !== 'playing' || track.positionMs === null) return;
+    if (!root.current || !track.playing || track.status !== 'playing' || track.positionMs === null) return;
     const epoch = Date.now(), monotonic = performance.now();
     let inView = typeof IntersectionObserver === 'undefined';
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -55,24 +75,9 @@ export function NowPlaying({ model, intents, mixer = null, onStreamVolume, lyric
     document.addEventListener('visibilitychange', sync);
     sync();
     return () => { clearInterval(timer); observer?.disconnect(); document.removeEventListener('visibilitychange', sync); };
-  }, [track?.playing, track?.status, track?.positionMs, track?.sampledAtMs, track?.rate, track?.busName, track?.trackId, track?.title]);
-  if (!track) return <Empty icon="music">No player · Your music appears here</Empty>;
-  const stream = playerStream(track, mixer?.available ? mixer.streams : []);
-  const mprisVolume = track.volumeWritable && track.volumePercent != null;
-  const volume = mprisVolume ? track.volumePercent : stream?.volumePercent ?? null;
+  }, [track.playing, track.status, track.positionMs, track.sampledAtMs, track.rate, track.busName, track.trackId, track.title]);
   const { position, length } = mediaProgress(track, nowMs);
-  return <div ref={root} className="now-playing" data-lyrics={showLyrics} data-reduced={reduced}>
-    {showLyrics && <div className="np-backdrop" aria-hidden="true"><SafeImage src={track.artUrl} alt="" /></div>}
-    <div className="np-player app-stack">
-      <div className="track-header"><div className="artwork"><Icon name="music"/><ArtworkCrossfade src={track.artUrl} alt={`${track.title} artwork`} reduced={reduced}/></div><div className="track-description"><div className="track-source"><small className="muted">{track.player}</small><span className="music-indicator" role="img" aria-label={track.playing ? 'Playing indicator' : 'Paused indicator'} data-playing={track.playing} data-static={reduced}>{[0,1,2,3,4].map(i => <i key={i}><b/></i>)}</span><span className="music-settings-links"><SettingsLink rowId="lyricsEnabled" label="Lyrics settings"/><SettingsLink rowId="equalizerEnabled" label="Equalizer settings"/></span></div><h2>{track.title || 'Unknown title'}</h2><p>{track.artist || 'Unknown artist'}</p><small className="muted">{track.album}</small></div></div>
-      <div className="track-progress">{position !== null && length !== null ? <progress aria-label="Track progress" max={length} value={Math.min(length, position)}/> : <p className="muted">Position unavailable</p>}<div className="app-footer muted"><span>{position === null ? 'Unknown' : duration(position)}</span><span className="title-spacer"/><span>{length === null ? 'Unknown' : duration(length)}</span></div></div>
-      <div className="transport"><button className="transport-skip" aria-label="Previous track" disabled={!track.canControl || !track.canGoPrevious} onClick={() => intents.media({ type: 'previous' })}><TransportGlyph kind="previous" /></button><button className="transport-main" aria-label={track.playing ? 'Pause' : 'Play'} data-playing={track.playing} disabled={!track.canControl} onClick={() => intents.media({ type: 'playPause' })}><TransportGlyph kind="play" /><TransportGlyph kind="pause" /></button><button className="transport-skip" aria-label="Next track" disabled={!track.canControl || !track.canGoNext} onClick={() => intents.media({ type: 'next' })}><TransportGlyph kind="next" /></button></div>
-      <div className="player-volume"><span className="muted">Volume</span>{volume !== null ? <DraftRange aria-label="Player volume" min={0} max={100} step={1} value={Math.min(100, Math.max(0, volume))} onCommit={percent => mprisVolume ? intents.media({ type:'volume',percent }) : stream && onStreamVolume?.(stream.index,percent)} /> : <span className="muted">Unavailable for this player</span>}<small className="muted">{volume === null ? '' : `${Math.round(volume)}%`}</small>
-        <button type="button" className="lyrics-toggle" aria-label={showLyrics ? 'Hide lyrics' : 'Show lyrics'} aria-pressed={showLyrics} title="Lyrics" onClick={() => setShowLyrics(on => !on)}><Icon name="quote" /></button></div>
-    </div>
-    {showLyrics && <LyricsStage model={model} track={track} reduced={reduced} enabled={lyricsEnabled} onEnabled={onLyricsEnabled}
-      seek={track.canControl && track.canSeek ? positionMs => intents.media({ type: 'seek', positionMs }) : null} />}
-  </div>;
+  return <div className="track-progress">{position !== null && length !== null ? <progress aria-label="Track progress" max={length} value={Math.min(length, position)}/> : <p className="muted">Position unavailable</p>}<div className="app-footer muted"><span>{position === null ? 'Unknown' : duration(position)}</span><span className="title-spacer"/><span>{length === null ? 'Unknown' : duration(length)}</span></div></div>;
 }
 
 /** Keep both covers in the fixed artwork box during the crossfade. */

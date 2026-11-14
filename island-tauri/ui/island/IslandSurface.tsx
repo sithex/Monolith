@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { useReducedMotionAll } from './components/motion-preference';
 import { useIslandState, dispatch } from '../ipc/island-state';
@@ -208,6 +208,17 @@ export function IslandSurface({ children, fail, paletteOpen = false, scheme }: {
       ...(left !== undefined && top !== undefined ? { left, top } : {}), transition: morph.transition });
     return () => animation.stop();
   }, [animation, targetW, targetH, radius, left, top, morph]);
+  // Listen throughout the webview while large without focusing a hover preview.
+  // Bubble after controls: terminal input and an already-handled Escape keep priority.
+  useEffect(() => {
+    if (state.mode !== 'large') return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented && !(event.target instanceof Element && event.target.closest('.terminal, input, select, textarea, [contenteditable]')))
+        void dispatch({ type: 'collapse' }).catch(fail);
+    };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [state.mode, fail]);
   return <motion.section ref={outer} className="island" data-state={state.mode} data-view={state.view} data-side-delay={morph.sideDelay} data-withdrawing={morph.withdrawing}
     style={{ maxWidth: Math.max(pill?.width ?? 0, limit.width), maxHeight: Math.max(pill?.height ?? 0, limit.height),
       '--open-content-width': `${fit.width - 2}px`, '--open-content-height': `${Math.max(0, fit.height - 44)}px`, ...(pill ? { position: 'fixed' } : {}) } as CSSProperties}
@@ -254,7 +265,5 @@ export function IslandSurface({ children, fail, paletteOpen = false, scheme }: {
     }}
     onMouseEnter={() => { if (!pill || current.current.mode !== 'still') void pointerIntent(true, dispatch).catch(fail); }}
     onMouseLeave={() => { void pointerIntent(false, dispatch).catch(fail); }}
-    onKeyDown={event => {
-      if (event.key === 'Escape' && !event.defaultPrevented && !(event.target as HTMLElement).closest('.terminal, input, select, textarea, [contenteditable]')) void dispatch({ type: 'collapse' }).catch(fail);
-    }}><svg className="notch-morph-skin" aria-hidden="true"><path ref={notchPath} /></svg>{children}</motion.section>;
+    ><svg className="notch-morph-skin" aria-hidden="true"><path ref={notchPath} /></svg>{children}</motion.section>;
 }

@@ -135,10 +135,12 @@ fn shelf_add_over_dbus_validates_parks_persists_and_opens_by_id() {
     store.command(ShelfOp::Reveal { id: id.clone() }).unwrap();
     let calls = opener.0.lock().unwrap().clone();
     assert_eq!(calls[0], [OsString::from("xdg-open"), hostile.clone().into_os_string()]);
-    assert_eq!(
-        calls[1],
-        [OsString::from("dolphin"), OsString::from("--select"), hostile.clone().into_os_string()]
-    );
+    let reveal = hermes_island_lib::integrations::downloads::reveal_argv(&hostile);
+    assert_eq!(calls[1], reveal);
+    // The hostile path travels as one percent-encoded URI argument, then the empty startup id.
+    let uri = hermes_island_lib::integrations::shelf::core::encode_uri(&hostile);
+    assert_eq!(reveal[reveal.len() - 2], OsString::from(uri));
+    assert_eq!(reveal[reveal.len() - 1], OsString::new());
     // An id that is not on the shelf opens nothing, even for a real file.
     let stranger = home.join("stranger.txt");
     fs::write(&stranger, b"x").unwrap();

@@ -302,11 +302,7 @@ fn downloads_real_inotify_add_rename_delete_and_only_injected_opener() {
                 OsString::from("xdg-open"),
                 dir.0.join("two.pdf").into_os_string()
             ],
-            vec![
-                OsString::from("dolphin"),
-                OsString::from("--select"),
-                dir.0.join("two.pdf").into_os_string()
-            ]
+            hermes_island_lib::integrations::downloads::reveal_argv(&dir.0.join("two.pdf"))
         ]
     );
     assert!(s.open("../not-a-download", OpenDownload::Open).is_err());

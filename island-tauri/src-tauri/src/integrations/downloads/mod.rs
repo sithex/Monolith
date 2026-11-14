@@ -32,8 +32,35 @@ impl Opener for DesktopOpener {
         };
         let mut cmd = std::process::Command::new(program);
         cmd.args(&argv[1..]);
-        crate::services::process::run_bounded(cmd, Duration::from_secs(5), 4096, false).map(drop)
+        crate::services::process::run_bounded(cmd, Duration::from_secs(10), 4096, false).map(drop)
     }
+}
+/// "Show in folder": ask the session's file manager (org.freedesktop.FileManager1, which
+/// Dolphin provides) to open a window with `path` selected. The call returns as soon as the
+/// file manager answers, and the window belongs to the file manager, not to us. Running
+/// `dolphin --select` directly made the new window our helper process: it never exited,
+/// so the bounded run timed out after 5s and killed the window it had just opened.
+/// busctl takes the URI as one argv element, so no path byte is ever parsed.
+pub fn reveal_argv(path: &Path) -> Vec<OsString> {
+    [
+        "busctl",
+        "--user",
+        "--timeout=8",
+        "call",
+        "org.freedesktop.FileManager1",
+        "/org/freedesktop/FileManager1",
+        "org.freedesktop.FileManager1",
+        "ShowItems",
+        "ass",
+        "1",
+    ]
+    .into_iter()
+    .map(OsString::from)
+    .chain([
+        OsString::from(crate::integrations::shelf::core::encode_uri(path)),
+        OsString::new(),
+    ])
+    .collect()
 }
 struct State {
     model: core::DownloadsModel,
@@ -304,11 +331,7 @@ impl DownloadsService {
         }
         let argv = match op {
             OpenDownload::Open => vec![OsString::from("xdg-open"), file.into_os_string()],
-            OpenDownload::Reveal => vec![
-                OsString::from("dolphin"),
-                OsString::from("--select"),
-                file.into_os_string(),
-            ],
+            OpenDownload::Reveal => reveal_argv(&file),
         };
         drop(state);
         self.opener.open(&argv)

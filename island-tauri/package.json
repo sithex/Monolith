@@ -1,7 +1,7 @@
 {
   "name": "hermes-island-tauri",
   "private": true,
-  "version": "5.1.0",
+  "version": "5.1.1",
   "type": "module",
   "description": "Hermes Island on Tauri v2 (Phase 1: skeleton + window + input region)",
   "scripts": {

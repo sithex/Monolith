@@ -210,11 +210,7 @@ impl TransfersService {
         let meta = std::fs::symlink_metadata(&path);
         let argv = match meta {
             Ok(m) if m.is_dir() => vec![OsString::from("xdg-open"), path.into_os_string()],
-            Ok(m) if m.is_file() => vec![
-                OsString::from("dolphin"),
-                OsString::from("--select"),
-                path.into_os_string(),
-            ],
+            Ok(m) if m.is_file() => crate::integrations::downloads::reveal_argv(&path),
             _ => {
                 let parent = path
                     .parent()

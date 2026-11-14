@@ -68,10 +68,10 @@ x86_64 Linux. It needs glibc 2.43 or newer (current Arch, CachyOS and Fedora) pl
 `run.sh`, the notch widget and the helper scripts:
 
 ```sh
-git clone --branch v5.1.0 https://github.com/sithex/Monolith.git ~/Hermes/Monolith
+git clone --branch v5.1.1 https://github.com/sithex/Monolith.git ~/Hermes/Monolith
 cd ~/Hermes/Monolith
 mkdir -p island-tauri/src-tauri/target/release
-tar -xzf ~/Downloads/monolith-v5.1.0-x86_64-linux.tar.gz -C island-tauri/src-tauri/target/release
+tar -xzf ~/Downloads/monolith-v5.1.1-x86_64-linux.tar.gz -C island-tauri/src-tauri/target/release
 island-tauri/run.sh --overlay
 ```
 

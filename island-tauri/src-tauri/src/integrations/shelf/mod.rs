@@ -209,11 +209,7 @@ impl ShelfStore {
             return Err(IslandError::unavailable("Moved or deleted"));
         }
         let argv = if reveal {
-            vec![
-                OsString::from("dolphin"),
-                OsString::from("--select"),
-                path.into_os_string(),
-            ]
+            crate::integrations::downloads::reveal_argv(&path)
         } else {
             vec![OsString::from("xdg-open"), path.into_os_string()]
         };

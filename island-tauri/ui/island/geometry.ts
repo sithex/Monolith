@@ -33,14 +33,22 @@ export function presetSize(preset: LayoutModel['preset']): { width: number; maxH
   return preset.type === 'custom' ? { width: preset.width, maxHeight: preset.maxHeight } : PRESET_SIZES[preset.type];
 }
 export type SideRect = { id: string; rect: Rect };
+/** Height of the taller side column, measured from the island's top edge. Slots are honoured
+ *  (an empty slot leaves a hole), identical to workspace::geometry. */
+export function sideColumnExtent(layout: LayoutModel): number {
+  const d = layout.buttonDiameter, g = layout.gap;
+  const extent = (side: string) => {
+    const slots = layout.buttons.filter(b => b.side === side).map(b => b.slot);
+    return slots.length ? (Math.max(...slots) + 1) * d + Math.max(...slots) * g : 0;
+  };
+  return Math.max(extent('left'), extent('right'));
+}
 /** Projection only: layout state is Rust-owned. Keep the short-island rule identical to workspace::geometry. */
 export function sideRects(layout: LayoutModel, island: Rect): SideRect[] {
   const d = layout.buttonDiameter, g = layout.gap;
   const sides = (side: string) => layout.buttons.filter(b => b.side === side).sort((a, b) => a.slot - b.slot);
   const left = sides('left'), right = sides('right'), bottom = sides('bottom');
-  // Slots are honoured (an empty slot leaves a hole), identical to workspace::geometry.
-  const extent = (v: typeof left) => v.length ? (Math.max(...v.map(b => b.slot)) + 1) * d + Math.max(...v.map(b => b.slot)) * g : 0;
-  const columnBottom = Math.max(island.height, extent(left), extent(right));
+  const columnBottom = Math.max(island.height, sideColumnExtent(layout));
   const first = bottom[0]?.slot ?? 0, span = bottom.length ? (bottom[bottom.length - 1]!.slot - first + 1) : 0;
   return [...left.map(b => ({ id: b.id, rect: { x: island.x - g - d, y: island.y + b.slot * (d + g), width: d, height: d } })),
     ...right.map(b => ({ id: b.id, rect: { x: island.x + island.width + g, y: island.y + b.slot * (d + g), width: d, height: d } })),

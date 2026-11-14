@@ -6,10 +6,10 @@ import { reportGeometry } from '../ipc/client';
 import { useApprovalHover } from './ApprovalNotice';
 import { useNotificationHover } from './notifications/notification-hover';
 import { useSettings, usePalette } from '../stores';
-import { notchMorphPath } from './notch-profile';
+import { notchMorphPath, notchMorphSpan, notchProgress, NOTCH_MORPH_SPAN } from './notch-profile';
 import { useLayout, useLauncher } from '../stores/apps';
 import { UI_SPRING } from './components/IslandShell';
-import { createGeometryReporter, fitSurface, effectiveLayout, visibleLayout, nativePill, presetSize } from './geometry';
+import { createGeometryReporter, fitSurface, effectiveLayout, visibleLayout, nativePill, presetSize, sideColumnExtent } from './geometry';
 import { pointerIntent } from './navigation';
 import type { IslandView } from '../ipc/bindings';
 import { arrivalTime, axisSpring, motionSpeed, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, scaled, surfaceRadius, WITHDRAW_LEAD } from './motion-profile';
@@ -118,15 +118,23 @@ export function IslandSurface({ children, fail, paletteOpen = false, scheme }: {
   // Content-sized pages still shrink to their content below this ceiling.
   const maxHeight = state.mode === 'large' && !layout.unchangedSizing ? customHeight : baseHeight;
   // The palette needs a usable list even above a short content-fitted settings page.
+  // A content-fitted page is never shorter than the side-button columns, so the circles run
+  // along the island's edges instead of hanging below a short page (e.g. an empty Agent runs).
   // Keep the user's explicit height ceiling and viewport constraints authoritative.
-  const height = fitsContent && contentH !== null ? Math.min(maxHeight, Math.max(paletteOpen ? 560 : MIN_FIT_HEIGHT, contentH)) : maxHeight;
+  const fitFloor = Math.max(paletteOpen ? 560 : MIN_FIT_HEIGHT, sideColumnExtent(visible));
+  const height = fitsContent && contentH !== null ? Math.min(maxHeight, Math.max(fitFloor, contentH)) : maxHeight;
   const fit = fitSurface(width, height, viewport, state.mode === 'large' ? visible : undefined);
   const limit = fitSurface(Infinity, Infinity, viewport, state.mode === 'large' ? visible : undefined);
   liveLayout.current = effectiveLayout(visible, fit.buttonScale);
   const targetW = state.mode === 'still' && pill ? pill.width : fit.width, targetH = state.mode === 'still' && pill ? pill.height : fit.height;
-  const previousMode = useRef(state.mode), previousPalette = useRef(paletteOpen);
+  const previousMode = useRef(state.mode), previousPalette = useRef(paletteOpen), notchSpan = useRef(NOTCH_MORPH_SPAN);
   const morph = useMemo(() => {
     const drawn = outer.current?.getBoundingClientRect() ?? { width: targetW, height: targetH };
+    // The notch silhouette morphs over the travel to the open height (notchMorphSpan): an open
+    // island always rests as its plain rounded shell, however close below the notch it stops.
+    // A close keeps the span of the height it leaves from, so the shape does not jump.
+    if (pill && state.mode !== 'still') notchSpan.current = notchMorphSpan(pill.height, targetH);
+    else if (pill && previousMode.current !== 'still') notchSpan.current = notchMorphSpan(pill.height, drawn.height);
     const withdrawing = previousMode.current === 'large' && state.mode !== 'large'; previousMode.current = state.mode;
     const delay = !reduced && withdrawing ? WITHDRAW_LEAD : 0;
     // Opening/closing the command palette is keyboard-driven: its height floor applies at once.
@@ -221,7 +229,7 @@ export function IslandSurface({ children, fail, paletteOpen = false, scheme }: {
           if (current.current.mode === 'still' && fade <= 0) arrive(root);
           else { root.style.opacity = fade >= 1 ? '' : String(+fade.toFixed(3)); delete root.dataset.arrived; }
         }
-        const p = Math.max(0, Math.min(1, 1 - (h - pill.height) / 72));
+        const p = notchProgress(h, pill.height, notchSpan.current);
         if (Number.isFinite(w) && Number.isFinite(h) && p > 0 && notchPath.current) {
           root.dataset.notching = 'true'; root.dataset.notchProgress = String(p);
           const cfg = config.current, bw = cfg.notchBorderEnabled === false ? 0 : (cfg.notchBorderWidth ?? .8);

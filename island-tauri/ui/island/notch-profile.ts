@@ -2,6 +2,19 @@
  * Progress 0 is the live rounded shell; 1 is the native taskbar notch. No reserved
  * canvas, layout reads, or extra animation clock: sample the existing size spring.
  */
+/** Longest stretch of height over which the shell morphs between the notch silhouette and
+ *  its open rectangle. */
+export const NOTCH_MORPH_SPAN = 72;
+/** The morph stretch for one open/close: never longer than the travel between the notch and
+ *  the open height, so an island that rests less than NOTCH_MORPH_SPAN below the notch (a
+ *  short content-fitted page) has fully become its open rectangle when it stops. */
+export function notchMorphSpan(pillHeight: number, openHeight: number): number {
+  return Math.max(1, Math.min(NOTCH_MORPH_SPAN, openHeight - pillHeight));
+}
+/** Morph progress at a drawn height: 1 at the notch, 0 once `span` pixels taller. */
+export function notchProgress(height: number, pillHeight: number, span: number): number {
+  return Math.max(0, Math.min(1, 1 - (height - pillHeight) / Math.max(1, span)));
+}
 export function notchMorphPath(width: number, height: number, radius: number, progress: number, borderWidth: number): string {
   const w = Math.max(1, width), h = Math.max(1, height);
   const p = Math.max(0, Math.min(1, progress));

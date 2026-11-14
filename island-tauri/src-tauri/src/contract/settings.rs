@@ -355,6 +355,13 @@ settings_schema! {
     /// KDE file copies/moves: progress in the closed notch and a Transfers card on the
     /// Downloads page. Off also drops the passive job monitor.
     notch_copy_progress: bool = true, "notchCopyProgress", plain;
+    /// Drop shelf: files dragged onto the notch are parked (paths only) on the Shelf page.
+    /// Off means the notch takes no drops; the parked list stays.
+    shelf_enabled: bool = true, "shelfEnabled", plain;
+    /// Most items kept on the shelf; the oldest are dropped past it.
+    shelf_max_items: f64 = 12.0, "shelfMaxItems", round((1.0, 50.0));
+    /// Remove an item once it has been dragged out of the shelf somewhere that took it.
+    shelf_remove_after_drag: bool = false, "shelfRemoveAfterDrag", plain;
     /// Output names that get a notch with `showNotchOnEveryMonitor` (empty = every monitor).
     notch_monitors: Vec<String> = Vec::new(), "notchMonitors", with(check_output_list);
     /// Output that shows the companion (`""` = every notch).
@@ -1013,8 +1020,8 @@ mod tests {
         // motion, terminal options) + 8 on Nov 6 (KDE popups, sound, app rules, approvals,
         // game-mode extras, palette shortcut) + 1 later Nov 6 (notification sound choice).
         // + 1 on Nov 14 (file-copy progress). Every key comes from the one `settings_schema!` table.
-        assert_eq!(keys.len(), 79);
-        assert_eq!(SETTINGS_KEYS.len(), 79);
+        assert_eq!(keys.len(), 82);
+        assert_eq!(SETTINGS_KEYS.len(), 82);
         let mut table: Vec<_> = SETTINGS_KEYS.iter().map(|k| k.to_string()).collect();
         table.sort();
         assert_eq!(table, keys, "file keys must equal the serde (IPC) keys");

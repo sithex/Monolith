@@ -92,7 +92,7 @@ fn a_kde_copy_reaches_the_card_and_the_notch_in_steps_and_the_job_is_undisturbed
     wait_until("monitor armed", T, || {
         (service.current().detail == "monitoring").then_some(())
     });
-    let companion = block_on(CompanionBus::start_at(&address)).unwrap();
+    let companion = block_on(CompanionBus::start_at(&address, None)).unwrap();
     companion.relay_copy_progress(service.progress());
     let listener = block_on(zbus::connection::Builder::address(address.as_str()).build())
         .unwrap();

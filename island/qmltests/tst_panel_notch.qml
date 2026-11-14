@@ -3,6 +3,7 @@ import QtTest
 import QtQuick.Window
 import "../plasma-anchor/contents/ui" as Panel
 import "../plasma-anchor/contents/ui/CopyProgress.js" as CopyProgress
+import "../plasma-anchor/contents/ui/Shelf.js" as Shelf
 
 TestCase {
     id: testCase
@@ -271,6 +272,52 @@ TestCase {
         compare(CopyProgress.percent(undefined), -1);
         compare(CopyProgress.percent(true), -1);
         compare(CopyProgress.percent({}), -1);
+    }
+    function test_shelf_drop_takes_only_local_files_as_a_copy_and_only_when_on() {
+        const notch = createTemporaryObject(factory, testCase);
+        const area = findChild(notch, "notchDropArea");
+        compare(area.enabled, false, "off until main.qml says online and on");
+        notch.shelfEnabled = true;
+        compare(area.enabled, true);
+        const drag = (urls, actions) => ({urls: urls, supportedActions: actions});
+        verify(area.wanted(drag(["file:///data/user/a b.txt"], Qt.CopyAction | Qt.MoveAction)));
+        verify(area.wanted(drag(["file://localhost/tmp/x"], Qt.LinkAction)));
+        compare(area.action(drag(["file:///a"], Qt.CopyAction | Qt.MoveAction)), Qt.CopyAction);
+        compare(area.action(drag(["file:///a"], Qt.LinkAction | Qt.MoveAction)), Qt.LinkAction);
+        verify(!area.wanted(drag(["file:///a"], Qt.MoveAction)), "never a move: the source would delete the file");
+        verify(!area.wanted(drag(["https://example.com/a"], Qt.CopyAction)));
+        verify(!area.wanted(drag(["file:///a", "smb://host/b"], Qt.CopyAction)), "one foreign URL refuses the drop");
+        verify(!area.wanted(drag([], Qt.CopyAction)));
+        const many = []; for (let i = 0; i < 65; i++) many.push("file:///f" + i);
+        verify(!area.wanted(drag(many, Qt.CopyAction)), "more than the island takes");
+        compare(Shelf.fileUrls(["file:///a b"]), ["file:///a b"]);
+        compare(Shelf.count({isFinished: true, isError: false, value: {value: 2}, values: [{value: 2}]}), 2);
+        compare(Shelf.count({isError: true, value: {value: 2}}), 0);
+        compare(Shelf.count(-3), 0);
+        compare(Shelf.count("x"), 0);
+    }
+    function test_shelf_drop_feedback_is_two_static_states_and_steps_back() {
+        const notch = createTemporaryObject(factory, testCase);
+        const outline = findChild(notch, "notchOutline");
+        notch.shelfEnabled = true;
+        const rest = outline.strokeColor.toString();
+        let changes = 0;
+        outline.strokeColorChanged.connect(() => changes++);
+        notch.dropHover = true;
+        compare(outline.strokeColor.toString(), Qt.color(notch.accent).toString());
+        notch.dropHover = false;
+        compare(outline.strokeColor.toString(), rest);
+        compare(changes, 2, "enter and leave: one repaint each");
+        notch.shelfResult(1);
+        compare(outline.strokeColor.toString(), Qt.color(notch.accent).toString());
+        tryCompare(notch, "dropFlash", 0, 2000);
+        compare(outline.strokeColor.toString(), rest);
+        notch.shelfResult(0);
+        compare(outline.strokeColor.toString(), Qt.color(notch.alertColor).toString(), "nothing parked: amber");
+        notch.shelfEnabled = false;
+        compare(notch.dropFlash, 0, "turning it off clears the feedback");
+        compare(outline.strokeColor.toString(), rest);
+        verify(!findChild(notch, "dropFlashHold").running || notch.dropFlash === 0);
     }
     function test_waiting_pulse_is_amber_slower_and_wins_over_working() {
         const notch = createTemporaryObject(factory, testCase);

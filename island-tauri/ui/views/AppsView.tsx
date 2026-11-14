@@ -16,6 +16,8 @@ import { TimerApp } from '../island/components/TimerApp';
 import { CalendarApp } from '../island/components/CalendarApp';
 import { ScratchpadApp } from '../island/components/ScratchpadApp';
 import { DownloadsApp, TransfersCard } from '../island/components/DownloadsApp';
+import { ShelfApp } from '../island/components/ShelfApp';
+import { copyText } from './agent-live-ipc';
 import { VolumeMixer, Brightness } from '../island/components/VolumeMixer';
 import { NotificationsView } from '../island/components/NotificationsView';
 import { QuickInfo } from '../island/components/QuickInfo';
@@ -28,7 +30,7 @@ import type { CalendarPresentation, CalendarLabels } from '../island/app-present
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 export function AppsView({ view, active }: { view: IslandView; active: boolean }) {
   const settings = useSettings(), notifications = useNotifications();
-  const timer = useApp('timer'), scratchpad = useApp('scratchpad'), downloads = useApp('downloads'), calendar = useApp('calendar'), transfers = useApp('transfers');
+  const timer = useApp('timer'), scratchpad = useApp('scratchpad'), downloads = useApp('downloads'), calendar = useApp('calendar'), transfers = useApp('transfers'), shelf = useApp('shelf');
   const mixer = useApp('mixer'), brightness = useApp('brightness'), toggles = useApp('toggles'), tiles = useApp('tiles'), updates = useApp('updates'), agents = useApp('agents');
   const media = useMedia(), lyrics = useLyrics(), equalizer = useEqualizer(), weather = useWeather(), power = usePower(), bluetooth = useBluetooth();
   const [notice, setNotice] = useState(''), [selected, setSelected] = useState<string | null>(null);
@@ -84,6 +86,10 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
       content = value.available ? <DownloadsApp items={value.value} transfers={moving} intents={{ download: op => run(() => appApi.downloadsOpen(op.name, op.type)), transfer: reveal }} />
         : <div className="app-stack"><TransfersCard items={moving} onReveal={reveal}/><ServiceNotice icon="download" source="downloads" reason={value.reason}/></div>;
     }
+    if (view === 'shelf' && shelf) content = <ShelfApp model={adapt.adaptShelf(shelf)} removeAfterDrag={settings.shelfRemoveAfterDrag}
+      off={<>The notch takes no drops while the shelf is off. <SettingsLink rowId="shelfEnabled" label="Turn it on in Settings" variant="text" />.</>}
+      intents={{ shelf: op => enqueueEpochCommand(appStores.shelf, run, () => appApi.shelfCommand(op.type === 'clear' ? { type: 'clear' } : op)),
+        copy: path => run(async () => { if (!await copyText(path)) throw Error('Could not copy the path'); setNotice('Path copied'); }) }} />;
     if ((view === 'mixer' || view === 'controls') && mixer) content = <VolumeMixer model={adapt.adaptMixer(mixer)} intents={{ mixer: op => enqueueEpochCommand(appStores.mixer,run,()=>appApi.mixerCommand(op)) }} />;
     if (view === 'brightness' && brightness) content = <Brightness displays={adapt.adaptBrightness(brightness)} intents={{ brightness: op => enqueueEpochCommand(appStores.brightness,run,()=>appApi.brightnessCommand(op)) }} />;
     if (view === 'controls') content = <div className="app-stack" data-testid="controls-runtime"><ControlsApp model={adapt.adaptIndependentControls(toggles,tiles,updates)} intents={{

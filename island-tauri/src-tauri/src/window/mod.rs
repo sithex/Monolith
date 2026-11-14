@@ -10,6 +10,7 @@ pub mod focus;
 #[cfg(target_os = "linux")]
 pub mod frame_clock;
 pub mod input_region;
+pub mod navigation;
 pub mod placement;
 pub mod shape;
 pub mod spike;
@@ -250,6 +251,17 @@ pub fn create_island_window(
         .map_err(|e| IslandError::internal(format!("window config rejected: {e}")))?
         .title(window_title(cli))
         .position(origin.x, origin.y);
+    {
+        // A dropped file or link must never replace the island page (see `navigation`).
+        let own = navigation::app_origin(tauri::is_dev(), app.config().build.dev_url.as_ref());
+        builder = builder.on_navigation(move |url| {
+            let ok = own.as_ref().is_some_and(|own| navigation::allowed(url, own));
+            if !ok {
+                tracing::warn!(scheme = url.scheme(), "Blocked a navigation away from the island page");
+            }
+            ok
+        });
+    }
     if cli.test_instance && cli.ui == UiKind::Island {
         builder = builder.initialization_script("window.__phase7bErrors=[];addEventListener('error',e=>window.__phase7bErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>window.__phase7bErrors.push(String(e.reason?.stack||e.reason)));");
     }

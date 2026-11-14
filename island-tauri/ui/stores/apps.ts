@@ -16,7 +16,7 @@ export const appStores = {
   brightness: createEpochTopic<NonNullable<AppsSnapshot['brightness']>>(), agents: createEpochTopic<NonNullable<AppsSnapshot['agents']>>(),
   mixer: createEpochTopic<NonNullable<AppsSnapshot['mixer']>>(), toggles: createEpochTopic<NonNullable<AppsSnapshot['toggles']>>(),
   updates: createEpochTopic<NonNullable<AppsSnapshot['updates']>>(), tiles: createEpochTopic<NonNullable<AppsSnapshot['tiles']>>(),
-  transfers: createEpochTopic<NonNullable<AppsSnapshot['transfers']>>(),
+  transfers: createEpochTopic<NonNullable<AppsSnapshot['transfers']>>(), shelf: createEpochTopic<NonNullable<AppsSnapshot['shelf']>>(),
 };
 export const launcherStore = createTopic<LauncherChanged>();
 export const layoutStore = createTopic<LayoutChanged>();
@@ -51,7 +51,7 @@ async function subscribeApps() {
     brightness: v => { appStores.brightness.apply(v, g.brightness); }, agents: v => { appStores.agents.apply(v, g.agents); },
     mixer: v => { appStores.mixer.apply(v, g.mixer); }, toggles: v => { appStores.toggles.apply(v, g.toggles); },
     updates: v => { appStores.updates.apply(v, g.updates); }, tiles: v => { appStores.tiles.apply(v, g.tiles); },
-    transfers: v => { appStores.transfers.apply(v, g.transfers); } });
+    transfers: v => { appStores.transfers.apply(v, g.transfers); }, shelf: v => { appStores.shelf.apply(v, g.shelf); } });
 }
 export async function listenExtended() {
   offApps = await subscribeApps();
@@ -72,6 +72,7 @@ function seedApps(boot: BootstrapSnapshot) {
   if (boot.apps.tiles) appStores.tiles.apply(boot.apps.tiles);
   if (boot.apps.updates) appStores.updates.apply(boot.apps.updates);
   if (boot.apps.transfers) appStores.transfers.apply(boot.apps.transfers);
+  if (boot.apps.shelf) appStores.shelf.apply(boot.apps.shelf);
 }
 export function seedExtended(boot: BootstrapSnapshot, workspace: Awaited<ReturnType<typeof loadWorkspace>>) {
   signature = JSON.stringify(boot.settings.moduleRegistry);

@@ -192,6 +192,7 @@ fn snapshot(
         "companionCharacter":settings.companion_character,
         "companionReactive":settings.companion_reactive,"companionMonitor":settings.companion_monitor,
         "copyProgress":settings.notch_copy_progress,
+        "shelf":settings.shelf_enabled,
         "waitingPulse":settings.notch_waiting_pulse,"hoverPeek":settings.notch_hover_peek,"hoverDelay":settings.hover_delay,
         "notchBorder":{"enabled":settings.notch_border_enabled,"color":border_color,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width},
         "background":background,"text":palette.as_ref().map(|p|&p.text),"dim":palette.as_ref().map(|p|&p.dim),
@@ -329,6 +330,7 @@ fn panel_style_payload(raw: &Value) -> Value {
         "companionMonitor",
         "waitingPulse",
         "copyProgress",
+        "shelf",
         "hoverPeek",
         "hoverDelay",
         "live",
@@ -378,6 +380,13 @@ mod notch_tests {
             style.get("copyPercent").is_none(),
             "progress goes as a D-Bus signal: no appletsrc write per step"
         );
+    }
+    #[test]
+    fn shelf_switch_rides_the_payload_and_nothing_about_its_items_does() {
+        let raw = json!({"shelf":false,"shelfItems":[{"path":"/x"}],"live":{}});
+        let style = panel_style_payload(&raw);
+        assert_eq!(style["shelf"], json!(false), "the notch needs the off switch");
+        assert!(style.get("shelfItems").is_none(), "paths never reach Plasma's config");
     }
     #[test]
     fn companion_freezes_only_in_game_mode_with_the_setting_on() {
@@ -529,9 +538,13 @@ impl NativeHost {
         let handle = app.clone();
         app.manage(StatusNudge(stop.clone()));
         let allow_panel_push = !app.state::<Services>().runtime.test_instance;
-        // The companion's pointer relay. Optional: without it the eyes simply rest ahead.
+        // The companion's pointer relay, copy progress and the drop shelf's `/Shelf`.
+        // Optional: without it the eyes rest ahead and the notch takes no drops.
+        let shelf = app
+            .try_state::<Arc<crate::integrations::system_services::SystemServices>>()
+            .map(|system| system.apps.shelf.clone());
         let companion = if allow_panel_push {
-            match tauri::async_runtime::block_on(super::companion::CompanionBus::start()) {
+            match tauri::async_runtime::block_on(super::companion::CompanionBus::start(shelf)) {
                 Ok(bus) => Some(bus),
                 Err(error) => {
                     tracing::warn!(%error, "Notch companion pointer relay unavailable");

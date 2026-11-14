@@ -10,6 +10,7 @@ use crate::{
         control_process::{fixture_from_env, Runner},
         downloads::{DesktopOpener, DownloadsService, Opener},
         jobs::TransfersService,
+        shelf::ShelfStore,
         mixer::MixerService,
         notifications::{hub::Hub, NotificationInput, NotificationSource, Urgency},
         power::PowerService,
@@ -55,6 +56,8 @@ pub struct AppServices {
     game_pause: super::plasma::game_effects::PollPause,
     /// File-copy progress (KDE job views). Not a launcher module: `notchCopyProgress` gates it.
     pub transfers: Arc<TransfersService>,
+    /// Drop shelf (paths parked from the notch). Not a service: no thread, no watcher.
+    pub shelf: Arc<ShelfStore>,
     slots: Mutex<Slots>,
     app: tauri::AppHandle,
     data: PathBuf,
@@ -173,6 +176,7 @@ impl AppServices {
             scratchpad: s.scratchpad.as_ref().map(|s| s.current()).transpose()?,
             downloads: s.downloads.as_ref().map(|s| s.current()).transpose()?,
             transfers: Some(self.transfers.current()),
+            shelf: self.shelf.current().ok(),
             calendar: s
                 .calendar
                 .as_ref()
@@ -201,6 +205,7 @@ impl AppServices {
         } else {
             Arc::new(DesktopOpener)
         };
+        let shelf = ShelfStore::new(data, opener.clone());
         let transfers = TransfersService::start(
             super::system_services::session_bus_address(
                 test_instance,
@@ -216,9 +221,16 @@ impl AppServices {
                 tracing::warn!("App event delivery failed");
             }
         }));
+        let app_handle = app.clone();
+        tauri::async_runtime::spawn(shelf.topic.forwarder(COALESCE, move |v| {
+            if v.emit_to(&app_handle, ISLAND_LABEL).is_err() {
+                tracing::warn!("App event delivery failed");
+            }
+        }));
         Self {
             game_pause,
             transfers,
+            shelf,
             power,
             slots: Mutex::new(Slots::default()),
             app: app.clone(),
@@ -249,6 +261,8 @@ impl AppServices {
     }
     pub fn configure(&self, settings: &Settings) -> Result<(), IslandError> {
         self.transfers.configure(settings.notch_copy_progress);
+        self.shelf
+            .configure(settings.shelf_enabled, settings.shelf_max_items);
         let mut slots = self.lock()?;
         if active(settings, "timer") {
             if slots.timer.is_none() {

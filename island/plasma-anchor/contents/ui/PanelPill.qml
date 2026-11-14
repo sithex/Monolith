@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Shapes
 import QtQuick.Window
 import org.kde.kirigami as Kirigami
+import "Shelf.js" as Shelf
 
 // Native, panel-contained notch. Hover never opens a webview or changes actor mode.
 Item {
@@ -69,6 +70,19 @@ Item {
     readonly property bool copyShown: copyPercent >= 0
     readonly property bool copyLive: animateHere && !companionFrozen
     readonly property string copyText: !copyShown ? "" : copyLive ? "⇣ " + copyPercent + "%" : "⇣ copying"
+    // Drop shelf (main.qml: shelfEnabled = online && the setting). A file drag over the notch
+    // lights the outline in the accent (one change on enter, one on leave); a drop holds it
+    // ~600 ms, amber when nothing could be parked, then one step back. No animation, no timer
+    // while idle: zero redraws until a file drag actually passes over this notch.
+    property bool shelfEnabled: false
+    signal filesDropped(var urls)
+    property bool dropHover: false
+    property int dropFlash: 0           // 1 parked, -1 refused, 0 none
+    readonly property bool dropShown: dropHover || dropFlash !== 0
+    readonly property color dropColor: dropFlash < 0 ? alertColor : accent
+    function shelfResult(count) { dropFlash = count > 0 ? 1 : -1; dropFlashHold.restart(); }
+    onShelfEnabledChanged: if (!shelfEnabled) { dropHover = false; dropFlash = 0; }
+    Timer { id: dropFlashHold; objectName: "dropFlashHold"; interval: 600; onTriggered: pill.dropFlash = 0 }
     readonly property bool motion: Kirigami.Units.longDuration > 0
     // Every notch repaint costs Plasma and KWin, on every monitor. The working pulse and the
     // music bars share one stepped clock (~8 updates/s, whole-pixel bar heights) instead of
@@ -102,6 +116,7 @@ Item {
         + (timerShown ? ". Timer " + timerText + (timerEndsAt > 0 ? "" : ", paused") : "")
         + (micMuted ? ". Microphone muted" : "")
         + (copyShown ? ". Copying files, " + copyPercent + " percent" : "")
+        + (shelfEnabled ? ". Drop files here to park them on the shelf" : "")
     Accessible.onPressAction: activated()
     Keys.onSpacePressed: event => { if (!event.isAutoRepeat) activated(); event.accepted = true; }
     Keys.onReturnPressed: event => { if (!event.isAutoRepeat) activated(); event.accepted = true; }
@@ -126,8 +141,8 @@ Item {
         ShapePath {
             id: outline
             objectName: "notchOutline"
-            strokeWidth: pill.pulsing ? Math.max(1, pill.borderEnabled ? Math.min(4, pill.borderWidth) : 0) : pill.borderEnabled ? Math.max(0, Math.min(4, pill.borderWidth)) : 0
-            strokeColor: pill.pulsing
+            strokeWidth: pill.dropShown ? 1.5 : pill.pulsing ? Math.max(1, pill.borderEnabled ? Math.min(4, pill.borderWidth) : 0) : pill.borderEnabled ? Math.max(0, Math.min(4, pill.borderWidth)) : 0
+            strokeColor: pill.dropShown ? pill.dropColor : pill.pulsing
                 ? Qt.rgba(pill.pulseColor.r, pill.pulseColor.g, pill.pulseColor.b, (pill.waitingShown ? .35 : .25) + .55 * pill.workPulse)
                 : Qt.rgba(pill.borderColor.r, pill.borderColor.g, pill.borderColor.b, Math.max(0, Math.min(1, pill.borderOpacity)))
             fillColor: pill.pulsing && .05 + .09 * pill.workPulse > .09 * pill.hoverProgress
@@ -284,6 +299,31 @@ Item {
         visible: opacity > 0
         opacity: pill.micMuted ? .85 : 0
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+    }
+    DropArea {
+        id: shelfDrop
+        objectName: "notchDropArea"
+        anchors.fill: parent
+        enabled: pill.shelfEnabled
+        // Only local files, and only as a copy or a link: never a move, which would make a
+        // file manager delete the original after the drop.
+        function wanted(drag) {
+            return Shelf.fileUrls(drag.urls).length > 0
+                && (drag.supportedActions & (Qt.CopyAction | Qt.LinkAction)) !== 0;
+        }
+        function action(drag) { return (drag.supportedActions & Qt.CopyAction) ? Qt.CopyAction : Qt.LinkAction; }
+        onEntered: drag => {
+            if (!wanted(drag)) { drag.accepted = false; return; }
+            drag.accept(action(drag));
+            pill.dropHover = true;
+        }
+        onExited: pill.dropHover = false
+        onDropped: drop => {
+            pill.dropHover = false;
+            if (!wanted(drop)) { drop.accepted = false; return; }
+            drop.accept(action(drop));
+            pill.filesDropped(Shelf.fileUrls(drop.urls));
+        }
     }
     MouseArea {
         id: pointer

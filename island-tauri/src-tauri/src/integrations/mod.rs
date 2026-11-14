@@ -12,6 +12,7 @@ pub mod control_process;
 pub mod dbus_util;
 pub mod downloads;
 pub mod jobs;
+pub mod shelf;
 pub mod media;
 pub mod mixer;
 pub mod notifications;

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-shelf-command"
+description = "Enables the shelf_command command without any pre-configured scope."
+commands.allow = ["shelf_command"]
+
+[[permission]]
+identifier = "deny-shelf-command"
+description = "Denies the shelf_command command without any pre-configured scope."
+commands.deny = ["shelf_command"]

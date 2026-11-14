@@ -25,7 +25,7 @@ export const LAUNCHER_WIDTH = 560;
 /** Pages with little content open at the Apps page's width instead of the island size setting
  *  (Nick, Nov 9: no dead space). Each still grows to fit wider content (a `[data-fit-width]` row,
  *  e.g. the mixer's faders) up to the size setting; height always follows the content. */
-export const COMPACT_VIEWS: ReadonlySet<IslandView> = new Set<IslandView>(['launcher', 'agents', 'mixer', 'brightness', 'timer', 'quickInfo', 'downloads', 'clipboard', 'notifications', 'scratchpad', 'controls']);
+export const COMPACT_VIEWS: ReadonlySet<IslandView> = new Set<IslandView>(['launcher', 'agents', 'mixer', 'brightness', 'timer', 'quickInfo', 'downloads', 'clipboard', 'notifications', 'scratchpad', 'controls', 'shelf']);
 /** Lowest open height for content-fitted pages: top bar + one line of content. */
 export const MIN_FIT_HEIGHT = 80;
 export function IslandSurface({ children, fail, paletteOpen = false, scheme }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean;

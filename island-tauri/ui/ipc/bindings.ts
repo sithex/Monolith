@@ -169,6 +169,10 @@ export const commands = {
 	transfersGet: () => typedError<TransfersChanged, IslandError>(__TAURI_INVOKE("transfers_get")),
 	/**  "Show in folder" for a running KDE file job; the folder comes from the job, not the page. */
 	transferReveal: (id: string) => typedError<null, IslandError>(__TAURI_INVOKE("transfer_reveal", { id })),
+	/**  The drop shelf (paths parked from the notch), each re-checked on disk. */
+	shelfGet: () => typedError<ShelfChanged, IslandError>(__TAURI_INVOKE("shelf_get")),
+	/**  Open / Reveal / Remove / Clear. Items are named by id; the path comes from the shelf. */
+	shelfCommand: (op: ShelfOp) => typedError<ShelfChanged, IslandError>(__TAURI_INVOKE("shelf_command", { op })),
 	calendarGet: (query: CalendarQuery) => typedError<CalendarChanged, IslandError>(__TAURI_INVOKE("calendar_get", { query })),
 	calendarCommand: (op: CalendarOp) => typedError<null, IslandError>(__TAURI_INVOKE("calendar_command", { op })),
 	calendarRefresh: () => typedError<null, IslandError>(__TAURI_INVOKE("calendar_refresh")),
@@ -220,6 +224,7 @@ export const events = {
 	scratchpadChanged: makeEvent<ScratchpadChanged, ScratchpadChanged>("scratchpad-changed"),
 	serviceStatus: makeEvent<ServiceStatus, ServiceStatus>("service-status"),
 	settingsChanged: makeEvent<SettingsChanged, SettingsChanged>("settings-changed"),
+	shelfChanged: makeEvent<ShelfChanged, ShelfChanged>("shelf-changed"),
 	tilesChanged: makeEvent<TilesChanged, TilesChanged>("tiles-changed"),
 	timerChanged: makeEvent<TimerChanged, TimerChanged>("timer-changed"),
 	togglesChanged: makeEvent<TogglesChanged, TogglesChanged>("toggles-changed"),
@@ -436,6 +441,7 @@ export type AppsSnapshot = {
 	scratchpad: ScratchpadChanged | null,
 	downloads: DownloadsChanged | null,
 	transfers: TransfersChanged | null,
+	shelf: ShelfChanged | null,
 	calendar: CalendarChanged | null,
 	brightness: BrightnessChanged | null,
 	agents: AgentsChanged | null,
@@ -882,7 +888,7 @@ export type IslandState = {
 /**  SPEC §4.5: the state actor is the ONLY emitter. Latest-value: consumers drop older `rev`s. */
 export type IslandStateChanged = IslandState;
 
-export type IslandView = "terminal" | "monitor" | "ai" | "settings" | "notifications" | "clipboard" | "launcher" | "music" | "quickInfo" | "timer" | "calendar" | "scratchpad" | "downloads" | "controls" | "mixer" | "brightness" | "agents" | "updates";
+export type IslandView = "terminal" | "monitor" | "ai" | "settings" | "notifications" | "clipboard" | "launcher" | "music" | "quickInfo" | "timer" | "calendar" | "scratchpad" | "downloads" | "controls" | "mixer" | "brightness" | "agents" | "updates" | "shelf";
 
 /**
  *  TypeScript-side description of arbitrary JSON. `serde_json::Value`'s own specta impl drags in
@@ -1060,7 +1066,7 @@ export type MixerStream = {
 	volumePercent: number | null,
 };
 
-export type ModuleConfig = ({ type: "systemTiles" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "updateBadge" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "quickToggles" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "mixer" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "agentTracker" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "brightness" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "timer" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "scratchpad" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "downloads" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "calendar" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "terminal"; fontSize: number }) & { dnd?: never; equalizer?: never; equalizerBands?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "monitor" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "ai" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "settings" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "notifications"; systemNotificationMirror: boolean; toastTtlMs: number; redactBodies: boolean; dnd: boolean }) & { equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never } | ({ type: "clipboard"; historySize: number; persist: boolean }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; lyrics?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "music"; lyrics: boolean; equalizer: boolean; equalizerBands: number }) & { dnd?: never; fontSize?: never; historySize?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | 
+export type ModuleConfig = ({ type: "systemTiles" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "updateBadge" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "quickToggles" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "mixer" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "agentTracker" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "brightness" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "timer" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "scratchpad" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "downloads" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "shelf" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "calendar" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "terminal"; fontSize: number }) & { dnd?: never; equalizer?: never; equalizerBands?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "monitor" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "ai" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "settings" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "notifications"; systemNotificationMirror: boolean; toastTtlMs: number; redactBodies: boolean; dnd: boolean }) & { equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never } | ({ type: "clipboard"; historySize: number; persist: boolean }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; lyrics?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "music"; lyrics: boolean; equalizer: boolean; equalizerBands: number }) & { dnd?: never; fontSize?: never; historySize?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | 
 /**  Only valid for an unknown module ID; serialized without a wrapper/tag. */
 ModuleJsonValue;
 
@@ -1492,6 +1498,15 @@ export type Settings = {
 	 *  Downloads page. Off also drops the passive job monitor.
 	 */
 	notchCopyProgress: boolean,
+	/**
+	 *  Drop shelf: files dragged onto the notch are parked (paths only) on the Shelf page.
+	 *  Off means the notch takes no drops; the parked list stays.
+	 */
+	shelfEnabled: boolean,
+	/**  Most items kept on the shelf; the oldest are dropped past it. */
+	shelfMaxItems: number,
+	/**  Remove an item once it has been dragged out of the shelf somewhere that took it. */
+	shelfRemoveAfterDrag: boolean,
 	/**  Output names that get a notch with `showNotchOnEveryMonitor` (empty = every monitor). */
 	notchMonitors: string[],
 	/**  Output that shows the companion (`""` = every notch). */
@@ -1600,6 +1615,9 @@ export type SettingsPatch = {
 	companionReactive?: boolean,
 	notchHoverPeek?: boolean,
 	notchCopyProgress?: boolean,
+	shelfEnabled?: boolean,
+	shelfMaxItems?: number,
+	shelfRemoveAfterDrag?: boolean,
 	notchMonitors?: string[],
 	companionMonitor?: string,
 	reduceMotion?: boolean,
@@ -1617,6 +1635,32 @@ export type SettingsPatch = {
 	gameModeFreezeCompanion?: boolean,
 	gameModePausePollers?: boolean,
 	paletteShortcut?: string,
+};
+
+export type ShelfChanged = {
+	rev: number,
+	/**  `shelfEnabled`: off means the notch takes no drops (the list stays). */
+	enabled: boolean,
+	maxItems: number,
+	items: ShelfRow[],
+};
+
+export type ShelfOp = { type: "open"; id: string } | { type: "reveal"; id: string } | { type: "remove"; id: string } | { type: "clear" };
+
+/**  One parked path on the drop shelf. Paths only: the shelf never reads file contents. */
+export type ShelfRow = {
+	/**  Opaque id for `shelf_command` (the item's `file://` URI); the path comes from Rust. */
+	id: string,
+	name: string,
+	/**  For display and "Copy path" (lossy only for names that are not UTF-8). */
+	path: string,
+	/**  Percent-encoded `file://` URI, used as the drag-out `text/uri-list`. */
+	uri: string,
+	folder: boolean,
+	/**  False when the file was moved or deleted since it was parked (re-checked on read). */
+	present: boolean,
+	/**  Unix time in ms. */
+	addedMs: number,
 };
 
 export type SystemStats = {

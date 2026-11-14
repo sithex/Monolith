@@ -11,7 +11,7 @@ use std::fmt;
 
 pub const CURRENT_VERSION: u32 = 2;
 pub const MAX_JSON_BYTES: usize = 256 * 1024;
-pub const KNOWN_IDS: [&str; 17] = [
+pub const KNOWN_IDS: [&str; 18] = [
     "terminal",
     "monitor",
     "ai",
@@ -29,7 +29,11 @@ pub const KNOWN_IDS: [&str; 17] = [
     "quick-toggles",
     "update-badge",
     "system-tiles",
+    "shelf",
 ];
+/// Known modules added after version 2 shipped: a saved v2 registry without one gets it
+/// appended (enabled, last), so an existing launcher shows the new app.
+const ADDED_IN_V2: [&str; 1] = ["shelf"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RegistryError {
@@ -129,6 +133,7 @@ pub enum ModuleConfig {
     Timer {},
     Scratchpad {},
     Downloads {},
+    Shelf {},
     Calendar {},
     Terminal {
         font_size: f64,
@@ -168,6 +173,7 @@ impl ModuleConfig {
             Self::Timer {} => Some("timer"),
             Self::Scratchpad {} => Some("scratchpad"),
             Self::Downloads {} => Some("downloads"),
+            Self::Shelf {} => Some("shelf"),
             Self::Calendar {} => Some("calendar"),
             Self::Terminal { .. } => Some("terminal"),
             Self::Monitor {} => Some("monitor"),
@@ -337,6 +343,7 @@ impl Registry {
             ModuleConfig::QuickToggles {},
             ModuleConfig::UpdateBadge {},
             ModuleConfig::SystemTiles {},
+            ModuleConfig::Shelf {},
         ];
         let modules = KNOWN_IDS
             .into_iter()
@@ -504,7 +511,29 @@ pub fn upgrade(value: Value) -> Result<Registry, RegistryError> {
 
 fn upgrade_input(mut raw: RegistryInput) -> Result<Registry, RegistryError> {
     match raw.version {
-        CURRENT_VERSION => Registry::new(raw.version, raw.modules),
+        CURRENT_VERSION => {
+            let mut next = Registry::new(raw.version, raw.modules)?;
+            for id in ADDED_IN_V2 {
+                if !next.modules.iter().any(|m| m.id.as_str() == id) {
+                    let mut module = Registry::defaults()
+                        .modules
+                        .into_iter()
+                        .find(|m| m.id.as_str() == id)
+                        .ok_or(RegistryError::InvalidPermutation)?;
+                    // Last, without renumbering anything the user arranged.
+                    module.order = next
+                        .modules
+                        .iter()
+                        .map(|m| m.order)
+                        .max()
+                        .map_or(Some(0), |o| o.checked_add(1))
+                        .ok_or(RegistryError::TooManyModules)?;
+                    next.modules.push(module);
+                }
+            }
+            next.validate()?;
+            Ok(next)
+        }
         0 | 1 => {
             // Validate BEFORE modifying, including duplicates and all config ranges.
             let mut next = Registry::new(CURRENT_VERSION, std::mem::take(&mut raw.modules))?;

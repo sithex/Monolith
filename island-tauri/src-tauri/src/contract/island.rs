@@ -35,6 +35,7 @@ pub enum IslandView {
     Brightness,
     Agents,
     Updates,
+    Shelf,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, specta::Type)]

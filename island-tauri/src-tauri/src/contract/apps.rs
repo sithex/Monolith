@@ -15,6 +15,7 @@ pub struct AppsSnapshot {
     pub scratchpad: Option<ScratchpadChanged>,
     pub downloads: Option<DownloadsChanged>,
     pub transfers: Option<TransfersChanged>,
+    pub shelf: Option<ShelfChanged>,
     pub calendar: Option<CalendarChanged>,
     pub brightness: Option<super::controls::BrightnessChanged>,
     pub agents: Option<super::controls::AgentsChanged>,
@@ -176,6 +177,40 @@ pub struct TransfersChanged {
     pub available: bool,
     pub detail: String,
     pub items: Vec<TransferRow>,
+}
+/// One parked path on the drop shelf. Paths only: the shelf never reads file contents.
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ShelfRow {
+    /// Opaque id for `shelf_command` (the item's `file://` URI); the path comes from Rust.
+    pub id: String,
+    pub name: String,
+    /// For display and "Copy path" (lossy only for names that are not UTF-8).
+    pub path: String,
+    /// Percent-encoded `file://` URI, used as the drag-out `text/uri-list`.
+    pub uri: String,
+    pub folder: bool,
+    /// False when the file was moved or deleted since it was parked (re-checked on read).
+    pub present: bool,
+    /// Unix time in ms.
+    pub added_ms: f64,
+}
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type, tauri_specta::Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ShelfChanged {
+    pub rev: u32,
+    /// `shelfEnabled`: off means the notch takes no drops (the list stays).
+    pub enabled: bool,
+    pub max_items: u32,
+    pub items: Vec<ShelfRow>,
+}
+#[derive(Deserialize, Clone, Debug, specta::Type)]
+#[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
+pub enum ShelfOp {
+    Open { id: String },
+    Reveal { id: String },
+    Remove { id: String },
+    Clear {},
 }
 #[derive(Deserialize, Clone, Copy, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]

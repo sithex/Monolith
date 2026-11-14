@@ -67,6 +67,8 @@ permissions = [
   "allow-downloads-open",
   "allow-transfers-get",
   "allow-transfer-reveal",
+  "allow-shelf-get",
+  "allow-shelf-command",
   "allow-calendar-get",
   "allow-calendar-command",
   "allow-calendar-refresh",

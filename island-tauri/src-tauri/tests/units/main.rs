@@ -20,6 +20,7 @@ mod clipboard_settings;
 mod downloads_core_fuzz_tests;
 mod downloads_core_model_tests;
 mod jobs_core;
+mod shelf_core;
 mod lrc_core_parse;
 mod lrclib_core_cache_key;
 mod lrclib_core_fuzz;

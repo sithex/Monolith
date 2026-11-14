@@ -78,6 +78,30 @@ pub async fn transfer_reveal(
     let s = system.apps.transfers.clone();
     super::blocking(move || s.reveal(&id)).await
 }
+/// The drop shelf (paths parked from the notch), each re-checked on disk.
+#[tauri::command]
+#[specta::specta]
+pub async fn shelf_get(
+    system: tauri::State<'_, Arc<SystemServices>>,
+) -> Result<ShelfChanged, IslandError> {
+    let s = system.apps.shelf.clone();
+    super::blocking(move || s.current()).await
+}
+/// Open / Reveal / Remove / Clear. Items are named by id; the path comes from the shelf.
+#[tauri::command]
+#[specta::specta]
+pub async fn shelf_command(
+    system: tauri::State<'_, Arc<SystemServices>>,
+    op: ShelfOp,
+) -> Result<ShelfChanged, IslandError> {
+    if let ShelfOp::Open { id } | ShelfOp::Reveal { id } | ShelfOp::Remove { id } = &op {
+        if id.is_empty() || id.len() > 3 * crate::integrations::shelf::core::MAX_URI_BYTES {
+            return Err(IslandError::invalid("Invalid shelf item"));
+        }
+    }
+    let s = system.apps.shelf.clone();
+    super::blocking(move || s.command(op)).await
+}
 
 #[tauri::command]
 #[specta::specta]

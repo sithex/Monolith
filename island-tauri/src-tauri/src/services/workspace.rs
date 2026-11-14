@@ -576,6 +576,7 @@ pub fn module_route(id: &str) -> Option<IslandView> {
         "mixer" => IslandView::Mixer,
         "quick-toggles" | "system-tiles" => IslandView::Controls,
         "update-badge" => IslandView::Updates,
+        "shelf" => IslandView::Shelf,
         _ => return None,
     })
 }

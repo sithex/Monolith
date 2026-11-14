@@ -109,7 +109,7 @@ export function insightsFromUsage(usage: AiUsage | null, period: AiPeriod = 'tod
   } };
 }
 // Knownness is a validated projection of the tagged registry config, never gallery metadata.
-const kinds: Record<string, string> = { terminal:'terminal', monitor:'monitor', ai:'ai', settings:'settings', notifications:'notifications', clipboard:'clipboard', music:'music', timer:'timer', scratchpad:'scratchpad', downloads:'downloads', calendar:'calendar', brightness:'brightness', 'agent-tracker':'agentTracker', mixer:'mixer', 'quick-toggles':'quickToggles', 'update-badge':'updateBadge', 'system-tiles':'systemTiles' };
+const kinds: Record<string, string> = { terminal:'terminal', monitor:'monitor', ai:'ai', settings:'settings', notifications:'notifications', clipboard:'clipboard', music:'music', timer:'timer', scratchpad:'scratchpad', downloads:'downloads', calendar:'calendar', brightness:'brightness', 'agent-tracker':'agentTracker', mixer:'mixer', 'quick-toggles':'quickToggles', 'update-badge':'updateBadge', 'system-tiles':'systemTiles', shelf:'shelf' };
 export function modulesFromRegistry(registry: Registry): ModuleSettingsModel {
   return { version: registry.version, modules: registry.modules.map(m => ({ id: m.id, label: m.id,
     order: m.order, enabled: m.enabled, locked: m.id === 'terminal' || m.id === 'settings',

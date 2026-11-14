@@ -11,6 +11,11 @@
 //! (`local.hermes.Monolith.Transfers`): a `CopyProgress(i)` signal in whole 10 % steps, at most
 //! one per 3 s plus start and end (`jobs::core::NotchSteps`). A signal costs plasmashell no
 //! config write and the island no process spawn, unlike the appearance push.
+//!
+//! The same connection also serves the drop shelf at `/Shelf`
+//! (`local.hermes.Monolith.Shelf.Add(as uris) → u parked`): the notch hands dropped file
+//! URIs over D-Bus so no shell command ever carries a file name. Rust validates every URI
+//! (`shelf::core::parse_uri`).
 use crate::services::process::run_bounded;
 use anyhow::{Context, Result};
 use std::{
@@ -31,6 +36,8 @@ pub const BUS_NAME: &str = "local.hermes.Monolith";
 pub const OBJECT_PATH: &str = "/Companion";
 pub const INTERFACE: &str = "local.hermes.Monolith.Companion";
 pub const TRANSFERS_INTERFACE: &str = "local.hermes.Monolith.Transfers";
+pub const SHELF_PATH: &str = "/Shelf";
+pub const SHELF_INTERFACE: &str = "local.hermes.Monolith.Shelf";
 /// The KWin plugin name the island owns; only this name is ever unloaded.
 pub const SCRIPT_NAME: &str = "monolith-companion-gaze";
 const SCRIPT: &str = include_str!("companion-gaze.qml");
@@ -102,6 +109,23 @@ impl Transfers {
     async fn copy_progress(emitter: &SignalEmitter<'_>, percent: i32) -> zbus::Result<()>;
 }
 
+/// The drop shelf's entry point for the notch.
+struct ShelfBus {
+    store: Arc<crate::integrations::shelf::ShelfStore>,
+}
+
+#[zbus::interface(name = "local.hermes.Monolith.Shelf")]
+impl ShelfBus {
+    /// Parks the dropped `file://` URIs (validated; invalid ones are skipped). Returns how
+    /// many were parked: 0 when none were valid or the shelf is off (`shelfEnabled`).
+    async fn add(&self, uris: Vec<String>) -> u32 {
+        let store = self.store.clone();
+        tokio::task::spawn_blocking(move || store.add_uris(&uris))
+            .await
+            .unwrap_or(0)
+    }
+}
+
 /// Relays the copy aggregate to the notch with the stepped cadence (event-driven: it wakes
 /// for a new aggregate or for the end of a 3 s gap, never on a timer of its own).
 async fn relay_progress(
@@ -153,18 +177,25 @@ pub struct CompanionBus {
 }
 
 impl CompanionBus {
-    pub async fn start() -> Result<Self> {
-        Self::start_with(zbus::connection::Builder::session()).await
+    /// `shelf`: serve `/Shelf` too (the drop shelf); `None` leaves it out.
+    pub async fn start(shelf: Option<Arc<crate::integrations::shelf::ShelfStore>>) -> Result<Self> {
+        Self::start_with(zbus::connection::Builder::session(), shelf).await
     }
 
     /// The same endpoint on an explicit bus (private-bus tests).
-    pub async fn start_at(address: &str) -> Result<Self> {
-        Self::start_with(zbus::connection::Builder::address(address)).await
+    pub async fn start_at(
+        address: &str,
+        shelf: Option<Arc<crate::integrations::shelf::ShelfStore>>,
+    ) -> Result<Self> {
+        Self::start_with(zbus::connection::Builder::address(address), shelf).await
     }
 
-    async fn start_with(builder: zbus::connection::Builder<'_>) -> Result<Self> {
+    async fn start_with(
+        builder: zbus::connection::Builder<'_>,
+        shelf: Option<Arc<crate::integrations::shelf::ShelfStore>>,
+    ) -> Result<Self> {
         let copy_current = Arc::new(AtomicI32::new(-1));
-        let build = builder
+        let mut builder = builder
             .name(BUS_NAME)
             .serve_at(
                 OBJECT_PATH,
@@ -177,8 +208,11 @@ impl CompanionBus {
                 Transfers {
                     current: copy_current.clone(),
                 },
-            )
-            .build();
+            );
+        if let Some(store) = shelf {
+            builder = builder.serve_at(SHELF_PATH, ShelfBus { store });
+        }
+        let build = builder.build();
         let connection = tokio::time::timeout(Duration::from_secs(3), build)
             .await
             .context("Companion D-Bus start timed out")??;

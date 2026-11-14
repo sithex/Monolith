@@ -9,12 +9,12 @@ import { launcherStore, useLauncher } from '../stores/apps';
 import { Icon } from './components/Icon';
 import { useReducedMotionPreference } from './components/motion-preference';
 import type { IconName } from './models';
-export const viewLabels: Record<IslandView,string> = { terminal:'Hermes',monitor:'System monitor',ai:'AI Agents',settings:'Settings',launcher:'Apps',notifications:'Notifications',clipboard:'Clipboard',music:'Now playing',quickInfo:'Quick info',timer:'Timer',calendar:'Calendar',scratchpad:'Scratchpad',downloads:'Downloads',controls:'Controls',mixer:'Volume mixer',brightness:'Brightness',agents:'Agent runs',updates:'Package updates' };
-export const viewIcons: Partial<Record<IslandView,IconName>> = { terminal:'terminal',monitor:'monitor',ai:'spark',settings:'settings',notifications:'bell',clipboard:'clipboard',music:'music',timer:'timer',calendar:'calendar',scratchpad:'note',downloads:'download',controls:'controls',mixer:'volume',brightness:'sun',agents:'spark',updates:'download',quickInfo:'weather',launcher:'grid' };
+export const viewLabels: Record<IslandView,string> = { terminal:'Hermes',monitor:'System monitor',ai:'AI Agents',settings:'Settings',launcher:'Apps',notifications:'Notifications',clipboard:'Clipboard',music:'Now playing',quickInfo:'Quick info',timer:'Timer',calendar:'Calendar',scratchpad:'Scratchpad',downloads:'Downloads',controls:'Controls',mixer:'Volume mixer',brightness:'Brightness',agents:'Agent runs',updates:'Package updates',shelf:'Shelf' };
+export const viewIcons: Partial<Record<IslandView,IconName>> = { terminal:'terminal',monitor:'monitor',ai:'spark',settings:'settings',notifications:'bell',clipboard:'clipboard',music:'music',timer:'timer',calendar:'calendar',scratchpad:'note',downloads:'download',controls:'controls',mixer:'volume',brightness:'sun',agents:'spark',updates:'download',quickInfo:'weather',launcher:'grid',shelf:'shelf' };
 // Tile tints (Nov 9): every app has its own system colour (motion-launcher.css --app-*);
 // Hermes keeps the theme accent. Tiles stay neutral, only the glyph is coloured.
 const tint: Partial<Record<IslandView,string>> = Object.fromEntries((['monitor','ai','agents','settings','notifications','clipboard','music','timer','calendar',
-  'scratchpad','downloads','updates','controls','mixer','brightness','quickInfo'] as IslandView[]).map(v => [v, `var(--app-${v})`]));
+  'scratchpad','downloads','shelf','updates','controls','mixer','brightness','quickInfo'] as IslandView[]).map(v => [v, `var(--app-${v})`]));
 tint.terminal = 'var(--ui-accent)';
 const tone = (view: IslandView | null | undefined) => (view && tint[view]) || 'var(--tile-ink, rgb(255 255 255 / .85))';
 const LONG_PRESS_MS = 450;

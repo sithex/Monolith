@@ -62,6 +62,16 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .transfer-bar { height: 4px; margin-top: 6px; border-radius: 2px; background: var(--ui-border); overflow: hidden; }
 .transfer-bar > span { display: block; height: 100%; background: var(--ui-accent); }
 .app-stack > .transfers { margin-bottom: 0; }
+/* Drop shelf: four actions per row wrap under the name instead of squeezing it. */
+.shelf-app { display: flex; flex-direction: column; gap: 10px; }
+.shelf-row { flex-wrap: wrap; cursor: grab; }
+.shelf-row[data-present='false'] { cursor: default; opacity: .75; }
+.shelf-row .row-content { flex: 1 1 180px; }
+.shelf-row .shelf-path { font-size: var(--fs-xs); word-break: break-all; }
+.shelf-row .row-actions { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+.shelf-footer { display: flex; align-items: center; gap: 10px; }
+.shelf-footer .app-caption { flex: 1; margin: 0; }
+.shelf-clear { flex: none; color: var(--ui-accent); }
 .kind-icon { color: var(--ui-accent); display: grid; place-items: center; flex-shrink: 0; }
 .notification-card .app-toolbar { align-items: start; }
 .notification-card .app-toolbar strong { padding-top: 6px; overflow-wrap: anywhere; }

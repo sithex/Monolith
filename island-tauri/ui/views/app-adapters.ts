@@ -2,7 +2,7 @@
 // These adapters own no clocks, requests, persistence or revision fencing.
 import type { CalendarChanged, AgendaRow as WireAgendaRow, MixerChanged, IslandNotification, WeatherState, PowerState, BtDevice, TogglesChanged, TilesChanged, UpdatesChanged, ClipSummary, ClipboardStatus, MediaChanged, LyricsChanged, EqualizerChanged } from '../ipc/client';
 import type { Service } from '../island/models';
-import type { TimerSnapshot, CalendarModel, CalendarPresentation, CalendarLabels, ScratchpadModel, DownloadItem, TransferItem, MixerModel, DisplayView, NotificationsModel, QuickInfoModel, ControlsModel, AgentUpdate } from '../island/app-presentations';
+import type { TimerSnapshot, CalendarModel, CalendarPresentation, CalendarLabels, ScratchpadModel, DownloadItem, TransferItem, ShelfModel, MixerModel, DisplayView, NotificationsModel, QuickInfoModel, ControlsModel, AgentUpdate } from '../island/app-presentations';
 const bad = (): never => { throw new TypeError('Malformed app snapshot'); };
 function record(x: unknown): Record<string, unknown> { if (x === null || typeof x !== 'object' || Array.isArray(x)) return bad(); return x as Record<string, unknown>; }
 function str(x: unknown, max = 4096): string { if (typeof x !== 'string' || new TextEncoder().encode(x).length > max || x.includes('\0')) return bad(); return x; }
@@ -94,6 +94,16 @@ export function adaptTransfers(raw: unknown): TransferItem[] {
       processedBytes: nonnegative(f.processedBytes), totalBytes: nonnegative(f.totalBytes), processedFiles: nonnegative(f.processedFiles),
       totalFiles: nonnegative(f.totalFiles), speed: nonnegative(f.speed), suspended: bool(f.suspended), destination: text(f.destination) };
   }, 16), f => f.id);
+}
+/** The drop shelf. A malformed snapshot throws (the page shows the module notice). */
+export function adaptShelf(raw: unknown): ShelfModel {
+  const r = record(raw); int(r.rev, 0, 4294967295);
+  const items = unique(list(r.items, x => {
+    const f = record(x); const uri = text(f.uri, 16384);
+    if (!uri.startsWith('file:///')) return bad();
+    return { id: text(f.id, 16384), name: text(f.name), path: text(f.path), uri, folder: bool(f.folder), present: bool(f.present), addedMs: num(f.addedMs) };
+  }, 50), f => f.id);
+  return { enabled: bool(r.enabled), maxItems: num(r.maxItems, 1, 50), items };
 }
 export function adaptMixer(raw: unknown): Service<MixerModel> {
   const { r, available, detail } = topic(raw);

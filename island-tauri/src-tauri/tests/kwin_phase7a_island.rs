@@ -318,6 +318,22 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     let _guard = lock();
     let mut s = Stack::new("phase7a");
     prepare(&s);
+    // Drop shelf (Session 5): parked paths seeded before launch (the test instance serves no
+    // D-Bus, so nothing can drop onto it): a file with a long name, a folder, and one that
+    // has since been deleted.
+    let parked = s.root.join("shelf-files");
+    fs::create_dir_all(parked.join("Project folder")).unwrap();
+    let long_name = parked.join("quarterly report with a rather long name that has to wrap.pdf");
+    fs::write(&long_name, b"x").unwrap();
+    let inst = s.root.join("inst");
+    fs::create_dir_all(&inst).unwrap();
+    std::fs::set_permissions(&inst, <fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700)).unwrap();
+    {
+        use hermes_island_lib::integrations::shelf::core::Shelf;
+        let mut shelf = Shelf::default();
+        shelf.add(vec![long_name.clone(), parked.join("Project folder"), parked.join("gone.txt")], 1, 12);
+        hermes_island_lib::integrations::private_file::write(&inst.join("shelf.json"), shelf.to_json().as_bytes(), 65536).unwrap();
+    }
     let mut app = launch(&s);
     let conn = s.connect();
     let root = conn.setup().roots[0].root;
@@ -511,6 +527,43 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         screenshot(&s, &conn, window, &format!("service-notice-{id}"));
     }
     eval(&s, "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{weatherEnabled:false}})");
+    // Drop shelf page: three seeded cards (one moved/deleted). Every button inside its card and
+    // clear of the text, cards at least 10 px apart, no sideways scroll.
+    invoke_dispatch_view(&s, "shelf");
+    until(&s, "7a shelf cards", 15, "document.querySelector('.island').dataset.view==='shelf' && getComputedStyle(document.querySelector('.app-pane:not([hidden])')).opacity==='1' && document.querySelectorAll('.app-pane:not([hidden]) .shelf-row').length===3");
+    settled(&s, &conn, window, IslandMode::Large);
+    let g = eval(&s, "(()=>{const R=e=>e.getBoundingClientRect(),pane=document.querySelector('.app-pane:not([hidden])'),rows=[...pane.querySelectorAll('.shelf-row')];\
+        const inside=(a,b)=>a.left>=b.left-.5&&a.right<=b.right+.5&&a.top>=b.top-.5&&a.bottom<=b.bottom+.5,hit=(a,b)=>a.left<b.right-.5&&b.left<a.right-.5&&a.top<b.bottom-.5&&b.top<a.bottom-.5;\
+        const cards=rows.map(row=>{const rr=R(row),texts=[...row.querySelectorAll('.row-content > *')].map(R),buttons=[...row.querySelectorAll('.row-actions button')];\
+          return {labels:buttons.map(b=>b.textContent),inside:buttons.every(b=>inside(R(b),rr)),overlap:buttons.some(b=>texts.some(t=>hit(R(b),t)))||buttons.some((b,i)=>buttons.some((c,j)=>i<j&&hit(R(b),R(c)))),\
+            small:buttons.some(b=>R(b).height<20||R(b).width<30),draggable:row.draggable,textInside:texts.every(t=>inside(t,rr))};});\
+        const gaps=rows.slice(1).map((r,i)=>R(r).top-R(rows[i]).bottom),clear=pane.querySelector('.shelf-clear'),cr=clear&&R(clear),last=R(rows[rows.length-1]);\
+        return {cards,gaps,overflow:pane.scrollWidth>pane.clientWidth+1,clearBelow:!!clear&&cr.top>=last.bottom+10,clearIn:!!clear&&inside(cr,R(pane))}})()");
+    let cards = g["cards"].as_array().unwrap();
+    assert_eq!(cards.len(), 3, "{g}");
+    assert_eq!(cards[0]["labels"], json!(["Open", "Reveal", "Copy path", "Remove"]), "{g}");
+    assert_eq!(cards[2]["labels"], json!(["Copy path", "Remove"]), "deleted item keeps only Copy/Remove {g}");
+    for c in cards {
+        assert_eq!(c["inside"], true, "shelf: button outside its card {g}");
+        assert_eq!(c["textInside"], true, "shelf: text outside its card {g}");
+        assert_eq!(c["overlap"], false, "shelf: button overlaps text or another button {g}");
+        assert_eq!(c["small"], false, "shelf: button collapsed {g}");
+    }
+    assert!(g["gaps"].as_array().unwrap().iter().all(|v| v.as_f64().unwrap() >= 10.0), "shelf: cards touch {g}");
+    assert_eq!(g["overflow"], false, "shelf: page scrolls sideways {g}");
+    assert_eq!(g["clearBelow"], true, "shelf: Clear all touches the cards {g}");
+    assert_eq!(g["clearIn"], true, "shelf: Clear all outside the page {g}");
+    screenshot(&s, &conn, window, "shelf");
+    // Open/Reveal reach Rust by id; a test instance never opens a real app.
+    let opened = eval(&s, "window.__TAURI_INTERNALS__.invoke('shelf_get').then(v=>window.__TAURI_INTERNALS__.invoke('shelf_command',{op:{type:'open',id:v.items[0].id}})).then(()=>'opened',e=>e.code)");
+    assert_eq!(opened, "unsupported", "{opened}");
+    eval(&s, "(document.querySelector('[aria-label=\"Remove gone.txt from the shelf\"]').click(),true)");
+    until(&s, "7a shelf remove", 10, "document.querySelectorAll('.app-pane:not([hidden]) .shelf-row').length===2");
+    assert!(!fs::read_to_string(inst.join("shelf.json")).unwrap().contains("gone.txt"));
+    // Navigation guard (Rust on_navigation): the page may not load anything outside the app.
+    eval(&s, &format!("(location.href={},true)", json!(format!("file://{}", long_name.display()))));
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!(eval(&s, "location.protocol+'//'+location.host+'|'+!!document.querySelector('.island')"), "tauri://localhost|true", "a file URL replaced the island page");
     // Skin is the fresh-install default (services/frontend.rs), so pick neutral first: every
     // iteration is a real change that must persist without a restart.
     for theme in ["neutral", "skin"] {

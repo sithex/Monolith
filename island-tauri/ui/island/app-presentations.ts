@@ -38,6 +38,9 @@ export type DownloadItem = Omit<DownloadRow, 'kind' | 'state'> & {
 };
 /** A running KDE file copy or move (Downloads page, Transfers card). */
 export type TransferItem = Omit<TransferRow, 'percent'> & { percent: number | null };
+/** One parked path on the drop shelf (Shelf page). */
+export type ShelfItem = { id: string; name: string; path: string; uri: string; folder: boolean; present: boolean; addedMs: number };
+export type ShelfModel = { enabled: boolean; maxItems: number; items: ShelfItem[] };
 export type MixerModel = Pick<MixerChanged, 'sinks' | 'streams' | 'defaultSink'>;
 export type MixerChannel = Pick<MixerChanged['sinks'][number], 'index' | 'volumePercent' | 'muted'> & { label: string; name: string | null };
 export type DisplayView = BrightnessChanged['displays'][number];

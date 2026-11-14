@@ -106,7 +106,12 @@ PlasmoidItem {
     // steps; see CopyProgressSource.qml.
     readonly property bool copyProgress: root.appearance.copyProgress !== false
     CopyProgressSource { id: copySource; active: root.copyProgress }
+    // Drop shelf (Settings → shelfEnabled): dropped file URLs go to the island over D-Bus,
+    // never through the helper's shell command line. See ShelfSink.qml.
+    readonly property bool shelf: root.appearance.shelf !== false
+    ShelfSink { id: shelfSink }
     compactRepresentation: PanelPill {
+        id: notchPill
         Layout.minimumWidth: root.notchWidth
         Layout.maximumWidth: root.notchWidth
         Layout.preferredWidth: root.notchWidth
@@ -131,6 +136,8 @@ PlasmoidItem {
         peekTrack: mediaPlayers.currentPlayer ? [mediaPlayers.currentPlayer.track, mediaPlayers.currentPlayer.artist].filter(s => !!s).join(" — ") : ""
         micMuted: root.live.micMuted === true
         copyPercent: root.online && root.copyProgress ? copySource.percent : -1
+        shelfEnabled: root.online && root.shelf
+        onFilesDropped: urls => shelfSink.add(urls, function(count) { notchPill.shelfResult(count); })
         companion: root.companion
         companionCharacter: String(root.appearance.companionCharacter || "blob")
         companionReactive: root.appearance.companionReactive !== false

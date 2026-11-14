@@ -184,7 +184,7 @@ export const onVisualChanged = (cb: (snapshot: import("./bindings").VisualChange
 // Phase 7b: generated DTOs only; components use explicit presentation projections.
 export type { NowPlaying, LyricsChanged, EqualizerChanged, MediaCommand } from "./bindings";
 export type { AppsSnapshot, TimerChanged, TimerKind, TimerOp, CalendarChanged, CalendarQuery, CalendarOp, AgendaRow,
-  ScratchpadChanged, ScratchpadOp, DownloadRow, OpenDownload, DownloadsChanged, TransferRow, TransfersChanged, MixerChanged, MixerOp,
+  ScratchpadChanged, ScratchpadOp, DownloadRow, OpenDownload, DownloadsChanged, TransferRow, TransfersChanged, ShelfRow, ShelfChanged, ShelfOp, MixerChanged, MixerOp,
   BrightnessChanged, BrightnessOp, WeatherState, PowerState, BtDevice, AgentsChanged,
   TogglesChanged, TogglesOp, TilesChanged, TilesOp, UpdatesChanged, ServiceStatus, MediaChanged,
   LauncherChanged, LauncherOp, LauncherItem, LayoutChanged, LayoutModel, LayoutOp, LayoutAction,
@@ -208,6 +208,8 @@ export const appApi = {
   downloadsOpen: (name: string, op: import('./bindings').OpenDownload) => unwrap(commands.downloadsOpen(name, op)),
   transfers: () => unwrap(commands.transfersGet()),
   transferReveal: (id: string) => unwrap(commands.transferReveal(id)),
+  shelf: () => unwrap(commands.shelfGet()),
+  shelfCommand: (op: import('./bindings').ShelfOp) => unwrap(commands.shelfCommand(op)),
   calendar: (q: import('./bindings').CalendarQuery) => unwrap(commands.calendarGet(q)),
   calendarCommand: (op: import('./bindings').CalendarOp) => unwrap(commands.calendarCommand(op)),
   calendarRefresh: () => unwrap(commands.calendarRefresh()),
@@ -233,6 +235,7 @@ export async function onAppTopics(h: AppListeners) {
     off.push(await events.tilesChanged.listen(e => h.tiles(e.payload)));
     off.push(await events.updatesChanged.listen(e => h.updates(e.payload)));
     off.push(await events.transfersChanged.listen(e => h.transfers(e.payload)));
+    off.push(await events.shelfChanged.listen(e => h.shelf(e.payload)));
     return () => off.forEach(f => f());
   } catch (error) { off.forEach(f => f()); throw error; }
 }

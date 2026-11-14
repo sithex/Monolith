@@ -69,6 +69,6 @@ html[data-launch='settled'] .island .app-pane:not([hidden]) > *, html[data-launc
 :root {
   --app-monitor: #30d158; --app-ai: #bf5af2; --app-agents: #5e5ce6; --app-settings: #98989d;
   --app-notifications: #ff6961; --app-clipboard: #ac8e68; --app-music: #ff375f; --app-timer: #ff9f0a;
-  --app-calendar: #ff453a; --app-scratchpad: #63e6e2; --app-downloads: #0a84ff; --app-updates: #30b0c7;
+  --app-calendar: #ff453a; --app-scratchpad: #63e6e2; --app-downloads: #0a84ff; --app-shelf: #ac8e68; --app-updates: #30b0c7;
   --app-controls: #98989d; --app-mixer: #da8fff; --app-brightness: #ffd60a; --app-quickInfo: #64d2ff;
 }

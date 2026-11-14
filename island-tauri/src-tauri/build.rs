@@ -68,6 +68,8 @@ const COMMANDS: &[&str] = &[
     "downloads_open",
     "transfers_get",
     "transfer_reveal",
+    "shelf_get",
+    "shelf_command",
     "calendar_get",
     "calendar_command",
     "calendar_refresh",

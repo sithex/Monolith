@@ -35,6 +35,8 @@ tokens=(
   '100.'"101.102.103"
   '/home/'"someone-else/private.txt"
   '/Users/'"someone-else/private.txt"
+  'nick'"-pc.tailnet.ts.net"
+  'Nicks'"-Laptop"
 )
 for token in "${tokens[@]}"; do
   printf '%s\n' "$token" > 'fixture with spaces.txt'

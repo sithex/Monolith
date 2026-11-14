@@ -66,11 +66,11 @@ const TAILSCALE_JSON: &str = r#"{
   "TUN": true,
   "Self": {
     "TailscaleIPs": ["100.64.0.1", "fd7a:115c:a1e0::1"],
-    "HostName": "nick-pc",
+    "HostName": "example-pc",
     "OS": "linux",
     "Online": true,
     "LastSeen": "2026-10-30T12:00:00Z",
-    "DNSName": "nick-pc.tailnet.ts.net"
+    "DNSName": "example-pc.tailnet.ts.net"
   },
   "Peer": {
     "100.64.0.3": {
@@ -374,7 +374,7 @@ fn parse_tailscale_status_fixture() {
     let (tile, skipped) = parse_tailscale_status_report(TAILSCALE_JSON).unwrap();
     assert_eq!(skipped, 0);
     assert_eq!(tile.backend, BackendState::Running);
-    assert_eq!(tile.self_name.as_deref(), Some("nick-pc"));
+    assert_eq!(tile.self_name.as_deref(), Some("example-pc"));
     // sorted online-first then host name: alpha, beta (online), zeta (offline)
     assert_eq!(tile.peers.len(), 3);
     assert_eq!(tile.peers[0].host_name, "alpha");
@@ -698,7 +698,7 @@ fn wire_types_serialize_camel_case() {
 
     let ts = TailscaleTile {
         backend: BackendState::Running,
-        self_name: Some("nick-pc".to_string()),
+        self_name: Some("example-pc".to_string()),
         peers: vec![Peer {
             host_name: "alpha".to_string(),
             online: Some(true),

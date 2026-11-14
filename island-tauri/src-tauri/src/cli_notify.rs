@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn test_notify_rejects_live_targets_before_connect_or_creation() {
         for path in [
-            "/home/nick/Hermes/Ripple/.island-data-overlay",
+            "/srv/example/.island-data-overlay",
             "/x/.island-data/inner",
         ] {
             assert!(parse(&args(&[

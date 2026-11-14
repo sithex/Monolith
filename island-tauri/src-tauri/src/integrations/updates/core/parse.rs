@@ -1,6 +1,6 @@
 //! Parsing of `checkupdates` / `paru -Qua` stdout.
 //!
-//! Verified on nick-pc (controller): `checkupdates` (pacman-contrib
+//! Verified on an Arch Linux machine: `checkupdates` (pacman-contrib
 //! 1.13.1) exit codes 0 = updates (stdout lines), 1 = unknown failure,
 //! 2 = no updates; each line is `<pkgname> <oldver> -> <newver>`,
 //! optionally suffixed ` [ignored]`. `paru -Qua` lists AUR updates in the

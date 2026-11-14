@@ -72,6 +72,13 @@ BEGIN {
             report("tailscale-ip", value, FNR)
         rest = substr(rest, RSTART + RLENGTH - (substr(rest, RSTART + RLENGTH - 1, 1) ~ /[^0-9.]/))
     }
+    # Private machine names (case-insensitive) must not reach the public repo.
+    lower = tolower($0)
+    rest = lower
+    while (match(rest, /nick[-]pc|nicks[-]laptop|one[p]lus/)) {
+        report("host-name", substr(rest, RSTART, RLENGTH), FNR)
+        rest = substr(rest, RSTART + RLENGTH)
+    }
     # Include the current user too: public-repo privacy must not depend on who commits.
     scan("home-path", "/(home|Users)/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.@+/-]*)?")
 }

@@ -5,7 +5,7 @@
 use crate::integrations::toggles::core::error::ParseError;
 
 /// The default audio source target. Always used, never a device name
-/// (nick-pc's default source is a DeepFilterNet virtual source).
+/// (a default source can be a virtual source such as a noise-suppression filter).
 pub const DEFAULT_SOURCE_ARG: &str = "@DEFAULT_SOURCE@";
 
 /// Maximum accepted `get-source-mute` stdout size in bytes.

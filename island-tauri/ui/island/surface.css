@@ -159,6 +159,9 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
    so there are no side gutters: 14px page margin each side. */
 .app-grid[data-cols] { grid-template-columns: repeat(var(--cols), 100px); }
 .view-pane[data-pane='launcher'] .app-pane:not([hidden]) { padding-inline: 9px; }
+/* The fixed-width grid is wider than the island while it grows open, which flashed a
+   horizontal scrollbar along the bottom. The launcher only ever scrolls vertically. */
+.view-pane[data-pane='launcher'] .app-pane { overflow-x: hidden; }
 /* Header rows span exactly the tile columns, so their edges line up with the tiles. */
 .app-grid > .launcher-toolbar, .app-grid > .app-section-label { grid-column: 1 / -1; }
 .tile-wrap { position: relative; touch-action: none; z-index: 1; }

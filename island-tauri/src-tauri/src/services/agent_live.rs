@@ -10,6 +10,7 @@ use crate::contract::agent_live::{
     AgentLiveRequest, AgentLiveSnapshot, HistoryRaw,
 };
 use crate::error::IslandError;
+use super::read_only_sqlite::open_regular;
 use std::{
     fs,
     io::{self, Read, Write},
@@ -223,20 +224,6 @@ fn mtime_ms(m: &fs::Metadata) -> f64 {
 
 /// Never follow an input-file symlink or block on a FIFO/device. Metadata is inspected on
 /// the same descriptor used to read, and every caller must additionally bound its read.
-fn open_regular(path: &Path) -> io::Result<fs::File> {
-    let file = fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
-        .open(path)?;
-    if !file.metadata()?.is_file() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "not a regular file",
-        ));
-    }
-    Ok(file)
-}
-
 fn read_bounded(file: &Path, max: u64) -> io::Result<Vec<u8>> {
     let source = open_regular(file)?;
     if source.metadata()?.len() > max {

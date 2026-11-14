@@ -2,9 +2,13 @@
 //! Phase 7a carried read-only gap. The Rust preflight alone cannot pin SQLite's open mode.
 use hermes_island_lib::{
     error::IslandError,
-    integrations::agents::{core::Event, AgentConfig, AgentEvents, AgentService},
+    integrations::agents::{
+        core::Event,
+        reader::{self, read_sessions},
+        AgentConfig, AgentEvents, AgentService,
+    },
 };
-use std::{fs, path::PathBuf, process::Command, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 
 struct Scratch(PathBuf);
 impl Drop for Scratch {
@@ -42,27 +46,12 @@ fn agents_missing_database_is_unavailable_and_reader_never_creates_it() {
     assert!(snapshot.chips.is_empty());
     assert!(!path.exists());
     // Pin the actual reader too: Rust's regular-file preflight otherwise masks mode=rwc.
-    let output = Command::new("/usr/bin/python3")
-        .args([
-            "-I",
-            "-c",
-            include_str!("../../src/integrations/agents/reader.py"),
-        ])
-        .arg(&path)
-        .arg("1000")
-        .env_clear()
-        .env("HOME", &dir.0)
-        .output()
-        .unwrap();
+    let error = read_sessions(&path, 1000.).unwrap_err();
+    assert_eq!(error.code, hermes_island_lib::error::ErrorCode::Unavailable);
     assert!(
-        !output.status.success(),
+        reader::open(&path).is_err(),
         "missing SQLite database was accepted"
     );
-    assert!(
-        output.stdout.is_empty(),
-        "unavailable must not fabricate an empty/zero snapshot"
-    );
-    assert!(String::from_utf8_lossy(&output.stderr).contains("unable to open database file"));
     assert!(
         !path.exists(),
         "read-only metadata reader CREATED a missing state.db"

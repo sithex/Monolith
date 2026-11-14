@@ -1,21 +1,19 @@
-//! Read-only SQLite metadata polling. Python stdlib matches the existing AI-usage adapter;
-//! the pure tracker owns classification and transitions, never SQL or filesystem effects.
+//! Read-only SQLite metadata polling, read in process (`reader.rs`); the pure tracker owns
+//! classification and transitions, never SQL or filesystem effects.
 use super::core::{self, Event, Tracker};
+use super::reader;
 use crate::{
     bus::Latest,
     contract::controls::{AgentChip, AgentsChanged},
     error::IslandError,
-    services::process::run_bounded,
 };
 use std::{
     collections::{BTreeSet, VecDeque},
     path::PathBuf,
-    process::Command,
     sync::{Arc, Mutex},
     thread::JoinHandle,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-const READER: &str = include_str!("reader.py");
 pub const POLL: Duration = Duration::from_secs(15);
 /// Unchanged database files reuse the last rows this long before a forced re-read.
 const REUSE_ROWS: Duration = Duration::from_secs(300);
@@ -72,7 +70,7 @@ pub struct AgentService {
     serial: Mutex<()>,
     stop: Mutex<bool>,
     worker: Mutex<Option<JoinHandle<()>>>,
-    /// Last rows read, so an untouched database costs a `stat` instead of a Python start.
+    /// Last rows read, so an untouched database costs a `stat` instead of a SQLite read.
     rows: Mutex<Option<(Fingerprint, std::time::Instant, Vec<core::SessionRow>)>>,
     pub topic: Latest<AgentsChanged>,
 }
@@ -141,7 +139,7 @@ impl AgentService {
         next
     }
     /// The production worker supplies epoch seconds; tests inject the same clock as SQL and
-    /// the pure core. Each refresh is serialized and subprocess output/time are bounded.
+    /// the pure core. Each refresh is serialized and the rows read are bounded.
     pub fn poll_at(&self, now: f64) -> Result<AgentsChanged, IslandError> {
         if !now.is_finite() || now < 0. {
             return Err(IslandError::invalid("Agent clock invalid"));
@@ -255,7 +253,7 @@ impl AgentService {
             .database
             .as_ref()
             .ok_or_else(|| IslandError::unavailable("Agent fixture database not configured"))?;
-        // Refuse missing/non-regular/symlinked files before Python can open any database.
+        // Refuse missing/non-regular/symlinked files before SQLite can open any database.
         if !path.is_absolute()
             || !std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && !m.is_symlink())
         {
@@ -272,15 +270,8 @@ impl AgentService {
                 }
             }
         }
-        let mut command = Command::new("/usr/bin/python3");
-        command
-            .args(["-I", "-c", READER])
-            .arg(path)
-            .arg(now.to_string());
-        let output = run_bounded(command, Duration::from_secs(2), 4 * 1024 * 1024, false)?;
-        let rows: Vec<core::SessionRow> = serde_json::from_slice(&output)
-            .map_err(|_| IslandError::unavailable("Agent metadata invalid"))?;
-        if rows.len() > 10_000 {
+        let rows = reader::read_sessions(path, now)?;
+        if rows.len() > reader::MAX_ROWS {
             return Err(IslandError::unavailable("Agent metadata row limit"));
         }
         if let Ok(mut cache) = self.rows.lock() {

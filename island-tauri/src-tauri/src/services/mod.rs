@@ -10,6 +10,7 @@ pub mod desktop_apps;
 pub mod frontend;
 pub mod palette;
 pub mod process;
+pub mod read_only_sqlite;
 pub mod settings;
 pub mod stats;
 pub mod terminal;

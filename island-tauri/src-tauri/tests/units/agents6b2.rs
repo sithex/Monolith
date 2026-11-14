@@ -9,9 +9,7 @@ use hermes_island_lib::{
 use serde_json::{json, Value};
 use std::{
     fs,
-    io::Write,
     path::PathBuf,
-    process::{Command, Stdio},
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc, Mutex,
@@ -52,15 +50,22 @@ impl AgentEvents for Sink {
 }
 fn sql(dir: &Scratch, statement: &str, args: Value) {
     assert!(dir.db().starts_with(std::env::temp_dir()));
-    let mut child=Command::new("/usr/bin/python3").args(["-I","-c","import sqlite3,json,sys; p=sys.argv[1]; c=sqlite3.connect(p); s,a=json.load(sys.stdin); c.execute(s,a); c.commit(); c.close()"])
-        .arg(dir.db()).env_clear().env("HOME",&dir.0).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped()).spawn().unwrap();
-    writeln!(child.stdin.take().unwrap(), "{}", json!([statement, args])).unwrap();
-    let result = child.wait_with_output().unwrap();
-    assert!(
-        result.status.success(),
-        "{}",
-        String::from_utf8_lossy(&result.stderr)
-    );
+    let params: Vec<rusqlite::types::Value> = args
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| match v {
+            Value::Null => rusqlite::types::Value::Null,
+            Value::String(s) => rusqlite::types::Value::Text(s.clone()),
+            Value::Number(n) if n.is_i64() => rusqlite::types::Value::Integer(n.as_i64().unwrap()),
+            Value::Number(n) => rusqlite::types::Value::Real(n.as_f64().unwrap()),
+            other => panic!("unsupported fixture value {other}"),
+        })
+        .collect();
+    // Opened, written and closed per statement, so no journal or WAL file stays behind.
+    let db = rusqlite::Connection::open(dir.db()).unwrap();
+    db.execute(statement, rusqlite::params_from_iter(params.iter()))
+        .unwrap();
 }
 fn schema(dir: &Scratch) {
     sql(dir,"CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT, parent_session_id TEXT, model TEXT, billing_provider TEXT, started_at REAL, ended_at REAL, end_reason TEXT, last_activity_at REAL, api_call_count INTEGER, title TEXT)",json!([]));

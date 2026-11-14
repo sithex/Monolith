@@ -7,6 +7,7 @@ mod agents6b2;
 mod agents_core_agent_tracker_tests;
 mod agents_core_fuzz_tests;
 mod agents_hub6b2;
+mod agents_reader;
 mod approval_actor;
 mod bluetooth_core_fuzz_tests;
 mod bluetooth_core_model_tests;

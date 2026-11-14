@@ -70,6 +70,9 @@ Item {
     readonly property bool copyShown: copyPercent >= 0
     readonly property bool copyLive: animateHere && !companionFrozen
     readonly property string copyText: !copyShown ? "" : copyLive ? "⇣ " + copyPercent + "%" : "⇣ copying"
+    // Fixed teal for the copy text and bar: it reads on dark notches (5:1 on #414559) and stays
+    // apart from lavender/gold accents and the amber alertColor, so a copy is noticed.
+    readonly property color copyColor: "#2dd4bf"
     // Drop shelf (main.qml: shelfEnabled = online && the setting). A file drag over the notch
     // lights the outline in the accent (one change on enter, one on leave); a drop holds it
     // ~600 ms, amber when nothing could be parked, then one step back. No animation, no timer
@@ -161,6 +164,38 @@ Item {
             } }
         }
     }
+    // File-copy bar along the flat part of the bottom edge (between the rounded lower corners of
+    // the outline above), clear of the border stroke at its widest so the drop highlight and the
+    // working pulse never cover it. A faint track while a copy runs; the fill follows the percent
+    // only where the number shows (copyLive), so it changes once per 10 % step and a notch that
+    // holds still keeps the bare track. No Behavior: one repaint per step.
+    Item {
+        id: copyBar
+        objectName: "notchCopyBar"
+        readonly property real corner: Math.min(6, pill.height / 4) + Math.min(10, pill.height / 2 - 1)
+        readonly property real inset: pill.borderEnabled ? Math.max(1.5, Math.min(4, pill.borderWidth)) : 1.5
+        visible: pill.copyShown
+        x: corner
+        width: Math.max(0, pill.width - 2 * corner)
+        height: 2
+        // Hugs the stroke's inner edge on a whole pixel: under the date line's descenders on a
+        // 32 px notch (a 26 px slot has no free row, the bar then crosses the date's lower edge).
+        y: pill.height - Math.ceil(inset) - height
+        Rectangle {
+            objectName: "notchCopyTrack"
+            anchors.fill: parent
+            radius: 1
+            color: Qt.rgba(pill.copyColor.r, pill.copyColor.g, pill.copyColor.b, .25)
+        }
+        Rectangle {
+            objectName: "notchCopyFill"
+            height: parent.height
+            radius: 1
+            width: pill.copyLive ? Math.round(parent.width * Math.max(0, Math.min(100, pill.copyPercent)) / 100) : 0
+            visible: width > 0
+            color: pill.copyColor
+        }
+    }
     // Hover peek. The closed native notch never opens the island's hover preview (its input
     // region is empty in Still mode and the widget sends no enter/leave), so the two can't
     // collide; the peek waits the same `hoverDelay` the preview uses (180 ms when that is
@@ -214,19 +249,32 @@ Item {
             height: parent.twoLines ? 14 : 18
             verticalAlignment: Text.AlignVCenter
         }
-        Text {
+        // A read-only TextEdit, not a Text: panel recolouring widgets (Panel Colorizer) assign a
+        // fixed colour to every visible Text in the panel, which breaks this line's colour binding
+        // and hid the timer accent and the teal copy text. They leave TextEdit alone. It takes no
+        // input: the MouseArea and DropArea below sit on top and it never takes focus.
+        TextEdit {
+            id: dateLine
             objectName: "panelDate"
             anchors.horizontalCenter: parent.horizontalCenter
+            readOnly: true
+            selectByMouse: false
+            activeFocusOnPress: false
+            enabled: false
+            textFormat: TextEdit.PlainText
             // A running or paused timer takes the date's line, then a file copy.
             text: pill.timerShown ? (pill.timerEndsAt > 0 ? "" : "❚❚ ") + pill.timerText
                 : pill.copyText !== "" ? pill.copyText : pill.dateText
             visible: parent.twoLines
             font.features: { "tnum": 1 }
-            color: pill.timerShown || pill.copyShown ? pill.accent : pill.textColor
+            color: pill.timerShown ? pill.accent : pill.copyShown ? pill.copyColor : pill.textColor
             font.pixelSize: 10
             font.weight: Font.DemiBold
             height: 12
-            verticalAlignment: Text.AlignVCenter
+            // Centre the taller line box (13-14 px) in 12 px where Text's AlignVCenter put it:
+            // TextEdit's own alignment stops at 0 and a half-pixel shift snapped down on the live
+            // panel, both drawing the line 1 px lower than the island's replica expects.
+            transform: Translate { y: Math.floor((dateLine.height - dateLine.contentHeight) / 2) }
         }
     }
     Row {

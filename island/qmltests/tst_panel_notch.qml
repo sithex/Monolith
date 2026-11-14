@@ -223,11 +223,13 @@ TestCase {
         date.textChanged.disconnect(record);
         compare(texts, ["⇣ 40%"], "one change per step, never a stale number in between");
         compare(date.text, "⇣ 40%");
-        compare(date.color, notch.accent);
+        compare(date.color, notch.copyColor, "copy text is the fixed teal, not the accent");
+        verify(!Qt.colorEqual(notch.copyColor, notch.accent));
         verify(/Copying files, 40 percent/.test(notch.Accessible.description));
         // A timer keeps the line; the copy comes back when it ends.
         notch.timerPausedMs = 60000;
         compare(date.text, "❚❚ 1:00");
+        compare(date.color, notch.accent, "a timer on the line keeps the accent");
         notch.timerPausedMs = -1;
         compare(date.text, "⇣ 40%");
         // Shown even with the date switched off.
@@ -255,6 +257,143 @@ TestCase {
         notch.companionFrozen = false;
         notch.copyPercent = -1;
         verify(!date.visible, "copy over, date still off");
+    }
+    function test_copy_bar_follows_the_percent_in_teal_and_holds_still_elsewhere() {
+        const notch = createTemporaryObject(factory, testCase, { width: 300, height: 32 });
+        const bar = findChild(notch, "notchCopyBar");
+        const fill = findChild(notch, "notchCopyFill");
+        const track = findChild(notch, "notchCopyTrack");
+        verify(bar && fill && track);
+        verify(!bar.visible, "no copy, no bar");
+        compare(fill.width, 0);
+        notch.copyPercent = 0;
+        verify(bar.visible, "a copy at 0 % shows the track");
+        compare(fill.width, 0);
+        compare(fill.color, notch.copyColor);
+        compare(track.color.r, notch.copyColor.r);
+        verify(track.color.a < .5, "the track is faint");
+        // Along the flat bottom edge: clear of the rounded corners (s 6 + r 10 = 16 px) and of
+        // the 0.8 px border, below the date line, inside the notch.
+        compare(bar.x, 16);
+        compare(bar.width, 268);
+        verify(bar.y + bar.height <= notch.height - 1.5, "clear of the drop-shelf outline");
+        const date = findChild(notch, "panelDate");
+        notch.copyPercent = 40;
+        const datePos = date.mapToItem(notch, 0, 0);
+        verify(bar.y >= datePos.y + date.baselineOffset + 2, "bar sits under the date text and its descenders");
+        notch.borderWidth = 4;
+        verify(bar.y + bar.height <= notch.height - 4, "clear of the widest border stroke");
+        notch.borderWidth = 0.8;
+        compare(fill.width, Math.round(268 * .4));
+        let widths = [];
+        const record = function() { widths.push(fill.width); };
+        fill.widthChanged.connect(record);
+        notch.copyPercent = 100;
+        fill.widthChanged.disconnect(record);
+        compare(widths, [268], "one change per step, nothing in between");
+        // Clock and date do not move when the bar appears.
+        const clock = findChild(notch, "panelClock");
+        const clockY = clock.mapToItem(notch, 0, 0).y;
+        notch.copyPercent = -1;
+        compare(clock.mapToItem(notch, 0, 0).y, clockY);
+        verify(!bar.visible, "copy over, bar gone");
+        notch.copyPercent = 50;
+        // Pointer on another monitor: the bar keeps the bare track and steps change nothing.
+        notch.companion = true;
+        const face = findChild(notch, "notchCompanion");
+        face.screenArea = Qt.rect(0, 0, 100, 100);
+        notch.pointerX = 5000; notch.pointerY = 5000; notch.pointerAt = Date.now();
+        verify(!face.attended);
+        verify(bar.visible);
+        compare(fill.width, 0);
+        let changes = 0;
+        const count = function() { changes++; };
+        fill.widthChanged.connect(count);
+        notch.copyPercent = 60;
+        notch.copyPercent = 70;
+        fill.widthChanged.disconnect(count);
+        compare(changes, 0, "steps elsewhere repaint nothing here");
+        notch.companion = false;
+        compare(fill.width, Math.round(268 * .7));
+        notch.companionFrozen = true;
+        compare(fill.width, 0, "game mode holds the bar still");
+    }
+    function test_copy_and_timer_colours_survive_a_panel_recolourer() {
+        // Panel Colorizer walks visibleChildren and assigns one colour to every Text it finds,
+        // which breaks colour bindings. The date line must not be one of them.
+        const notch = createTemporaryObject(factory, testCase, { accent: "#ca9ee6", textColor: "#c6d0f5" });
+        const recolour = function(item) {
+            for (const child of item.visibleChildren) {
+                if (child instanceof Text) child.color = "#c6d0f5";
+                recolour(child);
+            }
+        };
+        recolour(notch);
+        const date = findChild(notch, "panelDate");
+        verify(!(date instanceof Text), "the date line is out of a recolourer's reach");
+        notch.copyPercent = 40;
+        recolour(notch);
+        compare(date.text, "⇣ 40%");
+        compare(date.color, notch.copyColor, "copy text stays teal after a recolour");
+        notch.timerPausedMs = 60000;
+        compare(date.color, notch.accent, "timer keeps the accent after a recolour");
+        notch.timerPausedMs = -1;
+        notch.copyPercent = -1;
+        compare(date.color, notch.textColor);
+        verify(!date.activeFocusOnPress && date.readOnly && !date.enabled, "the line takes no input");
+    }
+    Component {
+        id: refDate
+        Text { font.pixelSize: 10; font.weight: Font.DemiBold; font.features: { "tnum": 1 }; height: 12; verticalAlignment: Text.AlignVCenter }
+    }
+    function test_date_line_draws_where_a_text_would() {
+        // The island's replica clock is matched to the pixel to this line; the TextEdit must put
+        // its glyphs exactly where the former Text did.
+        const notch = createTemporaryObject(factory, testCase, { width: 300, height: 32 });
+        const date = findChild(notch, "panelDate");
+        const ref = createTemporaryObject(refDate, notch, { text: date.text, color: date.color });
+        // The item's own box (mapToItem from the item itself would include its Translate).
+        const pos = date.parent.mapToItem(notch, date.x, date.y);
+        ref.x = pos.x; ref.y = pos.y;
+        compare(ref.width, date.width);
+        ref.visible = false;
+        waitForRendering(notch);
+        const rows = function(img, x0) {
+            let out = [];
+            for (let y = Math.max(0, pos.y - 3); y < Math.min(32, pos.y + 15); y++) {
+                let n = 0;
+                for (let x = 0; x < date.width; x++) { const c = img.pixel(x0 + x, y); if (c.r + c.g + c.b > 1.2) n++; }
+                out.push(n);
+            }
+            return out;
+        };
+        const withDate = grabImage(notch);
+        const a = rows(withDate, Math.round(pos.x));
+        date.opacity = 0;   // still laid out, so the clock does not move
+        ref.visible = true;
+        waitForRendering(notch);
+        const b = rows(grabImage(notch), Math.round(pos.x));
+        ref.visible = false; date.opacity = 1;
+        verify(a.reduce((p, q) => p + q, 0) > 20, "the date line drew something");
+        compare(a, b, "same rows as a Text with AlignVCenter");
+    }
+    function test_copy_bar_has_no_animation() {
+        const notch = createTemporaryObject(factory, testCase);
+        const bar = findChild(notch, "notchCopyBar");
+        const walk = function(item) {
+            const kids = (item.resources || []).concat(item.data || []);
+            for (const k of kids) {
+                const s = String(k);
+                verify(!/Animation|Behavior|Timer/.test(s), "no animation under the copy bar: " + s);
+                if (k !== item && k.data !== undefined) walk(k);
+            }
+        };
+        walk(bar);
+        // A Behavior on width would leave the width mid-way right after a step.
+        notch.copyPercent = 0;
+        const fill = findChild(notch, "notchCopyFill");
+        notch.copyPercent = 100;
+        compare(fill.width, bar.width, "the fill jumps in one frame");
     }
     function test_copy_progress_accepts_every_reply_shape_and_rejects_junk() {
         compare(CopyProgress.percent(40), 40);

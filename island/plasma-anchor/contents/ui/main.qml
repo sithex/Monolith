@@ -65,8 +65,8 @@ PlasmoidItem {
         busType: DBus.BusType.Session
         watchedService: "local.hermes.Monolith"
         onRegisteredChanged: {
-            if (registered) { islandUp.restart(); islandUpLate.restart(); }
-            else { islandUp.stop(); islandUpLate.stop(); islandGone.restart(); }
+            if (registered) { islandUp.restart(); islandUpLate.restart(); copySource.ask(); }
+            else { islandUp.stop(); islandUpLate.stop(); islandGone.restart(); copySource.percent = -1; }
         }
     }
     // Just launched: its first status write lands within a second or two.
@@ -102,6 +102,10 @@ PlasmoidItem {
             root.pointerAt = Date.now();
         }
     }
+    // File-copy progress (Settings → notchCopyProgress): a D-Bus signal from the island, in
+    // steps; see CopyProgressSource.qml.
+    readonly property bool copyProgress: root.appearance.copyProgress !== false
+    CopyProgressSource { id: copySource; active: root.copyProgress }
     compactRepresentation: PanelPill {
         Layout.minimumWidth: root.notchWidth
         Layout.maximumWidth: root.notchWidth
@@ -126,6 +130,7 @@ PlasmoidItem {
         hoverDelay: Number(root.appearance.hoverDelay ?? 180)
         peekTrack: mediaPlayers.currentPlayer ? [mediaPlayers.currentPlayer.track, mediaPlayers.currentPlayer.artist].filter(s => !!s).join(" — ") : ""
         micMuted: root.live.micMuted === true
+        copyPercent: root.online && root.copyProgress ? copySource.percent : -1
         companion: root.companion
         companionCharacter: String(root.appearance.companionCharacter || "blob")
         companionReactive: root.appearance.companionReactive !== false

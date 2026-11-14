@@ -62,6 +62,13 @@ Item {
         const pad = n => (n < 10 ? "0" : "") + n;
         return (h > 0 ? h + ":" + pad(m) : m) + ":" + pad(s);
     }
+    // File-copy progress: -1 = none, else 0..100 in tens (main.qml, from the island's D-Bus
+    // signal). Static text on the date line, after a timer. A notch on a monitor without the
+    // pointer (companion on) or a frozen notch holds still: "copying", without the number.
+    property int copyPercent: -1
+    readonly property bool copyShown: copyPercent >= 0
+    readonly property bool copyLive: animateHere && !companionFrozen
+    readonly property string copyText: !copyShown ? "" : copyLive ? "⇣ " + copyPercent + "%" : "⇣ copying"
     readonly property bool motion: Kirigami.Units.longDuration > 0
     // Every notch repaint costs Plasma and KWin, on every monitor. The working pulse and the
     // music bars share one stepped clock (~8 updates/s, whole-pixel bar heights) instead of
@@ -94,6 +101,7 @@ Item {
         + (waitingShown ? ". Hermes is waiting for you" : working ? ". Hermes is working" : "")
         + (timerShown ? ". Timer " + timerText + (timerEndsAt > 0 ? "" : ", paused") : "")
         + (micMuted ? ". Microphone muted" : "")
+        + (copyShown ? ". Copying files, " + copyPercent + " percent" : "")
     Accessible.onPressAction: activated()
     Keys.onSpacePressed: event => { if (!event.isAutoRepeat) activated(); event.accepted = true; }
     Keys.onReturnPressed: event => { if (!event.isAutoRepeat) activated(); event.accepted = true; }
@@ -180,7 +188,7 @@ Item {
         opacity: pill.peeking ? 0 : 1
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
-        readonly property bool twoLines: pill.showDate || pill.timerShown
+        readonly property bool twoLines: pill.showDate || pill.timerShown || pill.copyShown
         Text {
             objectName: "panelClock"
             anchors.horizontalCenter: parent.horizontalCenter
@@ -194,11 +202,12 @@ Item {
         Text {
             objectName: "panelDate"
             anchors.horizontalCenter: parent.horizontalCenter
-            // A running or paused timer takes the date's line.
-            text: pill.timerShown ? (pill.timerEndsAt > 0 ? "" : "❚❚ ") + pill.timerText : pill.dateText
+            // A running or paused timer takes the date's line, then a file copy.
+            text: pill.timerShown ? (pill.timerEndsAt > 0 ? "" : "❚❚ ") + pill.timerText
+                : pill.copyText !== "" ? pill.copyText : pill.dateText
             visible: parent.twoLines
             font.features: { "tnum": 1 }
-            color: pill.timerShown ? pill.accent : pill.textColor
+            color: pill.timerShown || pill.copyShown ? pill.accent : pill.textColor
             font.pixelSize: 10
             font.weight: Font.DemiBold
             height: 12

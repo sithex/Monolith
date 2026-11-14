@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import QtQuick.Window
 import "../plasma-anchor/contents/ui" as Panel
+import "../plasma-anchor/contents/ui/CopyProgress.js" as CopyProgress
 
 TestCase {
     id: testCase
@@ -209,6 +210,67 @@ TestCase {
         notch.micMuted = false;
         tryCompare(mic, "opacity", 0);
         compare(notch.width, 144); compare(notch.height, 26);
+    }
+    function test_copy_progress_takes_the_date_line_after_a_timer_and_holds_still_elsewhere() {
+        const notch = createTemporaryObject(factory, testCase);
+        const date = findChild(notch, "panelDate");
+        compare(date.text, "Sun, Nov 1");
+        let texts = [];
+        const record = function() { texts.push(date.text); };
+        date.textChanged.connect(record);
+        notch.copyPercent = 40;
+        date.textChanged.disconnect(record);
+        compare(texts, ["⇣ 40%"], "one change per step, never a stale number in between");
+        compare(date.text, "⇣ 40%");
+        compare(date.color, notch.accent);
+        verify(/Copying files, 40 percent/.test(notch.Accessible.description));
+        // A timer keeps the line; the copy comes back when it ends.
+        notch.timerPausedMs = 60000;
+        compare(date.text, "❚❚ 1:00");
+        notch.timerPausedMs = -1;
+        compare(date.text, "⇣ 40%");
+        // Shown even with the date switched off.
+        notch.showDate = false;
+        verify(date.visible);
+        // Companion on and the pointer on another monitor: this notch holds still.
+        notch.companion = true;
+        const face = findChild(notch, "notchCompanion");
+        face.screenArea = Qt.rect(0, 0, 100, 100);
+        notch.pointerX = 5000; notch.pointerY = 5000; notch.pointerAt = Date.now();
+        verify(!face.attended);
+        compare(date.text, "⇣ copying");
+        let changes = 0;
+        const count = function() { changes++; };
+        date.textChanged.connect(count);
+        notch.copyPercent = 50;
+        notch.copyPercent = 60;
+        date.textChanged.disconnect(count);
+        compare(changes, 0, "steps elsewhere repaint nothing here");
+        notch.pointerX = 50; notch.pointerY = 50; notch.pointerAt = Date.now() + 1;
+        verify(face.attended);
+        compare(date.text, "⇣ 60%");
+        notch.companionFrozen = true;
+        compare(date.text, "⇣ copying", "game mode freezes the number too");
+        notch.companionFrozen = false;
+        notch.copyPercent = -1;
+        verify(!date.visible, "copy over, date still off");
+    }
+    function test_copy_progress_accepts_every_reply_shape_and_rejects_junk() {
+        compare(CopyProgress.percent(40), 40);
+        compare(CopyProgress.percent([70]), 70);
+        compare(CopyProgress.percent({value: 20}), 20);
+        compare(CopyProgress.percent({values: [{value: 30}]}), 30);
+        // The pending reply Plasma's module hands to the resolve callback (seen on a private bus).
+        compare(CopyProgress.percent({objectName: "", isFinished: true, isError: false, isValid: true,
+            error: {isValid: false, message: "", name: ""}, value: {value: 30}, values: [{value: 30}]}), 30);
+        compare(CopyProgress.percent({isError: true, value: {value: 30}}), -1);
+        compare(CopyProgress.percent(-1), -1);
+        compare(CopyProgress.percent(101), -1);
+        compare(CopyProgress.percent("x"), -1);
+        compare(CopyProgress.percent(null), -1);
+        compare(CopyProgress.percent(undefined), -1);
+        compare(CopyProgress.percent(true), -1);
+        compare(CopyProgress.percent({}), -1);
     }
     function test_waiting_pulse_is_amber_slower_and_wins_over_working() {
         const notch = createTemporaryObject(factory, testCase);

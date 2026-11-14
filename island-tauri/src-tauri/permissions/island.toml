@@ -65,6 +65,8 @@ permissions = [
   "allow-scratchpad-command",
   "allow-downloads-get",
   "allow-downloads-open",
+  "allow-transfers-get",
+  "allow-transfer-reveal",
   "allow-calendar-get",
   "allow-calendar-command",
   "allow-calendar-refresh",

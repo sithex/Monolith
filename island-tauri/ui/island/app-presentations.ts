@@ -1,7 +1,7 @@
 // Generated wire projections plus explicitly local display/selection state.
 import type {
   TimerChanged, TimerKind, TimerOp, CalendarChanged, AgendaRow as WireAgendaRow,
-  ScratchpadChanged, ScratchpadOp, DownloadRow, OpenDownload, MixerChanged, MixerOp,
+  ScratchpadChanged, ScratchpadOp, DownloadRow, OpenDownload, TransferRow, MixerChanged, MixerOp,
   BrightnessChanged, BrightnessOp, IslandNotification, WeatherState, PowerState,
   BtDevice, AgentsChanged, TogglesChanged, TogglesOp, TilesChanged, TilesOp, UpdatesChanged,
 } from '../ipc/client';
@@ -36,6 +36,8 @@ export type FileKind = 'archive' | 'image' | 'video' | 'audio' | 'document' | 'p
 export type DownloadItem = Omit<DownloadRow, 'kind' | 'state'> & {
   kind: FileKind; state: 'inProgress' | 'settling' | 'ready'; ageLabel: string;
 };
+/** A running KDE file copy or move (Downloads page, Transfers card). */
+export type TransferItem = Omit<TransferRow, 'percent'> & { percent: number | null };
 export type MixerModel = Pick<MixerChanged, 'sinks' | 'streams' | 'defaultSink'>;
 export type MixerChannel = Pick<MixerChanged['sinks'][number], 'index' | 'volumePercent' | 'muted'> & { label: string; name: string | null };
 export type DisplayView = BrightnessChanged['displays'][number];
@@ -55,6 +57,7 @@ export interface AppViewIntents {
   calendar(action: { type: 'view'; view: 'month' | 'agenda' } | { type: 'previous' | 'next' | 'refresh' | 'configure' | 'create' } | { type: 'select'; instanceKey: string }): void;
   scratchpad(action: Exclude<ScratchpadOp, { type: 'create' }> | { type: 'select'; id: string } | { type: 'create' }): void;
   download(action: { type: OpenDownload; name: string }): void;
+  transfer(id: string): void;
   mixer(action: MixerOp): void;
   brightness(action: BrightnessOp): void;
   notification(action: { type: 'dismiss'; id: string } | { type: 'clearAll' }): void;

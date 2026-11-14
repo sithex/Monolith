@@ -2,7 +2,7 @@
 // These adapters own no clocks, requests, persistence or revision fencing.
 import type { CalendarChanged, AgendaRow as WireAgendaRow, MixerChanged, IslandNotification, WeatherState, PowerState, BtDevice, TogglesChanged, TilesChanged, UpdatesChanged, ClipSummary, ClipboardStatus, MediaChanged, LyricsChanged, EqualizerChanged } from '../ipc/client';
 import type { Service } from '../island/models';
-import type { TimerSnapshot, CalendarModel, CalendarPresentation, CalendarLabels, ScratchpadModel, DownloadItem, MixerModel, DisplayView, NotificationsModel, QuickInfoModel, ControlsModel, AgentUpdate } from '../island/app-presentations';
+import type { TimerSnapshot, CalendarModel, CalendarPresentation, CalendarLabels, ScratchpadModel, DownloadItem, TransferItem, MixerModel, DisplayView, NotificationsModel, QuickInfoModel, ControlsModel, AgentUpdate } from '../island/app-presentations';
 const bad = (): never => { throw new TypeError('Malformed app snapshot'); };
 function record(x: unknown): Record<string, unknown> { if (x === null || typeof x !== 'object' || Array.isArray(x)) return bad(); return x as Record<string, unknown>; }
 function str(x: unknown, max = 4096): string { if (typeof x !== 'string' || new TextEncoder().encode(x).length > max || x.includes('\0')) return bad(); return x; }
@@ -82,6 +82,18 @@ export function adaptDownloads(raw: unknown, ageLabel: (mtimeMs: number) => stri
     return { name, mtimeMs, sizeBytes: int(f.sizeBytes), kind: choice(f.kind, ['archive', 'image', 'video', 'audio', 'document', 'package', 'code', 'other']), state: choice(f.state, ['inProgress', 'settling', 'ready']), ageLabel: short(ageLabel(mtimeMs)) };
   }, 500), f => f.name);
   return service(available, detail, items);
+}
+/** Running KDE file jobs. Unavailable or switched off: no rows (the card simply hides). */
+export function adaptTransfers(raw: unknown): TransferItem[] {
+  if (raw === null || raw === undefined) return [];
+  const { r, available } = topic(raw);
+  if (!available) return [];
+  return unique(list(r.items, x => {
+    const f = record(x); const percent = num(f.percent, -1, 100);
+    return { id: text(f.id, 512), app: text(f.app, 256), title: text(f.title), percent: percent < 0 ? null : percent,
+      processedBytes: nonnegative(f.processedBytes), totalBytes: nonnegative(f.totalBytes), processedFiles: nonnegative(f.processedFiles),
+      totalFiles: nonnegative(f.totalFiles), speed: nonnegative(f.speed), suspended: bool(f.suspended), destination: text(f.destination) };
+  }, 16), f => f.id);
 }
 export function adaptMixer(raw: unknown): Service<MixerModel> {
   const { r, available, detail } = topic(raw);

@@ -352,6 +352,9 @@ settings_schema! {
     companion_reactive: bool = true, "companionReactive", plain;
     /// Hovering the closed notch peeks the playing track / running timer.
     notch_hover_peek: bool = true, "notchHoverPeek", plain;
+    /// KDE file copies/moves: progress in the closed notch and a Transfers card on the
+    /// Downloads page. Off also drops the passive job monitor.
+    notch_copy_progress: bool = true, "notchCopyProgress", plain;
     /// Output names that get a notch with `showNotchOnEveryMonitor` (empty = every monitor).
     notch_monitors: Vec<String> = Vec::new(), "notchMonitors", with(check_output_list);
     /// Output that shows the companion (`""` = every notch).
@@ -1009,9 +1012,9 @@ mod tests {
         // 55 keys up to Nov 3 + 14 on Nov 5 (game mode, shortcut, notch states, monitors,
         // motion, terminal options) + 8 on Nov 6 (KDE popups, sound, app rules, approvals,
         // game-mode extras, palette shortcut) + 1 later Nov 6 (notification sound choice).
-        // Every key comes from the one `settings_schema!` table.
-        assert_eq!(keys.len(), 78);
-        assert_eq!(SETTINGS_KEYS.len(), 78);
+        // + 1 on Nov 14 (file-copy progress). Every key comes from the one `settings_schema!` table.
+        assert_eq!(keys.len(), 79);
+        assert_eq!(SETTINGS_KEYS.len(), 79);
         let mut table: Vec<_> = SETTINGS_KEYS.iter().map(|k| k.to_string()).collect();
         table.sort();
         assert_eq!(table, keys, "file keys must equal the serde (IPC) keys");

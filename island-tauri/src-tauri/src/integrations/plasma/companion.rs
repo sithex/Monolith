@@ -6,6 +6,11 @@
 //! The island re-broadcasts it as the `Gaze(x, y)` signal, which every notch widget
 //! receives with Plasma's D-Bus `SignalWatcher` and turns into eye movement itself.
 //! Nothing here polls, and nothing runs while the pointer is still.
+//!
+//! The same object also carries file-copy progress for the closed notch
+//! (`local.hermes.Monolith.Transfers`): a `CopyProgress(i)` signal in whole 10 % steps, at most
+//! one per 3 s plus start and end (`jobs::core::NotchSteps`). A signal costs plasmashell no
+//! config write and the island no process spawn, unlike the appearance push.
 use crate::services::process::run_bounded;
 use anyhow::{Context, Result};
 use std::{
@@ -13,14 +18,19 @@ use std::{
     os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt},
     path::PathBuf,
     process::Command,
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicI32, Ordering},
+        Arc, Mutex,
+    },
     time::{Duration, Instant},
 };
+use tokio::sync::watch;
 use zbus::object_server::SignalEmitter;
 
 pub const BUS_NAME: &str = "local.hermes.Monolith";
 pub const OBJECT_PATH: &str = "/Companion";
 pub const INTERFACE: &str = "local.hermes.Monolith.Companion";
+pub const TRANSFERS_INTERFACE: &str = "local.hermes.Monolith.Transfers";
 /// The KWin plugin name the island owns; only this name is ever unloaded.
 pub const SCRIPT_NAME: &str = "monolith-companion-gaze";
 const SCRIPT: &str = include_str!("companion-gaze.qml");
@@ -75,14 +85,86 @@ impl Gaze {
     async fn gaze(emitter: &SignalEmitter<'_>, x: f64, y: f64) -> zbus::Result<()>;
 }
 
+/// Copy progress for the notch, on the same `/Companion` object.
+struct Transfers {
+    current: Arc<AtomicI32>,
+}
+
+#[zbus::interface(name = "local.hermes.Monolith.Transfers")]
+impl Transfers {
+    /// The value last sent with `CopyProgress` (-1 = no copy), for a notch that starts late.
+    fn progress(&self) -> i32 {
+        self.current.load(Ordering::Acquire)
+    }
+
+    /// -1 = no copy running, else 0..=100 in steps of 10.
+    #[zbus(signal)]
+    async fn copy_progress(emitter: &SignalEmitter<'_>, percent: i32) -> zbus::Result<()>;
+}
+
+/// Relays the copy aggregate to the notch with the stepped cadence (event-driven: it wakes
+/// for a new aggregate or for the end of a 3 s gap, never on a timer of its own).
+async fn relay_progress(
+    connection: zbus::Connection,
+    current: Arc<AtomicI32>,
+    mut aggregate: watch::Receiver<Option<u8>>,
+) {
+    use crate::integrations::jobs::core::{NotchSteps, Step};
+    let mut steps = NotchSteps::default();
+    loop {
+        let now = Instant::now();
+        let desired = *aggregate.borrow_and_update();
+        let later = match steps.decide(desired, now) {
+            Step::Send(value) => {
+                current.store(value, Ordering::Release);
+                let sent = async {
+                    let iface = connection
+                        .object_server()
+                        .interface::<_, Transfers>(OBJECT_PATH)
+                        .await?;
+                    Transfers::copy_progress(iface.signal_emitter(), value).await
+                };
+                if let Err(error) = sent.await {
+                    tracing::debug!(%error, "Copy progress signal not sent");
+                }
+                steps.sent(value, now);
+                continue;
+            }
+            Step::Later(at) => Some(at),
+            Step::Hold => None,
+        };
+        tokio::select! {
+            changed = aggregate.changed() => if changed.is_err() { break },
+            () = async {
+                match later {
+                    Some(at) => tokio::time::sleep_until(at.into()).await,
+                    None => std::future::pending().await,
+                }
+            } => {},
+        }
+    }
+}
+
 /// The session-bus endpoint; dropping it releases the name.
 pub struct CompanionBus {
-    _connection: zbus::Connection,
+    connection: zbus::Connection,
+    copy_current: Arc<AtomicI32>,
+    relay: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 impl CompanionBus {
     pub async fn start() -> Result<Self> {
-        let build = zbus::connection::Builder::session()
+        Self::start_with(zbus::connection::Builder::session()).await
+    }
+
+    /// The same endpoint on an explicit bus (private-bus tests).
+    pub async fn start_at(address: &str) -> Result<Self> {
+        Self::start_with(zbus::connection::Builder::address(address)).await
+    }
+
+    async fn start_with(builder: zbus::connection::Builder<'_>) -> Result<Self> {
+        let copy_current = Arc::new(AtomicI32::new(-1));
+        let build = builder
             .name(BUS_NAME)
             .serve_at(
                 OBJECT_PATH,
@@ -90,13 +172,43 @@ impl CompanionBus {
                     last: Mutex::new(None),
                 },
             )
+            .serve_at(
+                OBJECT_PATH,
+                Transfers {
+                    current: copy_current.clone(),
+                },
+            )
             .build();
         let connection = tokio::time::timeout(Duration::from_secs(3), build)
             .await
             .context("Companion D-Bus start timed out")??;
         Ok(Self {
-            _connection: connection,
+            connection,
+            copy_current,
+            relay: Mutex::new(None),
         })
+    }
+
+    /// Starts relaying the copy aggregate as `CopyProgress` signals (once).
+    pub fn relay_copy_progress(&self, aggregate: watch::Receiver<Option<u8>>) {
+        let task = tauri::async_runtime::spawn(relay_progress(
+            self.connection.clone(),
+            self.copy_current.clone(),
+            aggregate,
+        ));
+        if let Ok(mut slot) = self.relay.lock() {
+            if let Some(old) = slot.replace(task) {
+                old.abort();
+            }
+        }
+    }
+}
+
+impl Drop for CompanionBus {
+    fn drop(&mut self) {
+        if let Some(task) = self.relay.lock().ok().and_then(|mut t| t.take()) {
+            task.abort();
+        }
     }
 }
 

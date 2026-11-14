@@ -11,6 +11,7 @@ pub mod control_process;
 #[cfg(target_os = "linux")]
 pub mod dbus_util;
 pub mod downloads;
+pub mod jobs;
 pub mod media;
 pub mod mixer;
 pub mod notifications;

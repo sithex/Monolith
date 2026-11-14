@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-transfers-get"
+description = "Enables the transfers_get command without any pre-configured scope."
+commands.allow = ["transfers_get"]
+
+[[permission]]
+identifier = "deny-transfers-get"
+description = "Denies the transfers_get command without any pre-configured scope."
+commands.deny = ["transfers_get"]

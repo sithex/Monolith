@@ -54,6 +54,14 @@
 textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px; }
 .file-row, .bluetooth-row { display: flex; align-items: center; gap: 12px; }
 .file-row .kind-icon { color: var(--ui-green); }
+/* Transfers (DownloadsApp.tsx): running KDE copies above the downloads list. The bar moves in
+   whole percents with no transition: it follows the job, it does not animate on its own. */
+.transfers { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.transfers-title { margin: 0; font-size: var(--fs-sm); font-weight: 500; color: var(--ui-dim); }
+.transfer-row .kind-icon { color: var(--ui-accent); }
+.transfer-bar { height: 4px; margin-top: 6px; border-radius: 2px; background: var(--ui-border); overflow: hidden; }
+.transfer-bar > span { display: block; height: 100%; background: var(--ui-accent); }
+.app-stack > .transfers { margin-bottom: 0; }
 .kind-icon { color: var(--ui-accent); display: grid; place-items: center; flex-shrink: 0; }
 .notification-card .app-toolbar { align-items: start; }
 .notification-card .app-toolbar strong { padding-top: 6px; overflow-wrap: anywhere; }

@@ -9,6 +9,7 @@ use crate::{
         calendar::{CalendarConfig, CalendarService, TzConfig},
         control_process::{fixture_from_env, Runner},
         downloads::{DesktopOpener, DownloadsService, Opener},
+        jobs::TransfersService,
         mixer::MixerService,
         notifications::{hub::Hub, NotificationInput, NotificationSource, Urgency},
         power::PowerService,
@@ -35,6 +36,7 @@ use std::{
     time::Duration,
 };
 use tauri::Manager;
+use tauri_specta::Event as _;
 
 #[derive(Default)]
 struct Slots {
@@ -51,6 +53,8 @@ struct Slots {
 }
 pub struct AppServices {
     game_pause: super::plasma::game_effects::PollPause,
+    /// File-copy progress (KDE job views). Not a launcher module: `notchCopyProgress` gates it.
+    pub transfers: Arc<TransfersService>,
     slots: Mutex<Slots>,
     app: tauri::AppHandle,
     data: PathBuf,
@@ -168,6 +172,7 @@ impl AppServices {
                 .and_then(|t| t.topic.subscribe().borrow().clone()),
             scratchpad: s.scratchpad.as_ref().map(|s| s.current()).transpose()?,
             downloads: s.downloads.as_ref().map(|s| s.current()).transpose()?,
+            transfers: Some(self.transfers.current()),
             calendar: s
                 .calendar
                 .as_ref()
@@ -191,8 +196,29 @@ impl AppServices {
         power: Arc<PowerService>,
         game_pause: super::plasma::game_effects::PollPause,
     ) -> Self {
+        let opener: Arc<dyn Opener> = if test_instance {
+            Arc::new(TestOpener)
+        } else {
+            Arc::new(DesktopOpener)
+        };
+        let transfers = TransfersService::start(
+            super::system_services::session_bus_address(
+                test_instance,
+                std::env::var("DBUS_SESSION_BUS_ADDRESS").ok(),
+                std::env::var("XDG_RUNTIME_DIR").ok(),
+            ),
+            false,
+            opener,
+        );
+        let app_handle = app.clone();
+        tauri::async_runtime::spawn(transfers.topic.forwarder(COALESCE, move |v| {
+            if v.emit_to(&app_handle, ISLAND_LABEL).is_err() {
+                tracing::warn!("App event delivery failed");
+            }
+        }));
         Self {
             game_pause,
+            transfers,
             power,
             slots: Mutex::new(Slots::default()),
             app: app.clone(),
@@ -222,6 +248,7 @@ impl AppServices {
         }));
     }
     pub fn configure(&self, settings: &Settings) -> Result<(), IslandError> {
+        self.transfers.configure(settings.notch_copy_progress);
         let mut slots = self.lock()?;
         if active(settings, "timer") {
             if slots.timer.is_none() {
@@ -480,6 +507,7 @@ impl AppServices {
             .ok_or_else(|| IslandError::unavailable("Calendar module disabled"))
     }
     pub fn shutdown(&self) -> Result<(), IslandError> {
+        self.transfers.shutdown();
         let mut slots = self.lock()?;
         let mut errors = vec![];
         if let Some(service) = slots.tiles.take() {

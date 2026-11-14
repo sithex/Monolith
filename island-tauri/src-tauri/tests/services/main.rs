@@ -32,6 +32,7 @@ mod media_service;
 mod mixer6b2;
 mod power_service;
 mod tiles6b2;
+mod transfers_service;
 mod toggles6b2;
 mod updates6b2;
 mod weather_service;

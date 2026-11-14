@@ -20,7 +20,7 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
       onReset={() => patch({ [key]: '' })} resetLabel="Follow skin" />
     <button className="link" type="button" aria-label={`${rowSpec(id).label}: follow skin`} onClick={() => patch({ [key]: '' })}>{settings[key] || 'Follow skin'}</button>
   </div>);
-  const flag = (id: string, key: 'notchWaitingPulse' | 'notchHoverPeek' | 'companionReactive' | 'showNotchOnEveryMonitor' | 'companionEnabled' | 'notchBorderEnabled') => row(id,
+  const flag = (id: string, key: 'notchWaitingPulse' | 'notchHoverPeek' | 'notchCopyProgress' | 'companionReactive' | 'showNotchOnEveryMonitor' | 'companionEnabled' | 'notchBorderEnabled') => row(id,
     <input type="checkbox" className="switch" aria-label={id === 'companion' ? 'Notch companion' : rowSpec(id).label} checked={key === 'showNotchOnEveryMonitor' ? settings[key] === true : settings[key] !== false} onChange={e => patch({ [key]: e.target.checked })} />);
   const saved = settings.notchMonitors ?? [], known = outputs ?? [], choices = monitorChoices(saved, known);
   const companionOptions = [{ value: '', label: 'Every notch' }, ...[...new Set([...known, ...(settings.companionMonitor ? [settings.companionMonitor] : [])])].map(name => ({ value: name, label: name }))];
@@ -34,6 +34,7 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
     </div>, `${saved.length ? `${saved.length} selected` : 'All monitors'}${outputs === null ? ' · detecting…' : ''}`)}
     {flag('waitingPulse', 'notchWaitingPulse')}
     {flag('hoverPeek', 'notchHoverPeek')}
+    {flag('copyProgress', 'notchCopyProgress')}
     {color('notchColor', 'panelClockColor', background)}
     {row('notchWidth', <><DraftRange aria-label="Notch width" min={110} max={320} step={2} value={settings.notchWidth ?? 144} onCommit={(value, final) => { if (final) patch({ notchWidth: value }); }} /><output>{settings.notchWidth ?? 144}px</output></>)}
     {flag('notchBorder', 'notchBorderEnabled')}

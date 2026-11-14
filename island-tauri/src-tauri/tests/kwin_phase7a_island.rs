@@ -26,6 +26,60 @@ use x11rb::{
     connection::Connection, protocol::xproto::ConnectionExt as _, rust_connection::RustConnection,
 };
 
+/// A stand-in Plasma job server on the stack's private session bus (KDE interface XML shapes),
+/// so the Downloads page shows a real Transfers card from the island's passive job monitor.
+struct JobServer;
+#[zbus::interface(name = "org.kde.JobViewServerV2")]
+impl JobServer {
+    #[zbus(name = "requestView")]
+    fn request_view(
+        &self,
+        _app: String,
+        _caps: i32,
+        _hints: std::collections::HashMap<String, zbus::OwnedVariant>,
+    ) -> zbus::OwnedObjectPath {
+        zbus::OwnedObjectPath::try_from("/org/kde/notificationmanager/jobs/JobView_1").unwrap()
+    }
+}
+/// Starts a job server plus a KDE-style client that requests one copy view, 47 % done.
+fn fake_copy(s: &Stack) -> (zbus::Connection, zbus::Connection) {
+    use zbus::Variant;
+    let address = format!("unix:path={}/bus", s.root.display());
+    let block = |f| tauri::async_runtime::block_on(f);
+    let server = block(
+        zbus::connection::Builder::address(address.as_str())
+            .name("org.kde.JobViewServer")
+            .serve_at("/JobViewServer", JobServer)
+            .build(),
+    )
+    .unwrap();
+    // Plasma owns the server long before any copy starts: let the island's monitor arm on it.
+    until(s, "7a job monitor armed", 10, "window.__TAURI_INTERNALS__.invoke('transfers_get').then(t=>t.detail==='monitoring')");
+    let client = block(zbus::connection::Builder::address(address.as_str()).build()).unwrap();
+    fs::create_dir_all(s.root.join("Videos")).unwrap();
+    let dest = format!("file://{}/Videos/holiday%20film.mkv", s.root.display());
+    let hints: std::collections::HashMap<String, zbus::OwnedVariant> = [
+        ("title", Variant::from("Copying")),
+        ("percent", Variant::from(47u32)),
+        ("processedBytes", Variant::from(47u64 << 20)),
+        ("totalBytes", Variant::from(100u64 << 20)),
+        ("speed", Variant::from(3u64 << 20)),
+        ("destUrl", Variant::from(dest)),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), zbus::OwnedVariant::try_from(v).unwrap()))
+    .collect();
+    tauri::async_runtime::block_on(client.call_method(
+        Some("org.kde.JobViewServer"),
+        "/JobViewServer",
+        Some("org.kde.JobViewServerV2"),
+        "requestView",
+        &("org.kde.dolphin", 3i32, hints),
+    ))
+    .unwrap();
+    (server, client)
+}
+
 fn launch(s: &Stack) -> Owned {
     let log = fs::File::create(s.root.join("app.log")).unwrap();
     Owned(
@@ -417,6 +471,39 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         if id == "downloads" {
             // The Downloads folder comes from the desktop's user dirs: no Settings row, no button.
             assert!(notices.iter().all(|n| n["button"] == false), "downloads: unexpected button {g}");
+            // A KDE copy in progress: the Transfers card sits above the notice, its "Show in
+            // folder" button inside its row and clear of every line of text, the bar inside the
+            // row, and a real gap between the card and the notice below it.
+            let copy = fake_copy(&s);
+            until(&s, "7a transfers card", 15, "!!document.querySelector('.app-pane:not([hidden]) .transfer-row .row-actions button')");
+            settled(&s, &conn, window, IslandMode::Large);
+            let t = eval(&s, "(()=>{const R=e=>e.getBoundingClientRect(),pane=document.querySelector('.app-pane:not([hidden])');\
+                const hit=(a,t)=>a.left<t.right-1&&a.right>t.left+1&&a.top<t.bottom-1&&a.bottom>t.top+1;\
+                const inside=(a,c)=>a.left>=c.left-0.5&&a.right<=c.right+0.5&&a.top>=c.top-0.5&&a.bottom<=c.bottom+0.5;\
+                const section=pane.querySelector('.transfers'),row=section.querySelector('.transfer-row'),rr=R(row),b=row.querySelector('.row-actions button'),br=R(b);\
+                const texts=[...row.querySelectorAll('.row-content strong, .row-content small')].map(R),bar=R(row.querySelector('.transfer-bar'));\
+                const next=section.nextElementSibling,nr=next&&R(next);\
+                return {label:b.innerText,text:row.innerText,buttonIn:inside(br,rr),barIn:inside(bar,rr),overlap:texts.some(x=>hit(br,x))||hit(br,bar),\
+                size:Math.min(br.width,br.height),barWidth:R(row.querySelector('.transfer-bar > span')).width/bar.width,\
+                gap:nr?nr.top-R(section).bottom:-1,above:!!nr&&next.matches('.card'),overflow:pane.scrollWidth>pane.clientWidth+1}})()");
+            assert_eq!(t["label"], "Show in folder", "{t}");
+            assert!(t["text"].as_str().unwrap().contains("Copying · 47%"), "{t}");
+            assert!(t["text"].as_str().unwrap().contains("Dolphin →"), "{t}");
+            assert_eq!(t["buttonIn"], true, "transfers: button outside its row {t}");
+            assert_eq!(t["barIn"], true, "transfers: bar outside its row {t}");
+            assert_eq!(t["overlap"], false, "transfers: button overlaps the text or bar {t}");
+            assert!(t["size"].as_f64().unwrap() >= 20.0, "transfers: button collapsed {t}");
+            assert!((t["barWidth"].as_f64().unwrap() - 0.47).abs() < 0.02, "transfers: bar is not 47% {t}");
+            assert_eq!(t["above"], true, "transfers: card is not above the notice {t}");
+            assert!(t["gap"].as_f64().unwrap() >= 10.0, "transfers: card touches the notice {t}");
+            assert_eq!(t["overflow"], false, "transfers: page scrolls sideways {t}");
+            // Show in folder reaches Rust; a test instance never opens a real file manager.
+            let reveal = eval(&s, "window.__TAURI_INTERNALS__.invoke('transfer_reveal',{id:'/org/kde/notificationmanager/jobs/JobView_1'}).then(()=>'opened',e=>e.code)");
+            assert_eq!(reveal, "unsupported", "{reveal}");
+            screenshot(&s, &conn, window, "transfers-downloads");
+            // The copy's client leaves the bus: the card goes away by itself.
+            drop(copy);
+            until(&s, "7a transfers card cleared", 15, "!document.querySelector('.transfer-row')");
         } else {
             assert!(g["cards"].as_u64().unwrap() >= 2, "quickInfo: expected stacked cards {g}");
             assert!(notices.iter().any(|n| n["button"] == true && n["text"].as_str().unwrap().contains("Choose a location")), "quickInfo: no location button {g}");

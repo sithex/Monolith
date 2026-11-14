@@ -191,6 +191,7 @@ fn snapshot(
         "companion":settings.companion_enabled,
         "companionCharacter":settings.companion_character,
         "companionReactive":settings.companion_reactive,"companionMonitor":settings.companion_monitor,
+        "copyProgress":settings.notch_copy_progress,
         "waitingPulse":settings.notch_waiting_pulse,"hoverPeek":settings.notch_hover_peek,"hoverDelay":settings.hover_delay,
         "notchBorder":{"enabled":settings.notch_border_enabled,"color":border_color,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width},
         "background":background,"text":palette.as_ref().map(|p|&p.text),"dim":palette.as_ref().map(|p|&p.dim),
@@ -327,6 +328,7 @@ fn panel_style_payload(raw: &Value) -> Value {
         "companionFrozen",
         "companionMonitor",
         "waitingPulse",
+        "copyProgress",
         "hoverPeek",
         "hoverDelay",
         "live",
@@ -366,6 +368,16 @@ mod notch_tests {
         assert!(script.contains("[[145,407],[97,500]]"));
         assert!(script.contains("notchAppearance"));
         assert!(!script.contains("private"));
+    }
+    #[test]
+    fn copy_progress_switch_rides_the_payload_but_the_percent_never_does() {
+        let raw = json!({"copyProgress":false,"live":{"working":false},"copyPercent":40});
+        let style = panel_style_payload(&raw);
+        assert_eq!(style["copyProgress"], json!(false));
+        assert!(
+            style.get("copyPercent").is_none(),
+            "progress goes as a D-Bus signal: no appletsrc write per step"
+        );
     }
     #[test]
     fn companion_freezes_only_in_game_mode_with_the_setting_on() {
@@ -529,6 +541,12 @@ impl NativeHost {
         } else {
             None
         };
+        if let (Some(bus), Some(system)) = (
+            companion.as_ref(),
+            app.try_state::<Arc<crate::integrations::system_services::SystemServices>>(),
+        ) {
+            bus.relay_copy_progress(system.apps.transfers.progress());
+        }
         let relay = companion.is_some();
         let worker = std::thread::Builder::new()
             .name("ripple-status".into())

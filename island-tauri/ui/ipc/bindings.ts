@@ -166,6 +166,9 @@ export const commands = {
 	scratchpadCommand: (op: ScratchpadOp) => typedError<ScratchpadChanged, IslandError>(__TAURI_INVOKE("scratchpad_command", { op })),
 	downloadsGet: () => typedError<DownloadsChanged, IslandError>(__TAURI_INVOKE("downloads_get")),
 	downloadsOpen: (name: string, op: OpenDownload) => typedError<null, IslandError>(__TAURI_INVOKE("downloads_open", { name, op })),
+	transfersGet: () => typedError<TransfersChanged, IslandError>(__TAURI_INVOKE("transfers_get")),
+	/**  "Show in folder" for a running KDE file job; the folder comes from the job, not the page. */
+	transferReveal: (id: string) => typedError<null, IslandError>(__TAURI_INVOKE("transfer_reveal", { id })),
 	calendarGet: (query: CalendarQuery) => typedError<CalendarChanged, IslandError>(__TAURI_INVOKE("calendar_get", { query })),
 	calendarCommand: (op: CalendarOp) => typedError<null, IslandError>(__TAURI_INVOKE("calendar_command", { op })),
 	calendarRefresh: () => typedError<null, IslandError>(__TAURI_INVOKE("calendar_refresh")),
@@ -220,6 +223,7 @@ export const events = {
 	tilesChanged: makeEvent<TilesChanged, TilesChanged>("tiles-changed"),
 	timerChanged: makeEvent<TimerChanged, TimerChanged>("timer-changed"),
 	togglesChanged: makeEvent<TogglesChanged, TogglesChanged>("toggles-changed"),
+	transfersChanged: makeEvent<TransfersChanged, TransfersChanged>("transfers-changed"),
 	updatesChanged: makeEvent<UpdatesChanged, UpdatesChanged>("updates-changed"),
 	visualChanged: makeEvent<VisualChanged, VisualChanged>("visual-changed"),
 	weatherChanged: makeEvent<WeatherChanged, WeatherChanged>("weather-changed"),
@@ -431,6 +435,7 @@ export type AppsSnapshot = {
 	timer: TimerChanged | null,
 	scratchpad: ScratchpadChanged | null,
 	downloads: DownloadsChanged | null,
+	transfers: TransfersChanged | null,
 	calendar: CalendarChanged | null,
 	brightness: BrightnessChanged | null,
 	agents: AgentsChanged | null,
@@ -1482,6 +1487,11 @@ export type Settings = {
 	companionReactive: boolean,
 	/**  Hovering the closed notch peeks the playing track / running timer. */
 	notchHoverPeek: boolean,
+	/**
+	 *  KDE file copies/moves: progress in the closed notch and a Transfers card on the
+	 *  Downloads page. Off also drops the passive job monitor.
+	 */
+	notchCopyProgress: boolean,
 	/**  Output names that get a notch with `showNotchOnEveryMonitor` (empty = every monitor). */
 	notchMonitors: string[],
 	/**  Output that shows the companion (`""` = every notch). */
@@ -1589,6 +1599,7 @@ export type SettingsPatch = {
 	notchWaitingPulse?: boolean,
 	companionReactive?: boolean,
 	notchHoverPeek?: boolean,
+	notchCopyProgress?: boolean,
 	notchMonitors?: string[],
 	companionMonitor?: string,
 	reduceMotion?: boolean,
@@ -1729,6 +1740,33 @@ export type TogglesChanged = {
 };
 
 export type TogglesOp = { type: "powerProfile"; profile: string } | { type: "cycleProfile" } | { type: "micMute"; muted: boolean } | { type: "dnd"; on: boolean };
+
+/**  One KDE file job (copy, move, download through KIO) seen on the session bus. */
+export type TransferRow = {
+	/**  Opaque id for `transfer_reveal` (the job's object path). */
+	id: string,
+	/**  The app's desktop entry or name, e.g. `org.kde.dolphin`. */
+	app: string,
+	title: string,
+	/**  0..=100, or -1 while the job has not reported one. */
+	percent: number,
+	processedBytes: number,
+	totalBytes: number,
+	processedFiles: number,
+	totalFiles: number,
+	/**  Bytes per second (0 = unknown). */
+	speed: number,
+	suspended: boolean,
+	/**  Local destination folder shown on the card ("" = not a local path). */
+	destination: string,
+};
+
+export type TransfersChanged = {
+	rev: number,
+	available: boolean,
+	detail: string,
+	items: TransferRow[],
+};
 
 export type UiFont = "system" | "openrunde";
 

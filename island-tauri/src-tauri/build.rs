@@ -66,6 +66,8 @@ const COMMANDS: &[&str] = &[
     "scratchpad_command",
     "downloads_get",
     "downloads_open",
+    "transfers_get",
+    "transfer_reveal",
     "calendar_get",
     "calendar_command",
     "calendar_refresh",

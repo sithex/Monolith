@@ -14,6 +14,7 @@ pub struct AppsSnapshot {
     pub timer: Option<TimerChanged>,
     pub scratchpad: Option<ScratchpadChanged>,
     pub downloads: Option<DownloadsChanged>,
+    pub transfers: Option<TransfersChanged>,
     pub calendar: Option<CalendarChanged>,
     pub brightness: Option<super::controls::BrightnessChanged>,
     pub agents: Option<super::controls::AgentsChanged>,
@@ -146,6 +147,35 @@ pub struct DownloadsChanged {
     pub available: bool,
     pub detail: String,
     pub items: Vec<DownloadRow>,
+}
+/// One KDE file job (copy, move, download through KIO) seen on the session bus.
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferRow {
+    /// Opaque id for `transfer_reveal` (the job's object path).
+    pub id: String,
+    /// The app's desktop entry or name, e.g. `org.kde.dolphin`.
+    pub app: String,
+    pub title: String,
+    /// 0..=100, or -1 while the job has not reported one.
+    pub percent: f64,
+    pub processed_bytes: f64,
+    pub total_bytes: f64,
+    pub processed_files: f64,
+    pub total_files: f64,
+    /// Bytes per second (0 = unknown).
+    pub speed: f64,
+    pub suspended: bool,
+    /// Local destination folder shown on the card ("" = not a local path).
+    pub destination: String,
+}
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type, tauri_specta::Event)]
+#[serde(rename_all = "camelCase")]
+pub struct TransfersChanged {
+    pub rev: u32,
+    pub available: bool,
+    pub detail: String,
+    pub items: Vec<TransferRow>,
 }
 #[derive(Deserialize, Clone, Copy, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]

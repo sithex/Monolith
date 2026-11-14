@@ -58,6 +58,26 @@ pub async fn downloads_open(
     let s = system.apps.downloads()?;
     super::blocking(move || s.open(&name, op)).await
 }
+#[tauri::command]
+#[specta::specta]
+pub async fn transfers_get(
+    system: tauri::State<'_, Arc<SystemServices>>,
+) -> Result<TransfersChanged, IslandError> {
+    Ok(system.apps.transfers.current())
+}
+/// "Show in folder" for a running KDE file job; the folder comes from the job, not the page.
+#[tauri::command]
+#[specta::specta]
+pub async fn transfer_reveal(
+    system: tauri::State<'_, Arc<SystemServices>>,
+    id: String,
+) -> Result<(), IslandError> {
+    if id.is_empty() || id.len() > 512 {
+        return Err(IslandError::invalid("Invalid transfer id"));
+    }
+    let s = system.apps.transfers.clone();
+    super::blocking(move || s.reveal(&id)).await
+}
 
 #[tauri::command]
 #[specta::specta]

@@ -1,5 +1,44 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Read-only resolver. Source this file to inspect the same paths without launching anything.
+monolith_has_data() {
+  local entry
+  [[ -e "$1" || -L "$1" ]] || return 1
+  [[ -d "$1" && -r "$1" ]] || return 0
+  for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+    [[ -e "$entry" || -L "$entry" ]] || continue
+    [[ "${entry##*/}" == anchor-client.py && -L "$entry" ]] || return 0
+  done
+  return 1
+}
+monolith_data_dirs() { # root, overlay (0|1), optional explicit test directory
+  local root="$1" overlay="$2" home="${HOME:-/}" config="${XDG_CONFIG_HOME:-}" state="${XDG_STATE_HOME:-}"
+  [[ "$home" == /* ]] || home=/
+  [[ "$config" == /* ]] || config="${home%/}/.config"
+  [[ "$state" == /* ]] || state="${home%/}/.local/state"
+  MONOLITH_CONFIG="${config%/}/monolith"
+  MONOLITH_STATE="${state%/}/monolith"
+  MONOLITH_RUNTIME="$root/.island-data"
+  [[ "$overlay" != 1 ]] || MONOLITH_RUNTIME="$root/.island-data-overlay"
+  if [[ -n "${3:-}" ]]; then
+    local resolved real_config real_state
+    resolved=$(realpath -m -- "$3") || return 2
+    real_config=$(realpath -m -- "$MONOLITH_CONFIG") || return 2
+    real_state=$(realpath -m -- "$MONOLITH_STATE") || return 2
+    case "$resolved/" in
+      "$real_config/"* | "$real_state/"* | */.island-data/* | */.island-data-overlay/*)
+        echo 'Test launch refuses live Monolith directories' >&2; return 2 ;;
+    esac
+    MONOLITH_CONFIG="$3" MONOLITH_STATE="$3" MONOLITH_RUNTIME="$3"
+  elif [[ -d "$MONOLITH_RUNTIME" ]] && {
+    [[ -e "$MONOLITH_RUNTIME/.xdg-migration-failed" ]] ||
+    { [[ ! -f "$MONOLITH_STATE/MIGRATED-FROM-REPO.json" ]] && [[ -e "$MONOLITH_CONFIG/.migration-pending" || -L "$MONOLITH_CONFIG/.migration-pending" || -e "$MONOLITH_STATE/.migration-pending" || -L "$MONOLITH_STATE/.migration-pending" ]]; } ||
+    { ! monolith_has_data "$MONOLITH_CONFIG" && ! monolith_has_data "$MONOLITH_STATE"; };
+  }; then
+    MONOLITH_CONFIG="$MONOLITH_RUNTIME" MONOLITH_STATE="$MONOLITH_RUNTIME"
+  fi
+}
+[[ "${BASH_SOURCE[0]}" == "$0" ]] || return 0
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 BINARY="$ROOT/island-tauri/src-tauri/target/release/hermes-island"
 if [[ ! -x "$BINARY" ]]; then
@@ -15,10 +54,25 @@ cd -- "$ROOT"
 # Harness stays the CLI default. Only overlay launches without an explicit page select island.
 overlay=0
 ui=0
+test_instance=0
+test_data=""
+seen_data=0
+want_data=0
 for arg in "$@"; do
+  if [[ "$want_data" == 1 ]]; then test_data="$arg"; want_data=0; continue; fi
+  case "$arg" in
+    --data-dir) seen_data=1; want_data=1 ;;
+    --data-dir=*) seen_data=1; test_data="${arg#--data-dir=}" ;;
+    --test-instance) test_instance=1 ;;
+  esac
   [[ "$arg" != --overlay ]] || overlay=1
   case "$arg" in --ui|--ui=*) ui=1 ;; esac
 done
+# Reject incomplete test launches before reading any live settings/logs.
+if [[ "$test_instance" == 1 || "$seen_data" == 1 || "$want_data" == 1 ]]; then
+  [[ "$test_instance" == 1 && -n "$test_data" && "$want_data" == 0 ]] || { echo 'Test launch requires --test-instance --data-dir PATH' >&2; exit 2; }
+fi
+monolith_data_dirs "$ROOT" "$overlay" "$test_data"
 if [[ "$overlay" == 1 && "$ui" == 0 ]]; then
   set -- "$@" --ui island
 fi
@@ -30,14 +84,19 @@ if [[ "$overlay" == 1 && -n "${WAYLAND_DISPLAY:-}" ]]; then
   backend=$(/usr/bin/python3 -c 'import json,sys
 try: v=json.load(open(sys.argv[1])).get("displayBackend")
 except Exception: v=None
-print(v if v in ("wayland","x11") else "wayland")' "$ROOT/.island-data-overlay/settings.json" 2>/dev/null || echo wayland)
+print(v if v in ("wayland","x11") else "wayland")' "$MONOLITH_CONFIG/settings.json" 2>/dev/null || echo wayland)
 fi
 export GDK_BACKEND="${HERMES_ISLAND_GDK_BACKEND:-$backend}"
 # Detached overlay launches (autostart, panel, tray restart) keep their log in the data dir
 # (tray → View log); the previous run's log is kept as monolith.log.1.
-if [[ "$overlay" == 1 && ! -t 2 && -d "$ROOT/.island-data-overlay" ]]; then
-  log="$ROOT/.island-data-overlay/monolith.log"
+if [[ "$overlay" == 1 && ! -t 2 && "$test_instance" == 0 ]]; then
+  # On a fresh install there is no legacy directory; create only the selected state dir.
+  (umask 077; mkdir -p -- "$MONOLITH_STATE")
+  [[ ! -L "$MONOLITH_STATE" && -O "$MONOLITH_STATE" ]] || { echo 'Unsafe Monolith log directory' >&2; exit 1; }
+  chmod 700 -- "$MONOLITH_STATE"
+  log="$MONOLITH_STATE/monolith.log"
   [[ -f "$log" ]] && mv -f -- "$log" "$log.1"
+  umask 077
   exec 2>>"$log"
 fi
 
@@ -50,7 +109,7 @@ fi
 # --overlay, --test-instance, --data-dir) and launches while an island is already alive keep
 # the plain `exec`. HERMES_ISLAND_NO_SUPERVISOR=1 disables this; the *_SECS variables exist
 # for the shell tests (tests/run_rollback_test.sh).
-DATA="$ROOT/.island-data-overlay"
+DATA="$MONOLITH_STATE"
 supervise=0
 if [[ "$overlay" == 1 && -d "$DATA" && -z "${HERMES_ISLAND_NO_SUPERVISOR:-}" ]]; then
   supervise=1
@@ -59,11 +118,15 @@ if [[ "$overlay" == 1 && -d "$DATA" && -z "${HERMES_ISLAND_NO_SUPERVISOR:-}" ]];
   done
 fi
 status_pid() { # pid recorded in status.json; empty when unreadable
+  monolith_data_dirs "$ROOT" "$overlay" "$test_data"
+  DATA="$MONOLITH_STATE"
   [[ -r "$DATA/status.json" ]] || return 0
   { grep -o '"pid": *[0-9]*' -- "$DATA/status.json" | head -n1 | tr -dc '0-9'; } 2>/dev/null || true
 }
 status_age() { # seconds since status.json was written; huge when missing
   local m
+  monolith_data_dirs "$ROOT" "$overlay" "$test_data"
+  DATA="$MONOLITH_STATE"
   m=$(stat -c %Y -- "$DATA/status.json" 2>/dev/null) || { echo 999999; return 0; }
   echo $(($(date +%s) - m))
 }

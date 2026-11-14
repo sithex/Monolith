@@ -47,7 +47,7 @@ serves its own `dist/` straight away.
 `run.sh --overlay` supervises the island. A binary that stays healthy for ~30 s (it has written a
 `status.json` carrying its own pid) is copied to `target/release/hermes-island.last-good`. If a later
 build exits with an error within ~10 s, or runs 20 s without ever publishing its status, `run.sh` runs
-`hermes-island.last-good` once instead and logs the reason in `.island-data-overlay/monolith.log`.
+`hermes-island.last-good` once instead and logs the reason in `~/.local/state/monolith/monolith.log` (or the absolute `XDG_STATE_HOME` equivalent; the first migration launch may still log in the old folder).
 It never loops: one attempt per binary. Not supervised: launches with `--test-instance` or
 `--data-dir`, launches while another island is alive, and `HERMES_ISLAND_NO_SUPERVISOR=1`.
 Tests: `tests/run_rollback_test.sh` (fake binaries).

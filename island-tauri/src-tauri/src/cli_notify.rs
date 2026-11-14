@@ -106,7 +106,9 @@ pub fn parse(args: &[String]) -> Option<Result<NotifyCli, IslandError>> {
         if !test && data.is_some() {
             return Err(IslandError::invalid("--data-dir is test-only"));
         }
-        let data = data.unwrap_or_else(|| crate::paths::repo_root().join(".island-data-overlay"));
+        let data = data.unwrap_or_else(|| {
+            crate::paths::resolve_live_dir(&crate::paths::repo_root(), true).runtime_dir
+        });
         if test {
             validate_test_target(&data)?;
         }
@@ -138,7 +140,9 @@ fn validate_test_target(path: &Path) -> Result<(), IslandError> {
     }
     let resolved = std::fs::canonicalize(path)
         .map_err(|_| IslandError::invalid("Test notify directory must already exist"))?;
-    if forbidden(&resolved) {
+    if forbidden(&resolved)
+        || crate::paths::refuses_xdg_test_dir(&resolved, &crate::data_dirs::DataDirs::from_env())
+    {
         return Err(IslandError::invalid(
             "Test notify refuses live data directories",
         ));
@@ -216,10 +220,7 @@ mod tests {
     }
     #[test]
     fn test_notify_rejects_live_targets_before_connect_or_creation() {
-        for path in [
-            "/srv/example/.island-data-overlay",
-            "/x/.island-data/inner",
-        ] {
+        for path in ["/srv/example/.island-data-overlay", "/x/.island-data/inner"] {
             assert!(parse(&args(&[
                 "notify",
                 "--test-instance",

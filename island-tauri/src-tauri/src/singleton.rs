@@ -23,7 +23,7 @@ mod linux {
 
     pub struct InstanceGuard {
         // Locks are never unlinked: unlinking a lock inode permits a second owner.
-        _locks: [File; 2],
+        _locks: Vec<File>,
         socket: PathBuf,
         socket_identity: Option<Identity>,
         status: StatusFile,
@@ -98,7 +98,15 @@ mod linux {
     /// Separate expected owners for the two artifacts, so each ownership check is testable on
     /// its own (production always passes the effective UID for both).
     pub fn reclaim_as(data: &Path, status_uid: u32, socket_uid: u32) -> Result<()> {
-        let status_path = data.join("status.json");
+        reclaim_with_status(data, data, status_uid, socket_uid)
+    }
+    fn reclaim_with_status(
+        data: &Path,
+        state: &Path,
+        status_uid: u32,
+        socket_uid: u32,
+    ) -> Result<()> {
+        let status_path = state.join("status.json");
         let socket_path = data.join("panel.sock");
         let stat = |path: &Path, what: &str| -> Result<Option<fs::Metadata>> {
             match fs::symlink_metadata(path) {
@@ -199,6 +207,9 @@ mod linux {
     }
     impl InstanceGuard {
         pub fn acquire(data: &Path) -> Result<Self> {
+            Self::acquire_with_status(data, data)
+        }
+        pub fn acquire_with_status(data: &Path, state: &Path) -> Result<Self> {
             match fs::DirBuilder::new().mode(0o700).create(data) {
                 Ok(()) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
@@ -215,7 +226,7 @@ mod linux {
                 metadata.permissions().mode() & 0o077 == 0,
                 "Instance directory must be private (0700)"
             );
-            let lock = |name: &str| -> Result<File> {
+            let lock = |data: &Path, name: &str| -> Result<File> {
                 let file = OpenOptions::new()
                     .read(true)
                     .write(true)
@@ -245,12 +256,24 @@ mod linux {
                 );
                 Ok(file)
             };
-            let spec_lock = lock("island.lock")?;
-            let legacy_lock = lock("instance.lock")?;
+            let spec_lock = lock(data, "island.lock")?;
+            let legacy_lock = lock(data, "instance.lock")?;
+            let mut locks = vec![spec_lock, legacy_lock];
+            if data != state {
+                // Different checkouts share XDG state. They must also share ownership.
+                let parent = state.parent().context("State directory has no parent")?;
+                locks.push(lock(parent, ".monolith-instance.lock")?);
+            }
             // Both locks are ours: nothing legitimate can be using these artifacts. They are
             // reclaimed only when PROVEN stale; anything live, foreign or unverifiable is refused.
             // SAFETY: geteuid has no preconditions.
-            reclaim_stale(data, unsafe { libc::geteuid() })?;
+            if data == state {
+                reclaim_stale(data, unsafe { libc::geteuid() })?;
+            } else {
+                reclaim_with_status(data, state, unsafe { libc::geteuid() }, unsafe {
+                    libc::geteuid()
+                })?;
+            }
             // SAFETY: geteuid has no preconditions.
             match reclaim_stale_ingest(data, unsafe { libc::geteuid() })? {
                 IngestReclaim::Removed => tracing::info!("Reclaimed stale ingest socket"),
@@ -261,13 +284,13 @@ mod linux {
             }
             // The crash-leftover sweep is allowed only after BOTH locks and successful
             // status/socket validation. A live PID's pending rename remains untouched.
-            crate::status_temps::reclaim(data, unsafe { libc::geteuid() })?;
+            crate::status_temps::reclaim(state, unsafe { libc::geteuid() })?;
             let socket = data.join("panel.sock");
             Ok(Self {
-                _locks: [spec_lock, legacy_lock],
+                _locks: locks,
                 socket,
                 socket_identity: None,
-                status: StatusFile::new(data)?,
+                status: StatusFile::new(state)?,
                 closed: false,
             })
         }

@@ -24,6 +24,7 @@ fn appearance_is_atomic_private_persistent_and_visual_revisions_never_regress() 
     let services = Services::new(&ServiceConfig {
         repo_root: root,
         data_dir: data.clone(),
+        config_dir: data.clone(),
         home,
         overlay: true,
         test_instance: true,

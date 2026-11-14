@@ -23,6 +23,7 @@ new_repo() { # -> sets REPO, BIN, DATA
   cp "$RUN_SH" "$REPO/island-tauri/run.sh"
   BIN="$REPO/island-tauri/src-tauri/target/release/hermes-island"
   DATA="$REPO/.island-data-overlay"
+  export HOME="$REPO/home" XDG_CONFIG_HOME="$REPO/config" XDG_STATE_HOME="$REPO/state"
 }
 fake() { # path, body: a fake binary that counts its runs in $REPO/runs.<name>
   printf '#!/usr/bin/env bash\n%s\n' "$2" >"$1"
@@ -124,8 +125,8 @@ check "second launch while an island is alive just execs" "$([[ $code == 1 && "$
 new_repo
 fake "$BIN" "$FAIL1"
 fake "$BIN.last-good" 'echo run >>"$(dirname "$0")/../../../../runs.last-good"'
-"$REPO/island-tauri/run.sh" --overlay --test-instance >/dev/null 2>&1; a=$?
-"$REPO/island-tauri/run.sh" --data-dir /x >/dev/null 2>&1; b=$?
+"$REPO/island-tauri/run.sh" --overlay --test-instance --data-dir "$REPO/instance" >/dev/null 2>&1; a=$?
+"$REPO/island-tauri/run.sh" >/dev/null 2>&1; b=$?
 HERMES_ISLAND_NO_SUPERVISOR=1 "$REPO/island-tauri/run.sh" --overlay >/dev/null 2>&1; c=$?
 check "test-instance / harness / opt-out keep exec semantics" "$([[ $a == 1 && $b == 1 && $c == 1 && "$(runs last-good)" == 0 ]] && echo 0 || echo 1)"
 

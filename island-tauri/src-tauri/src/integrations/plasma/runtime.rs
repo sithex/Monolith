@@ -186,6 +186,7 @@ fn snapshot(
         "anchor":anchor,"bounds":bounds,"windowId":xid,"rectangles":rectangles,"pty":services.terminal.pid().unwrap_or(0),
         "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
         "gameMode":state.game_mode,
+        "dataMigrationError":app.state::<crate::paths::Paths>().migration_error,
         // Notch holds completely still: game mode on and "freeze the companion" kept enabled
         // (a derived boolean, so the QML never has to know about game-mode sources or settings).
         "companionFrozen":super::game_effects::GameEffects::plan(state.game_mode, &settings).freeze_companion,

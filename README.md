@@ -94,6 +94,16 @@ npm ci
 Either way, then install the notch widget and add it to your panel. [instructions.md](instructions.md) walks
 through that, plus autostart, updating and the problems you're likely to hit.
 
+Settings, layout and appearance are saved in `~/.config/monolith/`; history, calendar data, status and
+logs are in `~/.local/state/monolith/`. Absolute `XDG_CONFIG_HOME` and `XDG_STATE_HOME` values override the
+base directories. Back up both folders while Monolith is stopped. Deleting or re-cloning the checkout
+keeps your data; removing both folders after uninstalling also erases it.
+
+Existing installs migrate automatically on first start: Monolith verifies a copy of the old
+`.island-data-overlay/` data, keeps the originals and writes `MOVED-TO-XDG.txt`. If the copy fails, or the
+new folders already hold unrelated files, Monolith keeps using the old folder. Sockets and locks stay there while the app runs. See [instructions.md](instructions.md)
+for migration recovery, logs and uninstall details.
+
 ## Layout
 
 | Path | What's there |

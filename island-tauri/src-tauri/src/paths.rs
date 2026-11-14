@@ -14,6 +14,9 @@ const LIVE_DIR_NAMES: [&str; 2] = [".island-data", ".island-data-overlay"];
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Paths {
     pub data_dir: PathBuf,
+    pub config_dir: PathBuf,
+    pub runtime_dir: PathBuf,
+    pub migration_error: Option<String>,
     pub status: PathBuf,
     pub panel_sock: PathBuf,
     pub ingest_sock: PathBuf,
@@ -50,14 +53,23 @@ pub fn live_data_dirs(repo_root: &Path) -> Vec<PathBuf> {
     LIVE_DIR_NAMES.iter().map(|n| repo_root.join(n)).collect()
 }
 
-/// Pure live-path policy. No filesystem access, environment override or directory creation.
-/// Production supplies the compile-time repository root; tests supply a scratch root.
+/// Read-only live selection, also used by clients which must never initiate migration.
 pub fn resolve_live_dir(repo_root: &Path, overlay: bool) -> Paths {
-    derived_paths(repo_root.join(if overlay {
+    let old = repo_root.join(if overlay {
         ".island-data-overlay"
     } else {
         ".island-data"
-    }))
+    });
+    live_paths(crate::data_dirs::DataDirs::from_env().selected(&old), old)
+}
+
+fn live_paths(dirs: crate::data_dirs::DataDirs, runtime: PathBuf) -> Paths {
+    let mut paths = derived_paths(runtime.clone());
+    paths.config_dir = dirs.config;
+    paths.data_dir = dirs.state;
+    paths.status = paths.data_dir.join("status.json");
+    paths.runtime_dir = runtime;
+    paths
 }
 
 fn derived_paths(data_dir: PathBuf) -> Paths {
@@ -66,6 +78,9 @@ fn derived_paths(data_dir: PathBuf) -> Paths {
         panel_sock: data_dir.join("panel.sock"),
         ingest_sock: data_dir.join("ingest.sock"),
         lock: data_dir.join("island.lock"),
+        config_dir: data_dir.clone(),
+        runtime_dir: data_dir.clone(),
+        migration_error: None,
         data_dir,
     }
 }
@@ -81,13 +96,56 @@ pub fn resolve(cli: &crate::cli::Cli, root: &Path) -> Result<Paths, IslandError>
     } else if cli.data_dir.is_some() || cli.fixture_pty || cli.spike.is_some() {
         Err(IslandError::invalid("test-only options in live launch"))
     } else {
-        Ok(resolve_live_dir(root, cli.overlay))
+        let old = root.join(if cli.overlay {
+            ".island-data-overlay"
+        } else {
+            ".island-data"
+        });
+        let dirs = crate::data_dirs::DataDirs::from_env();
+        prepare_live_dirs(dirs, old)
+    }
+}
+
+pub(crate) fn prepare_live_dirs(
+    dirs: crate::data_dirs::DataDirs,
+    old: PathBuf,
+) -> Result<Paths, IslandError> {
+    match crate::data_dirs::prepare(&dirs, &old) {
+        Ok(_) => Ok(live_paths(dirs, old)),
+        // Lock contention means another island owns the data: exit like the singleton would,
+        // without marking a migration failure that would redirect clients of the running one.
+        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Err(IslandError::io(
+            format!("Monolith is already running: {error}"),
+        )),
+        Err(error) if old.is_dir() => {
+            tracing::error!(%error, "XDG migration failed; continuing with original data directory");
+            let failure = old.join(".xdg-migration-failed");
+            use std::os::unix::fs::OpenOptionsExt;
+            if let Ok(mut file) = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+                .open(failure)
+            {
+                use std::io::Write;
+                let _ = file
+                    .write_all(b"XDG migration failed; this launch is using the original data.\n");
+            }
+            let mut paths = derived_paths(old);
+            paths.migration_error = Some(error.to_string());
+            Ok(paths)
+        }
+        Err(error) => Err(IslandError::io(format!(
+            "Cannot prepare XDG directories: {error}"
+        ))),
     }
 }
 
 /// Absolute path with symlinks resolved for the longest existing ancestor; the not-yet-existing
 /// tail is appended verbatim. `..` in the tail is rejected (it could climb out after the check).
-fn canonical_lenient(path: &Path) -> Result<PathBuf, IslandError> {
+pub(crate) fn canonical_lenient(path: &Path) -> Result<PathBuf, IslandError> {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {
@@ -118,6 +176,14 @@ fn canonical_lenient(path: &Path) -> Result<PathBuf, IslandError> {
     Ok(resolved)
 }
 
+pub(crate) fn refuses_xdg_test_dir(path: &Path, dirs: &crate::data_dirs::DataDirs) -> bool {
+    [&dirs.config, &dirs.state].into_iter().any(|live| {
+        canonical_lenient(live)
+            .map(|live| path.starts_with(live))
+            .unwrap_or(true)
+    })
+}
+
 pub fn resolve_test_dir(data_dir: &Path, repo_root: &Path) -> Result<Paths, IslandError> {
     let resolved = canonical_lenient(data_dir)?;
     let named_live = resolved.components().any(|c| match c {
@@ -129,7 +195,8 @@ pub fn resolve_test_dir(data_dir: &Path, repo_root: &Path) -> Result<Paths, Isla
             .map(|live| resolved.starts_with(live))
             .unwrap_or(true) // cannot prove it is not live: refuse
     });
-    if named_live || inside_live {
+    let dirs = crate::data_dirs::DataDirs::from_env();
+    if named_live || inside_live || refuses_xdg_test_dir(&resolved, &dirs) {
         return Err(IslandError::invalid(
             "refusing to use a live Hermes Island data directory in a test instance",
         ));
@@ -238,11 +305,9 @@ mod tests {
 /// symlink to this checkout's `island/anchor-client.py`, so the widget never hardcodes
 /// where the repository lives. The client resolves the link, so it still finds the repo.
 pub fn anchor_client_link(state_home: Option<&Path>, home: &Path) -> PathBuf {
-    state_home
-        .filter(|p| p.is_absolute())
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| home.join(".local/state"))
-        .join("monolith/anchor-client.py")
+    crate::data_dirs::DataDirs::resolve(home, None, state_home)
+        .state
+        .join("anchor-client.py")
 }
 
 /// Point the link at `repo_root`'s client. Only ever replaces a symlink (never a real file)
@@ -260,7 +325,7 @@ pub fn publish_anchor_client(link: &Path, repo_root: &Path) -> std::io::Result<b
         _ => {}
     }
     let parent = link.parent().ok_or(std::io::ErrorKind::InvalidInput)?;
-    std::fs::create_dir_all(parent)?;
+    crate::data_dirs::private_dir(parent)?;
     let staging = parent.join(format!(".anchor-client.{}.tmp", std::process::id()));
     let _ = std::fs::remove_file(&staging);
     std::os::unix::fs::symlink(&target, &staging)?;

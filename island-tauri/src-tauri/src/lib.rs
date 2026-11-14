@@ -5,6 +5,7 @@ pub mod cli;
 pub mod cli_notify;
 pub mod commands;
 pub mod contract;
+pub mod data_dirs;
 pub mod error;
 pub mod identity;
 pub mod integrations;
@@ -200,7 +201,8 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
     let repo_root = paths::repo_root();
     let paths = paths::resolve(&cli, &repo_root)?;
     // Ownership precedes GTK, services, test sockets and status publication.
-    let instance = singleton::acquire(&paths.data_dir)?;
+    let instance =
+        singleton::InstanceGuard::acquire_with_status(&paths.runtime_dir, &paths.data_dir)?;
     if cli.overlay && !cli.test_instance {
         if let Some(home) = std::env::var_os("HOME").map(std::path::PathBuf::from) {
             let state = std::env::var_os("XDG_STATE_HOME").map(std::path::PathBuf::from);
@@ -227,8 +229,9 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
     };
     prepare_identity()?;
     let hooks_on = testhooks::hooks_enabled(&cli, std::env::var(cli::TEST_ENV).ok().as_deref());
-    let config =
+    let mut config =
         services::ServiceConfig::from_cli(&cli, repo_root, paths.data_dir.clone(), hooks_on);
+    config.config_dir = paths.config_dir.clone();
     let specta = specta_builder();
     let app = tauri::Builder::default()
         .invoke_handler(specta.invoke_handler())
@@ -240,9 +243,9 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
             let mut service = services::Services::new(&config);
             service.runtime.panel_anchor = anchor.as_ref().is_some_and(|a| a.native);
             app.manage(service);
-            app.manage(services::frontend::VisualService::new(paths.data_dir.clone())?);
+            app.manage(services::frontend::VisualService::new(paths.config_dir.clone())?);
             app.manage(Arc::new(services::workspace::WorkspaceService::new(
-                paths.data_dir.clone(),
+                paths.config_dir.clone(),
                 app.state::<services::Services>().settings.get()?.module_registry,
             )?));
             app.manage(integrations::plasma::anchor::PlasmaAnchor(anchor.clone()));
@@ -292,7 +295,7 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
                     app.handle().clone(),
                     actor_handle.clone(),
                     services.settings.clone(),
-                    &paths.data_dir,
+                    &paths.runtime_dir,
                 ),
                 &degraded,
             );

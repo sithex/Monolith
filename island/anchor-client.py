@@ -9,10 +9,35 @@ import socket
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DATA = os.path.join(ROOT, '.island-data-overlay')
 
+def resolve_data_dirs(env=None, root=ROOT, overlay=True):
+    """Read-only policy shared with Rust and run.sh; sockets keep their existing path."""
+    env = os.environ if env is None else env
+    home = env.get('HOME', '/')
+    if not os.path.isabs(home):
+        home = '/'
+    def base(key, default):
+        value = env.get(key, '')
+        return os.path.join(value if os.path.isabs(value) else os.path.join(home, default), 'monolith')
+    config = base('XDG_CONFIG_HOME', '.config')
+    state = base('XDG_STATE_HOME', '.local/state')
+    old = os.path.join(root, '.island-data-overlay' if overlay else '.island-data')
+    def has_data(path):
+        try:
+            with os.scandir(path) as entries:
+                return any(e.name != 'anchor-client.py' or not e.is_symlink() for e in entries)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True
+    pending = not os.path.isfile(os.path.join(state, 'MIGRATED-FROM-REPO.json')) and any(os.path.lexists(os.path.join(p, '.migration-pending')) for p in (config, state))
+    if os.path.isdir(old) and (os.path.exists(os.path.join(old, '.xdg-migration-failed')) or pending or (not has_data(config) and not has_data(state))):
+        config = state = old
+    return config, state, old
+
 def online():
     import json
     try:
-        with open(os.path.join(DATA, 'status.json')) as file:
+        with open(os.path.join(resolve_data_dirs()[1], 'status.json')) as file:
             state = json.load(file)
         os.kill(state['pid'], 0)
         return time.time() - state['updated'] < 8

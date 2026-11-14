@@ -86,8 +86,12 @@ The notch is a Plasma widget. Install it, then add it to the panel where you wan
 
 ```sh
 kpackagetool6 -t Plasma/Applet -i ~/Hermes/Monolith/island/plasma-anchor
-mkdir -p ~/.local/state/monolith
-ln -sf ~/Hermes/Monolith/island/anchor-client.py ~/.local/state/monolith/anchor-client.py
+case "$XDG_STATE_HOME" in
+  /*) monolith_state="$XDG_STATE_HOME/monolith" ;;
+  *) monolith_state="$HOME/.local/state/monolith" ;;
+esac
+(umask 077; mkdir -p "$monolith_state")
+ln -sf ~/Hermes/Monolith/island/anchor-client.py "$monolith_state/anchor-client.py"
 ```
 
 The link tells the notch where this copy of Monolith lives, so clicking it can start the island the first
@@ -156,11 +160,34 @@ Replace `YOU` with your username. Desktop files don't expand `~`.
 
 - **The tray icon** (right-click) has the things the island itself can't do: Restart Monolith, Restart
   terminal, Restart Plasma panel (when the notch misbehaves), Open Monolith folder, Open data folder, View log
-  (`.island-data-overlay/monolith.log`, previous run in `monolith.log.1`) and Start at login. Show/Hide,
+  (`~/.local/state/monolith/monolith.log`, previous run in `monolith.log.1`) and Start at login. Show/Hide,
   Do Not Disturb and Quit are there too.
 
-Your settings live in `.island-data-overlay/` inside the repo. That folder is in `.gitignore`, so it never
-gets committed. It holds your calendar link and clipboard history, among other things.
+Your settings, layout and appearance live in `~/.config/monolith/`. Clipboard history, shelf items,
+scratchpad, calendar link and cache, status and logs live in `~/.local/state/monolith/`. Absolute
+`XDG_CONFIG_HOME` and `XDG_STATE_HOME` values override those base directories; relative values are ignored.
+Both Monolith directories are private (0700); private files stay 0600.
+
+On the first start after updating, Monolith copies data from the checkout's `.island-data-overlay/`
+when both new locations have no data. It verifies file sizes and SHA-256 hashes before publishing the
+copy, leaves the originals in place and adds `MOVED-TO-XDG.txt` with the new paths. Symlinks and runtime
+files are skipped and reported. An interrupted copy is redone on the next start. If copying fails,
+Monolith logs the error and continues using the original folder; `status.json` includes
+`dataMigrationError`. Fix the reported problem and restart to try again. Existing XDG data is never merged
+with the old folder: if `~/.config/monolith/` or `~/.local/state/monolith/` already holds files that no
+migration put there, Monolith keeps using the old folder and reports that, rather than starting with default
+settings. The launcher's first migration run may continue writing its already-open log in the old folder
+until the next restart. Two small lock files, `.monolith-instance.lock` and `.monolith-migration.lock`, sit
+next to the state folder (in `~/.local/state/`). If you go back to a build from before this change (or
+`run.sh` falls back to `hermes-island.last-good` from before it), that build uses the old folder again, which
+still holds your data as it was at migration time.
+
+Back up both XDG Monolith directories while the island is stopped. The calendar link and clipboard files
+are private, so keep the backup private too. Re-cloning or deleting the checkout leaves this data intact.
+Sockets and singleton locks still use the checkout's `.island-data-overlay/`; keep that folder while the
+island is running. After uninstalling the notch and autostart entry and stopping Monolith, you can remove
+the checkout. To erase saved preferences and history too, remove both XDG Monolith directories (including
+the `anchor-client.py` link).
 
 ## Updating
 
@@ -171,14 +198,14 @@ cd island-tauri && npm ci && ./build.sh
 ```
 
 The build replaces the binary while the old one is still running, so restart the island afterwards: right-click
-the tray icon → **Restart Monolith**. Or quit it from the tray icon (or `kill` the PID in `.island-data-overlay/status.json`), wait for it to exit, then run
+the tray icon → **Restart Monolith**. Or quit it from the tray icon (or `kill` the PID in `~/.local/state/monolith/status.json`), wait for it to exit, then run
 `run.sh --overlay` again. Starting a second copy while the first is still running does nothing, because only
 one instance is allowed.
 
 ## Troubleshooting
 
 **Clicking the notch does nothing.** Check that the island is running (`pgrep -a hermes-island`) and that
-`~/.local/state/monolith/anchor-client.py` links to your copy (step 4). You can test the bridge on its own:
+`~/.local/state/monolith/anchor-client.py` (or the absolute `XDG_STATE_HOME` equivalent) links to your copy (step 4). You can test the bridge on its own:
 `python3 island/anchor-client.py pin` should open the island.
 
 **"Cannot bind ingest socket" after a crash or power cut.** A dead socket file was left behind. Make sure no

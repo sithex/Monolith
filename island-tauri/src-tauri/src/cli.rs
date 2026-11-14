@@ -1,4 +1,4 @@
-//! Command line (SPEC §2.6). Live mode uses a fixed repository-relative directory.
+//! Command line (SPEC §2.6). Live mode resolves XDG configuration and state directories.
 //!
 //! `hermes-island [--overlay] --test-instance --data-dir PATH [--ui harness|legacy] [--fixture-pty]`
 //!

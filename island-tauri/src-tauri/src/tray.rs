@@ -10,6 +10,7 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
+use tauri::Manager;
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{TrayIcon, TrayIconBuilder},
@@ -142,9 +143,13 @@ fn set_autostart(on: bool) -> std::io::Result<()> {
     }
 }
 
-fn run_system(action: SystemAction, router: &Handle) -> Result<(), String> {
+fn run_system(
+    action: SystemAction,
+    router: &Handle,
+    paths: &crate::paths::Paths,
+) -> Result<(), String> {
     let root = crate::paths::repo_root();
-    let data = root.join(".island-data-overlay");
+    let data = paths.data_dir.clone();
     let s = |p: &Path| p.display().to_string();
     match action {
         SystemAction::RestartApp => {
@@ -447,7 +452,9 @@ impl Tray {
                     if id == GAME_MODE_ID {
                         toggle_game_mode(app, &router, game_item.clone());
                     } else if let Some(system) = system_action(id) {
-                        if let Err(error) = run_system(system, &router) {
+                        if let Err(error) =
+                            run_system(system, &router, &app.state::<crate::paths::Paths>())
+                        {
                             tracing::warn!(%error, ?system, "Tray system action failed");
                         }
                         if system == SystemAction::Autostart {

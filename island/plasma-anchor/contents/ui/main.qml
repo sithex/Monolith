@@ -23,7 +23,7 @@ PlasmoidItem {
     property string dateText: Qt.formatDate(now, "ddd, MMM d")
     // Stable per-user link to the checkout's client (kept current by the island; created
     // once by the install step). No machine-specific repository path lives in the widget.
-    property string command: "/usr/bin/python3 -I -S \"${XDG_STATE_HOME:-$HOME/.local/state}/monolith/anchor-client.py\""
+    property string command: "case \"$XDG_STATE_HOME\" in /*) MONOLITH_STATE_HOME=\"$XDG_STATE_HOME\";; *) MONOLITH_STATE_HOME=\"$HOME/.local/state\";; esac; /usr/bin/python3 -I -S \"${MONOLITH_STATE_HOME:-$HOME/.local/state}/monolith/anchor-client.py\""
     preferredRepresentation: compactRepresentation
     Plasmoid.icon: "utilities-terminal"
     Plasmoid.constraintHints: Plasmoid.CanFillArea

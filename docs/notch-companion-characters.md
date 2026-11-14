@@ -217,7 +217,7 @@ cd ../../island && QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -inp
   check that `qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded
   monolith-companion-gaze` is still `true` (`qdbus-qt6` instead of `qdbus6` on Fedora).
 - **Setting, contract or Rust change:** also `./build.sh`, then restart the island (stop
-  the pid in `.island-data-overlay/status.json`, relaunch with `systemd-run --user
+  the pid in `~/.local/state/monolith/status.json` (or the absolute `XDG_STATE_HOME` equivalent), relaunch with `systemd-run --user
   --unit=monolith-companion-$(date +%s) --collect island-tauri/run.sh --overlay --ui
   island`).
 - Commit the source too. The installed widget is overwritten from the repo on the next

@@ -87,6 +87,7 @@ pub fn profile_dir(hermes_home: Option<std::ffi::OsString>, home: &Path) -> Path
 pub struct ServiceConfig {
     pub repo_root: PathBuf,
     pub data_dir: PathBuf,
+    pub config_dir: PathBuf,
     pub home: PathBuf,
     pub overlay: bool,
     pub test_instance: bool,
@@ -99,6 +100,7 @@ impl ServiceConfig {
     pub fn from_cli(cli: &Cli, repo_root: PathBuf, data_dir: PathBuf, test_hooks: bool) -> Self {
         Self {
             repo_root,
+            config_dir: data_dir.clone(),
             data_dir,
             home: std::env::var_os("HOME")
                 .map(PathBuf::from)
@@ -147,7 +149,7 @@ impl Services {
             cfg.test_instance,
         );
         let settings = Arc::new(settings::SettingsService::new(
-            cfg.data_dir.clone(),
+            cfg.config_dir.clone(),
             autostart,
         ));
         let approvals = approvals::ApprovalService::new({
@@ -279,6 +281,7 @@ mod tests {
         ServiceConfig {
             repo_root: dir.join("repo"),
             data_dir: dir.join("data"),
+            config_dir: dir.join("data"),
             home: dir.join("home"),
             overlay: true,
             test_instance,
@@ -286,6 +289,35 @@ mod tests {
             ui: UiKind::Legacy,
             test_hooks: false,
         }
+    }
+
+    #[test]
+    fn settings_use_configuration_directory_and_leave_state_preferences_untouched() {
+        let root = scratch("split-preferences");
+        let mut cfg = config(&root, true);
+        cfg.config_dir = root.join("config");
+        fs::create_dir_all(&cfg.config_dir).unwrap();
+        fs::create_dir_all(&cfg.data_dir).unwrap();
+        fs::write(
+            cfg.config_dir.join("settings.json"),
+            r#"{"terminalCommand":"saved command"}"#,
+        )
+        .unwrap();
+        fs::write(
+            cfg.data_dir.join("settings.json"),
+            r#"{"terminalCommand":"wrong directory"}"#,
+        )
+        .unwrap();
+        let services = Services::new(&cfg);
+        assert_eq!(
+            services.settings.get().unwrap().terminal_command,
+            "saved command"
+        );
+        assert_eq!(
+            fs::read_to_string(cfg.data_dir.join("settings.json")).unwrap(),
+            r#"{"terminalCommand":"wrong directory"}"#
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

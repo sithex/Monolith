@@ -316,7 +316,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
                     &s,
                     "7b monitor real interval",
                     8,
-                    "!!document.querySelector('progress[aria-label=\"CPU usage\"]')",
+                    "!!document.querySelector('[role=progressbar][aria-label=\"CPU usage\"][aria-valuenow]')",
                 );
             }
             capture(&s, &c, w, &format!("{theme}-{view}"));

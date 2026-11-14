@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useReducedMotionAll } from './motion-preference';
+import { describeServiceReason } from '../service-reasons';
 import type { PackageUpdate, UpdatesChanged } from '../../ipc/bindings';
 
 // Browser-only CSS import also leaves this component usable by the Node SSR checks.
@@ -74,7 +75,7 @@ export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; 
   const groups = groupUpdates(snapshot.items, query);
   const healthy = snapshot.available && !snapshot.error && !snapshot.stale && snapshot.count !== null;
   const empty = healthy && snapshot.count === 0;
-  const failure = snapshot.error ?? (!snapshot.available ? snapshot.detail : null);
+  const failure = snapshot.error ?? (!snapshot.available ? describeServiceReason(snapshot.detail, 'updates').text : null);
   const age = checkedLabel(snapshot.ageSecs);
   async function refresh() {
     if (busy.current) return;

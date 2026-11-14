@@ -4,6 +4,7 @@ import type { AppViewIntents, TimerSnapshot, TimerTab, CompletedTimerKind } from
 import { timerKind } from '../app-presentations';
 import { useReducedMotionAll } from './motion-preference';
 import { DUR, SPRING, tween } from '../motion-profile';
+import { ServiceNotice } from './AppPrimitives';
 export function duration(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   const hours = Math.floor(seconds / 3600);
@@ -113,7 +114,7 @@ export function TimerApp({ snapshot, intents, completedKind = snapshot.countdown
       onClick={() => setTab(t)}>{t === 'timer' ? 'Timer' : t === 'pomodoro' ? 'Pomodoro' : 'Stopwatch'}</button>)}</div>
       <button className="timer-start" disabled={!snapshot.available} onClick={start}>{running ? 'Pause' : status === 'paused' ? 'Resume' : 'Start'}</button>
     </div>
-    {!snapshot.available && <p className="unavailable">Unavailable · {snapshot.detail}</p>}
+    {!snapshot.available && <ServiceNotice icon="timer" reason={snapshot.detail} inline/>}
     <div role="tabpanel" id={`${id}-timer-panel-${tab}`} aria-labelledby={`${id}-timer-tab-${tab}`} className="app-stack">
       {tab === 'timer' && <MinuteWheel value={minutes} onChange={setMinutes} disabled={status !== 'idle'} reduced={reduced} />}
       {tab === 'pomodoro' && <p className="phase-label">{snapshot.phase === 'focus' ? 'Focus' : snapshot.phase === 'shortBreak' ? 'Short break' : 'Long break'} · Round {snapshot.round + 1}</p>}

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Service } from '../models';
+import { ServiceNotice } from './AppPrimitives';
 import type { AiDashboardData, AiFamily, AiPeriod, AiShare } from '../../views/adapters';
 
 const money = (v: number | null) => v === null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
@@ -22,7 +23,7 @@ function Shares({ title, lines, project }: { title: string; lines: AiShare[]; pr
   return <section className="ai-card ai-shares"><Header title={title} kind={project ? 'project' : 'models'}/>{lines.length ? lines.slice(0, 3).map(line => <div className="ai-share" key={line.name} title={line.name}><span>{line.name}</span><div className="ai-share-track"><i className={project ? '' : `ai-${line.family}`} style={{ width: '100%', transform: `scaleX(${Math.max(3 / 44, (line.cost ?? 0) / peak)})` }}/></div><small>{money(line.cost)}</small></div>) : <p className="ai-empty">No recorded activity</p>}</section>;
 }
 export function AiDashboard({ dashboard, period = 'today', onPeriodChange, onConnect, now = Date.now() }: { dashboard: Service<AiDashboardData>; period?: AiPeriod; onPeriodChange?: (p: AiPeriod) => void; onConnect?: (p: 'anthropic' | 'openai-codex') => void; now?: number }) {
-  if (!dashboard.available) return <div className="ai-dashboard"><section className="ai-card ai-empty">{dashboard.reason}</section></div>;
+  if (!dashboard.available) return <div className="ai-dashboard"><ServiceNotice icon="spark" reason={dashboard.reason}/></div>;
   const d = dashboard.value, label = period === 'today' ? 'Today' : period === 'week' ? '7 days' : '30 days';
   const peak = Math.max(0.001, ...d.buckets.map(b => b.cost ?? 0)), dayPeak = Math.max(0.001, ...d.days.map(b => b.cost ?? 0));
   const splitTotal = Object.values(d.split).reduce<number>((sum, v) => sum + (v ?? 0), 0);

@@ -8,6 +8,17 @@
 .app-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .app-empty { padding: 36px 18px; text-align: center; color: var(--ui-dim); }
 .app-empty svg { width: 32px; height: 32px; color: var(--ui-accent); margin-bottom: 8px; }
+/* ServiceNotice (AppPrimitives.tsx): a service that can't show its content. The card form matches .app-empty. */
+.service-notice { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 18px; text-align: center; color: var(--ui-dim); }
+.service-notice > svg { width: 32px; height: 32px; flex: none; color: var(--ui-accent); }
+.service-notice[data-kind='error'] > svg { color: var(--ui-amber); }
+.service-notice[data-kind='off'] > svg, .service-notice[data-kind='loading'] > svg { color: var(--ui-dim); }
+.service-notice-text { margin: 0; font-size: var(--fs-md); overflow-wrap: anywhere; }
+.service-notice-code { font-size: var(--fs-xs); opacity: .75; }
+.service-notice-action .settings-cross-link.settings-cross-link--text { display: inline-flex; align-items: center; padding: 5px 12px; border: 1px solid var(--ui-border); border-radius: var(--radius-4xl); text-decoration: none; font-size: var(--fs-sm); }
+.service-notice--inline { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 6px 8px; padding: 2px 0; text-align: left; }
+.service-notice--inline > svg { width: 16px; height: 16px; }
+.service-notice--inline .service-notice-text { flex: 1 1 160px; min-width: 0; }
 .app-banner { background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--radius-2xl); padding: 10px 12px; font-size: var(--fs-md); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .app-banner svg { width: 18px; height: 18px; }
 .app-banner button { margin-left: auto; color: var(--ui-accent); }

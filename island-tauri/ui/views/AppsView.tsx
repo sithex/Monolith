@@ -23,6 +23,7 @@ import { ControlsApp } from '../island/components/ControlsApp';
 import { AgentRunChips } from '../island/components/AgentRunChips';
 import { UpdatesApp } from '../island/components/UpdatesApp';
 import { SettingsLink } from './settings/SettingsLink';
+import { ServiceNotice } from '../island/components/AppPrimitives';
 import type { CalendarPresentation, CalendarLabels } from '../island/app-presentations';
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 export function AppsView({ view, active }: { view: IslandView; active: boolean }) {
@@ -78,7 +79,7 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
       const request = op.type === 'create' ? { type: 'create' as const, id: crypto.randomUUID().replaceAll('-', '') } : op;
       enqueueEpochCommand(appStores.scratchpad,run,async()=>{ const epoch=appStores.scratchpad.epoch(); const result=await appApi.scratchpadCommand(request); if(epoch===appStores.scratchpad.epoch()&&request.type==='create')setSelected(request.id); return result; });
     } }} />;
-    if (view === 'downloads' && downloads) { const value = adapt.adaptDownloads(downloads); content = value.available ? <DownloadsApp items={value.value} intents={{ download: op => run(() => appApi.downloadsOpen(op.name, op.type)) }} /> : <p>{value.reason}</p>; }
+    if (view === 'downloads' && downloads) { const value = adapt.adaptDownloads(downloads); content = value.available ? <DownloadsApp items={value.value} intents={{ download: op => run(() => appApi.downloadsOpen(op.name, op.type)) }} /> : <ServiceNotice icon="download" source="downloads" reason={value.reason}/>; }
     if ((view === 'mixer' || view === 'controls') && mixer) content = <VolumeMixer model={adapt.adaptMixer(mixer)} intents={{ mixer: op => enqueueEpochCommand(appStores.mixer,run,()=>appApi.mixerCommand(op)) }} />;
     if (view === 'brightness' && brightness) content = <Brightness displays={adapt.adaptBrightness(brightness)} intents={{ brightness: op => enqueueEpochCommand(appStores.brightness,run,()=>appApi.brightnessCommand(op)) }} />;
     if (view === 'controls') content = <div className="app-stack" data-testid="controls-runtime"><ControlsApp model={adapt.adaptIndependentControls(toggles,tiles,updates)} intents={{
@@ -86,7 +87,7 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
       tile: op => enqueueEpochCommand(appStores.tiles,run,()=>appApi.tilesCommand(op)),
       updates: () => enqueueEpochCommand(appStores.updates,run,()=>appApi.updatesRefresh()),
     }} />{content}</div>;
-    if (view === 'agents' && agents) { const value = adapt.adaptAgents(agents); content = value.available ? <AgentRunChips update={value.value} intents={{ agent: id => setNotice(id ? `Run ${id}` : 'More active runs') }} /> : <p>{value.reason}</p>; }
+    if (view === 'agents' && agents) { const value = adapt.adaptAgents(agents); content = value.available ? <AgentRunChips update={value.value} intents={{ agent: id => setNotice(id ? `Run ${id}` : 'More active runs') }} /> : <ServiceNotice icon="spark" source="agents" reason={value.reason}/>; }
     if (view === 'updates' && updates) content = <UpdatesApp snapshot={updates} onRefresh={async () => { const epoch = appStores.updates.epoch(); const value = await appApi.updatesRefresh(); appStores.updates.apply(value,epoch); }} />;
     if (view === 'notifications') content = <NotificationsView model={adapt.adaptNotifications(notifications,settings.dnd,settings.redactBodies)} intents={{ notification: op => run(() => op.type === 'clearAll' ? notificationsClear() : notificationsDismiss(op.id)) }} />;
     if (view === 'clipboard') content = <ClipboardView model={{ ...clips, paused: clips.status?.paused ?? false, items: clips.items.map(c => ({ ...c, ageLabel: 'Captured' })) }} intents={{ clipboard: op => {

@@ -217,6 +217,10 @@ fn view(
     assert_eq!(actor_state(s)["view"], id);
     settled(s, conn, window, IslandMode::Large);
 }
+/// Select a view through the actor (pages hidden from the launcher by default included).
+fn invoke_dispatch_view(s: &Stack, id: &str) {
+    eval(s, &format!("window.__TAURI_INTERNALS__.invoke('island_dispatch',{{intent:{{type:'selectView',view:{}}}}}).then(()=>true)", json!(id)));
+}
 fn screenshot(s: &Stack, conn: &RustConnection, window: u32, name: &str) {
     let overlay = host::overlay_size();
     assert_eq!(eval(s, "(()=>{const p=document.querySelector('.app-pane:not([hidden])');return p.scrollWidth<=p.clientWidth+1})()"), true, "view overflows horizontally");
@@ -379,6 +383,47 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         "!window.__islandTerminalTest.text().includes('UNSUBMITTED_7A_DRAFT')",
     );
     eval(&s,"(window.__islandTerminalTest.identity.options.cursorBlink=false,window.__islandTerminalTest.identity.blur(),true)");
+    // Unavailable services render ServiceNotice (AppPrimitives.tsx): a plain sentence, never a raw
+    // code, and a Settings button only where a setting exists. The test instance has no Downloads
+    // folder (not-configured: card, no button); weather enabled without a location is no-location
+    // ("Choose location" inside the Weather card, which is stacked with the Battery/Bluetooth cards).
+    eval(&s, "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{weatherEnabled:true}})");
+    for (id, ready) in [
+        ("downloads", ".service-notice[data-kind=setup]"),
+        ("quickInfo", ".service-notice-action button"),
+    ] {
+        invoke_dispatch_view(&s, id);
+        until(&s, &format!("7a {id} service notice"), 15, &format!("document.querySelector('.island').dataset.view==={} && getComputedStyle(document.querySelector('.app-pane:not([hidden])')).opacity==='1' && !!document.querySelector('.app-pane:not([hidden]) {ready}')", json!(id)));
+        settled(&s, &conn, window, IslandMode::Large);
+        let g = eval(&s, "(()=>{const R=e=>e.getBoundingClientRect(),pane=document.querySelector('.app-pane:not([hidden])');\
+            const hit=(a,t)=>a.left<t.right-1&&a.right>t.left+1&&a.top<t.bottom-1&&a.bottom>t.top+1;\
+            const notices=[...pane.querySelectorAll('.service-notice')].map(n=>{const card=n.closest('.card'),cr=R(card),b=n.querySelector('.service-notice-action button'),br=b&&R(b);\
+            const texts=[n.querySelector('.service-notice-text'),card.querySelector(':scope > h3')].filter(Boolean).map(R);\
+            return {text:n.innerText,button:!!b,size:br?Math.min(br.width,br.height):0,inCard:!br||(br.left>=cr.left-0.5&&br.right<=cr.right+0.5&&br.top>=cr.top-0.5&&br.bottom<=cr.bottom+0.5),\
+            overlap:!!br&&texts.some(t=>hit(br,t))}});\
+            const cards=[...pane.querySelectorAll('.app-stack > .card')].filter(e=>e.offsetParent).map(R);const cardGap=cards.length<2?99:Math.min(...cards.slice(1).map((b,i)=>b.top-cards[i].bottom));\
+            return {notices,cards:cards.length,cardGap,raw:/Unavailable ·|not-configured|no-location/.test(pane.innerText)}})()");
+        let notices = g["notices"].as_array().unwrap();
+        assert!(!notices.is_empty(), "{id}: no service notice {g}");
+        assert_eq!(g["raw"], false, "{id}: raw status code shown {g}");
+        for n in notices {
+            assert_eq!(n["inCard"], true, "{id}: notice button outside its card {g}");
+            assert_eq!(n["overlap"], false, "{id}: notice button overlaps its sentence or card title {g}");
+            if n["button"] == true {
+                assert!(n["size"].as_f64().unwrap() >= 20.0, "{id}: notice button collapsed {g}");
+            }
+        }
+        assert!(g["cardGap"].as_f64().unwrap() >= 10.0, "{id}: stacked cards touch {g}");
+        if id == "downloads" {
+            // The Downloads folder comes from the desktop's user dirs: no Settings row, no button.
+            assert!(notices.iter().all(|n| n["button"] == false), "downloads: unexpected button {g}");
+        } else {
+            assert!(g["cards"].as_u64().unwrap() >= 2, "quickInfo: expected stacked cards {g}");
+            assert!(notices.iter().any(|n| n["button"] == true && n["text"].as_str().unwrap().contains("Choose a location")), "quickInfo: no location button {g}");
+        }
+        screenshot(&s, &conn, window, &format!("service-notice-{id}"));
+    }
+    eval(&s, "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{weatherEnabled:false}})");
     // Skin is the fresh-install default (services/frontend.rs), so pick neutral first: every
     // iteration is a real change that must persist without a restart.
     for theme in ["neutral", "skin"] {
@@ -412,7 +457,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                     &s,
                     "7a monitor second sample has valid CPU interval",
                     8,
-                    "!!document.querySelector('progress[aria-label=\"CPU usage\"]')",
+                    "!!document.querySelector('[role=progressbar][aria-label=\"CPU usage\"][aria-valuenow]')",
                 );
             }
             if id == "ai" {

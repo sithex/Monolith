@@ -1,4 +1,5 @@
 import type { Service } from '../models';
+import { ServiceNotice } from './AppPrimitives';
 import type { AiInsightsData, AiPeriod } from '../../views/adapters';
 
 // "Sessions" tab of AI Stats: per-session cost, cache efficiency, workload and the priciest
@@ -19,7 +20,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 export function AiInsights({ insights, period, onPeriodChange }: { insights: Service<AiInsightsData>; period: AiPeriod; onPeriodChange?: (p: AiPeriod) => void }) {
-  if (!insights.available) return <div className="ai-dashboard"><section className="ai-card ai-empty">{insights.reason}</section></div>;
+  if (!insights.available) return <div className="ai-dashboard"><ServiceNotice icon="spark" reason={insights.reason}/></div>;
   const d = insights.value, label = period === 'today' ? 'Today' : period === 'week' ? '7 days' : '30 days';
   const prompt = d.prompt ?? 0;
   const parts = [

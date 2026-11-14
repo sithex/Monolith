@@ -1,8 +1,8 @@
 import type { ControlsModel, AppViewIntents } from '../app-presentations';
 import type { IconName } from '../models';
 import { Icon } from './Icon';
-import { Dropdown } from './AppPrimitives';
-function Unavailable({ reason }: { reason: string }) { return <p className="unavailable">Unavailable · {reason}</p>; }
+import { Dropdown, ServiceNotice } from './AppPrimitives';
+function Unavailable({ reason }: { reason: string }) { return <ServiceNotice icon="controls" reason={reason} inline/>; }
 function ToggleTile({ title, icon, available, detail, value, request, onChange }: { title: string; icon: IconName; available: boolean; detail: string; value: boolean | null; request: string | null; onChange(on: boolean): void }) {
   const pending = request !== null;
   return <div className={`card toggle-card ${pending ? 'is-pending' : ''}`}>

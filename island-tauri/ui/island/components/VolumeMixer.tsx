@@ -53,7 +53,7 @@ function Column({ channel, master, intents }: { channel: MixerChannel; master?: 
   </div>;
 }
 export function VolumeMixer({ model, intents }: { model: Service<MixerModel>; intents: Pick<AppViewIntents, 'mixer'> }) {
-  return <ServiceCard title="Volume mixer" service={model}>{value => {
+  return <ServiceCard title="Volume mixer" icon="volume" service={model}>{value => {
     const master = value.sinks.find(s => s.name === value.defaultSink);
     return <div className="mixer">
       <div className="select-label"><span>Output</span><Dropdown label="Mixer output" value={value.defaultSink} placeholder="Unknown output" options={value.sinks.map(o => ({ value: o.name, label: o.description }))} onChange={name => intents.mixer({ type: 'defaultSink', name })} /></div>
@@ -66,6 +66,6 @@ export function VolumeMixer({ model, intents }: { model: Service<MixerModel>; in
   }}</ServiceCard>;
 }
 export function Brightness({ displays, intents }: { displays: Service<DisplayView[]>; intents: Pick<AppViewIntents, 'brightness'> }) {
-  return <ServiceCard title="Brightness" service={displays}>{value => value.length ? <div className="app-stack">{value.map(display => <div key={display.name}><div className="app-toolbar"><Icon name="monitor"/><strong>{display.label || display.name}</strong><small className="muted">{display.isInternal ? 'Built-in' : 'External'}</small></div>{display.percent === null ? <p className="muted">Brightness unknown</p> : <label className="slider-row">Brightness<DraftRange aria-label={`${display.label || display.name} brightness`} min={0} max={100} step={1} value={display.percent} aria-busy={display.dragging}
+  return <ServiceCard title="Brightness" icon="sun" service={displays}>{value => value.length ? <div className="app-stack">{value.map(display => <div key={display.name}><div className="app-toolbar"><Icon name="monitor"/><strong>{display.label || display.name}</strong><small className="muted">{display.isInternal ? 'Built-in' : 'External'}</small></div>{display.percent === null ? <p className="muted">Brightness unknown</p> : <label className="slider-row">Brightness<DraftRange aria-label={`${display.label || display.name} brightness`} min={0} max={100} step={1} value={display.percent} aria-busy={display.dragging}
     onCommit={(percent, final) => { intents.brightness({ type: 'drag', name: display.name, percent }); if (final) intents.brightness({ type: 'release', name: display.name }); }} /><output>{display.percent}%</output></label>}</div>)}</div> : <Empty icon="monitor">No supported displays</Empty>}</ServiceCard>;
 }

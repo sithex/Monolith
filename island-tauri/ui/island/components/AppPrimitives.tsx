@@ -50,6 +50,8 @@ export function DraftRange({ value, onCommit, throttleMs = 90, live = true, onDr
 }
 import { Icon } from './Icon';
 import type { IconName, Service } from '../models';
+import { describeServiceReason, type ServiceReasonSource } from '../service-reasons';
+import { SettingsLink } from '../../views/settings/SettingsLink';
 /**
  * Island-styled replacement for a native <select> (WebKitGTK draws GTK's own popup,
  * which ignores the island theme). Listbox semantics + keyboard: arrows, Home/End,
@@ -103,8 +105,24 @@ export function Dropdown({ label, value, options, onChange, disabled = false, pl
 export function Empty({ icon, children }: { icon: IconName; children: ReactNode }) {
   return <div className="app-empty"><Icon name={icon}/><p>{children}</p></div>;
 }
-export function ServiceCard<T>({ title, service, children }: { title: string; service: Service<T>; children(value: T): ReactNode }) {
-  return <section className="card"><h3>{title}</h3>{service.available ? children(service.value) : <p className="unavailable">Unavailable · {service.reason}</p>}</section>;
+/**
+ * A service that can't show its content: icon, one plain sentence, an optional jump to the
+ * Settings row that fixes it, and the raw code (muted) only when the code is unknown.
+ * `inline` drops the card chrome for use inside an existing card.
+ */
+export function ServiceNotice({ icon, reason, source, inline = false }: { icon: IconName; reason: string; source?: ServiceReasonSource; inline?: boolean }) {
+  const r = describeServiceReason(reason, source);
+  const body = <>
+    <Icon name={icon}/>
+    <p className="service-notice-text">{r.text}{r.code && <small className="service-notice-code"> · {r.code}</small>}</p>
+    {r.action?.settingId && <span className="service-notice-action"><SettingsLink rowId={r.action.settingId} label={r.action.label} variant="text"/></span>}
+  </>;
+  return inline
+    ? <div className="service-notice service-notice--inline" data-kind={r.kind} role="status" aria-busy={r.kind === 'loading'}>{body}</div>
+    : <section className="card service-notice" data-kind={r.kind} role="status" aria-busy={r.kind === 'loading'}>{body}</section>;
+}
+export function ServiceCard<T>({ title, icon = 'spark', source, service, children }: { title: string; icon?: IconName; source?: ServiceReasonSource; service: Service<T>; children(value: T): ReactNode }) {
+  return <section className="card"><h3>{title}</h3>{service.available ? children(service.value) : <ServiceNotice icon={icon} reason={service.reason} source={source} inline/>}</section>;
 }
 // No external image fetches or file:// access from staging. Phase 7 supplies
 // bounded service-owned PNGs (including proxied artwork), not arbitrary URLs.

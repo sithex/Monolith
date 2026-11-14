@@ -99,7 +99,7 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
     }} />{content}</div>;
     if (view === 'agents' && agents) { const value = adapt.adaptAgents(agents); content = value.available ? <AgentRunChips update={value.value} intents={{ agent: id => setNotice(id ? `Run ${id}` : 'More active runs') }} /> : <ServiceNotice icon="spark" source="agents" reason={value.reason}/>; }
     if (view === 'updates' && updates) content = <UpdatesApp snapshot={updates} onRefresh={async () => { const epoch = appStores.updates.epoch(); const value = await appApi.updatesRefresh(); appStores.updates.apply(value,epoch); }} />;
-    if (view === 'notifications') content = <NotificationsView model={adapt.adaptNotifications(notifications,settings.dnd,settings.redactBodies)} intents={{ notification: op => run(() => op.type === 'clearAll' ? notificationsClear() : notificationsDismiss(op.id)) }} />;
+    if (view === 'notifications') content = <NotificationsView model={{ ...adapt.adaptNotifications(notifications,settings.dnd,settings.redactBodies), unavailable: adapt.notificationsDown(serviceStatus('notifications')) }} intents={{ notification: op => run(() => op.type === 'clearAll' ? notificationsClear() : notificationsDismiss(op.id)) }} />;
     if (view === 'clipboard') content = <ClipboardView model={{ ...clips, paused: clips.status?.paused ?? false, items: clips.items.map(c => ({ ...c, ageLabel: 'Captured' })) }} intents={{ clipboard: op => {
       if (op.type === 'search') { try { clipboardHistory.setQuery(op.query); } catch (error) { setNotice(String(error)); } return; }
       const epoch = clipboardHistory.epoch();

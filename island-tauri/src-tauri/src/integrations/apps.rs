@@ -351,19 +351,20 @@ impl AppServices {
                         std::env::var("DBUS_SYSTEM_BUS_ADDRESS").ok(),
                     )
                 };
-                let clipboard = self
-                    .app
-                    .state::<Arc<super::clipboard::Clipboard>>()
-                    .inner()
-                    .clone();
-                let service = TilesService::start(
-                    Runner::for_instance(self.test_instance, fixture_from_env()),
-                    session,
-                    system,
-                    clipboard,
-                );
-                self.forward(&service.topic);
-                slots.tiles = Some(service);
+                // The clipboard stand-in is always managed; only a failed stand-in is missing.
+                match self.app.try_state::<Arc<super::clipboard::Clipboard>>() {
+                    Some(clipboard) => {
+                        let service = TilesService::start(
+                            Runner::for_instance(self.test_instance, fixture_from_env()),
+                            session,
+                            system,
+                            clipboard.inner().clone(),
+                        );
+                        self.forward(&service.topic);
+                        slots.tiles = Some(service);
+                    }
+                    None => tracing::warn!("System tiles need the clipboard service, which failed to start"),
+                }
             }
         } else if let Some(service) = slots.tiles.take() {
             service.shutdown()?;

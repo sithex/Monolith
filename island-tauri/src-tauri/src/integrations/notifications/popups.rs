@@ -150,6 +150,10 @@ impl Popups {
             items: self.rows.iter().cloned().collect(),
         }
     }
+    /// A delivery of the current snapshot failed: send it again on the next round.
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
     pub fn take_dirty(&mut self) -> bool {
         std::mem::take(&mut self.dirty)
     }

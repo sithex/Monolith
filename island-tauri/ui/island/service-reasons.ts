@@ -58,6 +58,10 @@ export const SERVICE_REASONS: Readonly<Record<string, Entry>> = {
   'tailscale-unavailable': error('Tailscale isn’t running or isn’t installed.'),
   'voice-runner-unavailable': error('Hermes voice tools aren’t installed.'),
   'no-fixture-database': error('No test database is configured.'),
+  'start-failed': error('This failed to start. Restart Monolith to try again; the log says why.'),
+  'ingest-unavailable': error('Hermes can’t send alerts to the island right now. Desktop notifications still work.'),
+  'delivery-restarting': loading('Hit a problem and is restarting…'),
+  'delivery-stopped': error('This stopped after repeated failures. Restart Monolith to bring it back.'),
 };
 
 /** Codes whose meaning depends on the service. Looked up as `<source>:<code>` before the table above. */
@@ -67,6 +71,12 @@ const BY_SOURCE: Readonly<Record<string, Entry>> = {
   'scratchpad:save-failed': error('Couldn’t save your notes. The file on disk was left as it was.'),
   'clipboard:disabled': off('Clipboard history is turned off.'),
   'weather:disabled': off('Weather is turned off.'),
+  'notifications:start-failed': error('Notifications failed to start. Restart Monolith to try again.'),
+  'notifications:delivery-restarting': loading('Notifications hit a problem and are restarting…'),
+  'notifications:delivery-stopped': error('Notifications stopped after repeated failures. Restart Monolith to bring them back.'),
+  'clipboard:start-failed': error('Clipboard history failed to start. Your saved history was left untouched.'),
+  'clipboard:delivery-restarting': loading('Clipboard history hit a problem and is restarting…'),
+  'clipboard:delivery-stopped': error('Clipboard history stopped after repeated failures. Restart Monolith to bring it back.'),
 };
 
 /** `detail` values that describe a working backend. They are never error text. */

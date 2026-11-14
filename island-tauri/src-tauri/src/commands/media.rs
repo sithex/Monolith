@@ -13,7 +13,7 @@ use std::sync::Arc;
 #[specta::specta]
 pub async fn media_control(
     cmd: MediaCommand,
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<(), IslandError> {
     let media = Arc::clone(&system.media);
     media.control(cmd).await
@@ -25,7 +25,7 @@ pub async fn media_control(
 #[specta::specta]
 pub async fn media_set_visible(
     visible: bool,
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<(), IslandError> {
     system.equalizer.set_visible(visible);
     Ok(())

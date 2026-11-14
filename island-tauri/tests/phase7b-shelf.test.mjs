@@ -36,7 +36,9 @@ test('drop guard is installed on the window in the capture phase for enter, over
   assert.equal(removed.length, 3);
   const main = src('ui/island-main.tsx');
   assert.match(main, /installDropGuard\(window/);
-  assert.ok(main.indexOf('installDropGuard(window') < main.indexOf('beforeFirstRender('), 'guard before the first render');
+  // The first render goes through startIsland (error-fallback.tsx), which wraps beforeFirstRender.
+  assert.ok(main.indexOf('startIsland(') > 0 && main.indexOf('installDropGuard(window') < main.indexOf('startIsland('), 'guard before the first render');
+  assert.match(src('ui/island/error-fallback.tsx'), /await beforeFirstRender\(load, seed, mount\)/);
   assert.doesNotMatch(src('ui/island/drop-guard.ts'), /from '\.\.?\//, 'no relative imports (loaded standalone)');
 });
 

@@ -45,7 +45,8 @@ export type MixerModel = Pick<MixerChanged, 'sinks' | 'streams' | 'defaultSink'>
 export type MixerChannel = Pick<MixerChanged['sinks'][number], 'index' | 'volumePercent' | 'muted'> & { label: string; name: string | null };
 export type DisplayView = BrightnessChanged['displays'][number];
 export type NotificationItem = Omit<IslandNotification, 'rev'> & { hidden: boolean; ageLabel: string };
-export type NotificationsModel = { dnd: boolean; items: NotificationItem[] };
+/** `unavailable`: the reason code while delivery is down (see service-reasons.ts). */
+export type NotificationsModel = { dnd: boolean; items: NotificationItem[]; unavailable?: string };
 export type WeatherView = Omit<WeatherState, 'rev' | 'available'> & { updatedLabel: string | null };
 export type PowerView = Omit<PowerState, 'rev' | 'available'>;
 export type QuickInfoModel = { weather: Service<WeatherView>; power: Service<PowerView>; bluetooth: Service<BtDevice[]> };

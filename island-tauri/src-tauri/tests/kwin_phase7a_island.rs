@@ -214,6 +214,50 @@ fn click(s: &Stack, eis: &mut Wheel, origin: (i32, i32), selector: &str) {
         origin.1 + point[1].as_f64().unwrap() as i32,
     );
 }
+fn fallback_round_trip(
+    s: &Stack,
+    conn: &RustConnection,
+    window: u32,
+    eis: &mut Wheel,
+    origin: (i32, i32),
+    name: &str,
+    trigger: &str,
+) {
+    eval(s, trigger);
+    until(s, &format!("7a {name} fallback card"), 20, "!!document.querySelector('[data-island-fallback]') && !document.querySelector('.island')");
+    let layout = eval(s, "(()=>{const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};const card=document.querySelector('[data-island-fallback]');const style=getComputedStyle(card);return {card:box(card),text:box(card.querySelector('.island-fallback-text')),button:box(card.querySelector('button')),label:card.querySelector('button').textContent,line:card.textContent,background:style.backgroundColor,radius:parseFloat(style.borderRadius)||0,vw:innerWidth,vh:innerHeight}})()");
+    let n = |path: &[&str]| -> f64 {
+        path.iter().fold(&layout, |v, k| &v[*k]).as_f64().unwrap()
+    };
+    // Rendered layout: on screen, not transparent, button inside the card and clear of the text.
+    assert!(n(&["card", "width"]) >= 200. && n(&["card", "height"]) >= 36., "{name}: card size {layout}");
+    assert!(n(&["card", "x"]) >= 0. && n(&["card", "y"]) >= 0. && n(&["card", "right"]) <= n(&["vw"]) && n(&["card", "bottom"]) <= n(&["vh"]), "{name}: card on screen {layout}");
+    assert!(!layout["background"].as_str().unwrap().contains("rgba(0, 0, 0, 0)") && layout["background"] != "transparent", "{name}: solid card {layout}");
+    assert!(n(&["button", "x"]) >= n(&["card", "x"]) && n(&["button", "right"]) <= n(&["card", "right"]) && n(&["button", "y"]) >= n(&["card", "y"]) && n(&["button", "bottom"]) <= n(&["card", "bottom"]), "{name}: Reload inside the card {layout}");
+    assert!(n(&["text", "right"]) <= n(&["button", "x"]), "{name}: text clear of Reload {layout}");
+    assert!(n(&["button", "width"]) >= 44. && n(&["button", "height"]) >= 24., "{name}: Reload is a real target {layout}");
+    assert_eq!(layout["label"], "Reload");
+    let line = layout["line"].as_str().unwrap();
+    assert!(line.starts_with("Monolith hit an error.") && line.contains("Test-requested"), "{name}: {line}");
+    // The input region covers the whole card (inset by its corner radius), so it is clickable.
+    let card = RoundedRect { x: n(&["card", "x"]), y: n(&["card", "y"]), width: n(&["card", "width"]), height: n(&["card", "height"]), radius: n(&["radius"]) };
+    let inset = card.radius.ceil() as i32 + 1;
+    let probes = [
+        (card.x as i32 + inset, card.y as i32 + 1),
+        ((card.x + card.width) as i32 - inset, (card.y + card.height) as i32 - 2),
+        ((card.x + card.width / 2.) as i32, (card.y + card.height / 2.) as i32),
+        (n(&["button", "x"]) as i32 + 4, (n(&["button", "y"]) + n(&["button", "height"]) / 2.) as i32),
+    ];
+    wait_for(&format!("7a {name} fallback input region"), Duration::from_secs(10), || {
+        let rows = normalize_rows(&input_region(conn, window));
+        probes
+            .iter()
+            .all(|&(x, y)| rows.iter().any(|r| i32::from(r.y) <= y && y < i32::from(r.y) + i32::from(r.height) && i32::from(r.x) <= x && x < i32::from(r.x) + i32::from(r.width)))
+            .then_some(())
+    });
+    click(s, eis, origin, "[data-island-fallback] button");
+    until(s, &format!("7a {name} fallback Reload restores the island"), 25, "!!document.querySelector('.island') && !document.querySelector('[data-island-fallback]')");
+}
 fn settings_section(s: &Stack, eis: &mut Wheel, origin: (i32, i32), section: &str) {
     click(
         s,
@@ -724,6 +768,12 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         20,
         "!!document.querySelector('.island') && document.documentElement.dataset.theme==='neutral'",
     );
+    // Failsafes: a bootstrap that fails and a render that throws each leave a solid card that is
+    // visible and clickable (the window's input region covers it), and its Reload brings the
+    // island back.
+    fallback_round_trip(&s, &conn, window, &mut eis, origin, "bootstrap",
+        "(sessionStorage.setItem('island-test-fault','bootstrap'),setTimeout(()=>location.reload(),250),true)");
+    fallback_round_trip(&s, &conn, window, &mut eis, origin, "render", "(window.__islandTestCrash(),true)");
     assert_eq!(unsafe { libc::kill(pid as i32, libc::SIGTERM) }, 0);
     wait_for(
         "7a owned app and fixture PTY exited",

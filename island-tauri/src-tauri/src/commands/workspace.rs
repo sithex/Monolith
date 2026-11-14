@@ -63,9 +63,6 @@ pub async fn launcher_command(
                     app.clone(),
                     app.state::<Services>(),
                     app.state::<crate::state::host::IslandActor>(),
-                    app.state::<crate::integrations::notifications::hub::Notifications>(),
-                    app.state::<Arc<crate::integrations::clipboard::Clipboard>>(),
-                    app.state::<Arc<crate::integrations::system_services::SystemServices>>(),
                 )
                 .await?;
                 let worker = app.clone();

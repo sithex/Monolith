@@ -26,7 +26,6 @@ use std::{
         atomic::{AtomicU32, Ordering},
         mpsc, Arc, Mutex,
     },
-    thread::JoinHandle,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::Manager;
@@ -71,11 +70,13 @@ pub fn nudge_status(app: &tauri::AppHandle) {
     }
 }
 
+/// Longest wait for the status worker on quit: one helper call (3 s) plus a margin.
+const STATUS_WORKER_JOIN: Duration = Duration::from_millis(3500);
 pub struct NativeHost {
     instance: Arc<Mutex<InstanceGuard>>,
     panel: Mutex<Option<PanelSocket>>,
     stop: mpsc::SyncSender<StatusMsg>,
-    worker: Mutex<Option<JoinHandle<()>>>,
+    worker: Mutex<Option<crate::services::shutdown::BoundedThread>>,
     watcher: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
     /// The notch companion's pointer relay (never in test instances).
     companion: Mutex<Option<super::companion::CompanionBus>>,
@@ -561,9 +562,7 @@ impl NativeHost {
             bus.relay_copy_progress(system.apps.transfers.progress());
         }
         let relay = companion.is_some();
-        let worker = std::thread::Builder::new()
-            .name("ripple-status".into())
-            .spawn(move || {
+        let worker = crate::services::shutdown::BoundedThread::spawn("ripple-status", move || {
                 let mut last_write = Instant::now();
                 let mut last_panel_style = Value::Null;
                 let mut anchor = anchor;
@@ -875,9 +874,18 @@ impl NativeHost {
             .map_err(|_| anyhow::anyhow!("Status worker slot poisoned"))?
             .take()
         {
-            worker
-                .join()
-                .map_err(|_| anyhow::anyhow!("Status worker panicked"))?;
+            // The worker may be inside a 3 s helper call (qdbus, kscreen-doctor) or waiting on
+            // the main thread: never wait for it without a bound.
+            match worker.join_within(STATUS_WORKER_JOIN) {
+                crate::services::shutdown::JoinOutcome::Joined => {}
+                crate::services::shutdown::JoinOutcome::Panicked => {
+                    anyhow::bail!("Status worker panicked")
+                }
+                crate::services::shutdown::JoinOutcome::TimedOut => tracing::warn!(
+                    ?STATUS_WORKER_JOIN,
+                    "Status worker did not stop in time; left behind"
+                ),
+            }
         }
         if let Some(bus) = self
             .companion

@@ -13,6 +13,7 @@ pub mod desktop_apps;
 pub mod fonts;
 pub mod frontend;
 pub mod island;
+pub mod managed;
 pub mod media;
 pub mod notifications;
 pub mod probe;

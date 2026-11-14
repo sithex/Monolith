@@ -57,7 +57,7 @@ pub async fn process_kill(
 #[tauri::command]
 #[specta::specta]
 pub async fn weather_refresh(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<WeatherState, IslandError> {
     let weather = Arc::clone(&system.weather);
     weather.refresh().await
@@ -68,7 +68,7 @@ pub async fn weather_refresh(
 #[specta::specta]
 pub async fn weather_geocode(
     query: String,
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<Vec<GeoPlace>, IslandError> {
     let weather = Arc::clone(&system.weather);
     weather.geocode(&query).await

@@ -18,6 +18,7 @@ mod calendar_core_ics_rules;
 mod clipboard_core_history;
 mod clipboard_settings;
 mod downloads_core_fuzz_tests;
+mod failsafes;
 mod downloads_core_model_tests;
 mod jobs_core;
 mod shelf_core;

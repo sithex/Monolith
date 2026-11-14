@@ -130,6 +130,10 @@ function notification(x: unknown): Omit<IslandNotification, 'rev'> {
     actions: unique(list(r.actions, x => { const a = record(x); return { key: text(a.key, 256), label: text(a.label, 1024) }; }, 64), a => a.key),
     canInvokeActions: bool(r.canInvokeActions), progress: nullable(r.progress, x => num(x, 0, 1)) };
 }
+/** The reason to show while notification delivery is down; nothing while it starts or runs. */
+export function notificationsDown(status: { available: boolean; detail: string } | null): string | undefined {
+  return status && !status.available && status.detail !== 'starting' ? status.detail : undefined;
+}
 export function adaptNotifications(raw: unknown, dnd: boolean, redactBodies: boolean, ageLabel: (receivedAt: number) => string = () => 'Age unavailable'): NotificationsModel {
   bool(dnd); bool(redactBodies);
   return { dnd, items: unique(list(raw, notification, 200), n => n.id).map(n => ({ ...n, hidden: redactBodies, body: redactBodies ? null : n.body, iconPng: redactBodies ? null : n.iconPng, actions: redactBodies ? [] : n.actions, canInvokeActions: false, ageLabel: short(ageLabel(n.receivedAt)) })) };

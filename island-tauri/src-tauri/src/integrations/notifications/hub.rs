@@ -5,8 +5,13 @@ use super::{
     *,
 };
 use crate::{
-    contract::notify as wire,
+    bus::COALESCE,
+    contract::{notify as wire, system::ServiceStatus},
     error::IslandError,
+    integrations::{
+        pump::{deliver, supervise, Backoff, Delivery, PumpHealth, RestartPolicy},
+        service_status::Reporter,
+    },
     services::settings::SettingsService,
     state::{actor::Handle, machine::Intent},
     window::ISLAND_LABEL,
@@ -306,25 +311,36 @@ impl Hub {
             Ok(((), store.set_policy(p).map_err(core_error)?))
         })
     }
+    /// One delivery pump. It ends with `Ok` only on a stop request or when the state actor is
+    /// gone; a full actor queue or a failed emit is retried with bounded backoff, and anything
+    /// it could not deliver is re-sent as a fresh snapshot (`repair_needed`), never dropped.
+    /// `resync`: a restarted pump re-sends the full list and popups the page may have missed.
     async fn run(
         self: Arc<Self>,
-        app: tauri::AppHandle,
+        out: Arc<dyn HubOutlet>,
         mut stopped: watch::Receiver<bool>,
+        resync: bool,
     ) -> Result<(), IslandError> {
         let mut state_changes = self.actor.watch();
         // Popup ids last emitted: a new id grows the notch into the card, an empty queue
         // lets a notification-caused hover close (popups.rs owns the card lifetimes).
         let mut popup_ids: Vec<String> = Vec::new();
+        // The newest popup intent the actor has not accepted yet (it was Busy).
+        let mut owed: Option<Intent> = None;
+        let mut backoff = Backoff::new(Duration::from_millis(50), Duration::from_secs(5));
+        let mut failing = 0u32;
+        if resync {
+            let mut inner = self.lock_inner()?;
+            inner.repair_needed = true;
+            inner.popups.mark_dirty();
+        }
         loop {
             // Register before inspecting the queue, avoiding lost wakeups between drain/wait.
             let notified = self.wake.notified();
             tokio::pin!(notified);
             notified.as_mut().enable();
             let (pending, unread, expiry, repair, popup_state) = {
-                let mut inner = self
-                    .inner
-                    .lock()
-                    .map_err(|_| IslandError::internal("Notification store poisoned"))?;
+                let mut inner = self.lock_inner()?;
                 let expired = inner.store.expire(self.now()).map_err(core_error)?;
                 self.queue(&mut inner, expired);
                 let now = self.origin.elapsed().as_millis() as u64;
@@ -350,6 +366,10 @@ impl Hub {
                     popup_state,
                 )
             };
+            // `emit_failed`: the page missed something; it is re-synced from a snapshot next
+            // round. `failed`: anything to retry (a failed emit or a Busy actor), after backoff.
+            let mut emit_failed = false;
+            let mut failed = false;
             if let Some(popups) = popup_state {
                 let ids: Vec<String> = popups
                     .items
@@ -358,58 +378,47 @@ impl Hub {
                     .collect();
                 let fresh = ids.iter().find(|id| !popup_ids.contains(id)).cloned();
                 let emptied = ids.is_empty() && !popup_ids.is_empty();
-                popup_ids = ids;
-                popups
-                    .emit_to(&app, ISLAND_LABEL)
-                    .map_err(|_| IslandError::internal("Notification popups emit failed"))?;
-                if let Some(id) = fresh {
-                    self.actor.dispatch(Intent::PopupShown(id)).await?;
-                } else if emptied {
-                    self.actor.dispatch(Intent::PopupsEmpty).await?;
+                if let Err(error) = out.send(Outbound::Popups(popups)) {
+                    tracing::debug!(%error, "Notification popups delivery failed");
+                    self.lock_inner()?.popups.mark_dirty();
+                    emit_failed = true;
+                } else {
+                    popup_ids = ids;
+                    if let Some(id) = fresh {
+                        owed = Some(Intent::PopupShown(id));
+                    } else if emptied {
+                        owed = Some(Intent::PopupsEmpty);
+                    }
+                }
+            }
+            if let Some(intent) = owed.take() {
+                let actor = &self.actor;
+                match deliver(|| actor.dispatch(intent.clone()), &mut stopped).await {
+                    Delivery::Done(_) => {}
+                    Delivery::Busy => {
+                        owed = Some(intent);
+                        failed = true;
+                    }
+                    Delivery::Stopped => break,
+                    Delivery::Failed(_) if !self.actor.is_running() => break,
+                    Delivery::Failed(error) => {
+                        tracing::warn!(%error, "State actor refused a popup intent")
+                    }
                 }
             }
             if let Some(repair) = repair {
-                repair
-                    .emit_to(&app, ISLAND_LABEL)
-                    .map_err(|_| IslandError::internal("NotificationSnapshot emit failed"))?;
+                if let Err(error) = out.send(Outbound::Snapshot(repair)) {
+                    tracing::debug!(%error, "NotificationSnapshot delivery failed");
+                    emit_failed = true;
+                }
             }
             for (changes, close_owner) in pending {
-                for delta in changes.events {
-                    match delta {
-                        Delta::NotificationReceived(n) => {
-                            // A drained batch can be superseded by privacy/close while
-                            // awaiting the actor. Never re-emit an obsolete private payload.
-                            let current = self
-                                .inner
-                                .lock()
-                                .map_err(|_| IslandError::internal("Notification store poisoned"))?
-                                .store
-                                .is_current(&n.0.id, n.0.rev);
-                            if current {
-                                // Popup presentation is independent of the hover-preview state.
-                                // Recheck and hold serialization
-                                // through emit, so a concurrent scrub cannot be undone.
-                                let inner = self.inner.lock().map_err(|_| {
-                                    IslandError::internal("Notification store poisoned")
-                                })?;
-                                if inner.store.is_current(&n.0.id, n.0.rev) {
-                                    wire::NotificationReceived(n.0.into())
-                                        .emit_to(&app, ISLAND_LABEL)
-                                        .map_err(|_| {
-                                            IslandError::internal(
-                                                "NotificationReceived emit failed",
-                                            )
-                                        })?;
-                                }
-                            }
-                        }
-                        Delta::NotificationClosed(c) => wire::NotificationClosed {
-                            rev: c.rev,
-                            id: c.id,
-                            reason: c.reason.into(),
-                        }
-                        .emit_to(&app, ISLAND_LABEL)
-                        .map_err(|_| IslandError::internal("NotificationClosed emit failed"))?,
+                // After a failed emit the rest of the drained deltas are not sent one by one:
+                // the snapshot below carries the store as it is now.
+                if !emit_failed {
+                    if let Err(error) = self.emit_changes(out.as_ref(), changes.events) {
+                        tracing::debug!(%error, "Notification event delivery failed");
+                        emit_failed = true;
                     }
                 }
                 // Remote close is deliberately independent of local removal. Monitor wiring
@@ -420,28 +429,106 @@ impl Hub {
                     }
                 }
             }
-            self.actor
-                .dispatch(Intent::NotificationsSync(unread))
-                .await?;
+            if emit_failed {
+                self.lock_inner()?.repair_needed = true;
+                failed = true;
+            }
+            let actor = &self.actor;
+            match deliver(|| actor.dispatch(Intent::NotificationsSync(unread)), &mut stopped).await {
+                Delivery::Done(_) => {}
+                // The count is recomputed and sent again next round.
+                Delivery::Busy => failed = true,
+                Delivery::Stopped => break,
+                Delivery::Failed(_) if !self.actor.is_running() => break,
+                Delivery::Failed(error) => {
+                    tracing::warn!(%error, "State actor refused the notification count")
+                }
+            }
+            let retry = if failed {
+                failing = failing.saturating_add(1);
+                if failing == 1 {
+                    tracing::warn!("Notification delivery is failing; retrying with backoff");
+                }
+                Some(backoff.next_delay())
+            } else {
+                if failing > 0 {
+                    tracing::info!(rounds = failing, "Notification delivery recovered");
+                }
+                failing = 0;
+                backoff.reset();
+                None
+            };
             let wait = async {
-                match expiry {
-                    Some(deadline) => {
-                        tokio::time::sleep(Duration::from_secs_f64(
-                            ((deadline - self.now()).max(0.)) / 1000.,
-                        ))
-                        .await
-                    }
-                    None => std::future::pending::<()>().await,
+                let expiry = expiry
+                    .map(|deadline| Duration::from_secs_f64(((deadline - self.now()).max(0.)) / 1000.));
+                match (expiry, retry) {
+                    (Some(a), Some(b)) => tokio::time::sleep(a.min(b)).await,
+                    (Some(a), None) | (None, Some(a)) => tokio::time::sleep(a).await,
+                    (None, None) => std::future::pending::<()>().await,
                 }
             };
             tokio::select! { biased;
                 result=stopped.changed()=>{if result.is_err()||*stopped.borrow(){break;}},
-                ()=&mut notified=>{},
+                // A retry waits out its backoff even when new work arrives: no retry storm.
+                ()=&mut notified, if retry.is_none() =>{},
                 changed=state_changes.changed()=>{ if changed.is_err() { break; } self.refresh_policy()?; },
                 ()=wait=>{},
             }
         }
         Ok(())
+    }
+    fn lock_inner(&self) -> Result<std::sync::MutexGuard<'_, Inner>, IslandError> {
+        self.inner
+            .lock()
+            .map_err(|_| IslandError::internal("Notification store poisoned"))
+    }
+    /// Emits one drained batch; stops at the first failed emit.
+    fn emit_changes(&self, out: &dyn HubOutlet, events: Vec<Delta>) -> Result<(), IslandError> {
+        for delta in events {
+            match delta {
+                Delta::NotificationReceived(n) => {
+                    // A drained batch can be superseded by privacy/close while awaiting the
+                    // actor. Never re-emit an obsolete private payload. Recheck and hold
+                    // serialization through emit, so a concurrent scrub cannot be undone.
+                    let inner = self.lock_inner()?;
+                    if inner.store.is_current(&n.0.id, n.0.rev) {
+                        out.send(Outbound::Received(wire::NotificationReceived(n.0.into())))?;
+                    }
+                }
+                Delta::NotificationClosed(c) => out.send(Outbound::Closed(wire::NotificationClosed {
+                    rev: c.rev,
+                    id: c.id,
+                    reason: c.reason.into(),
+                }))?,
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Everything the hub sends to the page.
+#[derive(Debug)]
+pub enum Outbound {
+    Popups(popups::NotificationPopups),
+    Snapshot(wire::NotificationSnapshot),
+    Received(wire::NotificationReceived),
+    Closed(wire::NotificationClosed),
+    Status(ServiceStatus),
+}
+/// Where hub events go: the island window in the app, a recorder in tests.
+pub trait HubOutlet: Send + Sync + 'static {
+    fn send(&self, event: Outbound) -> Result<(), IslandError>;
+}
+impl HubOutlet for tauri::AppHandle {
+    fn send(&self, event: Outbound) -> Result<(), IslandError> {
+        let sent = match event {
+            Outbound::Popups(e) => e.emit_to(self, ISLAND_LABEL),
+            Outbound::Snapshot(e) => e.emit_to(self, ISLAND_LABEL),
+            Outbound::Received(e) => e.emit_to(self, ISLAND_LABEL),
+            Outbound::Closed(e) => e.emit_to(self, ISLAND_LABEL),
+            Outbound::Status(e) => e.emit_to(self, ISLAND_LABEL),
+        };
+        sent.map_err(|e| IslandError::internal(format!("Notification event emit failed: {e}")))
     }
 }
 impl Handler for Hub {
@@ -469,6 +556,9 @@ fn core_error(_: Error) -> IslandError {
 
 pub struct Notifications {
     pub hub: Arc<Hub>,
+    /// `notifications` availability: delivery pump health, plus whether Hermes' ingest
+    /// socket could be opened (desktop notifications work without it).
+    pub status: Arc<Reporter>,
     stop: watch::Sender<bool>,
     task: Mutex<Option<tauri::async_runtime::JoinHandle<Result<(), IslandError>>>>,
     ingest: Mutex<Option<IngestServer>>,
@@ -483,30 +573,82 @@ impl Notifications {
         settings: Arc<SettingsService>,
         data: &Path,
     ) -> Result<Self, IslandError> {
+        let bus = std::env::var("DBUS_SESSION_BUS_ADDRESS").unwrap_or_default();
+        Self::start_with(Arc::new(app), actor, settings, data, bus, RestartPolicy::standard())
+    }
+    /// `start` with the outlet, session bus address and restart policy supplied (tests use a
+    /// recorder, a bus that does not exist and short pauses).
+    pub fn start_with(
+        out: Arc<dyn HubOutlet>,
+        actor: Handle,
+        settings: Arc<SettingsService>,
+        data: &Path,
+        bus: String,
+        policy: RestartPolicy,
+    ) -> Result<Self, IslandError> {
         let hub = Hub::new(actor, settings);
         let (stop, stopped) = watch::channel(false);
-        let ingest = IngestServer::start(data, hub.clone())?;
-        hub.refresh_policy()?;
-        let address = std::env::var("DBUS_SESSION_BUS_ADDRESS").unwrap_or_default();
+        let status = Reporter::new("notifications");
+        // Optional: without the socket only Hermes' own alerts are missing. A stale socket
+        // left by a crash used to stop the whole island from starting.
+        let ingest = match IngestServer::start(data, hub.clone()) {
+            Ok(ingest) => Some(ingest),
+            Err(error) => {
+                tracing::warn!(%error, "Hermes notification socket unavailable; desktop notifications still work");
+                None
+            }
+        };
+        let ingest_ok = ingest.is_some();
+        if let Err(error) = hub.refresh_policy() {
+            // The policy is refreshed again on every state change.
+            tracing::warn!(%error, "Notification policy not applied at start");
+        }
+        let forward = out.clone();
+        tauri::async_runtime::spawn(status.topic.forwarder(COALESCE, move |value: ServiceStatus| {
+            if let Err(error) = forward.send(Outbound::Status(value)) {
+                tracing::debug!(%error, "Notification status delivery failed");
+            }
+        }));
         let monitor_task = tauri::async_runtime::spawn(hub.monitor.clone().run(
             hub.clone(),
-            address,
+            bus.clone(),
             hub.mirror_enabled.subscribe(),
             stopped.clone(),
         ));
-        let task = tauri::async_runtime::spawn(hub.clone().run(app, stopped.clone()));
+        let (pump_hub, pump_stop, report) = (hub.clone(), stopped.clone(), status.clone());
+        let mut restarted = false;
+        let task = tauri::async_runtime::spawn(async move {
+            supervise(
+                "notifications",
+                policy,
+                pump_stop.clone(),
+                move || {
+                    let resync = std::mem::replace(&mut restarted, true);
+                    pump_hub.clone().run(out.clone(), pump_stop.clone(), resync)
+                },
+                move |health| match health {
+                    PumpHealth::Running if ingest_ok => report.available("ready"),
+                    PumpHealth::Running => report.unavailable("ingest-unavailable"),
+                    PumpHealth::Restarting => report.unavailable("delivery-restarting"),
+                    PumpHealth::Stopped => report.unavailable("delivery-stopped"),
+                },
+            )
+            .await;
+            Ok(())
+        });
         #[cfg(target_os = "linux")]
         let takeover_task = tauri::async_runtime::spawn(takeover::run(
             hub.clone(),
-            std::env::var("DBUS_SESSION_BUS_ADDRESS").unwrap_or_default(),
+            bus,
             hub.takeover_enabled.subscribe(),
             stopped,
         ));
         Ok(Self {
             hub,
+            status,
             stop,
             task: Mutex::new(Some(task)),
-            ingest: Mutex::new(Some(ingest)),
+            ingest: Mutex::new(ingest),
             monitor_task: Mutex::new(Some(monitor_task)),
             #[cfg(target_os = "linux")]
             takeover_task: Mutex::new(Some(takeover_task)),

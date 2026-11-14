@@ -132,6 +132,11 @@ impl Handle {
     pub fn shutdown(&self) {
         self.stop.send_replace(true);
     }
+    /// False once the actor was told to stop or its task has ended (its queue is closed).
+    /// Lets a caller tell "the authority is gone" from an ordinary refused intent.
+    pub fn is_running(&self) -> bool {
+        !*self.stop.borrow() && !self.queue.is_closed()
+    }
 }
 /// Publish only a changed state: every publication rewrites the status file and wakes
 /// its watchers, and most effects (a refused focus, a cue) leave the state untouched.

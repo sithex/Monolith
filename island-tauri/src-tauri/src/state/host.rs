@@ -67,9 +67,11 @@ impl Sink for IslandSink {
         for effect in effects {
             match effect {
                 Effect::SetClipboardPaused(paused) => {
-                    self.app
-                        .state::<Arc<crate::integrations::clipboard::Clipboard>>()
-                        .set_paused(*paused)?;
+                    crate::commands::managed::require::<
+                        Arc<crate::integrations::clipboard::Clipboard>,
+                        _,
+                    >(&self.app)?
+                    .set_paused(*paused)?;
                 }
                 Effect::EmitState => {}
                 Effect::PlayClick => bus::emit_cue(&self.app, CueKind::Click)?,

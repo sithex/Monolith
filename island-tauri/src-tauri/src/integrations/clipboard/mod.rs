@@ -14,6 +14,7 @@ mod unsupported;
 use crate::{
     contract::{clipboard as wire, settings::Settings},
     error::{ErrorCode, IslandError},
+    integrations::pump::{pause, supervise, Backoff, PumpHealth, RestartPolicy},
     window::ISLAND_LABEL,
 };
 use history::{ClipInput, ClipPayload, HistoryConfig, HistoryStore, OfferOutcome, SkipReason};
@@ -61,6 +62,8 @@ pub struct Clipboard {
     events: Mutex<Option<EventTask>>,
     event_stop: watch::Sender<bool>,
     closed: AtomicBool,
+    /// The startup stand-in (see `unavailable`): settings changes never touch it.
+    frozen: bool,
 }
 impl Clipboard {
     pub fn new(data: PathBuf, settings: Settings) -> Result<Arc<Self>, IslandError> {
@@ -106,13 +109,53 @@ impl Clipboard {
             events: Mutex::new(None),
             event_stop: watch::channel(false).0,
             closed: AtomicBool::new(false),
+            frozen: false,
         });
         service.configure(settings)?;
         Ok(service)
     }
+    /// The stand-in managed when `new` failed at startup: empty, never captures, never
+    /// reads or writes `clipboard.json` (a saved history that failed to load is left as it
+    /// was), and `configure` is a no-op so saving settings still works. Its status reads
+    /// `available: false`, `start-failed`.
+    pub fn unavailable(data: PathBuf) -> Result<Arc<Self>, IslandError> {
+        let config = HistoryConfig::default();
+        let store = HistoryStore::new(config.clone()).map_err(core_error)?;
+        Ok(Arc::new(Self {
+            shared: Arc::new(Shared {
+                inner: Mutex::new(Inner {
+                    store,
+                    config,
+                    persist: false,
+                    rev: 0,
+                    pending: VecDeque::new(),
+                }),
+                enabled: AtomicBool::new(false),
+                paused: AtomicBool::new(false),
+                epoch: AtomicU32::new(0),
+                status: watch::channel(wire::ClipboardStatus {
+                    detail: crate::services::degraded::START_FAILED.into(),
+                    ..Default::default()
+                })
+                .0,
+                wake: Notify::new(),
+                file: data.join("clipboard.json"),
+                #[cfg(target_os = "linux")]
+                watcher_wake: Mutex::new(None),
+            }),
+            worker: Mutex::new(None),
+            events: Mutex::new(None),
+            event_stop: watch::channel(false).0,
+            closed: AtomicBool::new(false),
+            frozen: true,
+        }))
+    }
     pub fn configure(&self, settings: Settings) -> Result<(), IslandError> {
         if self.closed.load(Ordering::Acquire) {
             return Err(IslandError::unavailable("Clipboard service stopped"));
+        }
+        if self.frozen {
+            return Ok(());
         }
         let cfg = config(&settings)?;
         // Serialize enable/disable and joins; capture never needs the worker slot lock.
@@ -246,6 +289,15 @@ impl Clipboard {
         Ok(())
     }
     pub fn start_events(self: &Arc<Self>, app: tauri::AppHandle) -> Result<(), IslandError> {
+        self.start_events_with(Arc::new(app), RestartPolicy::standard())
+    }
+    /// Starts the supervised delivery pump. A failed pump is restarted with backoff; while it
+    /// is down the status says `delivery-restarting`, and `delivery-stopped` once it gave up.
+    pub fn start_events_with(
+        self: &Arc<Self>,
+        out: Arc<dyn ClipOutlet>,
+        policy: RestartPolicy,
+    ) -> Result<(), IslandError> {
         if self.closed.load(Ordering::Acquire) {
             return Err(IslandError::unavailable("Clipboard service stopped"));
         }
@@ -257,44 +309,32 @@ impl Clipboard {
             ));
         }
         let shared = self.shared.clone();
-        let mut stopped = self.event_stop.subscribe();
-        let mut status = self.watch_status();
+        let stop = self.event_stop.clone();
+        let report = self.shared.clone();
+        // What the watcher had published before the pump failed, restored once it runs again.
+        let saved: Arc<Mutex<Option<(bool, String)>>> = Arc::default();
+        // One status revision across pump restarts, so the page never ignores a newer one.
+        let revision = Arc::new(AtomicU32::new(0));
+        let (tell, tell_rev) = (out.clone(), revision.clone());
         *task = Some(tauri::async_runtime::spawn(async move {
-            let mut revision = 0u32;
-            loop {
-                let notified = shared.wake.notified();
-                tokio::pin!(notified);
-                notified.as_mut().enable();
-                // Take one at a time: no hidden, unbounded drained delivery batch.
-                match shared.emit_one(&app) {
-                    Ok(true) => {
-                        tokio::task::yield_now().await;
-                        continue;
-                    }
-                    Ok(false) => {}
-                    Err(error) => {
-                        tracing::error!(%error, "Clipboard event store failed");
-                        break;
-                    }
-                }
-                tokio::select! { biased;
-                    changed = stopped.changed() => { if changed.is_err() || *stopped.borrow() {break;} },
-                    changed = status.changed() => {
-                        if changed.is_err() { break; }
-                        // Latest-value status is coalesced; no appearance/status polling.
-                        tokio::select! {
-                            _ = stopped.changed() => break,
-                            () = tokio::time::sleep(std::time::Duration::from_millis(100)) => {},
-                        }
-                        revision = revision.wrapping_add(1);
-                        let latest = status.borrow_and_update().clone();
-                        if let Err(error) = (wire::ClipboardStatusChanged { rev: revision, status: latest }).emit_to(&app, ISLAND_LABEL) {
+            supervise(
+                "clipboard",
+                policy,
+                stop.subscribe(),
+                move || pump(shared.clone(), out.clone(), stop.subscribe(), revision.clone()),
+                move |health| {
+                    report.pump_health(health, &saved);
+                    // The pump is down and cannot forward this change itself.
+                    if health != PumpHealth::Running {
+                        let status = report.status.borrow().clone();
+                        let rev = tell_rev.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
+                        if let Err(error) = tell.status(&wire::ClipboardStatusChanged { rev, status }) {
                             tracing::warn!(%error, "Clipboard status delivery failed");
                         }
-                    },
-                    () = &mut notified => {},
-                }
-            }
+                    }
+                },
+            )
+            .await;
         }));
         Ok(())
     }
@@ -325,23 +365,146 @@ impl Drop for Clipboard {
         }
     }
 }
+/// Entries that failed to reach the page this many times in a row are skipped (the page
+/// still sees them on its next list read).
+const ADDED_ATTEMPTS: u32 = 3;
+enum Emitted {
+    Sent,
+    Idle,
+    Retry,
+}
+/// Where clipboard events go: the island window in the app, a recorder in tests.
+pub trait ClipOutlet: Send + Sync + 'static {
+    fn added(&self, item: &wire::ClipSummary) -> Result<(), IslandError>;
+    fn status(&self, status: &wire::ClipboardStatusChanged) -> Result<(), IslandError>;
+}
+impl ClipOutlet for tauri::AppHandle {
+    fn added(&self, item: &wire::ClipSummary) -> Result<(), IslandError> {
+        wire::ClipboardAdded(item.clone())
+            .emit_to(self, ISLAND_LABEL)
+            .map_err(|e| IslandError::internal(format!("ClipboardAdded emit failed: {e}")))
+    }
+    fn status(&self, status: &wire::ClipboardStatusChanged) -> Result<(), IslandError> {
+        status
+            .clone()
+            .emit_to(self, ISLAND_LABEL)
+            .map_err(|e| IslandError::internal(format!("ClipboardStatusChanged emit failed: {e}")))
+    }
+}
+/// One delivery pump run: queued entries one at a time (no hidden unbounded batch) and the
+/// coalesced latest status. Ends `Ok` on stop; `Err` only when the history lock is broken.
+async fn pump(
+    shared: Arc<Shared>,
+    out: Arc<dyn ClipOutlet>,
+    mut stopped: watch::Receiver<bool>,
+    revision: Arc<AtomicU32>,
+) -> Result<(), IslandError> {
+    let mut status = shared.status.subscribe();
+    let mut attempts = 0u32;
+    let mut backoff = Backoff::new(
+        std::time::Duration::from_millis(50),
+        std::time::Duration::from_secs(1),
+    );
+    loop {
+        let notified = shared.wake.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        match shared.emit_one(out.as_ref(), &mut attempts)? {
+            Emitted::Sent => {
+                backoff.reset();
+                tokio::task::yield_now().await;
+                continue;
+            }
+            Emitted::Retry => {
+                if pause(backoff.next_delay(), &mut stopped).await {
+                    break;
+                }
+                continue;
+            }
+            Emitted::Idle => {}
+        }
+        tokio::select! { biased;
+            changed = stopped.changed() => { if changed.is_err() || *stopped.borrow() {break;} },
+            changed = status.changed() => {
+                if changed.is_err() { break; }
+                // Latest-value status is coalesced; no appearance/status polling.
+                if pause(std::time::Duration::from_millis(100), &mut stopped).await { break; }
+                let revision = revision.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
+                // A failed status emit is retried a few times, then left to the next change.
+                let mut retry = Backoff::new(std::time::Duration::from_millis(50), std::time::Duration::from_secs(1));
+                for attempt in 1..=ADDED_ATTEMPTS {
+                    let latest = status.borrow_and_update().clone();
+                    match out.status(&wire::ClipboardStatusChanged { rev: revision, status: latest }) {
+                        Ok(()) => break,
+                        Err(error) if attempt == ADDED_ATTEMPTS => tracing::warn!(%error, "Clipboard status delivery failed"),
+                        Err(_) => if pause(retry.next_delay(), &mut stopped).await { return Ok(()); },
+                    }
+                }
+            },
+            () = &mut notified => {},
+        }
+    }
+    Ok(())
+}
 impl Shared {
-    fn emit_one(&self, app: &tauri::AppHandle) -> Result<bool, IslandError> {
+    /// Sends the oldest queued entry. A failed emit puts it back at the front for a retry
+    /// after a pause; after [`ADDED_ATTEMPTS`] failures in a row it is dropped and counted.
+    fn emit_one(&self, out: &dyn ClipOutlet, attempts: &mut u32) -> Result<Emitted, IslandError> {
         let mut inner = self.inner()?;
         if !self.enabled.load(Ordering::Acquire) {
             inner.pending.clear();
-            return Ok(false);
+            return Ok(Emitted::Idle);
         }
         let Some(item) = inner.pending.pop_front() else {
-            return Ok(false);
+            return Ok(Emitted::Idle);
         };
-        if inner.store.list(None, 500).iter().any(|s| s.id == item.id) {
-            if let Err(error) = wire::ClipboardAdded(item).emit_to(app, ISLAND_LABEL) {
-                tracing::warn!(%error, "Clipboard event delivery failed");
-                self.status_change(|s| s.dropped = s.dropped.saturating_add(1));
+        if !inner.store.list(None, 500).iter().any(|s| s.id == item.id) {
+            return Ok(Emitted::Sent);
+        }
+        match out.added(&item) {
+            Ok(()) => {
+                *attempts = 0;
+                Ok(Emitted::Sent)
+            }
+            Err(error) => {
+                *attempts += 1;
+                if *attempts >= ADDED_ATTEMPTS {
+                    tracing::warn!(%error, "Clipboard event delivery failed; entry left for the next list read");
+                    *attempts = 0;
+                    self.status_change(|s| s.dropped = s.dropped.saturating_add(1));
+                    Ok(Emitted::Sent)
+                } else {
+                    tracing::debug!(%error, "Clipboard event delivery failed; retrying");
+                    inner.pending.push_front(item);
+                    Ok(Emitted::Retry)
+                }
             }
         }
-        Ok(true)
+    }
+    /// Mirrors the delivery pump's health into the status the Clipboard page shows.
+    fn pump_health(&self, health: PumpHealth, saved: &Mutex<Option<(bool, String)>>) {
+        let Ok(mut saved) = saved.lock() else { return };
+        self.status.send_modify(|s| match health {
+            PumpHealth::Running => {
+                if let Some((available, detail)) = saved.take() {
+                    if s.detail == "delivery-restarting" {
+                        s.available = available;
+                        s.detail = detail;
+                    }
+                }
+            }
+            PumpHealth::Restarting | PumpHealth::Stopped => {
+                if saved.is_none() && !s.detail.starts_with("delivery-") {
+                    *saved = Some((s.available, s.detail.clone()));
+                }
+                s.available = false;
+                s.detail = if health == PumpHealth::Stopped {
+                    "delivery-stopped".into()
+                } else {
+                    "delivery-restarting".into()
+                };
+            }
+        });
     }
     fn inner(&self) -> Result<MutexGuard<'_, Inner>, IslandError> {
         lock(&self.inner)

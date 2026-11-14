@@ -29,9 +29,6 @@ pub async fn settings_patch(
     app: tauri::AppHandle,
     services: tauri::State<'_, Services>,
     actor: tauri::State<'_, IslandActor>,
-    notifications: tauri::State<'_, crate::integrations::notifications::hub::Notifications>,
-    clipboard: tauri::State<'_, Arc<crate::integrations::clipboard::Clipboard>>,
-    system: tauri::State<'_, Arc<crate::integrations::system_services::SystemServices>>,
 ) -> Result<Settings, IslandError> {
     // Phase 7b: registry edits and launcher commits share one transaction boundary.
     let _workspace_transaction = super::workspace::settings_guard().await;
@@ -49,14 +46,25 @@ pub async fn settings_patch(
     // The state actor owns hoverDelay / clickSounds / toast / dnd decisions: it must see every
     // persisted change before the caller does.
     actor.handle.settings(next.clone()).await?;
-    let hub = notifications.hub.clone();
-    blocking(move || hub.refresh_policy()).await?;
-    let clipboard = clipboard.inner().clone();
-    let settings = services.settings.clone();
-    blocking(move || clipboard.configure(settings.get()?)).await?;
-    let system = system.inner().clone();
-    let configured = next.clone();
-    blocking(move || system.configure(&configured)).await?;
+    // Subsystems that failed to start are skipped: a degraded island still saves settings.
+    if let Some(notifications) =
+        app.try_state::<crate::integrations::notifications::hub::Notifications>()
+    {
+        let hub = notifications.hub.clone();
+        blocking(move || hub.refresh_policy()).await?;
+    }
+    if let Some(clipboard) = app.try_state::<Arc<crate::integrations::clipboard::Clipboard>>() {
+        let clipboard = clipboard.inner().clone();
+        let settings = services.settings.clone();
+        blocking(move || clipboard.configure(settings.get()?)).await?;
+    }
+    if let Some(system) =
+        app.try_state::<Arc<crate::integrations::system_services::SystemServices>>()
+    {
+        let system = system.inner().clone();
+        let configured = next.clone();
+        blocking(move || system.configure(&configured)).await?;
+    }
     services.settings_topic.publish(next.clone());
     Ok(next)
 }
@@ -71,9 +79,6 @@ pub async fn patch_from_host(
         app.clone(),
         app.state::<Services>(),
         app.state::<IslandActor>(),
-        app.state::<crate::integrations::notifications::hub::Notifications>(),
-        app.state::<Arc<crate::integrations::clipboard::Clipboard>>(),
-        app.state::<Arc<crate::integrations::system_services::SystemServices>>(),
     )
     .await
 }

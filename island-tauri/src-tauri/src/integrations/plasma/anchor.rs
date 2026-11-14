@@ -289,9 +289,19 @@ pub async fn discover() -> Result<Anchor, IslandError> {
                 false,
             )
         };
-        let outputs: Value = serde_json::from_slice(&run(outputs)?)
+        // The two helpers are independent: run them side by side, so a slow start costs
+        // the slower one (at most 3 s), not both in a row (up to 6 s before the window).
+        let (outputs, panels) = std::thread::scope(|scope| {
+            let panels = scope.spawn(|| run(panels));
+            let outputs = run(outputs);
+            let panels = panels
+                .join()
+                .unwrap_or_else(|_| Err(IslandError::internal("Plasma helper thread panicked")));
+            (outputs, panels)
+        });
+        let outputs: Value = serde_json::from_slice(&outputs?)
             .map_err(|_| IslandError::invalid("Invalid display helper JSON"))?;
-        let panels: Value = serde_json::from_slice(&run(panels)?)
+        let panels: Value = serde_json::from_slice(&panels?)
             .map_err(|_| IslandError::invalid("Invalid Plasma helper JSON"))?;
         anchor_from_data(&outputs, &panels)
     })

@@ -85,7 +85,7 @@ function seedSystem(boot: BootstrapSnapshot) {
   if (boot.lyrics) validated(lyricsStore,parseLyrics,boot.lyrics);
   if (boot.weather) weatherStore.apply(boot.weather); if (boot.power) powerStore.apply(boot.power);
   bluetoothStore.apply({ rev: boot.bluetoothRev, devices: boot.bluetooth });
-  for (const v of [boot.capabilities.powerStatus, boot.capabilities.weatherStatus, boot.capabilities.bluetoothStatus, boot.capabilities.mediaStatus]) {
+  for (const v of [boot.capabilities.powerStatus, boot.capabilities.weatherStatus, boot.capabilities.bluetoothStatus, boot.capabilities.mediaStatus, boot.capabilities.notificationsStatus]) {
     if (!statuses.has(v.service)) statuses.set(v.service, createEpochTopic<ServiceStatus>()); statuses.get(v.service)?.apply(v);
   }
 }

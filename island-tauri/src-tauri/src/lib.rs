@@ -258,38 +258,80 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
                 app.handle().clone(),
                 app.state::<state::host::IslandActor>().handle.clone(),
             )));
-            let clipboard = integrations::clipboard::Clipboard::new(paths.data_dir.clone(), services.settings.get()?)?;
-            clipboard.start_events(app.handle().clone())?;
-            app.manage(clipboard);
-            app.manage(integrations::notifications::hub::Notifications::start(
-                app.handle().clone(),
-                app.state::<state::host::IslandActor>().handle.clone(),
-                services.settings.clone(),
-                &paths.data_dir,
-            )?);
-            let window = window::create_island_window(app.handle(), &cli)?;
-            // Phase 6a power/weather/Bluetooth. Battery alerts feed the notification hub, and a
-            // test instance never reaches the real system bus (see `system_bus_address`).
-            let hub = app
-                .state::<integrations::notifications::hub::Notifications>()
-                .hub
-                .clone();
-            app.manage(Arc::new(
-                integrations::system_services::SystemServices::start(
-                    app.handle(),
-                    &services.settings.get()?,
-                    cli.test_instance,
-                    hub,
-                    &paths.data_dir,
-                )?,
-            ));
-            if matches!(cli.ui, contract::island::UiKind::Legacy | contract::island::UiKind::Island) {
-                app.manage(tray::Tray::start(app.handle(), app.state::<state::host::IslandActor>().handle.clone())?);
+            // Optional subsystems from here on: one that fails is recorded, logged and shown
+            // as unavailable (`start-failed`); the island still starts. Only the instance lock
+            // above, the services/actor before this point, the window and the native host
+            // (it owns the instance guard and status.json) may abort startup.
+            let degraded = services::degraded::Degraded::default();
+            let actor_handle = app.state::<state::host::IslandActor>().handle.clone();
+            let clipboard = services::degraded::optional(
+                "clipboard",
+                services
+                    .settings
+                    .get()
+                    .and_then(|settings| integrations::clipboard::Clipboard::new(paths.data_dir.clone(), settings))
+                    .and_then(|clipboard| {
+                        clipboard.start_events(app.handle().clone())?;
+                        Ok(clipboard)
+                    }),
+                &degraded,
+            )
+            .or_else(|| {
+                services::degraded::optional(
+                    "clipboard-stand-in",
+                    integrations::clipboard::Clipboard::unavailable(paths.data_dir.clone()),
+                    &degraded,
+                )
+            });
+            if let Some(clipboard) = clipboard {
+                app.manage(clipboard);
             }
-            if cli.overlay && services.settings.get()?.show_in_taskbar {
-                window
-                    .set_skip_taskbar(false)
-                    .map_err(|e| error::IslandError::internal(format!("taskbar update failed: {e}")))?;
+            let notifications = services::degraded::optional(
+                "notifications",
+                integrations::notifications::hub::Notifications::start(
+                    app.handle().clone(),
+                    actor_handle.clone(),
+                    services.settings.clone(),
+                    &paths.data_dir,
+                ),
+                &degraded,
+            );
+            // Battery alerts feed the hub; without notifications they go to an unmanaged hub.
+            let hub = notifications.as_ref().map_or_else(
+                || integrations::notifications::hub::Hub::new(actor_handle.clone(), services.settings.clone()),
+                |n| n.hub.clone(),
+            );
+            if let Some(notifications) = notifications {
+                app.manage(notifications);
+            }
+            let window = window::create_island_window(app.handle(), &cli)?;
+            // Phase 6a power/weather/Bluetooth. A test instance never reaches the real system
+            // bus (see `system_bus_address`).
+            let system = services::degraded::optional(
+                "system-services",
+                services.settings.get().and_then(|settings| {
+                    integrations::system_services::SystemServices::start(
+                        app.handle(),
+                        &settings,
+                        cli.test_instance,
+                        hub,
+                        &paths.data_dir,
+                    )
+                }),
+                &degraded,
+            );
+            if let Some(system) = system {
+                app.manage(Arc::new(system));
+            }
+            if matches!(cli.ui, contract::island::UiKind::Legacy | contract::island::UiKind::Island) {
+                if let Some(tray) = services::degraded::optional("tray", tray::Tray::start(app.handle(), actor_handle.clone()), &degraded) {
+                    app.manage(tray);
+                }
+            }
+            if cli.overlay && services.settings.get().is_ok_and(|s| s.show_in_taskbar) {
+                if let Err(error) = window.set_skip_taskbar(false) {
+                    tracing::warn!(%error, "Could not show the island in the taskbar");
+                }
             }
             services.start_palette_watcher(services::profile_dir(
                 std::env::var_os("HERMES_HOME"),
@@ -306,6 +348,10 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
                 .map_err(|_| error::IslandError::internal("test hooks slot is poisoned"))? =
                 hooks.map(Arc::new);
             app.manage(integrations::plasma::runtime::NativeHost::start(app.handle(), instance, anchor)?);
+            let failed = degraded.failed();
+            if !failed.is_empty() {
+                tracing::warn!(?failed, "Island started without some optional subsystems");
+            }
             // Game mode fullscreen detection + the global toggle shortcut (product island only).
             integrations::plasma::gamemode::start_for_app(app.handle());
             for signal in [libc::SIGTERM, libc::SIGINT] {
@@ -331,53 +377,73 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
     app.run(|handle, event| {
         // Kill the PTY's owned process tree, stop watchers and remove the test socket.
         if let tauri::RunEvent::Exit = event {
-            if let Some(clipboard) = tauri::Manager::try_state::<
-                std::sync::Arc<integrations::clipboard::Clipboard>,
-            >(handle)
-            {
-                if let Err(error) = clipboard.shutdown() {
-                    tracing::error!(%error, "Clipboard shutdown failed");
-                }
-            }
-            if let Some(system) = tauri::Manager::try_state::<
-                std::sync::Arc<integrations::system_services::SystemServices>,
-            >(handle)
-            {
-                system.shutdown();
-            }
-            if let Some(tray) = tauri::Manager::try_state::<tray::Tray>(handle) {
-                if let Err(error) = tray.shutdown() {
-                    tracing::error!(%error, "Tray shutdown failed");
-                }
-            }
-            if let Some(notifications) =
-                tauri::Manager::try_state::<integrations::notifications::hub::Notifications>(handle)
-            {
-                if let Err(error) = notifications.shutdown() {
-                    tracing::error!(%error, "Notification shutdown failed");
-                }
-            }
-            integrations::plasma::gamemode::shutdown_for_app(handle);
-            // Stop the authority first so no new effect reaches a half-torn-down host.
-            if let Some(actor) = tauri::Manager::try_state::<state::host::IslandActor>(handle) {
-                if let Err(error) = actor.shutdown() {
-                    tracing::error!(%error, "State actor shutdown failed");
-                }
-            }
-            if let Some(host) =
-                tauri::Manager::try_state::<integrations::plasma::runtime::NativeHost>(handle)
-            {
-                if let Err(error) = host.shutdown() {
-                    tracing::error!(%error, "Native ownership cleanup failed");
-                }
-            }
-            if let Some(services) = tauri::Manager::try_state::<services::Services>(handle) {
-                services.shutdown();
-            }
+            shutdown_steps(handle);
         }
     });
     Ok(())
 }
+
+/// Quit within one deadline (`services::shutdown`). Steps keep their old order: the state
+/// authority stops before the native host so no new effect reaches a half-torn-down host.
+/// Each runs off the GTK main thread; a step that overruns is logged and left behind.
+fn shutdown_steps(handle: &tauri::AppHandle) {
+    use services::shutdown::{run, Step};
+    use std::{sync::Arc, time::Duration};
+    use tauri::Manager;
+    let secs = Duration::from_secs;
+    let step = |name: &'static str, cap: Duration, work: fn(&tauri::AppHandle) -> Result<(), String>| {
+        let handle = handle.clone();
+        Step::new(name, cap, move || work(&handle))
+    };
+    run(
+        vec![
+            step("clipboard", secs(2), |h| match h.try_state::<Arc<integrations::clipboard::Clipboard>>() {
+                Some(clipboard) => clipboard.shutdown().map_err(|e| e.to_string()),
+                None => Ok(()),
+            }),
+            step("system-services", secs(3), |h| {
+                if let Some(system) = h.try_state::<Arc<integrations::system_services::SystemServices>>() {
+                    system.shutdown();
+                }
+                Ok(())
+            }),
+            step("tray", secs(1), |h| match h.try_state::<tray::Tray>() {
+                Some(tray) => tray.shutdown().map_err(|e| e.to_string()),
+                None => Ok(()),
+            }),
+            step("notifications", secs(5), |h| {
+                match h.try_state::<integrations::notifications::hub::Notifications>() {
+                    Some(notifications) => notifications.shutdown().map_err(|e| e.to_string()),
+                    None => Ok(()),
+                }
+            }),
+            step("game-mode", secs(2), |h| {
+                integrations::plasma::gamemode::shutdown_for_app(h);
+                Ok(())
+            }),
+            step("state-actor", secs(3), |h| match h.try_state::<state::host::IslandActor>() {
+                Some(actor) => actor.shutdown().map_err(|e| e.to_string()),
+                None => Ok(()),
+            }),
+            step("native-host", secs(4), |h| {
+                match h.try_state::<integrations::plasma::runtime::NativeHost>() {
+                    Some(host) => host.shutdown().map_err(|e| format!("{e:#}")),
+                    None => Ok(()),
+                }
+            }),
+            step("services", secs(3), |h| {
+                if let Some(services) = h.try_state::<services::Services>() {
+                    services.shutdown();
+                }
+                Ok(())
+            }),
+        ],
+        SHUTDOWN_DEADLINE,
+    );
+}
+
+/// The whole quit, every step included.
+const SHUTDOWN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub fn run() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();

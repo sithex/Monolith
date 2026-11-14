@@ -1369,6 +1369,11 @@ export type ServiceCapabilities = {
 	aiUsage: boolean,
 	voice: boolean,
 	notifications: boolean,
+	/**
+	 *  Failsafes (additive): notification delivery health with a reason (`ready`,
+	 *  `ingest-unavailable`, `delivery-restarting`, `delivery-stopped`, `start-failed`).
+	 */
+	notificationsStatus: ServiceStatus,
 	systemNotificationMirror: boolean,
 	notificationMonitor: NotificationMonitorStatus,
 	canInvokeActions: boolean,

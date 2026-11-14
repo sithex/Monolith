@@ -11,14 +11,14 @@ use std::{
 #[tauri::command]
 #[specta::specta]
 pub async fn timer_get(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<TimerChanged, IslandError> {
     system.apps.timer()?.request(None).await
 }
 #[tauri::command]
 #[specta::specta]
 pub async fn timer_command(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
     op: TimerOp,
 ) -> Result<TimerChanged, IslandError> {
     system.apps.timer()?.request(Some(op)).await
@@ -26,7 +26,7 @@ pub async fn timer_command(
 #[tauri::command]
 #[specta::specta]
 pub async fn scratchpad_get(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<ScratchpadChanged, IslandError> {
     let s = system.apps.scratchpad()?;
     super::blocking(move || s.current()).await
@@ -34,7 +34,7 @@ pub async fn scratchpad_get(
 #[tauri::command]
 #[specta::specta]
 pub async fn scratchpad_command(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
     op: ScratchpadOp,
 ) -> Result<ScratchpadChanged, IslandError> {
     let s = system.apps.scratchpad()?;
@@ -43,7 +43,7 @@ pub async fn scratchpad_command(
 #[tauri::command]
 #[specta::specta]
 pub async fn downloads_get(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<DownloadsChanged, IslandError> {
     let s = system.apps.downloads()?;
     super::blocking(move || s.current()).await
@@ -51,7 +51,7 @@ pub async fn downloads_get(
 #[tauri::command]
 #[specta::specta]
 pub async fn downloads_open(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
     name: String,
     op: OpenDownload,
 ) -> Result<(), IslandError> {
@@ -61,7 +61,7 @@ pub async fn downloads_open(
 #[tauri::command]
 #[specta::specta]
 pub async fn transfers_get(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<TransfersChanged, IslandError> {
     Ok(system.apps.transfers.current())
 }
@@ -69,7 +69,7 @@ pub async fn transfers_get(
 #[tauri::command]
 #[specta::specta]
 pub async fn transfer_reveal(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
     id: String,
 ) -> Result<(), IslandError> {
     if id.is_empty() || id.len() > 512 {
@@ -82,7 +82,7 @@ pub async fn transfer_reveal(
 #[tauri::command]
 #[specta::specta]
 pub async fn shelf_get(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<ShelfChanged, IslandError> {
     let s = system.apps.shelf.clone();
     super::blocking(move || s.current()).await
@@ -91,7 +91,7 @@ pub async fn shelf_get(
 #[tauri::command]
 #[specta::specta]
 pub async fn shelf_command(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
     op: ShelfOp,
 ) -> Result<ShelfChanged, IslandError> {
     if let ShelfOp::Open { id } | ShelfOp::Reveal { id } | ShelfOp::Remove { id } = &op {
@@ -106,7 +106,7 @@ pub async fn shelf_command(
 #[tauri::command]
 #[specta::specta]
 pub async fn calendar_get(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
     query: ObjectOnly<CalendarQuery>,
 ) -> Result<CalendarChanged, IslandError> {
     let q = query.0;
@@ -132,7 +132,7 @@ pub async fn calendar_get(
 #[tauri::command]
 #[specta::specta]
 pub async fn calendar_command(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
     op: CalendarOp,
 ) -> Result<(), IslandError> {
     let s = system.apps.calendar()?;
@@ -141,7 +141,7 @@ pub async fn calendar_command(
 #[tauri::command]
 #[specta::specta]
 pub async fn calendar_refresh(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<(), IslandError> {
     let s = system.apps.calendar()?;
     let now = SystemTime::now()
@@ -155,7 +155,7 @@ pub async fn calendar_refresh(
 #[tauri::command]
 #[specta::specta]
 pub async fn calendar_set_subscription(
-    system: tauri::State<'_, Arc<SystemServices>>,
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
     url: Option<String>,
 ) -> Result<(), IslandError> {
     if url

@@ -19,7 +19,7 @@ pub enum PopupOp {
 #[specta::specta]
 pub async fn notification_popup(
     op: PopupOp,
-    notifications: tauri::State<'_, Notifications>,
+    notifications: crate::commands::managed::Managed<'_, Notifications>,
 ) -> Result<NotificationPopups, IslandError> {
     let hub = notifications.hub.clone();
     match op {

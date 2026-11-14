@@ -19,6 +19,7 @@ pub mod notifications;
 pub mod plasma;
 pub mod power;
 pub mod private_file;
+pub mod pump;
 pub mod scratchpad;
 pub mod service_status;
 pub mod system_services;

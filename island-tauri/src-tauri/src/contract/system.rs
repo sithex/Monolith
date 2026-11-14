@@ -259,6 +259,9 @@ pub struct ServiceCapabilities {
     pub ai_usage: bool,
     pub voice: bool,
     pub notifications: bool,
+    /// Failsafes (additive): notification delivery health with a reason (`ready`,
+    /// `ingest-unavailable`, `delivery-restarting`, `delivery-stopped`, `start-failed`).
+    pub notifications_status: ServiceStatus,
     pub system_notification_mirror: bool,
     pub notification_monitor: NotificationMonitorStatus,
     pub can_invoke_actions: bool,

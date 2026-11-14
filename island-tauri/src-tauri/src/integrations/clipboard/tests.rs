@@ -246,3 +246,120 @@ fn clipboard_persistence_load_rejects_group_or_other_readable_file() {
     fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
     fs::remove_dir_all(&dir).unwrap();
 }
+
+/// Records delivered clipboard events; fails the next N `added` emits.
+#[derive(Default)]
+struct Outlet {
+    added: Mutex<Vec<String>>,
+    statuses: Mutex<Vec<wire::ClipboardStatus>>,
+    fail_next: AtomicU32,
+}
+impl ClipOutlet for Outlet {
+    fn added(&self, item: &wire::ClipSummary) -> Result<(), IslandError> {
+        if self
+            .fail_next
+            .load(Ordering::SeqCst)
+            .checked_sub(1)
+            .is_some_and(|left| {
+                self.fail_next.store(left, Ordering::SeqCst);
+                true
+            })
+        {
+            return Err(IslandError::internal("injected emit failure"));
+        }
+        self.added.lock().unwrap().push(item.preview.clone());
+        Ok(())
+    }
+    fn status(&self, status: &wire::ClipboardStatusChanged) -> Result<(), IslandError> {
+        self.statuses.lock().unwrap().push(status.status.clone());
+        Ok(())
+    }
+}
+fn wait_until(what: &str, mut ready: impl FnMut() -> bool) {
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !ready() {
+        assert!(std::time::Instant::now() < end, "timed out waiting for {what}");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+fn policy(max_restarts: u32) -> RestartPolicy {
+    RestartPolicy {
+        max_restarts,
+        backoff: Backoff::new(
+            std::time::Duration::from_millis(10),
+            std::time::Duration::from_millis(10),
+        ),
+        healthy_after: std::time::Duration::from_secs(60),
+    }
+}
+#[test]
+fn clipboard_delivery_retries_a_failed_emit_and_keeps_order() {
+    let service = service().unwrap();
+    let out = Arc::new(Outlet::default());
+    out.fail_next.store(2, Ordering::SeqCst);
+    service.start_events_with(out.clone(), policy(0)).unwrap();
+    service.shared.enabled.store(true, Ordering::Release);
+    let epoch = service.shared.epoch.load(Ordering::Acquire);
+    for text in ["one", "two"] {
+        service
+            .shared
+            .offer(ClipPayload::Text(text.into()), vec![], epoch)
+            .unwrap();
+    }
+    wait_until("both entries delivered", || out.added.lock().unwrap().len() == 2);
+    assert_eq!(*out.added.lock().unwrap(), ["one", "two"]);
+    assert_eq!(service.status().unwrap().dropped, 0, "a retried entry is not a drop");
+    service.shutdown().unwrap();
+}
+#[test]
+fn clipboard_dead_pump_is_restarted_then_reported_stopped() {
+    let service = service().unwrap();
+    let out = Arc::new(Outlet::default());
+    service.start_events_with(out.clone(), policy(1)).unwrap();
+    // A broken history lock: every pump run fails at once.
+    let shared = service.shared.clone();
+    let _ = std::thread::spawn(move || {
+        let _guard = shared.inner.lock().unwrap();
+        panic!("poison the clipboard history lock");
+    })
+    .join();
+    service.shared.wake.notify_one();
+    wait_until("reported stopped", || {
+        service.status().unwrap().detail == "delivery-stopped"
+    });
+    let status = service.status().unwrap();
+    assert!(!status.available);
+    wait_until("the page was told", || {
+        out.statuses
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|s| s.detail == "delivery-stopped")
+    });
+}
+#[test]
+fn clipboard_stand_in_never_touches_the_saved_history() {
+    let dir = std::env::temp_dir().join(format!("hi-clipboard-stand-in-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("clipboard.json");
+    std::fs::write(&file, b"{\"saved\":\"unreadable by this build\"}").unwrap();
+    let stand_in = Clipboard::unavailable(dir.clone()).unwrap();
+    let status = stand_in.status().unwrap();
+    assert_eq!((status.available, status.detail.as_str()), (false, "start-failed"));
+    let settings = Settings {
+        clipboard_history: true,
+        clipboard_persist: true,
+        ..Settings::default()
+    };
+    stand_in.configure(settings).unwrap();
+    assert!(lock(&stand_in.worker).unwrap().is_none(), "no capture starts");
+    assert!(stand_in.list(None, 10).unwrap().is_empty());
+    assert_eq!(stand_in.copy("x").unwrap_err().code, ErrorCode::Invalid);
+    assert_eq!(
+        std::fs::read(&file).unwrap(),
+        b"{\"saved\":\"unreadable by this build\"}",
+        "saved history left as it was"
+    );
+    stand_in.shutdown().unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}

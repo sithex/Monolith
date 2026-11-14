@@ -6,7 +6,7 @@ use crate::{
 #[tauri::command]
 #[specta::specta]
 pub async fn notifications_list(
-    notifications: tauri::State<'_, Notifications>,
+    notifications: crate::commands::managed::Managed<'_, Notifications>,
 ) -> Result<Vec<IslandNotification>, IslandError> {
     let hub = notifications.hub.clone();
     blocking(move || hub.list()).await
@@ -15,7 +15,7 @@ pub async fn notifications_list(
 #[specta::specta]
 pub async fn notifications_dismiss(
     id: String,
-    notifications: tauri::State<'_, Notifications>,
+    notifications: crate::commands::managed::Managed<'_, Notifications>,
 ) -> Result<(), IslandError> {
     if id.is_empty() || id.len() > 256 {
         return Err(IslandError::invalid("Invalid notification id"));
@@ -26,7 +26,7 @@ pub async fn notifications_dismiss(
 #[tauri::command]
 #[specta::specta]
 pub async fn notifications_clear(
-    notifications: tauri::State<'_, Notifications>,
+    notifications: crate::commands::managed::Managed<'_, Notifications>,
 ) -> Result<(), IslandError> {
     let hub = notifications.hub.clone();
     blocking(move || hub.clear()).await

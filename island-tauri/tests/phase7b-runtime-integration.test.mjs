@@ -88,7 +88,7 @@ test('runtime system-topic listeners fence replaced lifecycle callbacks and vali
   const empty={timer:null,scratchpad:null,downloads:null,calendar:null,brightness:null,agents:null,mixer:null,toggles:null,updates:null,tiles:null};
   const settings={clipboardHistory:false,clipboardHistorySize:100,clipboardPersist:false,moduleRegistry:{version:1,modules:[]}};
   const service=name=>({rev:0,service:name,available:false,detail:'Fixture unavailable'});
-  const boot={settings,apps:empty,mediaRev:0,media:null,lyrics:null,weather:null,power:null,bluetoothRev:0,bluetooth:[],capabilities:{clipboardStatus:clipStatus,powerStatus:service('power'),weatherStatus:service('weather'),bluetoothStatus:service('bluetooth'),mediaStatus:service('media')}};
+  const boot={settings,apps:empty,mediaRev:0,media:null,lyrics:null,weather:null,power:null,bluetoothRev:0,bluetooth:[],capabilities:{clipboardStatus:clipStatus,powerStatus:service('power'),weatherStatus:service('weather'),bluetoothStatus:service('bluetooth'),mediaStatus:service('media'),notificationsStatus:service('notifications')}};
   const client={bootstrap:async()=>boot,launcherGet:async()=>({rev:0,items:[],editing:false}),layoutGet:async()=>({rev:0}),onAppTopics:async h=>{apps.push(h);return ()=>{};},onSystemTopics:async h=>{systems.push(h);return ()=>{};},onLauncherChanged:async()=>()=>{},onLayoutChanged:async()=>()=>{},clipboardList:async()=>[],onClipboardAdded:async()=>()=>{},onClipboardStatus:async()=>()=>{}};
   const d=driver({'ui/ipc/client.ts':client}),stores=d.load('ui/stores/apps.ts');await stores.listenExtended();
   systems[0].media({rev:50,nowPlaying:null});assert.equal(stores.mediaStore.getSnapshot().rev,50);

@@ -93,15 +93,14 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
         copy: path => run(async () => { if (!await copyText(path)) throw Error('Could not copy the path'); setNotice('Path copied'); }) }} />;
     if (view === 'autoclicker' && autoclicker) content = <AutoclickerApp model={autoclicker}
       intents={{ autoclicker: op => enqueueEpochCommand(appStores.autoclicker, run, () => appApi.autoclickerCommand(op)) }} />;
-    if ((view === 'mixer' || view === 'controls') && mixer) content = <VolumeMixer model={adapt.adaptMixer(mixer)} intents={{ mixer: op => enqueueEpochCommand(appStores.mixer,run,()=>appApi.mixerCommand(op)) }} />;
+    if (view === 'mixer' && mixer) content = <VolumeMixer model={adapt.adaptMixer(mixer)} intents={{ mixer: op => enqueueEpochCommand(appStores.mixer,run,()=>appApi.mixerCommand(op)) }} />;
     if (view === 'brightness' && brightness) content = <Brightness displays={adapt.adaptBrightness(brightness)} intents={{ brightness: op => enqueueEpochCommand(appStores.brightness,run,()=>appApi.brightnessCommand(op)) }} />;
     if (view === 'controls') content = <div className="app-stack" data-testid="controls-runtime"><ControlsApp model={adapt.adaptIndependentControls(toggles,tiles,updates)} intents={{
       toggle: op => enqueueEpochCommand(appStores.toggles,run,()=>appApi.togglesCommand(op)),
       tile: op => enqueueEpochCommand(appStores.tiles,run,()=>appApi.tilesCommand(op)),
-      updates: () => enqueueEpochCommand(appStores.updates,run,()=>appApi.updatesRefresh()),
-    }} />{content}</div>;
+    }} /></div>;
     if (view === 'agents' && agents) { const value = adapt.adaptAgents(agents); content = value.available ? <AgentRunChips update={value.value} intents={{ agent: id => setNotice(id ? `Run ${id}` : 'More active runs') }} /> : <ServiceNotice icon="spark" source="agents" reason={value.reason}/>; }
-    if (view === 'updates' && updates) content = <UpdatesApp snapshot={updates} onRefresh={async () => { const epoch = appStores.updates.epoch(); const value = await appApi.updatesRefresh(); appStores.updates.apply(value,epoch); }} />;
+    if (view === 'updates' && updates) content = <UpdatesApp snapshot={updates} onRefresh={async () => { const epoch = appStores.updates.epoch(); const value = await appApi.updatesRefresh(); appStores.updates.apply(value,epoch); }} onInstall={manager => appApi.updatesInstall(manager)} />;
     if (view === 'notifications') content = <NotificationsView model={{ ...adapt.adaptNotifications(notifications,settings.dnd,settings.redactBodies), unavailable: adapt.notificationsDown(serviceStatus('notifications')) }} intents={{ notification: op => run(() => op.type === 'clearAll' ? notificationsClear() : notificationsDismiss(op.id)) }} />;
     if (view === 'clipboard') content = <ClipboardView model={{ ...clips, paused: clips.status?.paused ?? false, items: clips.items.map(c => ({ ...c, ageLabel: 'Captured' })) }} intents={{ clipboard: op => {
       if (op.type === 'search') { try { clipboardHistory.setQuery(op.query); } catch (error) { setNotice(String(error)); } return; }

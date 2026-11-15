@@ -1,7 +1,7 @@
-//! The autoclicker's global hotkey, registered with KGlobalAccel (`org.kde.kglobalaccel`,
-//! component `monolith-autoclicker`, action `toggle-autoclicker`). It is registered only
-//! while the autoclicker is armed and unregistered when disarmed or when the island quits, so
-//! the key is never swallowed while nothing would use it. A key another component owns is
+//! The autoclicker's global hotkeys, registered with KGlobalAccel (`org.kde.kglobalaccel`,
+//! component `monolith-autoclicker`): `toggle-autoclicker` while armed, `stop-autoclicker`
+//! while clicking. One host per action. Each is unregistered when not wanted and when the
+//! island quits, so a key is never swallowed while nothing would use it. A key another component owns is
 //! never taken. KGlobalAccel reports both press and release, which is what hold mode needs.
 use crate::integrations::dbus_util;
 use crate::keyseq;
@@ -15,8 +15,21 @@ const ACCEL_IFACE: &str = "org.kde.KGlobalAccel";
 const COMPONENT_IFACE: &str = "org.kde.kglobalaccel.Component";
 pub const COMPONENT: &str = "monolith-autoclicker";
 const COMPONENT_FRIENDLY: &str = "Monolith Autoclicker";
-pub const ACTION: &str = "toggle-autoclicker";
-const ACTION_FRIENDLY: &str = "Start / stop clicking";
+
+/// One KGlobalAccel action.
+#[derive(Clone, Copy)]
+pub struct Action {
+    pub id: &'static str,
+    pub friendly: &'static str,
+}
+pub const TOGGLE: Action = Action {
+    id: "toggle-autoclicker",
+    friendly: "Start / stop clicking",
+};
+pub const STOP: Action = Action {
+    id: "stop-autoclicker",
+    friendly: "Stop clicking (emergency)",
+};
 const SET_PRESENT: u32 = 2;
 const NO_AUTOLOADING: u32 = 4;
 
@@ -37,12 +50,12 @@ pub struct HotkeyHost {
 }
 
 impl HotkeyHost {
-    pub fn start(on_key: KeySink, on_status: StatusSink) -> Self {
+    pub fn start(action: Action, on_key: KeySink, on_status: StatusSink) -> Self {
         let (want, want_rx) = watch::channel(None);
         let (stop, stop_rx) = watch::channel(false);
         let (done_tx, done) = std::sync::mpsc::channel();
         tauri::async_runtime::spawn(async move {
-            run(want_rx, stop_rx, on_key, on_status).await;
+            run(action, want_rx, stop_rx, on_key, on_status).await;
             let _ = done_tx.send(());
         });
         Self {
@@ -70,8 +83,8 @@ impl HotkeyHost {
     }
 }
 
-fn action_id() -> Vec<&'static str> {
-    vec![COMPONENT, ACTION, COMPONENT_FRIENDLY, ACTION_FRIENDLY]
+fn action_id(action: Action) -> Vec<&'static str> {
+    vec![COMPONENT, action.id, COMPONENT_FRIENDLY, action.friendly]
 }
 
 fn owner_rule(name: &str) -> String {
@@ -83,6 +96,7 @@ fn key_rule(member: &str) -> String {
 }
 
 async fn run(
+    action: Action,
     mut want: watch::Receiver<Option<String>>,
     mut stop: watch::Receiver<bool>,
     on_key: KeySink,
@@ -116,14 +130,14 @@ async fn run(
     let mut accel = dbus_util::name_owner(&conn, ACCEL).await.ok().flatten();
     let mut registered = false;
     let mut current = want.borrow_and_update().clone();
-    apply(&conn, &accel, &current, &mut registered, &on_status).await;
+    apply(&conn, action, &accel, &current, &mut registered, &on_status).await;
     loop {
         tokio::select! {
             changed = stop.changed() => if changed.is_err() || *stop.borrow() { break },
             changed = want.changed() => {
                 if changed.is_err() { break; }
                 current = want.borrow_and_update().clone();
-                apply(&conn, &accel, &current, &mut registered, &on_status).await;
+                apply(&conn, action, &accel, &current, &mut registered, &on_status).await;
             }
             msg = dbus_util::next(&mut owner) => match msg {
                 Some(Ok(msg)) => {
@@ -131,28 +145,28 @@ async fn run(
                         if let Ok((_, _, new)) = msg.body().deserialize::<(String, String, String)>() {
                             accel = (!new.is_empty()).then_some(new);
                             registered = false;
-                            apply(&conn, &accel, &current, &mut registered, &on_status).await;
+                            apply(&conn, action, &accel, &current, &mut registered, &on_status).await;
                         }
                     }
                 }
                 _ => break,
             },
             msg = dbus_util::next(&mut pressed) => match msg {
-                Some(Ok(msg)) => if is_ours(&msg, &accel) { on_key(Key::Pressed) },
+                Some(Ok(msg)) => if is_ours(&msg, action, &accel) { on_key(Key::Pressed) },
                 _ => break,
             },
             msg = dbus_util::next(&mut released) => match msg {
-                Some(Ok(msg)) => if is_ours(&msg, &accel) { on_key(Key::Released) },
+                Some(Ok(msg)) => if is_ours(&msg, action, &accel) { on_key(Key::Released) },
                 _ => break,
             },
         }
     }
     if registered && accel.is_some() {
-        let _ = unregister(&conn).await;
+        let _ = unregister(&conn, action).await;
     }
 }
 
-fn is_ours(msg: &zbus::Message, accel: &Option<String>) -> bool {
+fn is_ours(msg: &zbus::Message, action: Action, accel: &Option<String>) -> bool {
     let header = msg.header();
     let from_accel =
         matches!((header.sender(), accel), (Some(s), Some(owner)) if s.as_str() == owner);
@@ -161,17 +175,17 @@ fn is_ours(msg: &zbus::Message, accel: &Option<String>) -> bool {
         && msg
             .body()
             .deserialize::<(String, String, i64)>()
-            .is_ok_and(|(c, a, _)| c == COMPONENT && a == ACTION)
+            .is_ok_and(|(c, a, _)| c == COMPONENT && a == action.id)
 }
 
-async fn unregister(conn: &Connection) -> Result<bool, crate::error::IslandError> {
+async fn unregister(conn: &Connection, action: Action) -> Result<bool, crate::error::IslandError> {
     dbus_util::call(
         conn,
         ACCEL,
         ACCEL_PATH,
         ACCEL_IFACE,
         "unregister",
-        &(COMPONENT, ACTION),
+        &(COMPONENT, action.id),
     )
     .await
 }
@@ -212,6 +226,7 @@ async fn owners(conn: &Connection, code: i32) -> Vec<String> {
 
 async fn apply(
     conn: &Connection,
+    action: Action,
     accel: &Option<String>,
     want: &Option<String>,
     registered: &mut bool,
@@ -225,11 +240,11 @@ async fn apply(
     let text = match want.as_deref().map(str::trim) {
         None | Some("") => {
             if *registered {
-                let _ = unregister(conn).await;
+                let _ = unregister(conn, action).await;
                 *registered = false;
             }
             match want {
-                None => on_status("off", "Arm the autoclicker to use the hotkey".into()),
+                None => on_status("off", String::new()),
                 Some(_) => on_status("none", "No hotkey set".into()),
             }
             return;
@@ -243,7 +258,7 @@ async fn apply(
             return;
         }
     };
-    let id = action_id();
+    let id = action_id(action);
     let result = async {
         let () =
             dbus_util::call(conn, ACCEL, ACCEL_PATH, ACCEL_IFACE, "doRegister", &(&id,)).await?;
@@ -293,7 +308,7 @@ async fn apply(
     }
     .await;
     match result {
-        Ok(true) => on_status("bound", format!("{text} starts and stops clicking")),
+        Ok(true) => on_status("bound", format!("{text} is registered")),
         Ok(false) => {
             let who = owners(conn, code).await;
             let detail = if who.is_empty() {

@@ -38,6 +38,7 @@ use std::{
     time::Duration,
 };
 use tauri::Manager;
+use tokio::sync::watch;
 use tauri_specta::Event as _;
 
 #[derive(Default)]
@@ -62,6 +63,10 @@ pub struct AppServices {
     /// Autoclicker (virtual mouse + KDE hotkey). Idle until started.
     pub autoclicker: Arc<Autoclicker>,
     slots: Mutex<Slots>,
+    /// Modules the side buttons need (`side_button_needs`) and the settings last configured,
+    /// so a layout change can re-run `configure`.
+    side_needs: Mutex<Vec<&'static str>>,
+    last_settings: Mutex<Option<Settings>>,
     app: tauri::AppHandle,
     data: PathBuf,
     test_instance: bool,
@@ -124,6 +129,110 @@ impl Opener for TestOpener {
             "Desktop opener disabled in test instances",
         ))
     }
+}
+/// A `data:` PNG of one solid colour (`#RRGGBB`), for the "colour copied" notification.
+pub fn colour_swatch(hex: &str) -> Option<String> {
+    use base64::Engine as _;
+    use image::{codecs::png::PngEncoder, ExtendedColorType, ImageEncoder};
+    let digits = hex.strip_prefix('#').filter(|d| d.len() >= 6)?;
+    let channel = |i: usize| u8::from_str_radix(digits.get(i..i + 2)?, 16).ok();
+    let rgb = [channel(0)?, channel(2)?, channel(4)?];
+    const SIDE: u32 = 48;
+    let pixels: Vec<u8> = rgb.iter().copied().cycle().take((SIDE * SIDE * 3) as usize).collect();
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+        .write_image(&pixels, SIDE, SIDE, ExtendedColorType::Rgb8)
+        .ok()?;
+    Some(format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(png)
+    ))
+}
+
+/// Each finished colour pick posts one notification: the colour with a swatch, or why it
+/// failed (a cancelled pick posts nothing). The success card stays until clicked
+/// (`popups::sticky`) and the island draws it as a colour card with a Copy button. A pick from a side button tucks the island away,
+/// so this is the only place the result shows.
+async fn announce_colours(
+    mut tiles: watch::Receiver<Option<crate::contract::tiles::TilesChanged>>,
+    hub: Arc<Hub>,
+) {
+    let mut busy = false;
+    loop {
+        let (now_busy, colour, error) = match tiles.borrow_and_update().as_ref() {
+            Some(t) => (t.picker_busy, t.last_colour.clone(), t.action_error.clone()),
+            None => (false, None, None),
+        };
+        if busy && !now_busy {
+            // Esc in the picker is a choice, not a failure.
+            let cancelled = error
+                .as_deref()
+                .is_some_and(|e| e.to_ascii_lowercase().contains("cancel"));
+            let note = match (&error, colour) {
+                (None, Some(colour)) => Some((
+                    format!("Copied {colour}"),
+                    "The colour is on your clipboard.".to_owned(),
+                    colour_swatch(&colour),
+                )),
+                (Some(error), _) if !cancelled => Some((
+                    "Couldn't pick a colour".to_owned(),
+                    error.clone(),
+                    None,
+                )),
+                _ => None,
+            };
+            if let Some((title, body, icon_png)) = note {
+                let posted = hub.insert(NotificationInput {
+                    source: NotificationSource::Alert,
+                    app_name: crate::integrations::notifications::popups::COLOUR_PICKER_APP.into(),
+                    title,
+                    body: Some(body),
+                    icon_png,
+                    urgency: Urgency::Low,
+                    actions: vec![],
+                    progress: None,
+                    dedupe_key: None,
+                    server_id: None,
+                    replaces_id: 0,
+                    transient: true,
+                    ttl_ms: Some(6000.0),
+                });
+                if let Err(error) = posted {
+                    tracing::warn!(%error, "Colour notification not posted");
+                }
+            }
+        }
+        busy = now_busy;
+        if tiles.changed().await.is_err() {
+            break;
+        }
+    }
+}
+
+/// The modules a side button's quick action runs through. They are started for the button
+/// even while their app is switched off (the colour picker needs System tiles, the mic button
+/// Quick toggles), so a button never reports "module disabled".
+pub fn side_button_needs<'a>(
+    actions: impl IntoIterator<Item = &'a crate::contract::workspace::LayoutAction>,
+) -> Vec<&'static str> {
+    use crate::contract::workspace::LayoutAction as A;
+    let mut needs: Vec<&'static str> = actions
+        .into_iter()
+        .filter_map(|action| match action {
+            A::Screenshot {} | A::PickColour {} | A::KeepAwake {} => Some("system-tiles"),
+            A::MicMute {} | A::CyclePowerProfile {} => Some("quick-toggles"),
+            _ => None,
+        })
+        .collect();
+    needs.sort_unstable();
+    needs.dedup();
+    needs
+}
+/// The Controls page is the "quick-toggles" tile; its Keep awake, audio output, network and
+/// voice cards come from "system-tiles". So an enabled Controls app runs both, and the
+/// launcher draws only the one tile (Launcher.tsx skips "system-tiles").
+fn controls_needs(settings: &Settings, id: &str) -> bool {
+    id == "system-tiles" && active(settings, "quick-toggles")
 }
 fn active(settings: &Settings, id: &str) -> bool {
     settings
@@ -245,6 +354,8 @@ impl AppServices {
             autoclicker,
             power,
             slots: Mutex::new(Slots::default()),
+            side_needs: Mutex::new(Vec::new()),
+            last_settings: Mutex::new(None),
             app: app.clone(),
             data: data.into(),
             test_instance,
@@ -271,12 +382,45 @@ impl AppServices {
             }
         }));
     }
+    /// The side buttons changed: start (or stop) the modules their quick actions need.
+    pub fn side_buttons<'a>(
+        &self,
+        actions: impl IntoIterator<Item = &'a crate::contract::workspace::LayoutAction>,
+    ) -> Result<(), IslandError> {
+        let needs = side_button_needs(actions);
+        {
+            let mut current = self
+                .side_needs
+                .lock()
+                .map_err(|_| IslandError::internal("Side button needs poisoned"))?;
+            if *current == needs {
+                return Ok(());
+            }
+            *current = needs;
+        }
+        let settings = self.last_settings.lock().ok().and_then(|s| s.clone());
+        match settings {
+            Some(settings) => self.configure(&settings),
+            None => Ok(()),
+        }
+    }
+    fn wanted(&self, settings: &Settings, id: &str) -> bool {
+        active(settings, id)
+            || controls_needs(settings, id)
+            || self
+                .side_needs
+                .lock()
+                .is_ok_and(|needs| needs.contains(&id))
+    }
     pub fn configure(&self, settings: &Settings) -> Result<(), IslandError> {
+        if let Ok(mut last) = self.last_settings.lock() {
+            *last = Some(settings.clone());
+        }
         self.transfers.configure(settings.notch_copy_progress);
         self.shelf
             .configure(settings.shelf_enabled, settings.shelf_max_items);
         let mut slots = self.lock()?;
-        if active(settings, "timer") {
+        if self.wanted(settings, "timer") {
             if slots.timer.is_none() {
                 let timer = TimerService::start(
                     Arc::new(MonotonicClock::default()),
@@ -292,7 +436,7 @@ impl AppServices {
         } else if let Some(timer) = slots.timer.take() {
             timer.shutdown()?;
         }
-        if active(settings, "scratchpad") {
+        if self.wanted(settings, "scratchpad") {
             if slots.scratchpad.is_none() {
                 let scratch = ScratchpadService::new(self.data.clone());
                 scratch.start()?;
@@ -302,7 +446,7 @@ impl AppServices {
         } else if let Some(scratch) = slots.scratchpad.take() {
             scratch.shutdown()?;
         }
-        if active(settings, "downloads") {
+        if self.wanted(settings, "downloads") {
             if slots.downloads.is_none() {
                 let opener: Arc<dyn Opener> = if self.test_instance {
                     Arc::new(TestOpener)
@@ -319,7 +463,7 @@ impl AppServices {
         } else if let Some(downloads) = slots.downloads.take() {
             downloads.shutdown()?;
         }
-        if active(settings, "calendar") {
+        if self.wanted(settings, "calendar") {
             if slots.calendar.is_none() {
                 let calendar = CalendarService::new_gated(
                     CalendarConfig {
@@ -344,7 +488,7 @@ impl AppServices {
         } else if let Some(calendar) = slots.calendar.take() {
             calendar.shutdown()?;
         }
-        if active(settings, "system-tiles") {
+        if self.wanted(settings, "system-tiles") {
             if slots.tiles.is_none() {
                 let session = if self.test_instance {
                     std::env::var("HERMES_ISLAND_CONTROLS_SESSION_BUS").ok()
@@ -373,6 +517,10 @@ impl AppServices {
                             clipboard.inner().clone(),
                         );
                         self.forward(&service.topic);
+                        tauri::async_runtime::spawn(announce_colours(
+                            service.topic.subscribe(),
+                            self.hub.clone(),
+                        ));
                         slots.tiles = Some(service);
                     }
                     None => tracing::warn!("System tiles need the clipboard service, which failed to start"),
@@ -381,7 +529,7 @@ impl AppServices {
         } else if let Some(service) = slots.tiles.take() {
             service.shutdown()?;
         }
-        if active(settings, "update-badge") {
+        if self.wanted(settings, "update-badge") {
             if slots.updates.is_none() {
                 let service = UpdatesService::start_gated(
                     Runner::for_instance(self.test_instance, fixture_from_env()),
@@ -395,7 +543,7 @@ impl AppServices {
         } else if let Some(service) = slots.updates.take() {
             service.shutdown()?;
         }
-        if active(settings, "quick-toggles") {
+        if self.wanted(settings, "quick-toggles") {
             if slots.toggles.is_none() {
                 let address = if self.test_instance {
                     std::env::var("HERMES_ISLAND_CONTROLS_SYSTEM_BUS").ok()
@@ -416,7 +564,7 @@ impl AppServices {
         } else if let Some(service) = slots.toggles.take() {
             service.shutdown()?;
         }
-        if active(settings, "mixer") {
+        if self.wanted(settings, "mixer") {
             if slots.mixer.is_none() {
                 let service = MixerService::start(Runner::for_instance(
                     self.test_instance,
@@ -428,7 +576,7 @@ impl AppServices {
         } else if let Some(service) = slots.mixer.take() {
             service.shutdown()?;
         }
-        if active(settings, "brightness") {
+        if self.wanted(settings, "brightness") {
             if slots.brightness.is_none() {
                 // A test instance requires an explicit private endpoint. Never implicitly use
                 // its inherited session bus, which may be the user's desktop bus.
@@ -448,7 +596,7 @@ impl AppServices {
         } else if let Some(service) = slots.brightness.take() {
             service.shutdown()?;
         }
-        if active(settings, "agent-tracker") {
+        if self.wanted(settings, "agent-tracker") {
             if slots.agents.is_none() {
                 let config = AgentConfig::for_instance(
                     self.test_instance,
@@ -592,5 +740,80 @@ impl AppServices {
             Some(e) => Err(e),
             None => Ok(()),
         }
+    }
+}
+
+#[cfg(test)]
+mod side_button_tests {
+    use super::side_button_needs;
+    use crate::contract::{island::IslandView, workspace::LayoutAction as A};
+
+    #[test]
+    fn quick_actions_keep_their_module_running_and_pages_do_not() {
+        assert_eq!(side_button_needs(&[A::PickColour {}]), ["system-tiles"]);
+        assert_eq!(
+            side_button_needs(&[
+                A::Screenshot {},
+                A::KeepAwake {},
+                A::MicMute {},
+                A::CyclePowerProfile {}
+            ]),
+            ["quick-toggles", "system-tiles"]
+        );
+        let pages = [
+            A::OpenApp {
+                view: IslandView::Controls,
+            },
+            A::ToggleAutoclicker {},
+            A::PlayPause {},
+        ];
+        assert!(side_button_needs(&pages).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod controls_tests {
+    use crate::contract::{modules::Registry, settings::Settings};
+
+    fn with_controls(on: bool) -> Settings {
+        let defaults = Registry::defaults();
+        let modules = defaults
+            .modules()
+            .iter()
+            .cloned()
+            .map(|mut m| {
+                if m.id.as_str() == "quick-toggles" {
+                    m.enabled = on;
+                }
+                m
+            })
+            .collect();
+        Settings {
+            module_registry: Registry::new(crate::contract::modules::CURRENT_VERSION, modules)
+                .unwrap(),
+            ..Settings::default()
+        }
+    }
+
+    #[test]
+    fn the_controls_app_runs_system_tiles_even_while_that_module_is_off() {
+        // Defaults: Controls (quick-toggles) on, system-tiles off; its cards still need it.
+        assert!(!super::active(&with_controls(true), "system-tiles"));
+        assert!(super::controls_needs(&with_controls(true), "system-tiles"));
+        assert!(!super::controls_needs(&with_controls(false), "system-tiles"));
+        assert!(!super::controls_needs(&with_controls(true), "clipboard"));
+    }
+}
+
+#[cfg(test)]
+mod colour_tests {
+    #[test]
+    fn swatch_is_a_small_png_data_url_and_junk_is_none() {
+        let swatch = super::colour_swatch("#3a7bd5").unwrap();
+        assert!(swatch.starts_with("data:image/png;base64,iVBOR"));
+        assert!(swatch.len() < 4096);
+        assert_eq!(super::colour_swatch("3a7bd5"), None);
+        assert_eq!(super::colour_swatch("#zz0000"), None);
+        assert_eq!(super::colour_swatch("#abc"), None);
     }
 }

@@ -1,29 +1,15 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useTransform, type AnimationPlaybackControls } from 'framer-motion';
+import { animate, motion, useMotionValue, useMotionValueEvent, useTransform, type AnimationPlaybackControls } from 'framer-motion';
 import type { AppViewIntents, TimerSnapshot, TimerTab, CompletedTimerKind } from '../app-presentations';
 import { timerKind } from '../app-presentations';
 import { useReducedMotionAll } from './motion-preference';
-import { DUR, SPRING, tween } from '../motion-profile';
+import { SPRING } from '../motion-profile';
 import { ServiceNotice } from './AppPrimitives';
+import { RollingText } from './RollingText';
 export function duration(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   const hours = Math.floor(seconds / 3600);
   return `${hours ? `${hours}:` : ''}${String(Math.floor(seconds / 60) % (hours ? 60 : 100000)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-}
-
-/** Digits roll vertically when they change (0.3 s). */
-function RollingText({ text, reduced }: { text: string; reduced: boolean }) {
-  // Ambient (once a second): never tied to the last input modality.
-  const still = reduced;
-  const chars = text.split('');
-  return <span aria-hidden="true" style={{ display: 'inline-flex', overflow: 'hidden' }}>{chars.map((c, i) => {
-    const slot = chars.length - i;  // keyed from the right so seconds keep their slot when hours appear
-    return <span key={slot} style={{ position: 'relative', display: 'inline-block' }}>
-      <AnimatePresence initial={false} mode="popLayout">
-        <motion.span key={c} className="digit" initial={still ? { opacity: 0 } : { y: '-70%', opacity: 0 }} animate={still ? { opacity: 1 } : { y: '0%', opacity: 1 }}
-          exit={still ? { opacity: 0 } : { y: '70%', opacity: 0 }} transition={tween(reduced ? DUR.press : DUR.slow)}>{c}</motion.span>
-      </AnimatePresence></span>;
-  })}</span>;
 }
 
 const TICK = 14;

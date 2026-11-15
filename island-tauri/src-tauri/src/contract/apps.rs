@@ -282,19 +282,29 @@ pub enum ClickButton {
     Right,
     Middle,
 }
+/// What each click presses: a mouse button or a keyboard key.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ClickTarget {
+    Mouse,
+    Key,
+}
+/// `hold`: press once when the run starts and keep it down until it stops.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ClickKind {
     Single,
     Double,
+    Hold,
 }
 /// `toggle`: one press of the hotkey starts, the next stops. `hold`: clicks while the
-/// hotkey is held down.
+/// hotkey is held down. `burst`: each press sends `burstCount` clicks.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum TriggerMode {
     Toggle,
     Hold,
+    Burst,
 }
 /// Saved to `autoclicker.json`. Every field is range-checked by
 /// `integrations::autoclicker::core::validate`.
@@ -305,9 +315,16 @@ pub struct AutoclickerConfig {
     pub interval_ms: u32,
     /// Random ± spread on each interval, in percent (0 ..= 50).
     pub jitter_percent: u32,
+    pub target: ClickTarget,
     pub button: ClickButton,
+    /// Key text for `target: key` (`E`, `Space`, `Ctrl+C`).
+    pub key: String,
     pub kind: ClickKind,
+    /// How long each press is held down before release (0 ..= 1000 ms).
+    pub press_ms: u32,
     pub mode: TriggerMode,
+    /// Clicks per hotkey press in burst mode (1 ..= 1000).
+    pub burst_count: u32,
     /// Stop after this many clicks (0 = no limit).
     pub click_limit: u32,
     /// Stop after this many seconds (0 = no limit).
@@ -316,6 +333,8 @@ pub struct AutoclickerConfig {
     pub start_delay_s: u32,
     /// KGlobalAccel key text (`F8`, `Ctrl+Alt+K`); `""` = no hotkey.
     pub hotkey: String,
+    /// Always stops clicking; registered with KDE only while clicking. `""` = none.
+    pub stop_hotkey: String,
 }
 #[derive(Serialize, Clone, Debug, PartialEq, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
@@ -332,9 +351,17 @@ pub struct AutoclickerChanged {
     pub starting: bool,
     /// Clicks in the current (or last) run.
     pub clicks: f64,
+    /// Clicking time of the current (or last) run, excluding the start delay.
+    pub session_ms: f64,
+    /// All runs ever (until reset).
+    pub lifetime_clicks: f64,
+    pub lifetime_ms: f64,
     /// `off` | `bound` | `none` | `conflict` | `invalid` | `unavailable` | `pending`.
     pub hotkey_state: String,
     pub hotkey_detail: String,
+    /// The stop hotkey, same states (`off` while not clicking).
+    pub stop_hotkey_state: String,
+    pub stop_hotkey_detail: String,
 }
 #[derive(Deserialize, Clone, Debug, specta::Type)]
 #[serde(
@@ -348,4 +375,5 @@ pub enum AutoclickerOp {
     Arm { armed: bool },
     Start {},
     Stop {},
+    ResetStats {},
 }

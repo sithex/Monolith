@@ -191,6 +191,11 @@ export const commands = {
 	togglesCommand: (op: TogglesOp) => typedError<TogglesChanged, IslandError>(__TAURI_INVOKE("toggles_command", { op })),
 	updatesGet: () => typedError<UpdatesChanged, IslandError>(__TAURI_INVOKE("updates_get")),
 	updatesRefresh: () => typedError<UpdatesChanged, IslandError>(__TAURI_INVOKE("updates_refresh")),
+	/**
+	 *  Opens Konsole running the full upgrade for `manager`; the list is re-checked once the
+	 *  window closes. Returns as soon as the window is open.
+	 */
+	updatesInstall: (manager: UpdateManager) => typedError<boolean, IslandError>(__TAURI_INVOKE("updates_install", { manager })),
 	tilesGet: () => typedError<TilesChanged, IslandError>(__TAURI_INVOKE("tiles_get")),
 	tilesCommand: (op: TilesOp) => typedError<TilesChanged, IslandError>(__TAURI_INVOKE("tiles_command", { op })),
 	/**
@@ -470,9 +475,17 @@ export type AutoclickerChanged = {
 	starting: boolean,
 	/**  Clicks in the current (or last) run. */
 	clicks: number,
+	/**  Clicking time of the current (or last) run, excluding the start delay. */
+	sessionMs: number,
+	/**  All runs ever (until reset). */
+	lifetimeClicks: number,
+	lifetimeMs: number,
 	/**  `off` | `bound` | `none` | `conflict` | `invalid` | `unavailable` | `pending`. */
 	hotkeyState: string,
 	hotkeyDetail: string,
+	/**  The stop hotkey, same states (`off` while not clicking). */
+	stopHotkeyState: string,
+	stopHotkeyDetail: string,
 };
 
 /**
@@ -484,9 +497,16 @@ export type AutoclickerConfig = {
 	intervalMs: number,
 	/**  Random ± spread on each interval, in percent (0 ..= 50). */
 	jitterPercent: number,
+	target: ClickTarget,
 	button: ClickButton,
+	/**  Key text for `target: key` (`E`, `Space`, `Ctrl+C`). */
+	key: string,
 	kind: ClickKind,
+	/**  How long each press is held down before release (0 ..= 1000 ms). */
+	pressMs: number,
 	mode: TriggerMode,
+	/**  Clicks per hotkey press in burst mode (1 ..= 1000). */
+	burstCount: number,
 	/**  Stop after this many clicks (0 = no limit). */
 	clickLimit: number,
 	/**  Stop after this many seconds (0 = no limit). */
@@ -495,9 +515,11 @@ export type AutoclickerConfig = {
 	startDelayS: number,
 	/**  KGlobalAccel key text (`F8`, `Ctrl+Alt+K`); `""` = no hotkey. */
 	hotkey: string,
+	/**  Always stops clicking; registered with KDE only while clicking. `""` = none. */
+	stopHotkey: string,
 };
 
-export type AutoclickerOp = { type: "configure"; config: AutoclickerConfig } | { type: "arm"; armed: boolean } | { type: "start" } | { type: "stop" };
+export type AutoclickerOp = { type: "configure"; config: AutoclickerConfig } | { type: "arm"; armed: boolean } | { type: "start" } | { type: "stop" } | { type: "resetStats" };
 
 /**  Latest-value topic (`BluetoothChanged`); SPEC §3.1 requires a revision on every payload. */
 export type BluetoothChanged = {
@@ -647,7 +669,11 @@ export type ClaudeRegEntry = {
 
 export type ClickButton = "left" | "right" | "middle";
 
-export type ClickKind = "single" | "double";
+/**  `hold`: press once when the run starts and keep it down until it stops. */
+export type ClickKind = "single" | "double" | "hold";
+
+/**  What each click presses: a mouse button or a keyboard key. */
+export type ClickTarget = "mouse" | "key";
 
 export type ClipContent = { type: "text"; text: string } | { type: "image"; pngDataUrl: string; width: number; height: number } | { type: "files"; uris: string[] };
 
@@ -979,7 +1005,9 @@ export type LauncherItem = {
 
 export type LauncherOp = { type: "begin" } | { type: "move"; id: string; to: number } | { type: "disable"; id: string } | { type: "enable"; id: string } | { type: "cancel" } | { type: "commit" };
 
-export type LayoutAction = { type: "openApp"; view: IslandView } | { type: "appGrid" } | { type: "settings" } | { type: "volume" } | { type: "nowPlaying" } | { type: "timer" } | { type: "playPause" } | { type: "nextTrack" } | { type: "previousTrack" } | { type: "toggleDnd" } | { type: "micMute" } | { type: "cyclePowerProfile" } | { type: "screenshot" } | { type: "pickColour" } | { type: "keepAwake" } | { type: "collapse" } | { type: "toggleGameMode" } | { type: "commandPalette" } | { type: "launchDesktop"; desktopId: string };
+export type LayoutAction = { type: "openApp"; view: IslandView } | { type: "appGrid" } | { type: "settings" } | { type: "volume" } | { type: "nowPlaying" } | { type: "timer" } | { type: "playPause" } | { type: "nextTrack" } | { type: "previousTrack" } | { type: "toggleDnd" } | { type: "micMute" } | { type: "cyclePowerProfile" } | { type: "screenshot" } | { type: "pickColour" } | { type: "keepAwake" } | { type: "collapse" } | { type: "toggleGameMode" } | { type: "commandPalette" } | 
+/**  Starts the autoclicker (with its start delay) or stops it. */
+{ type: "toggleAutoclicker" } | { type: "launchDesktop"; desktopId: string };
 
 export type LayoutButton = {
 	id: string,
@@ -1871,9 +1899,9 @@ export type TransfersChanged = {
 
 /**
  *  `toggle`: one press of the hotkey starts, the next stops. `hold`: clicks while the
- *  hotkey is held down.
+ *  hotkey is held down. `burst`: each press sends `burstCount` clicks.
  */
-export type TriggerMode = "toggle" | "hold";
+export type TriggerMode = "toggle" | "hold" | "burst";
 
 export type UiFont = "system" | "openrunde";
 
@@ -1889,6 +1917,15 @@ export type UiKind =
 "legacy" | 
 /**  Phase 7 typed renderer; harness remains the default until Phase 9. */
 "island";
+
+/**  Which full upgrade the Update button opens in Konsole. */
+export type UpdateManager = 
+/**  `paru -Syu`: repositories and the AUR. */
+"paru" | 
+/**  `sudo pacman -Syu`: repositories only. */
+"pacman" | 
+/**  `sudo dnf upgrade --refresh`. */
+"dnf";
 
 /**  Package manager behind the update badge, chosen once from os-release at service start. */
 export type UpdatesBackend = "pacman" | "dnf" | 

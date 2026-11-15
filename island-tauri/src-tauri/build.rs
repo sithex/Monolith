@@ -85,6 +85,7 @@ const COMMANDS: &[&str] = &[
     "toggles_command",
     "updates_get",
     "updates_refresh",
+    "updates_install",
     "tiles_get",
     "tiles_command",
     "test_probe_reply",

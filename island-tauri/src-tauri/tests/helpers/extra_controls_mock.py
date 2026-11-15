@@ -72,7 +72,8 @@ def method(conn,sender,path,iface,member,params,invocation):
         cookies.remove(args[0])
         invocation.return_value(V('()',()))
     elif member == 'pick':
-        invocation.return_value(V('(u)',(0xff12ab34,)))
+        # KWin 6 answers with one QColor struct argument, `(u)`, not a bare `u`.
+        invocation.return_value(V('((u))',((0xff12ab34,),)))
     else:
         raise AssertionError(member)
 
@@ -82,7 +83,7 @@ for name in props:
     if name == SS:
         methods = '<method name="Inhibit"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="u" direction="out"/></method><method name="UnInhibit"><arg type="u" direction="in"/></method>'
     if name == KWIN:
-        methods = '<method name="pick"><arg type="u" direction="out"/></method>'
+        methods = '<method name="pick"><arg type="(u)" direction="out"/></method>'
     xml = f'<node><interface name="{ifaces[name]}">{properties}{methods}</interface></node>'
     bus.register_object(paths[name],Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0],method,get_property,set_property)
 xml = '<node><interface name="org.freedesktop.NetworkManager.Device"><property name="DeviceType" type="u" access="read"/></interface></node>'

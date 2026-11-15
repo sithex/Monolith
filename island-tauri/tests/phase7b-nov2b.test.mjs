@@ -133,7 +133,7 @@ test('a page side button becomes Back while its page is showing, and returns to 
   assert.equal(sideBackFor({ type: 'playPause' }, 'music', { ...back, view: 'launcher' }), null, 'quick actions never turn into Back');
   assert.equal(sideBackFor({ type: 'appGrid' }, undefined, back), null);
   const side = src('ui/island/SideControls.tsx');
-  assert.match(side, /if \(returning\) back!\.go\(\)/, 'the tap runs the island back history, not a fresh navigation');
+  assert.match(side, /if \(returning\) \{ launchFromSide\(face\.current, 'return'\); back!\.go\(\); return; \}/, 'the tap runs the island back history, not a fresh navigation');
   assert.match(side, /returning \? 'back' : actionIcon/);
   // The spinning wrapper must fill the button: the icon is sized in % of its container.
   assert.match(src('ui/island/polish.css'), /\.live-side-button \.side-icon \{[^}]*width: 100%; height: 100%/);

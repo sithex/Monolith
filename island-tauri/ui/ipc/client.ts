@@ -184,7 +184,7 @@ export const onVisualChanged = (cb: (snapshot: import("./bindings").VisualChange
 // Phase 7b: generated DTOs only; components use explicit presentation projections.
 export type { NowPlaying, LyricsChanged, EqualizerChanged, MediaCommand } from "./bindings";
 export type { AppsSnapshot, TimerChanged, TimerKind, TimerOp, CalendarChanged, CalendarQuery, CalendarOp, AgendaRow,
-  ScratchpadChanged, ScratchpadOp, DownloadRow, OpenDownload, DownloadsChanged, TransferRow, TransfersChanged, ShelfRow, ShelfChanged, ShelfOp, AutoclickerChanged, AutoclickerConfig, AutoclickerOp, ClickButton, ClickKind, TriggerMode, MixerChanged, MixerOp,
+  ScratchpadChanged, ScratchpadOp, DownloadRow, OpenDownload, DownloadsChanged, TransferRow, TransfersChanged, ShelfRow, ShelfChanged, ShelfOp, AutoclickerChanged, AutoclickerConfig, AutoclickerOp, ClickButton, ClickKind, ClickTarget, TriggerMode, MixerChanged, MixerOp,
   BrightnessChanged, BrightnessOp, WeatherState, PowerState, BtDevice, AgentsChanged,
   TogglesChanged, TogglesOp, TilesChanged, TilesOp, UpdatesChanged, ServiceStatus, MediaChanged,
   LauncherChanged, LauncherOp, LauncherItem, LayoutChanged, LayoutModel, LayoutOp, LayoutAction,
@@ -221,6 +221,7 @@ export const appApi = {
   togglesCommand: (op: import('./bindings').TogglesOp) => unwrap(commands.togglesCommand(op)),
   tilesCommand: (op: import('./bindings').TilesOp) => unwrap(commands.tilesCommand(op)),
   updatesRefresh: () => unwrap(commands.updatesRefresh()),
+  updatesInstall: (manager: import('./bindings').UpdateManager) => unwrap(commands.updatesInstall(manager)),
 };
 type AppListeners = { [K in keyof import('./bindings').AppsSnapshot]: (value: NonNullable<import('./bindings').AppsSnapshot[K]>) => void };
 export async function onAppTopics(h: AppListeners) {

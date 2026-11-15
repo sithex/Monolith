@@ -36,9 +36,10 @@ test('runtime Controls renders working toggles when tiles and updates are indepe
   const model=a.adaptIndependentControls(toggles,null,null);
   const html=render(ControlsApp,{model,intents:noop});
   assert.match(html,/aria-label="Mic mute"/);assert.match(html,/aria-label="Cycle power profile"/);assert.match(html,/Do Not Disturb/);
-  assert.match(html,/System tiles disabled/);assert.match(html,/Package updates disabled/);assert.doesNotMatch(html,/0 repo|0 AUR|update-badge/);
+  assert.match(html,/System tiles disabled/);assert.doesNotMatch(html,/Package updates|0 repo|0 AUR|update-badge/);
+  // Slimmed (Nov 15): package updates have their own app, so Controls never shows them.
   const onlyUpdates=render(ControlsApp,{model:a.adaptIndependentControls(null,null,updates),intents:noop});
-  assert.match(onlyUpdates,/Unknown · no successful check/);assert.match(onlyUpdates,/Check updates/);assert.doesNotMatch(onlyUpdates,/aria-label="Mic mute"/);
+  assert.doesNotMatch(onlyUpdates,/Check updates|aria-label="Mic mute"/);assert.match(onlyUpdates,/Quick toggles disabled/);
 });
 test('runtime clipboard push invalidates one authoritative list and coalesces bursts without speculative append',async()=>{
   const h=historyHarness();await h.owner.configure(true,'first');h.owner.setVisible(true);

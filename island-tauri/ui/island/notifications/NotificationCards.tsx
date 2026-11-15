@@ -3,17 +3,74 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useSettings } from '../../stores';
 import { useIslandState, dispatch } from '../../ipc/island-state';
 import { changePopup, listenPopups, usePopups } from '../../ipc/notifications';
-import type { Popup, PopupOp } from '../../ipc/client';
+import { terminalCopy, type Popup, type PopupOp } from '../../ipc/client';
 import './notification-cards.css';
 import { MAX_STACK, setMeasured, useShownPopups } from './notification-hover';
 export { useNotificationHover } from './notification-hover';
 
 const surfacesChanged = () => window.dispatchEvent(new Event('island-surfaces-changed'));
+
+/** The hex a successful colour pick posted ("Copied #rrggbb" from the Colour picker), else null.
+ *  Mirrors `popups::sticky` in Rust: those cards never time out. */
+export function pickedColour(n: Popup['notification']): string | null {
+  if (n.source !== 'alert' || n.appName !== 'Colour picker') return null;
+  const hex = /^Copied (#[0-9a-f]{6})$/i.exec(n.title)?.[1];
+  return hex ? hex.toLowerCase() : null;
+}
+// Same event as Icon's pingIcon (inlined: the node card tests load this module standalone).
+const pingIcon = (name: string) => window.dispatchEvent(new CustomEvent('island-icon-ping', { detail: name }));
+const rgbOf = (hex: string) => { const v = parseInt(hex.slice(1), 16); return `rgb(${v >> 16 & 255}, ${v >> 8 & 255}, ${v & 255})`; };
+
+/** A picked colour: the swatch, its hex and rgb, and Copy. Stays until clicked; a click
+ *  anywhere on it (or Copy) dismisses it — it never opens another page. */
+function ColourCard({ hex, popup, perform, inNotch }: { hex: string; popup: Popup; perform(op: PopupOp): void; inNotch: boolean }) {
+  const n = popup.notification;
+  const [copied, setCopied] = useState<string | null>(null);
+  const timer = useRef<number | null>(null);
+  useEffect(() => { pingIcon('picker'); return () => { if (timer.current !== null) clearTimeout(timer.current); }; }, []);
+  const dismiss = () => perform({ type: 'dismiss', id: n.id });
+  const copy = (text: string) => {
+    if (timer.current !== null) clearTimeout(timer.current);
+    terminalCopy(text).then(() => { setCopied(text); timer.current = window.setTimeout(dismiss, 650); })
+      .catch(() => setCopied('failed'));
+  };
+  const rgb = rgbOf(hex);
+  return <motion.article className="notification-card colour-card" data-island-extension={inNotch ? undefined : 'notification'} data-in-notch={inNotch}
+    data-testid="notification-toast" data-colour={hex} role="status" aria-label={`Picked colour ${hex}`} onUpdate={surfacesChanged} onClick={dismiss}>
+    <div className="notification-card-head">
+      <span className="notification-icon colour-card-dot" aria-hidden="true" style={{ background: hex }} />
+      <span className="notification-app">{n.appName}</span><span className="notification-priority">Click to close</span>
+      <button className="notification-close" aria-label="Dismiss picked colour" onClick={e => { e.stopPropagation(); dismiss(); }}>
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+      </button>
+    </div>
+    <div className="colour-card-body">
+      {/* The swatch springs up out of a drop, like ink landing. */}
+      <motion.span className="colour-card-swatch" style={{ background: hex }} aria-hidden="true"
+        initial={{ scale: .45, opacity: 0, borderRadius: 28 }} animate={{ scale: 1, opacity: 1, borderRadius: 14 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 22, opacity: { duration: .12 } }} />
+      <div className="colour-card-values">
+        <strong className="colour-card-hex">{hex.toUpperCase()}</strong>
+        <span className="colour-card-rgb">{rgb}</span>
+      </div>
+      <div className="colour-card-copy" onClick={e => e.stopPropagation()}>
+        <button type="button" data-copied={copied === hex} onClick={() => copy(hex)}>{copied === hex ? 'Copied' : 'Copy hex'}</button>
+        <button type="button" data-copied={copied === rgb} onClick={() => copy(rgb)}>{copied === rgb ? 'Copied' : 'Copy rgb'}</button>
+      </div>
+    </div>
+    {copied === 'failed' && <p className="colour-card-error" role="alert">Couldn't copy. The colour was copied when it was picked.</p>}
+  </motion.article>;
+}
 export function NotificationCard({ popup, redact = false, perform, changed = surfacesChanged, inNotch = false }: {
   popup: Popup; redact?: boolean; perform(op: PopupOp): void; changed?(): void;
   /** Drawn inside the island surface: no separate input region, no floating card chrome. */
   inNotch?: boolean;
 }) {
+  const hex = pickedColour(popup.notification);
+  if (hex) return <ColourCard hex={hex} popup={popup} perform={perform} inNotch={inNotch} />;
+  return <PlainCard popup={popup} redact={redact} perform={perform} changed={changed} inNotch={inNotch} />;
+}
+function PlainCard({ popup, redact, perform, changed, inNotch }: { popup: Popup; redact: boolean; perform(op: PopupOp): void; changed(): void; inNotch: boolean }) {
   const n = popup.notification;
   const [hovered, setHovered] = useState(false), [focused, setFocused] = useState(false);
   const held = useRef(false), focusedNow = useRef(false);
@@ -102,6 +159,14 @@ export function NotchNotifications({ fail, placement }: { fail(error: unknown): 
 export function NotificationCards({ fail }: { fail(error: unknown): void }) {
   const state = useIslandState(), snapshot = usePopups();
   useEffect(() => { void listenPopups().catch(fail); }, []);
+  // A new card on top rings every bell icon (side button, launcher tile, history header).
+  // Only a card that wasn't there before rings it; dismissing the top card doesn't.
+  const top = snapshot.items[0]?.notification.id ?? null, seen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const ids = new Set(snapshot.items.map(p => p.notification.id));
+    if (seen.current && top && !seen.current.has(top) && pickedColour(snapshot.items[0]!.notification) === null) pingIcon('bell');
+    seen.current = ids;
+  }, [snapshot]);
   useLayoutEffect(() => { surfacesChanged(); }, [snapshot, state.mode]);
   return null;
 }

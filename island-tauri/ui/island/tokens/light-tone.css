@@ -69,9 +69,6 @@ html[data-tone='light'] .updates-bump { border: 1px solid color-mix(in srgb, var
 html[data-tone='light'] .updates-footer { border-top: 1px solid color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
 html[data-tone='light'] .updates-app .updates-action { background: color-mix(in srgb, var(--ui-text) 12%, transparent); }
 html[data-tone='light'] .updates-app .updates-action:hover { background: color-mix(in srgb, var(--ui-text) 17%, transparent); }
-html[data-tone='light'] .updates-commands { background: color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
-html[data-tone='light'] .updates-command + .updates-command { border-top: 1px solid color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
-html[data-tone='light'] .updates-command button { border: 1px solid color-mix(in srgb, var(--ui-text) 8%, transparent); background: color-mix(in srgb, var(--ui-text) 6.5%, transparent); }
 
 /* Inline-styled whites (Launcher tile icons, the volume fader glyph) read these variables. */
 html[data-tone='light'] { --tile-ink: color-mix(in srgb, var(--ui-text) 85%, transparent); --fader-ink: color-mix(in srgb, var(--ui-text) 60%, transparent); }

@@ -1,5 +1,5 @@
-//! A virtual mouse on `/dev/uinput`: the only way a Wayland client can click for the user
-//! without a root daemon. On a desktop session logind grants the seat user write access
+//! A virtual mouse and keyboard on `/dev/uinput`: the only way a Wayland client can click or
+//! press keys for the user without a root daemon. On a desktop session logind grants the seat user write access
 //! (`uaccess`), so no group or udev rule is needed there. The device has buttons and
 //! relative axes (it never moves) so libinput treats it as a pointer; the compositor clicks
 //! wherever the real pointer is.
@@ -79,8 +79,11 @@ impl Mouse {
         ioctl(fd, UI_SET_EVBIT, EV_KEY.into())?;
         ioctl(fd, UI_SET_EVBIT, EV_REL.into())?;
         ioctl(fd, UI_SET_EVBIT, EV_SYN.into())?;
-        for button in [BTN_LEFT, BTN_RIGHT, BTN_MIDDLE] {
-            ioctl(fd, UI_SET_KEYBIT, button.into())?;
+        for code in [BTN_LEFT, BTN_RIGHT, BTN_MIDDLE]
+            .into_iter()
+            .chain(super::keys::all_codes())
+        {
+            ioctl(fd, UI_SET_KEYBIT, code.into())?;
         }
         ioctl(fd, UI_SET_RELBIT, REL_X as libc::c_ulong)?;
         ioctl(fd, UI_SET_RELBIT, REL_Y as libc::c_ulong)?;
@@ -95,7 +98,11 @@ impl Mouse {
             ff_effects_max: 0,
         };
         setup.name[..NAME.len()].copy_from_slice(NAME);
-        ioctl(fd, UI_DEV_SETUP, &setup as *const UinputSetup as libc::c_ulong)?;
+        ioctl(
+            fd,
+            UI_DEV_SETUP,
+            &setup as *const UinputSetup as libc::c_ulong,
+        )?;
         ioctl(fd, UI_DEV_CREATE, 0)?;
         Ok(Self { file })
     }
@@ -116,6 +123,11 @@ impl Mouse {
             ClickButton::Right => BTN_RIGHT,
             ClickButton::Middle => BTN_MIDDLE,
         };
+        self.key(code, down)
+    }
+
+    /// A key (or button) code from the device's bitmap, down or up.
+    pub fn key(&self, code: u16, down: bool) -> std::io::Result<()> {
         self.emit(EV_KEY, code, i32::from(down))?;
         self.emit(EV_SYN, SYN_REPORT, 0)
     }
@@ -133,14 +145,23 @@ mod tests {
     #[test]
     #[ignore = "creates a real /dev/uinput device"]
     fn creates_a_virtual_mouse_the_kernel_lists() {
-        assert!(super::writable(), "/dev/uinput is not writable for this user");
+        assert!(
+            super::writable(),
+            "/dev/uinput is not writable for this user"
+        );
         let mouse = super::Mouse::create().expect("create");
         std::thread::sleep(std::time::Duration::from_millis(200));
         let devices = std::fs::read_to_string("/proc/bus/input/devices").unwrap();
-        assert!(devices.contains("Monolith autoclicker"), "device not listed");
+        assert!(
+            devices.contains("Monolith autoclicker"),
+            "device not listed"
+        );
         drop(mouse);
         std::thread::sleep(std::time::Duration::from_millis(200));
         let devices = std::fs::read_to_string("/proc/bus/input/devices").unwrap();
-        assert!(!devices.contains("Monolith autoclicker"), "device not destroyed");
+        assert!(
+            !devices.contains("Monolith autoclicker"),
+            "device not destroyed"
+        );
     }
 }

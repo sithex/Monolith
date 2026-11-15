@@ -83,7 +83,12 @@
 .le-tile[aria-pressed='true'] small { color: color-mix(in srgb, var(--ui-accent) 70%, transparent); }
 
 /* ---- Quick-action side buttons ------------------------------------------ */
-.live-side-button[data-lit='true'] { background: var(--ui-accent); color: var(--ui-on-accent); border-color: transparent; }
+/* Lit draws its icon in --ui-on-accent (the dark background colour), so the accent fill must win
+   over the hover/press backgrounds (surface.css, !important) and glass (html[data-glass]): before,
+   a just-clicked lit button showed a dark icon on a dark hover fill and the icon vanished. */
+html .live-side-button[data-lit='true'] { background: var(--ui-accent) !important; color: var(--ui-on-accent); border-color: transparent; }
+html .live-side-button[data-lit='true'][data-hover='true'] { background: color-mix(in srgb, var(--ui-accent) 84%, white) !important; color: var(--ui-on-accent); border-color: transparent; }
+html .live-side-button[data-lit='true']:active { background: color-mix(in srgb, var(--ui-accent) 82%, black) !important; }
 /* Icon wrapper (spins between the page icon and Back). It fills the button so the icon's
    percentage size (surface.css: 46% of the button) still resolves against the button. */
 .live-side-button .side-icon { display: grid; place-items: center; width: 100%; height: 100%; line-height: 0; }
@@ -214,3 +219,26 @@ html[data-theme='album'][data-reduce-motion='true'] { transition-duration: 0s; }
 .settings-import textarea { width: 100%; box-sizing: border-box; resize: vertical; background: rgb(0 0 0 / .25); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); padding: 8px 10px; font: var(--fs-sm)/1.4 var(--ui-mono); }
 .scheme-row[data-testid='appearance-album'] .scheme-dots i { transition: background-color var(--album-fade, 600ms) ease; }
 
+
+/* ---- Staggered entry (Nov 15) -------------------------------------------- */
+/* When a page opens, its cards arrive one after another, 30 ms apart, with the page-in lift.
+   Same gates as page-in: no keyframe while a swipe carries the page or for keyboard paging.
+   .ac-advanced is excluded: framer-motion owns its transform. */
+.island .app-pane:not(.terminal-pane):not([hidden]) .app-stack > :not(.ac-advanced) { animation: page-in var(--dur-base) var(--ease-out) both; }
+.island .app-stack > :nth-child(2) { animation-delay: 30ms; } .island .app-stack > :nth-child(3) { animation-delay: 60ms; }
+.island .app-stack > :nth-child(4) { animation-delay: 90ms; } .island .app-stack > :nth-child(5) { animation-delay: 120ms; }
+.island .app-stack > :nth-child(6) { animation-delay: 150ms; } .island .app-stack > :nth-child(n+7) { animation-delay: 180ms; }
+html[data-nav-via='key'] .island .app-pane .app-stack > *, .island .view-stage[data-swiping='true'] .app-stack > * { animation: none; }
+@media (prefers-reduced-motion: reduce) { .island .app-pane .app-stack > * { animation: none; } }
+
+/* ---- Lit quick actions glow (Nov 15) -------------------------------------- */
+/* A lit side button wears a soft accent ring that breathes. Only transform/opacity animate
+   (compositor), and only on lit buttons, which only show while the island is open. */
+.live-side-button { position: relative; }
+.live-side-button::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+  border: 1.5px solid var(--ui-accent); opacity: 0; transform: scale(.88); will-change: transform, opacity;
+  transition: opacity .3s var(--v-ease, ease), transform .35s var(--v-ease, ease); }
+.live-side-button[data-lit='true']::after { opacity: .5; transform: scale(1); animation: lit-ring calc(2.6s / var(--motion-speed, 1)) ease-in-out .35s infinite; }
+@keyframes lit-ring { 0%, 100% { transform: scale(1); opacity: .5; } 50% { transform: scale(1.12); opacity: .12; } }
+html[data-reduce-motion='true'] .live-side-button[data-lit='true']::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { .live-side-button[data-lit='true']::after { animation: none; } }

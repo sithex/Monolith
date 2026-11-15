@@ -65,8 +65,8 @@ PlasmoidItem {
         busType: DBus.BusType.Session
         watchedService: "local.hermes.Monolith"
         onRegisteredChanged: {
-            if (registered) { islandUp.restart(); islandUpLate.restart(); copySource.ask(); }
-            else { islandUp.stop(); islandUpLate.stop(); islandGone.restart(); copySource.percent = -1; }
+            if (registered) { islandUp.restart(); islandUpLate.restart(); copySource.ask(); clickSource.ask(); }
+            else { islandUp.stop(); islandUpLate.stop(); islandGone.restart(); copySource.percent = -1; clickSource.clicking = false; }
         }
     }
     // Just launched: its first status write lands within a second or two.
@@ -106,6 +106,8 @@ PlasmoidItem {
     // steps; see CopyProgressSource.qml.
     readonly property bool copyProgress: root.appearance.copyProgress !== false
     CopyProgressSource { id: copySource; active: root.copyProgress }
+    // The autoclicker is clicking: a D-Bus signal on start and stop; see AutoclickerSource.qml.
+    AutoclickerSource { id: clickSource }
     // Drop shelf (Settings → shelfEnabled): dropped file URLs go to the island over D-Bus,
     // never through the helper's shell command line. See ShelfSink.qml.
     readonly property bool shelf: root.appearance.shelf !== false
@@ -136,6 +138,7 @@ PlasmoidItem {
         peekTrack: mediaPlayers.currentPlayer ? [mediaPlayers.currentPlayer.track, mediaPlayers.currentPlayer.artist].filter(s => !!s).join(" — ") : ""
         micMuted: root.live.micMuted === true
         copyPercent: root.online && root.copyProgress ? copySource.percent : -1
+        clicking: root.online && clickSource.clicking
         shelfEnabled: root.online && root.shelf
         onFilesDropped: urls => shelfSink.add(urls, function(count) { notchPill.shelfResult(count); })
         companion: root.companion

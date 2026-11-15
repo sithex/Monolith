@@ -84,6 +84,7 @@ permissions = [
   "allow-toggles-command",
   "allow-updates-get",
   "allow-updates-refresh",
+  "allow-updates-install",
   "allow-tiles-get",
   "allow-tiles-command",
   "allow-test-probe-reply",

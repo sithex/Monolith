@@ -115,6 +115,14 @@ pub async fn layout_command(
 ) -> Result<LayoutChanged, IslandError> {
     let workspace = app.state::<Arc<WorkspaceService>>().inner().clone();
     let snapshot = blocking(move || workspace.layout_command(op.0)).await?;
+    if let Some(system) =
+        app.try_state::<Arc<crate::integrations::system_services::SystemServices>>()
+    {
+        let buttons = snapshot.layout.buttons.iter().map(|b| &b.action);
+        if let Err(error) = system.apps.side_buttons(buttons) {
+            tracing::warn!(%error, "Side button services not updated");
+        }
+    }
     snapshot
         .emit_to(&app, ISLAND_LABEL)
         .map_err(|_| IslandError::internal("Cannot publish layout snapshot"))?;

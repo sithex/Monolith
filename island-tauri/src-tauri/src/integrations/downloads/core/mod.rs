@@ -381,10 +381,8 @@ fn accept(st: &FileStat, show_hidden: bool, rejected: &mut u64) -> bool {
         *rejected += 1;
         return false;
     }
-    if st.name.starts_with('.') && !show_hidden {
-        return false;
-    }
-    true
+    // Dotfiles only when "show hidden" is on.
+    show_hidden || !st.name.starts_with('.')
 }
 
 /// Names that must be rejected and counted: empty, `.`, `..`, or anything

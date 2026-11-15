@@ -91,6 +91,7 @@ pub enum ButtonAction {
     Collapse,
     ToggleGameMode,
     CommandPalette,
+    ToggleAutoclicker,
     LaunchDesktop { desktop_id: String },
     Command { id: String },
 }

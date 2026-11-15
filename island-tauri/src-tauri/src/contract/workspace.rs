@@ -68,6 +68,8 @@ pub enum LayoutAction {
     // Manual game mode on/off (`settings.gameMode`).
     ToggleGameMode {},
     CommandPalette {},
+    /// Starts the autoclicker (with its start delay) or stops it.
+    ToggleAutoclicker {},
     LaunchDesktop { desktop_id: String },
 }
 

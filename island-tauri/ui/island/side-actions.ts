@@ -9,14 +9,14 @@ import { isQuickAction, layoutActionView, type QuickAction } from './geometry';
 import type { IconName } from './models';
 
 export type ActionOption = { key: string; action: LayoutAction; label: string; icon: IconName; group: 'Apps' | 'Quick actions' };
-const PAGES: IslandView[] = ['launcher', 'terminal', 'settings', 'mixer', 'music', 'timer', 'calendar', 'ai', 'monitor', 'notifications', 'clipboard', 'scratchpad', 'downloads', 'brightness', 'updates', 'agents', 'quickInfo'];
+const PAGES: IslandView[] = ['launcher', 'terminal', 'settings', 'mixer', 'music', 'timer', 'calendar', 'ai', 'monitor', 'notifications', 'clipboard', 'scratchpad', 'downloads', 'brightness', 'updates', 'autoclicker', 'controls', 'agents', 'quickInfo'];
 const pageAction = (view: IslandView): LayoutAction =>
   view === 'launcher' ? { type: 'appGrid' } : view === 'settings' ? { type: 'settings' } : view === 'mixer' ? { type: 'volume' } : view === 'music' ? { type: 'nowPlaying' } : view === 'timer' ? { type: 'timer' } : { type: 'openApp', view };
 const QUICK: { type: Exclude<QuickAction, 'launchDesktop'>; label: string; icon: IconName }[] = [
   { type: 'playPause', label: 'Play / pause', icon: 'play' }, { type: 'nextTrack', label: 'Next track', icon: 'next' }, { type: 'previousTrack', label: 'Previous track', icon: 'prev' },
   { type: 'toggleDnd', label: 'Do Not Disturb', icon: 'moon' }, { type: 'micMute', label: 'Mute microphone', icon: 'mic' }, { type: 'cyclePowerProfile', label: 'Cycle power profile', icon: 'power' },
-  { type: 'keepAwake', label: 'Keep awake', icon: 'coffee' }, { type: 'screenshot', label: 'Screenshot', icon: 'camera' }, { type: 'pickColour', label: 'Colour picker', icon: 'picker' },
-  { type: 'commandPalette', label: 'Command palette', icon: 'spark' },
+  { type: 'keepAwake', label: 'Caffeine', icon: 'coffee' }, { type: 'screenshot', label: 'Screenshot', icon: 'camera' }, { type: 'pickColour', label: 'Colour picker', icon: 'picker' },
+  { type: 'commandPalette', label: 'Command palette', icon: 'spark' }, { type: 'toggleAutoclicker', label: 'Start / stop autoclicker', icon: 'cursor' },
   { type: 'toggleGameMode', label: 'Game mode', icon: 'gamepad' }, { type: 'collapse', label: 'Minimize island', icon: 'minimize' },
 ];
 export const ACTION_OPTIONS: ActionOption[] = [
@@ -33,6 +33,12 @@ export const actionOption = (action: LayoutAction) => ACTION_OPTIONS.find(o => o
 export const actionIcon = (action: LayoutAction): IconName => actionOption(action)?.icon ?? 'spark';
 export const actionLabel = (action: LayoutAction) => action.type === 'launchDesktop' ? 'Launch desktop app' : actionOption(action)?.label ?? 'Button';
 
+/** Collapses the island before an action that needs the screen. A collapse that fails (a
+ *  compositor stall can time out the input-region update) must not cancel the action itself. */
+async function tuckAway() {
+  try { await dispatch({ type: 'collapse' }); } catch (error) { console.warn('Collapse before a quick action failed', error); }
+}
+
 /** Run a side button: pages navigate, quick actions fire their command and keep the page. */
 export async function runSideAction(action: LayoutAction, navigate: (view: IslandView) => void) {
   if (!isQuickAction(action.type)) { navigate(layoutActionView(action)); return; }
@@ -45,15 +51,22 @@ export async function runSideAction(action: LayoutAction, navigate: (view: Islan
     case 'micMute': { const t = appStores.toggles.getSnapshot(); if (!t?.micAvailable) throw new Error('Microphone control unavailable'); appStores.toggles.apply(await appApi.togglesCommand({ type: 'micMute', muted: !t.micMuted })); return; }
     case 'cyclePowerProfile': appStores.toggles.apply(await appApi.togglesCommand({ type: 'cycleProfile' })); return;
     case 'keepAwake': { const k = appStores.tiles.getSnapshot()?.keepAwake; appStores.tiles.apply(await appApi.tilesCommand({ type: 'keepAwake', on: !k?.on, durationMs: null })); return; }
-    case 'screenshot': await dispatch({ type: 'collapse' }); appStores.tiles.apply(await appApi.tilesCommand({ type: 'screenshot' })); return;
-    case 'pickColour': await dispatch({ type: 'collapse' }); appStores.tiles.apply(await appApi.tilesCommand({ type: 'pickColour' })); return;
+    case 'screenshot': await tuckAway(); appStores.tiles.apply(await appApi.tilesCommand({ type: 'screenshot' })); return;
+    case 'pickColour': await tuckAway(); appStores.tiles.apply(await appApi.tilesCommand({ type: 'pickColour' })); return;
     // Manual game mode follows the effective state the island shows (gameMode || auto fullscreen).
     case 'toggleGameMode': return saveSettings({ gameMode: !currentIslandState().gameMode });
     case 'commandPalette': window.dispatchEvent(new Event('island-command-palette')); return;
+    // Starting tucks the island away so the start delay is spent moving the pointer, not around it.
+    case 'toggleAutoclicker': {
+      const running = !!appStores.autoclicker.getSnapshot()?.running;
+      if (!running) await tuckAway();
+      appStores.autoclicker.apply(await appApi.autoclickerCommand(running ? { type: 'stop' } : { type: 'start' }));
+      return;
+    }
     case 'collapse': return dispatch({ type: 'collapse' });
   }
 }
 /** Live on/off state for toggle-like quick actions (drawn as a lit button). */
-export function quickActive(action: LayoutAction, s: { dnd: boolean; micMuted: boolean | null | undefined; awake: boolean | null | undefined; playing: boolean; gameMode?: boolean }) {
-  return action.type === 'toggleDnd' ? s.dnd : action.type === 'toggleGameMode' ? !!s.gameMode : action.type === 'micMute' ? !!s.micMuted : action.type === 'keepAwake' ? !!s.awake : action.type === 'playPause' ? s.playing : false;
+export function quickActive(action: LayoutAction, s: { dnd: boolean; micMuted: boolean | null | undefined; awake: boolean | null | undefined; playing: boolean; gameMode?: boolean; clicking?: boolean }) {
+  return action.type === 'toggleAutoclicker' ? !!s.clicking : action.type === 'toggleDnd' ? s.dnd : action.type === 'toggleGameMode' ? !!s.gameMode : action.type === 'micMute' ? !!s.micMuted : action.type === 'keepAwake' ? !!s.awake : action.type === 'playPause' ? s.playing : false;
 }

@@ -43,6 +43,15 @@ pub fn allowed(settings: &Settings, app: &str) -> bool {
         && !settings.notification_denied_apps.iter().any(|a| a == app)
         && app_rule(settings, app).is_none_or(|r| r.popup)
 }
+/// The app name the colour picker posts its result under (integrations/apps.rs).
+pub const COLOUR_PICKER_APP: &str = "Colour picker";
+/// A successful colour pick ("Copied #rrggbb") stays up until it is clicked: the card is
+/// where the user reads and re-copies the colour, so it must not time out under them.
+pub fn sticky(n: &IslandNotification) -> bool {
+    n.source == crate::contract::notify::NotificationSource::Alert
+        && n.app_name == COLOUR_PICKER_APP
+        && n.title.starts_with("Copied #")
+}
 pub fn urgency(settings: &Settings, app: &str, original: super::Urgency) -> super::Urgency {
     use super::Urgency;
     match app_rule(settings, app).map(|r| r.urgency) {
@@ -60,9 +69,10 @@ impl Popups {
             return;
         }
         let critical = notification.urgency == crate::contract::notify::Urgency::Critical;
+        let lasting = critical || sticky(&notification);
         self.rows.push_front(Popup {
             notification,
-            remaining_ms: (!critical).then_some(settings.toast_ttl_ms),
+            remaining_ms: (!lasting).then_some(settings.toast_ttl_ms),
             ttl_ms: settings.toast_ttl_ms,
             paused: false,
         });
@@ -228,6 +238,36 @@ mod tests {
         assert_eq!(q.snapshot().items.len(), 1);
         assert_eq!(q.snapshot().items[0].notification.id, "critical");
         q.remove("critical");
+        assert!(q.snapshot().items.is_empty());
+    }
+    #[test]
+    fn a_picked_colour_stays_until_dismissed_but_a_failed_pick_times_out() {
+        let s = Settings::default();
+        let mut q = Popups::default();
+        let mut picked = note("picked", false);
+        picked.source = crate::contract::notify::NotificationSource::Alert;
+        picked.app_name = COLOUR_PICKER_APP.into();
+        picked.title = "Copied #12ab34".into();
+        let mut failed = picked.clone();
+        failed.id = "failed".into();
+        failed.title = "Couldn't pick a colour".into();
+        // A system notification that merely shares the name is not ours.
+        let mut lookalike = picked.clone();
+        lookalike.id = "lookalike".into();
+        lookalike.source = crate::contract::notify::NotificationSource::System;
+        q.insert(picked, &s, 0);
+        q.insert(failed, &s, 0);
+        q.insert(lookalike, &s, 0);
+        q.tick(s.toast_ttl_ms as u64 * 10);
+        let ids: Vec<_> = q
+            .snapshot()
+            .items
+            .iter()
+            .map(|p| p.notification.id.clone())
+            .collect();
+        assert_eq!(ids, ["picked"]);
+        assert_eq!(q.snapshot().items[0].remaining_ms, None);
+        q.remove("picked");
         assert!(q.snapshot().items.is_empty());
     }
     #[test]

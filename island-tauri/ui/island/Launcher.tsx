@@ -43,6 +43,16 @@ function markLaunch(kind: 'open' | 'return') {
   // second time. 'settled' switches the keyframe off; ViewPager clears it on the next view change.
   launchClear = setTimeout(() => { root.dataset.launch = 'settled'; }, 600);
 }
+/** A side button opens (or goes Back from) a page: the page grows out of / settles toward that
+ *  button. The origin is in stage coordinates, so a button outside the island puts it past the
+ *  stage edge and the page arrives from that side. */
+export function launchFromSide(button: HTMLElement | null, kind: 'open' | 'return') {
+  const stage = document.querySelector<HTMLElement>('.island .view-stage'); if (!button || !stage) return;
+  const s = stage.getBoundingClientRect(), r = button.getBoundingClientRect(), root = document.documentElement;
+  root.style.setProperty('--launch-x', `${Math.round(r.left + r.width / 2 - s.left)}px`);
+  root.style.setProperty('--launch-y', `${Math.round(r.top + r.height / 2 - s.top)}px`);
+  markLaunch(kind);
+}
 function launchFrom(tile: HTMLElement | undefined) {
   const stage = tile?.closest?.('.view-stage'); if (!tile || !stage) return;
   const s = stage.getBoundingClientRect(), r = tile.getBoundingClientRect(), root = document.documentElement;
@@ -227,9 +237,10 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
   const onUp = () => { if (press.current?.timer) clearTimeout(press.current.timer); press.current = null; setTimeout(() => { if (!dragRef.current) suppressClick.current = false; }, 0); };
 
   const tile = (id: string, index: number, zone: 'shown' | 'hidden') => {
-    // The Controls app was retired (Nov 2): its tile stays in the arrangement so
-    // Rust's move indices are unchanged, but it is never drawn.
-    const item = byId.get(id); if (!item || item.view === 'controls') return null;
+    // Controls is one tile: "quick-toggles". "system-tiles" also routes to Controls and runs
+    // whenever Controls is on (apps.rs controls_needs), so its own tile is never drawn; it
+    // stays in the arrangement so Rust's move indices are unchanged.
+    const item = byId.get(id); if (!item || item.id === 'system-tiles') return null;
     const view = item.view, name = label(item), dragging = drag?.id === id || landing?.id === id;
     if (!timings.current.has(id)) timings.current.set(id, wiggleTiming(Math.random(), Math.random()));
     return <motion.div key={id} layout={!quiet} className="tile-wrap" data-tile={id} data-disabled={zone === 'hidden'} style={{ opacity: dragging ? 0 : 1 }}

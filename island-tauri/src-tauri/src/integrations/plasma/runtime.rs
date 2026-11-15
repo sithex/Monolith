@@ -561,6 +561,7 @@ impl NativeHost {
             app.try_state::<Arc<crate::integrations::system_services::SystemServices>>(),
         ) {
             bus.relay_copy_progress(system.apps.transfers.progress());
+            bus.relay_clicking(system.apps.autoclicker.running());
         }
         let relay = companion.is_some();
         let worker = crate::services::shutdown::BoundedThread::spawn("ripple-status", move || {

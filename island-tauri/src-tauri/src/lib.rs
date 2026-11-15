@@ -118,6 +118,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::controls::toggles_command,
             commands::controls::updates_get,
             commands::controls::updates_refresh,
+            commands::controls::updates_install,
             commands::controls::tiles_get,
             commands::controls::tiles_command,
             commands::probe::test_probe_reply,
@@ -327,6 +328,12 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
                 &degraded,
             );
             if let Some(system) = system {
+                // Quick actions on the side buttons start the modules they run through.
+                if let Ok(layout) = app.state::<Arc<services::workspace::WorkspaceService>>().layout_get() {
+                    if let Err(error) = system.apps.side_buttons(layout.layout.buttons.iter().map(|b| &b.action)) {
+                        tracing::warn!(%error, "Side button services not started");
+                    }
+                }
                 app.manage(Arc::new(system));
             }
             if matches!(cli.ui, contract::island::UiKind::Legacy | contract::island::UiKind::Island) {

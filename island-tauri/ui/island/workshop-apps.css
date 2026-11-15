@@ -139,3 +139,8 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .ac-number input::-webkit-inner-spin-button { opacity: .5; }
 .ac-range { width: 160px; }
 .autoclicker-app .shortcut-recorder { align-items: flex-end; }
+.ac-tabs { align-self: flex-start; }
+/* The Advanced cards fade in below Basic; the wrapper clips while its height animates. */
+.ac-advanced { display: flex; flex-direction: column; gap: inherit; overflow: hidden; margin-top: -14px; }
+/* The stack gap moves inside the clip, so a closed wrapper takes no space at all. */
+.ac-advanced > :first-child { margin-top: 14px; }

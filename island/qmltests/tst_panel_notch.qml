@@ -258,6 +258,32 @@ TestCase {
         notch.copyPercent = -1;
         verify(!date.visible, "copy over, date still off");
     }
+    function test_autoclicker_takes_the_date_line_after_a_timer_and_before_a_copy() {
+        const notch = createTemporaryObject(factory, testCase);
+        const date = findChild(notch, "panelDate");
+        let changes = 0;
+        const count = function() { changes++; };
+        date.textChanged.connect(count);
+        notch.clicking = true;
+        date.textChanged.disconnect(count);
+        compare(changes, 1, "starting is one repaint");
+        compare(date.text, "● clicking");
+        compare(date.color, notch.clickColor);
+        verify(/Autoclicker is clicking/.test(notch.Accessible.description));
+        notch.copyPercent = 40;
+        compare(date.text, "● clicking", "a copy waits behind the autoclicker");
+        notch.timerPausedMs = 60000;
+        compare(date.text, "❚❚ 1:00", "a timer wins");
+        notch.timerPausedMs = -1;
+        notch.clicking = false;
+        compare(date.text, "⇣ 40%");
+        notch.copyPercent = -1;
+        notch.showDate = false;
+        notch.clicking = true;
+        verify(date.visible, "shown with the date switched off");
+        notch.clicking = false;
+        verify(!date.visible);
+    }
     function test_copy_bar_follows_the_percent_in_teal_and_holds_still_elsewhere() {
         const notch = createTemporaryObject(factory, testCase, { width: 300, height: 32 });
         const bar = findChild(notch, "notchCopyBar");

@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useReducedMotionAll } from './motion-preference';
 import { describeServiceReason } from '../service-reasons';
-import type { PackageUpdate, UpdatesChanged } from '../../ipc/bindings';
+import type { PackageUpdate, UpdateManager, UpdatesChanged } from '../../ipc/bindings';
 
 // Browser-only CSS import also leaves this component usable by the Node SSR checks.
 if (typeof document !== 'undefined') void import('../updates.css');
@@ -50,11 +50,16 @@ export function sourceLabel(source: string): { title: string; via: string; aria:
   return { title: source, via: '', aria: source };
 }
 
-// Commands offered for copying; the island itself never runs them.
-export function updateCommands(backend: Backend): { label: string; command: string }[] {
-  if (backend === 'dnf') return [{ label: 'Fedora repositories · dnf', command: 'sudo dnf upgrade --refresh' }];
+// The Update buttons. Each opens Konsole running `command`, where the user reviews the
+// transaction and types their password; the island never installs anything itself.
+// `aur`: paru is installed (the AUR half of the check ran).
+export function updateCommands(backend: Backend, aur = true): { manager: UpdateManager; button: string; label: string; command: string }[] {
+  if (backend === 'dnf') return [{ manager: 'dnf', button: 'Update', label: 'Fedora repositories · dnf', command: 'sudo dnf upgrade --refresh' }];
   if (backend === 'unsupported') return [];
-  return [{ label: 'AUR + repositories · paru', command: 'paru -Syu' }, { label: 'Repositories only · pacman', command: 'sudo pacman -Syu' }];
+  const pacman = { manager: 'pacman' as const, label: 'Repositories only · pacman', command: 'sudo pacman -Syu' };
+  return aur
+    ? [{ manager: 'paru', button: 'Update all', label: 'AUR + repositories · paru', command: 'paru -Syu' }, { ...pacman, button: 'Repos only' }]
+    : [{ ...pacman, button: 'Update' }];
 }
 
 // Multilib (dnf) lists one row per name.arch; show the arch only where a name repeats.
@@ -66,11 +71,13 @@ function RefreshGlyph() {
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.7-1L20 9M4 15l2.2 3A7 7 0 0 0 18 17" /></svg>;
 }
 
-export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; onRefresh: () => Promise<unknown> }) {
+export function UpdatesApp({ snapshot, onRefresh, onInstall }: { snapshot: UpdatesChanged; onRefresh: () => Promise<unknown>; onInstall: (manager: UpdateManager) => Promise<unknown> }) {
   const reduced = useReducedMotionAll();
   const [query, setQuery] = useState(''), [checking, setChecking] = useState(false), [actionError, setActionError] = useState('');
-  const [commandsOpen, setCommandsOpen] = useState(false), [copied, setCopied] = useState('');
+  const [opening, setOpening] = useState(false), [openedAt, setOpenedAt] = useState(0);
   const busy = useRef(false);
+  // The re-check after the Konsole window closes ends the "open in Konsole" note.
+  useEffect(() => { if (openedAt && Date.now() - openedAt > 3000) setOpenedAt(0); }, [snapshot.rev]);
   const backend: Backend = snapshot.backend ?? 'pacman';
   const groups = groupUpdates(snapshot.items, query);
   const healthy = snapshot.available && !snapshot.error && !snapshot.stale && snapshot.count !== null;
@@ -84,12 +91,12 @@ export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; 
     catch (error) { setActionError(`Couldn't check · ${String(error)}`); }
     finally { busy.current = false; setChecking(false); }
   }
-  async function copy(command: string) {
-    setCopied(''); setActionError('');
-    try {
-      if (!navigator.clipboard?.writeText) throw Error('Clipboard unavailable. Select and copy the command below.');
-      await navigator.clipboard.writeText(command); setCopied(command);
-    } catch (error) { setActionError(String(error)); }
+  async function install(manager: UpdateManager) {
+    if (busy.current) return;
+    busy.current = true; setOpening(true); setActionError('');
+    try { await onInstall(manager); setOpenedAt(Date.now()); }
+    catch (error) { setActionError(`Couldn't start the update · ${String(error)}`); }
+    finally { busy.current = false; setOpening(false); }
   }
   if (backend === 'unsupported') return <section className="updates-app" aria-label="Package updates">
     <header className="updates-hero"><div className="updates-hero-copy"><span className="updates-eyebrow">Package updates</span>
@@ -100,7 +107,7 @@ export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; 
   </section>;
   const seen = new Set<string>(), repeated = new Set<string>();
   for (const item of snapshot.items) (seen.has(item.name) ? repeated : seen).add(item.name);
-  const commands = updateCommands(backend);
+  const commands = updateCommands(backend, snapshot.aurCount !== null);
   let rowIndex = 0;
   return <section className="updates-app" aria-label="Package updates">
     <header className="updates-hero">
@@ -138,7 +145,11 @@ export function UpdatesApp({ snapshot, onRefresh }: { snapshot: UpdatesChanged; 
       })}
       {groups.length === 0 && <p className="updates-no-results">No packages match “{query}”.</p>}
     </div>}
-    <footer className="updates-footer"><span>Review and install in your terminal</span><button type="button" className="updates-action" aria-expanded={commandsOpen} onClick={() => setCommandsOpen(value => !value)}>Update… <span aria-hidden="true">↗</span></button></footer>
-    {commandsOpen && <div className="updates-commands"><p>The island never installs packages. Copy the command for your installed package manager, then review it in a terminal.</p>{commands.map(({ label, command }) => <div className="updates-command" key={command}><div><span>{label}</span><code>{command}</code></div><button type="button" aria-label={`Copy ${command}`} onClick={() => void copy(command)}>{copied === command ? 'Copied ✓' : 'Copy'}</button></div>)}<p role="status">{copied ? 'Command copied. Nothing has been run.' : 'No system changes are made here.'}</p></div>}
+    <footer className="updates-footer">
+      <span role="status">{openedAt ? 'Updating in Konsole. This list refreshes when you close it.' : 'Opens in Konsole to confirm and enter your password'}</span>
+      <div className="updates-actions">{commands.map(({ manager, button, label, command }, i) =>
+        <button type="button" key={manager} className={`updates-action${i === 0 ? ' is-primary' : ''}`} title={`${label}: ${command}`} aria-label={`${button}: ${label}`}
+          disabled={opening || openedAt > 0} onClick={() => void install(manager)}>{button}</button>)}</div>
+    </footer>
   </section>;
 }

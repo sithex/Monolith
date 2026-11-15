@@ -12,6 +12,10 @@
 //! one per 3 s plus start and end (`jobs::core::NotchSteps`). A signal costs plasmashell no
 //! config write and the island no process spawn, unlike the appearance push.
 //!
+//! It also tells the notch when the autoclicker is clicking
+//! (`local.hermes.Monolith.Autoclicker`): `ClickingChanged(b)` on start and stop only, never
+//! per click, and `Clicking() → b` for a notch that starts late.
+//!
 //! The same connection also serves the drop shelf at `/Shelf`
 //! (`local.hermes.Monolith.Shelf.Add(as uris) → u parked`): the notch hands dropped file
 //! URIs over D-Bus so no shell command ever carries a file name. Rust validates every URI
@@ -109,6 +113,46 @@ impl Transfers {
     async fn copy_progress(emitter: &SignalEmitter<'_>, percent: i32) -> zbus::Result<()>;
 }
 
+/// Whether the autoclicker is clicking, on the same `/Companion` object.
+struct ClickerBus {
+    current: Arc<std::sync::atomic::AtomicBool>,
+}
+
+#[zbus::interface(name = "local.hermes.Monolith.Autoclicker")]
+impl ClickerBus {
+    fn clicking(&self) -> bool {
+        self.current.load(Ordering::Acquire)
+    }
+
+    #[zbus(signal)]
+    async fn clicking_changed(emitter: &SignalEmitter<'_>, clicking: bool) -> zbus::Result<()>;
+}
+
+async fn relay_clicking(
+    connection: zbus::Connection,
+    current: Arc<std::sync::atomic::AtomicBool>,
+    mut running: watch::Receiver<bool>,
+) {
+    loop {
+        let value = *running.borrow_and_update();
+        if current.swap(value, Ordering::AcqRel) != value {
+            let sent = async {
+                let iface = connection
+                    .object_server()
+                    .interface::<_, ClickerBus>(OBJECT_PATH)
+                    .await?;
+                ClickerBus::clicking_changed(iface.signal_emitter(), value).await
+            };
+            if let Err(error) = sent.await {
+                tracing::debug!(%error, "Autoclicker signal not sent");
+            }
+        }
+        if running.changed().await.is_err() {
+            break;
+        }
+    }
+}
+
 /// The drop shelf's entry point for the notch.
 struct ShelfBus {
     store: Arc<crate::integrations::shelf::ShelfStore>,
@@ -173,7 +217,9 @@ async fn relay_progress(
 pub struct CompanionBus {
     connection: zbus::Connection,
     copy_current: Arc<AtomicI32>,
+    clicking: Arc<std::sync::atomic::AtomicBool>,
     relay: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    clicker_relay: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 impl CompanionBus {
@@ -195,6 +241,7 @@ impl CompanionBus {
         shelf: Option<Arc<crate::integrations::shelf::ShelfStore>>,
     ) -> Result<Self> {
         let copy_current = Arc::new(AtomicI32::new(-1));
+        let clicking = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let mut builder = builder
             .name(BUS_NAME)
             .serve_at(
@@ -208,6 +255,12 @@ impl CompanionBus {
                 Transfers {
                     current: copy_current.clone(),
                 },
+            )
+            .serve_at(
+                OBJECT_PATH,
+                ClickerBus {
+                    current: clicking.clone(),
+                },
             );
         if let Some(store) = shelf {
             builder = builder.serve_at(SHELF_PATH, ShelfBus { store });
@@ -219,7 +272,9 @@ impl CompanionBus {
         Ok(Self {
             connection,
             copy_current,
+            clicking,
             relay: Mutex::new(None),
+            clicker_relay: Mutex::new(None),
         })
     }
 
@@ -238,10 +293,28 @@ impl CompanionBus {
     }
 }
 
+impl CompanionBus {
+    /// Starts relaying the autoclicker's running state as `ClickingChanged` (once).
+    pub fn relay_clicking(&self, running: watch::Receiver<bool>) {
+        let task = tauri::async_runtime::spawn(relay_clicking(
+            self.connection.clone(),
+            self.clicking.clone(),
+            running,
+        ));
+        if let Ok(mut slot) = self.clicker_relay.lock() {
+            if let Some(old) = slot.replace(task) {
+                old.abort();
+            }
+        }
+    }
+}
+
 impl Drop for CompanionBus {
     fn drop(&mut self) {
-        if let Some(task) = self.relay.lock().ok().and_then(|mut t| t.take()) {
-            task.abort();
+        for slot in [&self.relay, &self.clicker_relay] {
+            if let Some(task) = slot.lock().ok().and_then(|mut t| t.take()) {
+                task.abort();
+            }
         }
     }
 }

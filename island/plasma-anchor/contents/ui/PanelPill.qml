@@ -73,6 +73,11 @@ Item {
     // Fixed teal for the copy text and bar: it reads on dark notches (5:1 on #414559) and stays
     // apart from lavender/gold accents and the amber alertColor, so a copy is noticed.
     readonly property color copyColor: "#2dd4bf"
+    // The autoclicker is clicking (main.qml, from the island's D-Bus signal): static text on
+    // the date line after a timer and before a copy, in the autoclicker app's pink. It
+    // changes on start and stop only, never per click.
+    property bool clicking: false
+    readonly property color clickColor: "#ff6482"
     // Drop shelf (main.qml: shelfEnabled = online && the setting). A file drag over the notch
     // lights the outline in the accent (one change on enter, one on leave); a drop holds it
     // ~600 ms, amber when nothing could be parked, then one step back. No animation, no timer
@@ -118,6 +123,7 @@ Item {
         + (waitingShown ? ". Hermes is waiting for you" : working ? ". Hermes is working" : "")
         + (timerShown ? ". Timer " + timerText + (timerEndsAt > 0 ? "" : ", paused") : "")
         + (micMuted ? ". Microphone muted" : "")
+        + (clicking ? ". Autoclicker is clicking" : "")
         + (copyShown ? ". Copying files, " + copyPercent + " percent" : "")
         + (shelfEnabled ? ". Drop files here to park them on the shelf" : "")
     Accessible.onPressAction: activated()
@@ -238,7 +244,7 @@ Item {
         opacity: pill.peeking ? 0 : 1
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
-        readonly property bool twoLines: pill.showDate || pill.timerShown || pill.copyShown
+        readonly property bool twoLines: pill.showDate || pill.timerShown || pill.clicking || pill.copyShown
         Text {
             objectName: "panelClock"
             anchors.horizontalCenter: parent.horizontalCenter
@@ -262,12 +268,13 @@ Item {
             activeFocusOnPress: false
             enabled: false
             textFormat: TextEdit.PlainText
-            // A running or paused timer takes the date's line, then a file copy.
+            // A running or paused timer takes the date's line, then the autoclicker, then a copy.
             text: pill.timerShown ? (pill.timerEndsAt > 0 ? "" : "❚❚ ") + pill.timerText
+                : pill.clicking ? "● clicking"
                 : pill.copyText !== "" ? pill.copyText : pill.dateText
             visible: parent.twoLines
             font.features: { "tnum": 1 }
-            color: pill.timerShown ? pill.accent : pill.copyShown ? pill.copyColor : pill.textColor
+            color: pill.timerShown ? pill.accent : pill.clicking ? pill.clickColor : pill.copyShown ? pill.copyColor : pill.textColor
             font.pixelSize: 10
             font.weight: Font.DemiBold
             height: 12

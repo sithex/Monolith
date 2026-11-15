@@ -317,7 +317,13 @@ async fn pick(
     if reply.data().len() > 1024 {
         return Err(IslandError::unavailable("Colour picker reply limit"));
     }
-    let argb: u32 = reply.body().deserialize().map_err(dbus_util::transport)?;
+    // KWin 6 replies with one QColor struct, `(u)`; older builds sent a bare `u`.
+    let body = reply.body();
+    let argb = body
+        .deserialize::<(u32,)>()
+        .map(|(argb,)| argb)
+        .or_else(|_| body.deserialize::<u32>())
+        .map_err(dbus_util::transport)?;
     let colour = core::argb_to_hex(argb);
     let copy = colour.clone();
     tokio::task::spawn_blocking(move || clipboard.copy_colour(&copy))
@@ -428,7 +434,7 @@ async fn worker(
                             let owner=sources.ss.current().owner.ok_or_else(||IslandError::unavailable("ScreenSaver unavailable"))?;
                             if cookie.is_none() {
                                 let address=session.as_deref().ok_or_else(||IslandError::unavailable("No private session bus"))?;let conn=dbus_util::connect(address).await?;
-                                if let Some(core::Action::Inhibit{app,reason})=awake.turn_on(now(),"User enabled keep awake") {
+                                if let Some(core::Action::Inhibit{app,reason})=awake.turn_on(now(),"Caffeine is on") {
                                     let reply=bus::call::<_,u32>(&conn,&owner,SCREENSAVER_PATH,SCREENSAVER,"Inhibit",&(app.as_str(),reason.as_str())).await;
                                     match reply {Ok(id)=>{cookie=Some(Cookie{conn,owner,cookie:id});awake.inhibited(id);},Err(error)=>{awake.failed("inhibit-failed");return Err(error);}}
                                 }

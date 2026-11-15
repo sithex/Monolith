@@ -157,7 +157,7 @@ test('Mixer preserves null volume, real sink/stream identities and observed boos
   // Unknown volume: no fader at all, an explicit placeholder instead of a fabricated 0 %.
   assert.match(html, /<p class="muted"[^>]*>Unknown<\/p>/); assert.doesNotMatch(html, /role="slider"/); assert.match(html, /fader-pct">—</);
   const boosted = render('VolumeMixer', { model: a.adaptMixer(mixer({ sinks: [sink({ volumePercent: 150 })] })), intents });
-  assert.match(boosted, /fader-pct">150%</, 'the observed boost is shown, not clamped');
+  assert.match(boosted, /fader-pct"><span class="sr-only">150%</, 'the observed boost is shown, not clamped');
   assert.match(boosted, /aria-valuenow="100"/, 'the fader itself tops out at 100 %');
   assert.equal(a.adaptMixer(mixer({ sinks: [sink({ state: '' })] })).value.sinks[0].state, '', 'Core leaves absent sink state empty, not a fabricated running state');
 });
@@ -225,23 +225,24 @@ test('Controls preserve request IDs and optimistic display without fabricated co
   const model = a.adaptControls(toggles(), tiles(), updates());
   assert.equal(model.toggles.micRequest, 'mic-1'); assert.equal(model.toggles.powerRequest, 'power-1');
   assert.equal(model.tiles.keepAwake.on, null); assert.equal(model.tiles.output.current, null); assert.equal(model.updates.count, null);
-  const html = render('ControlsApp', { model, intents }); assert.match(html, /Pending · performance/); assert.match(html, /Pending · On/); assert.match(html, /aria-busy="true"/); assert.match(html, /Unknown · no successful check/);
+  const html = render('ControlsApp', { model, intents }); assert.match(html, /Pending · performance/); assert.match(html, /Pending · On/); assert.match(html, /aria-busy="true"/);
+  // Slimmed (Nov 15): updates live in the Updates app, capture on side buttons.
+  assert.doesNotMatch(html, /Check updates|Colour picker|Screenshot|update-badge/);
 });
 test('Controls preserve offline false separately from null and do not invent online counts', () => {
   const model = a.adaptControls(toggles({ micRequest: null, powerRequest: null }), tiles(), updates());
   assert.equal(model.tiles.tailscale.peers[0].online, false); assert.equal(model.tiles.tailscale.peers[1].online, null);
   const html = render('ControlsApp', { model, intents }); assert.match(html, /Offline · Last seen: Unknown/); assert.match(html, /Online status unknown/); assert.match(html, /Unknown online/); assert.ok(html.indexOf('>Online peer<') < html.indexOf('>Offline peer<')); assert.doesNotMatch(html, /Pending ·/);
 });
-test('Controls emit exact generated toggle/tile/update ops and disable busy picker', () => {
-  const model = a.adaptControls(toggles(), tiles({ pickerBusy: true }), updates());
-  const calls = []; const command = { toggle: op => calls.push(op), tile: op => calls.push(op), updates: op => calls.push(op) };
+test('Controls emit exact generated toggle/tile ops; Caffeine offers a duration and Turn off', () => {
+  const model = a.adaptControls(toggles(), tiles(), updates());
+  const calls = []; const command = { toggle: op => calls.push(op), tile: op => calls.push(op) };
   const tree = capture(components.ControlsApp, { model, intents: command });
   byLabel(tree, 'Mic mute').props.onClick(); byLabel(tree, 'Cycle power profile').props.onClick();
-  const awake = nodes(tree).find(n => typeof n.type === 'function' && n.props.label === 'Keep awake duration');
+  const awake = nodes(tree).find(n => typeof n.type === 'function' && n.props.label === 'Caffeine duration');
   assert.ok(awake.props.options.some(o => o.value === 'off'));
-  awake.props.onChange('off'); byText(tree, 'Check updates').props.onClick();
-  assert.deepEqual(calls, [{ type: 'micMute', muted: false }, { type: 'cycleProfile' }, { type: 'keepAwake', on: false, durationMs: null }, { type: 'refresh' }]);
-  const picker = nodes(tree).find(n => n.type === 'button' && nodes(n).some(n => n.type === 'strong' && n.props.children === 'Colour picker')); assert.equal(picker.props.disabled, true);
+  awake.props.onChange('off'); awake.props.onChange('3600000');
+  assert.deepEqual(calls, [{ type: 'micMute', muted: false }, { type: 'cycleProfile' }, { type: 'keepAwake', on: false, durationMs: null }, { type: 'keepAwake', on: true, durationMs: 3600000 }]);
 });
 test('Controls reject malformed closed enums and oversized request IDs, preserving opaque backend names', () => {
   for (const patch of [{ powerProfile: 'turbo' }, { powerRequest: 1 }, { micRequest: 'x'.repeat(129) }, { micMuted: 'true' }]) malformed(() => a.adaptControls(toggles(patch), tiles(), updates()));

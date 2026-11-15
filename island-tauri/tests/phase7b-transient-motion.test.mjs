@@ -34,6 +34,7 @@ test('notification exit retracts upward in 150ms ease-out; each reduced-motion s
       '../../stores': { useSettings: () => ({ reduceMotion: source === 'setting', animationSpeed: 100 }) },
       '../../ipc/island-state': { useIslandState: () => ({ mode: 'hover' }) },
       '../../ipc/notifications': { usePopups: () => ({ items: [popup] }) },
+      '../../ipc/client': { terminalCopy: async () => {} },
       '../geometry': {}, './notification-cards.css': {},
       './notification-hover': { useShownPopups: () => [popup] },
     };

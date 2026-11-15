@@ -475,6 +475,7 @@ fn core_action(action: LayoutAction) -> Result<ButtonAction, IslandError> {
         LayoutAction::Collapse {} => ButtonAction::Collapse,
         LayoutAction::ToggleGameMode {} => ButtonAction::ToggleGameMode,
         LayoutAction::CommandPalette {} => ButtonAction::CommandPalette,
+        LayoutAction::ToggleAutoclicker {} => ButtonAction::ToggleAutoclicker,
         LayoutAction::LaunchDesktop { desktop_id } => {
             if !super::desktop_apps::valid_desktop_id(&desktop_id) {
                 return Err(IslandError::invalid("Invalid desktop application ID"));
@@ -506,6 +507,7 @@ fn project_action(action: &ButtonAction) -> Result<LayoutAction, IslandError> {
         ButtonAction::Collapse => LayoutAction::Collapse {},
         ButtonAction::ToggleGameMode => LayoutAction::ToggleGameMode {},
         ButtonAction::CommandPalette => LayoutAction::CommandPalette {},
+        ButtonAction::ToggleAutoclicker => LayoutAction::ToggleAutoclicker {},
         ButtonAction::LaunchDesktop { desktop_id } => {
             if !super::desktop_apps::valid_desktop_id(desktop_id) {
                 return Err(IslandError::invalid("Invalid desktop application ID"));
@@ -786,6 +788,7 @@ mod desktop_action_tests {
             "collapse",
             "toggleGameMode",
             "commandPalette",
+            "toggleAutoclicker",
         ] {
             let action: LayoutAction =
                 serde_json::from_value(serde_json::json!({"type": tag})).unwrap();

@@ -12,8 +12,9 @@ const file = new URL('../ui/island/notifications/NotificationCards.tsx', import.
 const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const module = { exports: {} };
 const mocks = {
-  'framer-motion': { motion: { article: ({ onUpdate, ...props }) => React.createElement('article', props) } },
-  '../../stores': {}, '../../ipc/island-state': {}, '../../ipc/notifications': {}, '../geometry': {}, './notification-cards.css': {}, './notification-hover': {},
+  'framer-motion': { motion: { article: ({ onUpdate, ...props }) => React.createElement('article', props),
+    span: ({ initial, animate, transition, ...props }) => React.createElement('span', props) } },
+  '../../stores': {}, '../../ipc/island-state': {}, '../../ipc/notifications': {}, '../../ipc/client': { terminalCopy: async () => {} }, '../geometry': {}, './notification-cards.css': {}, './notification-hover': {},
 };
 vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename: file.pathname })(name => mocks[name] ?? nativeRequire(name), module, module.exports);
 const { NotificationCard } = module.exports;
@@ -25,6 +26,17 @@ test('normal card escapes text, offers real actions and an honest app-reply fall
   assert.match(html, /Reply in app/); assert.doesNotMatch(html, /<input|<textarea/);
   assert.match(html, /&lt;b&gt;not executable&lt;\/b&gt;/); assert.doesNotMatch(html, /<b>/);
   assert.match(html, /data-island-extension="notification"/); assert.match(html, /Dismiss A message/);
+});
+test('a picked colour is a colour card: swatch, hex, rgb, copy, no timer and no "open" button', () => {
+  const picked = { ...note, id: 'c-1', source: 'alert', appName: 'Colour picker', title: 'Copied #12AB34', body: 'The colour is on your clipboard.', actions: [], canInvokeActions: false };
+  const html = card(picked, { popup: { notification: picked, remainingMs: null, ttlMs: 6000, paused: false } });
+  assert.match(html, /colour-card/); assert.match(html, /data-colour="#12ab34"/);
+  assert.match(html, /#12AB34/); assert.match(html, /rgb\(18, 171, 52\)/);
+  assert.match(html, /Copy hex/); assert.match(html, /Copy rgb/);
+  assert.doesNotMatch(html, /notification-timer/); assert.doesNotMatch(html, /notification-content/);
+  // Only our own alert counts; a system notification with the same name stays a plain card.
+  assert.doesNotMatch(card({ ...picked, source: 'system' }), /colour-card/);
+  assert.doesNotMatch(card({ ...picked, title: "Couldn't pick a colour" }), /colour-card/);
 });
 test('cards drawn inside the notch are part of the surface: no separate input region', () => {
   const html = card(note, { inNotch: true });

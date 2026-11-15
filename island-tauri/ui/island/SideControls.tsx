@@ -9,6 +9,7 @@ import { Icon } from './components/Icon';
 import { visibleLayout, isQuickAction, sideBackFor } from './geometry';
 import { actionIcon, actionLabel, quickActive, runSideAction } from './side-actions';
 import { useSettings } from '../stores';
+import { launchFromSide } from './Launcher';
 import { useApp, useMedia } from '../stores/apps';
 import { DUR, EASE_OUT, SPRING, sideDropPath, tween, WITHDRAW_SECONDS } from './motion-profile';
 
@@ -34,9 +35,23 @@ function SideBubble({ button, diameter, gap, progress, interactive, navigate, li
   // Rust forwards the real X11 crossing as `island-pointer-left`.
   const [hovered, setHovered] = useState(false);
   const face = useRef<HTMLButtonElement>(null);
+  // After a leave we forced, WebKit still believes the pointer is on the face: it sends no new
+  // `pointerenter` on the way back, and it replays its last known position as fake
+  // `pointermove`s (on the X11 leave and after layout changes). So a forced clear is re-armed
+  // only by real movement: a move at a position different from the first one seen after it.
+  // `undefined` = not stale; `null` = stale, no position yet.
+  const stale = useRef<{ x: number; y: number } | null | undefined>(undefined);
+  const rearm = (e: { pointerType: string; clientX: number; clientY: number }) => {
+    if (e.pointerType !== 'mouse' || hovered) return;
+    const at = stale.current;
+    if (at === undefined) { setHovered(true); return; }
+    if (at === null) { stale.current = { x: e.clientX, y: e.clientY }; return; }
+    if (at.x === e.clientX && at.y === e.clientY) return;
+    stale.current = undefined; setHovered(true);
+  };
   useEffect(() => {
     if (!hovered) return;
-    const clear = () => setHovered(false);
+    const clear = () => { stale.current = null; setHovered(false); };
     const elsewhere = (e: Event) => { if (!face.current?.contains(e.target as Node)) clear(); };
     window.addEventListener('island-pointer-left', clear); window.addEventListener('blur', clear);
     document.addEventListener('pointerover', elsewhere, true); document.documentElement.addEventListener('pointerleave', clear);
@@ -50,21 +65,30 @@ function SideBubble({ button, diameter, gap, progress, interactive, navigate, li
     <svg className="side-neck" aria-hidden="true" width={diameter} height={diameter}><motion.path d={neck} style={{ opacity }} /></svg>
     <motion.div className="side-emergence" style={{ x, y, scale, opacity }}>
       <motion.button ref={face} data-testid={`side-${button.id}`} className="round-button live-side-button" tabIndex={interactive ? 0 : -1} data-quick={quick} data-lit={lit} data-hover={lifted}
-        onPointerEnter={e => { if (e.pointerType === 'mouse') setHovered(true); }} onPointerLeave={() => setHovered(false)}
+        // Leaving the whole island straight from a button gets no DOM leave either, so WebKit
+        // still counts the pointer as inside and sends no new `pointerenter` on the way back.
+        onPointerEnter={e => { if (e.pointerType === 'mouse') { stale.current = undefined; setHovered(true); } }}
+        onPointerMove={rearm} onPointerLeave={() => { stale.current = undefined; setHovered(false); }}
         data-back={returning}
         aria-label={returning ? `Back to ${back!.label}` : button.label ?? (button.action.type === 'appGrid' ? 'Open apps' : quick ? actionLabel(button.action) : `Open ${actionLabel(button.action)}`)} aria-pressed={quick ? lit : undefined} aria-disabled={!interactive} title={returning ? `Back to ${back!.label}` : button.label ?? actionLabel(button.action)}
         animate={{ scale: lifted ? 1.04 : 1 }} whileTap={interactive && !reducedIcon ? { scale: .97 } : {}}
-        transition={SPRING.snappy()} onClick={() => { if (!interactive) return; if (returning) back!.go(); else void runSideAction(button.action, navigate).catch(fail); }}>
+        transition={SPRING.snappy()} onClick={() => {
+          if (!interactive) return;
+          // Pages grow out of the button that opened them; Back settles toward it.
+          if (returning) { launchFromSide(face.current, 'return'); back!.go(); return; }
+          if (!quick) launchFromSide(face.current, 'open');
+          void runSideAction(button.action, navigate).catch(fail);
+        }}>
         <motion.span key={icon} className="side-icon" initial={reducedIcon ? { opacity: 0 } : { opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }}
-          transition={tween(DUR.fast)}><Icon name={icon}/></motion.span></motion.button>
+          transition={tween(DUR.fast)}><Icon name={icon} active={quick ? lit : undefined}/></motion.span></motion.button>
     </motion.div>
   </motion.div>;
 }
 
 export function SideControls({ navigate, fail, view, back }: { navigate(view: IslandView): void; fail(error: unknown): void; view?: IslandView; back?: SideBack | null }) {
   const layout = useLayout(), state = useIslandState(), launcher = useLauncher(), reduced = useReducedMotionAll();
-  const settings = useSettings(), toggles = useApp('toggles'), tiles = useApp('tiles'), media = useMedia();
-  const live = { dnd: settings.dnd, micMuted: toggles?.micMuted, awake: tiles?.keepAwake.on, playing: !!media?.nowPlaying?.playing, gameMode: state.gameMode };
+  const settings = useSettings(), toggles = useApp('toggles'), tiles = useApp('tiles'), media = useMedia(), clicker = useApp('autoclicker');
+  const live = { dnd: settings.dnd, micMuted: toggles?.micMuted, awake: tiles?.keepAwake.on, playing: !!media?.nowPlaying?.playing, gameMode: state.gameMode, clicking: !!clicker?.running };
   const model = visibleLayout(layout.layout, launcher.items.filter(i => i.enabled && i.known && i.view).map(i => i.view!));
   const progress = useMotionValue(0), generation = useRef(0);
   const [ready, setReady] = useState(false);

@@ -3,7 +3,7 @@ use crate::{
     contract::{
         controls::{
             AgentsChanged, BrightnessChanged, BrightnessOp, MixerChanged, MixerOp, TogglesChanged,
-            TogglesOp, UpdatesChanged, UpdatesOp,
+            TogglesOp, UpdateManager, UpdatesChanged, UpdatesOp,
         },
         settings::ObjectOnly,
         tiles::{TilesChanged, TilesOp},
@@ -80,6 +80,25 @@ pub async fn updates_refresh(
     system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
 ) -> Result<UpdatesChanged, IslandError> {
     system.apps.updates()?.request(UpdatesOp::Refresh).await
+}
+
+/// Opens Konsole running the full upgrade for `manager`; the list is re-checked once the
+/// window closes. Returns as soon as the window is open.
+#[tauri::command]
+#[specta::specta]
+pub async fn updates_install(
+    system: crate::commands::managed::Managed<'_, Arc<SystemServices>>,
+    manager: UpdateManager,
+) -> Result<bool, IslandError> {
+    let service = system.apps.updates()?;
+    let backend = service.current().backend;
+    let after = service.clone();
+    crate::integrations::updates::install::launch(manager, backend, move || {
+        if let Err(error) = tauri::async_runtime::block_on(after.request(UpdatesOp::Refresh)) {
+            tracing::debug!(%error, "Re-check after the update window failed");
+        }
+    })?;
+    Ok(true)
 }
 
 #[tauri::command]

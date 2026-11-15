@@ -1,0 +1,51 @@
+/* Animated icons (components/Icon.tsx: Framework7 glyphs on a 56-unit grid, so lengths and
+   origins below are in glyph units). Three layers, one job each: .icon-glyph = appear,
+   .icon-hover = hover gesture, .icon-fx = state reactions (JS). Only transform/opacity animate. */
+.icon { overflow: visible; --icon-hover: icon-pop; --icon-hover-ms: 460ms; }
+.icon :is(.icon-hover, .icon-fx, .icon-glyph) { transform-origin: 28px 28px; }
+.icon[data-icon='bell'] :is(.icon-hover, .icon-fx) { transform-origin: 28px 6px; }
+.icon[data-icon='picker'] :is(.icon-hover, .icon-fx) { transform-origin: 9px 47px; }
+.icon[data-icon='cursor'] :is(.icon-hover, .icon-fx) { transform-origin: 16px 14px; }
+
+/* Appear: the glyph springs in from small when it mounts (page open, button emerging), like
+   SF Symbols' appear effect. A toggle's filled variant swap rides the .icon-fx bounce. */
+.icon .icon-glyph { animation: icon-appear calc(420ms / var(--motion-speed, 1)) cubic-bezier(.34, 1.4, .64, 1) both; }
+@keyframes icon-appear { from { opacity: 0; transform: scale(.55); } 45% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
+
+/* Hover gesture, per icon. Side buttons use their own data-hover (WebKit's :hover sticks there). */
+:is(button, a, [role='button'], [role='tab'], .tile):not(.live-side-button):not(:disabled):hover .icon .icon-hover,
+.live-side-button[data-hover='true'] .icon .icon-hover {
+  animation: var(--icon-hover) calc(var(--icon-hover-ms) / var(--motion-speed, 1)) cubic-bezier(.23, 1, .32, 1) both;
+}
+.icon:is([data-icon='settings'], [data-icon='power']) { --icon-hover: icon-spin; --icon-hover-ms: 700ms; }
+.icon:is([data-icon='sun'], [data-icon='spark'], [data-icon='snow']) { --icon-hover: icon-quarter; --icon-hover-ms: 620ms; }
+.icon:is([data-icon='bell'], [data-icon='timer'], [data-icon='gamepad'], [data-icon='music']) { --icon-hover: icon-wobble; --icon-hover-ms: 620ms; }
+.icon:is([data-icon='back'], [data-icon='prev']) { --icon-hover: icon-left; }
+.icon:is([data-icon='next'], [data-icon='play'], [data-icon='terminal'], [data-icon='quote']) { --icon-hover: icon-right; }
+.icon:is([data-icon='download']) { --icon-hover: icon-drop; --icon-hover-ms: 560ms; }
+.icon:is([data-icon='mic'], [data-icon='shelf'], [data-icon='cloud'], [data-icon='rain'], [data-icon='storm'], [data-icon='network']) { --icon-hover: icon-rise; }
+.icon:is([data-icon='moon'], [data-icon='picker'], [data-icon='note'], [data-icon='clipboard']) { --icon-hover: icon-tilt; --icon-hover-ms: 560ms; }
+.icon:is([data-icon='cursor']) { --icon-hover: icon-tap; }
+.icon:is([data-icon='volume'], [data-icon='volumeOff'], [data-icon='bluetooth']) { --icon-hover: icon-pulse; }
+.icon:is([data-icon='more']) { --icon-hover: icon-left-right; }
+/* Caffeine: the cup tips like a sip. */
+.icon:is([data-icon='coffee']) { --icon-hover: icon-sip; --icon-hover-ms: 560ms; }
+.icon[data-icon='coffee'] :is(.icon-hover, .icon-fx) { transform-origin: 26px 46px; }
+@keyframes icon-sip { 0%, 100% { transform: rotate(0); } 40% { transform: rotate(-14deg); } 75% { transform: rotate(4deg); } }
+@keyframes icon-pop { 0% { transform: scale(1); } 40% { transform: scale(1.16); } 70% { transform: scale(.96); } 100% { transform: scale(1); } }
+@keyframes icon-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes icon-quarter { from { transform: rotate(0) scale(1); } 50% { transform: rotate(45deg) scale(1.1); } to { transform: rotate(90deg) scale(1); } }
+@keyframes icon-wobble { 0%, 100% { transform: rotate(0); } 18% { transform: rotate(15deg); } 36% { transform: rotate(-12deg); } 54% { transform: rotate(8deg); } 72% { transform: rotate(-4deg); } }
+@keyframes icon-left { 0%, 100% { transform: translateX(0); } 45% { transform: translateX(-7px); } }
+@keyframes icon-right { 0%, 100% { transform: translateX(0); } 45% { transform: translateX(7px); } }
+@keyframes icon-left-right { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-5px); } 65% { transform: translateX(5px); } }
+@keyframes icon-drop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(8px); } 70% { transform: translateY(-2.5px); } }
+@keyframes icon-rise { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-7px); } }
+@keyframes icon-tilt { 0%, 100% { transform: rotate(0); } 40% { transform: rotate(-16deg); } 75% { transform: rotate(5deg); } }
+@keyframes icon-tap { 0%, 100% { transform: translate(0, 0) scale(1); } 40% { transform: translate(3.5px, 3.5px) scale(.88); } }
+@keyframes icon-pulse { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.12); } 60% { transform: scale(.97); } 80% { transform: scale(1.04); } }
+
+
+/* Reduced motion (OS or the in-app setting): icons just appear; no gestures. */
+html[data-reduce-motion='true'] .icon :is(.icon-glyph, .icon-hover) { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .icon :is(.icon-glyph, .icon-hover) { animation: none !important; } }

@@ -4,7 +4,6 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { load } from './phase7b-loader.mjs';
 const { UpdatesApp, versionDifference, versionBump, checkedLabel, groupUpdates, updateCommands, sourceLabel } = load('ui/island/components/UpdatesApp.tsx');
-const { ControlsApp } = load('ui/island/components/ControlsApp.tsx');
 const adapters = load('ui/views/app-adapters.ts');
 const snapshot = patch => ({ rev: 1, backend: 'pacman', available: true, detail: 'read-only-checks', count: null, repoCount: null, aurCount: null, needsReboot: false, stale: false, error: null, items: [], ageSecs: null, nextCheckInSecs: 60, ...patch });
 const pkg = patch => ({ name: 'fixture-package', oldVersion: '1.2.3', newVersion: '1.2.4', ignored: false, source: 'repo', arch: null, ...patch });
@@ -53,16 +52,18 @@ test('Updates bump hints classify numeric increases only and never guess epochs 
   for (const [oldVersion, newVersion] of [['1.2.3-1', '1.2.4-1'], ['1:1.2', '1:2.0'], ['r23.abc', 'r24.def'], ['1.2', '1.2.1'], ['1.2', '1.2'], ['2.1', '1.9'], ['1.2.3.4', '1.2.3.5'], ['v1.2', 'v2.0']]) assert.equal(versionBump(oldVersion, newVersion), null);
 });
 
-test('Updates search appears only for longer lists and upgrades require explicit terminal review', () => {
+test('Updates search appears only for longer lists and upgrades open in a terminal for review', () => {
   assert.doesNotMatch(render({ items: Array.from({ length: 8 }, (_, i) => pkg({ name: `pkg-${i}` })) }), /Filter packages/);
-  const html = render({ items: Array.from({ length: 9 }, (_, i) => pkg({ name: `pkg-${i}` })) });
+  const html = render({ aurCount: 0, items: Array.from({ length: 9 }, (_, i) => pkg({ name: `pkg-${i}` })) });
   assert.match(html, /Filter packages/); assert.match(html, /Available package updates/);
-  assert.match(html, /Update…/); assert.match(html, /Review and install in your terminal/);
-  assert.doesNotMatch(html, /Open in terminal|sudo pacman|paru -Syu/);
+  assert.match(html, />Update all</); assert.match(html, />Repos only</); assert.match(html, /Opens in Konsole to confirm and enter your password/);
+  assert.match(html, /title="AUR \+ repositories · paru: paru -Syu"/, 'the exact command is on the button');
+  assert.doesNotMatch(html, /Copy|Update…/);
+  const noParu = render({ aurCount: null, items: [pkg()] });
+  assert.match(noParu, />Update</); assert.doesNotMatch(noParu, /Update all|paru/);
 });
 
 const dnfPkg = patch => pkg({ source: 'dnf', arch: 'x86_64', oldVersion: '2.44-1.fc45', newVersion: '2.44-2.fc45', ...patch });
-const controls = updates => renderToStaticMarkup(createElement(ControlsApp, { model: { toggles: null, tiles: null, updates }, intents: new Proxy({}, { get: () => () => {} }) }));
 
 test('Updates dnf backend renders Fedora labels, multilib rows and only the dnf command', () => {
   const items = [dnfPkg({ name: 'glibc' }), dnfPkg({ name: 'glibc', arch: 'i686' }), dnfPkg({ name: 'LibRaw', oldVersion: '0.22.2-1.fc45', newVersion: '0.22.3-1.fc45' }), dnfPkg({ name: 'obsoleter', arch: 'noarch', oldVersion: '' })];
@@ -74,23 +75,17 @@ test('Updates dnf backend renders Fedora labels, multilib rows and only the dnf 
   assert.match(html, /title="Installed version unknown">\?</);
   assert.doesNotMatch(html, /AUR|paru|pacman|Official repositories/);
   assert.equal(groupUpdates(items, 'i686').flatMap(group => group.items).length, 1);
-  assert.deepEqual(updateCommands('dnf'), [{ label: 'Fedora repositories · dnf', command: 'sudo dnf upgrade --refresh' }]);
-  assert.deepEqual(updateCommands('pacman').map(c => c.command), ['paru -Syu', 'sudo pacman -Syu']);
+  assert.deepEqual(updateCommands('dnf'), [{ manager: 'dnf', button: 'Update', label: 'Fedora repositories · dnf', command: 'sudo dnf upgrade --refresh' }]);
+  assert.deepEqual(updateCommands('pacman').map(c => [c.manager, c.command]), [['paru', 'paru -Syu'], ['pacman', 'sudo pacman -Syu']]);
+  assert.deepEqual(updateCommands('pacman', false).map(c => c.manager), ['pacman']);
   assert.deepEqual(updateCommands('unsupported'), []);
   assert.deepEqual(sourceLabel('repo'), { title: 'Official repositories', via: 'pacman', aria: 'Official repositories' });
-  assert.match(controls(snapshot({ backend: 'dnf', count: 4, repoCount: 4 })), /4 Fedora repositories · dnf/);
-  assert.doesNotMatch(controls(snapshot({ backend: 'dnf', count: 4, repoCount: 4 })), /AUR/);
-  assert.match(controls(snapshot({ count: 3, repoCount: 2, aurCount: 1 })), /2 repo · 1 AUR/, 'pacman copy unchanged');
-  assert.match(controls(snapshot({ count: 1, repoCount: 1, aurCount: null })), /1 repo · Unknown AUR/, 'no paru: repo count still shown');
 });
 
 test('Updates unsupported backend is a calm empty state without error, count, refresh or commands', () => {
   const html = render({ backend: 'unsupported', available: false, detail: 'unsupported-system', nextCheckInSecs: 0 });
   assert.match(html, /Not supported on this distro/); assert.match(html, /Update checks aren’t available here/);
   assert.doesNotMatch(html, /Couldn|updates-status-error|unsupported-system|updates-total|Check updates|Update…|Stale|sudo|paru/);
-  const card = controls(snapshot({ backend: 'unsupported', available: false, detail: 'unsupported-system' }));
-  assert.match(card, /Not supported on this distro/);
-  assert.doesNotMatch(card, /update-badge|Unknown|unsupported-system|Check updates/);
 });
 
 test('Updates adapter accepts the dnf wire shape and still rejects unknown backends and sources', () => {

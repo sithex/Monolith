@@ -22,6 +22,7 @@ mod pipewire_fixture;
 mod private_bus;
 
 mod apps6b1_services;
+mod autoclicker_service;
 mod bluetooth_service;
 mod brightness6b2;
 mod carried6b2;

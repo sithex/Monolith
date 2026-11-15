@@ -204,3 +204,14 @@ pub struct UpdatesChanged {
 pub enum UpdatesOp {
     Refresh,
 }
+/// Which full upgrade the Update button opens in Konsole.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum UpdateManager {
+    /// `paru -Syu`: repositories and the AUR.
+    Paru,
+    /// `sudo pacman -Syu`: repositories only.
+    Pacman,
+    /// `sudo dnf upgrade --refresh`.
+    Dnf,
+}

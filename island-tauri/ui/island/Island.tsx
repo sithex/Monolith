@@ -39,6 +39,7 @@ import './motion-media.css';
 import './motion-system.css';
 import './motion-transient.css';
 import './motion-launcher.css';
+import './icon-motion.css';
 import './tokens/light-tone.css';
 import './tokens/scheme-picker.css';
 import '../views/settings/settings-controls.css';

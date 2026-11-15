@@ -22,6 +22,7 @@ mod failsafes;
 mod downloads_core_model_tests;
 mod jobs_core;
 mod shelf_core;
+mod autoclicker_core;
 mod lrc_core_parse;
 mod lrclib_core_cache_key;
 mod lrclib_core_fuzz;

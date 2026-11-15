@@ -102,6 +102,25 @@ pub async fn shelf_command(
     let s = system.apps.shelf.clone();
     super::blocking(move || s.command(op)).await
 }
+/// Autoclicker settings, run state and hotkey status.
+#[tauri::command]
+#[specta::specta]
+pub async fn autoclicker_get(
+    system: tauri::State<'_, Arc<SystemServices>>,
+) -> Result<AutoclickerChanged, IslandError> {
+    let s = system.apps.autoclicker.clone();
+    super::blocking(move || s.current()).await
+}
+/// Configure / Arm / Start / Stop.
+#[tauri::command]
+#[specta::specta]
+pub async fn autoclicker_command(
+    system: tauri::State<'_, Arc<SystemServices>>,
+    op: AutoclickerOp,
+) -> Result<AutoclickerChanged, IslandError> {
+    let s = system.apps.autoclicker.clone();
+    super::blocking(move || s.command(op)).await
+}
 
 #[tauri::command]
 #[specta::specta]

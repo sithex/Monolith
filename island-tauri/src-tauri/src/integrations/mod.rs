@@ -1,6 +1,7 @@
 //! Independent native integrations; lifecycle wiring belongs to the application host.
 pub mod agents;
 pub mod apps;
+pub mod autoclicker;
 pub mod bluetooth;
 pub mod brightness;
 pub mod calendar;

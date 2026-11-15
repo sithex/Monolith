@@ -16,6 +16,7 @@ pub struct AppsSnapshot {
     pub downloads: Option<DownloadsChanged>,
     pub transfers: Option<TransfersChanged>,
     pub shelf: Option<ShelfChanged>,
+    pub autoclicker: Option<AutoclickerChanged>,
     pub calendar: Option<CalendarChanged>,
     pub brightness: Option<super::controls::BrightnessChanged>,
     pub agents: Option<super::controls::AgentsChanged>,
@@ -270,4 +271,81 @@ pub struct CalendarChanged {
     pub age_ms: Option<f64>,
     pub updated_at: Option<f64>,
     pub agenda: Vec<AgendaRow>,
+}
+
+// ---- Autoclicker -------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ClickButton {
+    Left,
+    Right,
+    Middle,
+}
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ClickKind {
+    Single,
+    Double,
+}
+/// `toggle`: one press of the hotkey starts, the next stops. `hold`: clicks while the
+/// hotkey is held down.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum TriggerMode {
+    Toggle,
+    Hold,
+}
+/// Saved to `autoclicker.json`. Every field is range-checked by
+/// `integrations::autoclicker::core::validate`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AutoclickerConfig {
+    /// Time between clicks (1 ms ..= 1 h).
+    pub interval_ms: u32,
+    /// Random ± spread on each interval, in percent (0 ..= 50).
+    pub jitter_percent: u32,
+    pub button: ClickButton,
+    pub kind: ClickKind,
+    pub mode: TriggerMode,
+    /// Stop after this many clicks (0 = no limit).
+    pub click_limit: u32,
+    /// Stop after this many seconds (0 = no limit).
+    pub time_limit_s: u32,
+    /// Delay before clicking when started from the island's Start button (0 ..= 10 s).
+    pub start_delay_s: u32,
+    /// KGlobalAccel key text (`F8`, `Ctrl+Alt+K`); `""` = no hotkey.
+    pub hotkey: String,
+}
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type, tauri_specta::Event)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoclickerChanged {
+    pub rev: u32,
+    /// False when `/dev/uinput` cannot be opened for writing.
+    pub available: bool,
+    pub detail: String,
+    pub config: AutoclickerConfig,
+    /// The hotkey is registered with KDE only while armed.
+    pub armed: bool,
+    pub running: bool,
+    /// Counting down the start delay (running is true too).
+    pub starting: bool,
+    /// Clicks in the current (or last) run.
+    pub clicks: f64,
+    /// `off` | `bound` | `none` | `conflict` | `invalid` | `unavailable` | `pending`.
+    pub hotkey_state: String,
+    pub hotkey_detail: String,
+}
+#[derive(Deserialize, Clone, Debug, specta::Type)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum AutoclickerOp {
+    Configure { config: AutoclickerConfig },
+    Arm { armed: bool },
+    Start {},
+    Stop {},
 }

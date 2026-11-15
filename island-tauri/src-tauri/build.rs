@@ -70,6 +70,8 @@ const COMMANDS: &[&str] = &[
     "transfer_reveal",
     "shelf_get",
     "shelf_command",
+    "autoclicker_get",
+    "autoclicker_command",
     "calendar_get",
     "calendar_command",
     "calendar_refresh",

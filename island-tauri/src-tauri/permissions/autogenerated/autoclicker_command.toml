@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-autoclicker-command"
+description = "Enables the autoclicker_command command without any pre-configured scope."
+commands.allow = ["autoclicker_command"]
+
+[[permission]]
+identifier = "deny-autoclicker-command"
+description = "Denies the autoclicker_command command without any pre-configured scope."
+commands.deny = ["autoclicker_command"]

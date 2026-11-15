@@ -69,6 +69,8 @@ permissions = [
   "allow-transfer-reveal",
   "allow-shelf-get",
   "allow-shelf-command",
+  "allow-autoclicker-get",
+  "allow-autoclicker-command",
   "allow-calendar-get",
   "allow-calendar-command",
   "allow-calendar-refresh",

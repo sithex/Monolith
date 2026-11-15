@@ -11,7 +11,7 @@ use std::fmt;
 
 pub const CURRENT_VERSION: u32 = 2;
 pub const MAX_JSON_BYTES: usize = 256 * 1024;
-pub const KNOWN_IDS: [&str; 18] = [
+pub const KNOWN_IDS: [&str; 19] = [
     "terminal",
     "monitor",
     "ai",
@@ -30,10 +30,11 @@ pub const KNOWN_IDS: [&str; 18] = [
     "update-badge",
     "system-tiles",
     "shelf",
+    "autoclicker",
 ];
 /// Known modules added after version 2 shipped: a saved v2 registry without one gets it
 /// appended (enabled, last), so an existing launcher shows the new app.
-const ADDED_IN_V2: [&str; 1] = ["shelf"];
+const ADDED_IN_V2: [&str; 2] = ["shelf", "autoclicker"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RegistryError {
@@ -134,6 +135,7 @@ pub enum ModuleConfig {
     Scratchpad {},
     Downloads {},
     Shelf {},
+    Autoclicker {},
     Calendar {},
     Terminal {
         font_size: f64,
@@ -174,6 +176,7 @@ impl ModuleConfig {
             Self::Scratchpad {} => Some("scratchpad"),
             Self::Downloads {} => Some("downloads"),
             Self::Shelf {} => Some("shelf"),
+            Self::Autoclicker {} => Some("autoclicker"),
             Self::Calendar {} => Some("calendar"),
             Self::Terminal { .. } => Some("terminal"),
             Self::Monitor {} => Some("monitor"),
@@ -344,6 +347,7 @@ impl Registry {
             ModuleConfig::UpdateBadge {},
             ModuleConfig::SystemTiles {},
             ModuleConfig::Shelf {},
+            ModuleConfig::Autoclicker {},
         ];
         let modules = KNOWN_IDS
             .into_iter()

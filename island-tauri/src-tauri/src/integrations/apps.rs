@@ -11,6 +11,7 @@ use crate::{
         downloads::{DesktopOpener, DownloadsService, Opener},
         jobs::TransfersService,
         shelf::ShelfStore,
+        autoclicker::Autoclicker,
         mixer::MixerService,
         notifications::{hub::Hub, NotificationInput, NotificationSource, Urgency},
         power::PowerService,
@@ -58,6 +59,8 @@ pub struct AppServices {
     pub transfers: Arc<TransfersService>,
     /// Drop shelf (paths parked from the notch). Not a service: no thread, no watcher.
     pub shelf: Arc<ShelfStore>,
+    /// Autoclicker (virtual mouse + KDE hotkey). Idle until started.
+    pub autoclicker: Arc<Autoclicker>,
     slots: Mutex<Slots>,
     app: tauri::AppHandle,
     data: PathBuf,
@@ -177,6 +180,7 @@ impl AppServices {
             downloads: s.downloads.as_ref().map(|s| s.current()).transpose()?,
             transfers: Some(self.transfers.current()),
             shelf: self.shelf.current().ok(),
+            autoclicker: self.autoclicker.current().ok(),
             calendar: s
                 .calendar
                 .as_ref()
@@ -206,6 +210,7 @@ impl AppServices {
             Arc::new(DesktopOpener)
         };
         let shelf = ShelfStore::new(data, opener.clone());
+        let autoclicker = Autoclicker::new(data, test_instance);
         let transfers = TransfersService::start(
             super::system_services::session_bus_address(
                 test_instance,
@@ -227,10 +232,17 @@ impl AppServices {
                 tracing::warn!("App event delivery failed");
             }
         }));
+        let app_handle = app.clone();
+        tauri::async_runtime::spawn(autoclicker.topic.forwarder(COALESCE, move |v| {
+            if v.emit_to(&app_handle, ISLAND_LABEL).is_err() {
+                tracing::warn!("App event delivery failed");
+            }
+        }));
         Self {
             game_pause,
             transfers,
             shelf,
+            autoclicker,
             power,
             slots: Mutex::new(Slots::default()),
             app: app.clone(),
@@ -523,6 +535,7 @@ impl AppServices {
     }
     pub fn shutdown(&self) -> Result<(), IslandError> {
         self.transfers.shutdown();
+        self.autoclicker.shutdown();
         let mut slots = self.lock()?;
         let mut errors = vec![];
         if let Some(service) = slots.tiles.take() {

@@ -173,6 +173,10 @@ export const commands = {
 	shelfGet: () => typedError<ShelfChanged, IslandError>(__TAURI_INVOKE("shelf_get")),
 	/**  Open / Reveal / Remove / Clear. Items are named by id; the path comes from the shelf. */
 	shelfCommand: (op: ShelfOp) => typedError<ShelfChanged, IslandError>(__TAURI_INVOKE("shelf_command", { op })),
+	/**  Autoclicker settings, run state and hotkey status. */
+	autoclickerGet: () => typedError<AutoclickerChanged, IslandError>(__TAURI_INVOKE("autoclicker_get")),
+	/**  Configure / Arm / Start / Stop. */
+	autoclickerCommand: (op: AutoclickerOp) => typedError<AutoclickerChanged, IslandError>(__TAURI_INVOKE("autoclicker_command", { op })),
 	calendarGet: (query: CalendarQuery) => typedError<CalendarChanged, IslandError>(__TAURI_INVOKE("calendar_get", { query })),
 	calendarCommand: (op: CalendarOp) => typedError<null, IslandError>(__TAURI_INVOKE("calendar_command", { op })),
 	calendarRefresh: () => typedError<null, IslandError>(__TAURI_INVOKE("calendar_refresh")),
@@ -201,6 +205,7 @@ export const events = {
 	agentsChanged: makeEvent<AgentsChanged, AgentsChanged>("agents-changed"),
 	anchorSignal: makeEvent<AnchorSignal, AnchorSignal>("anchor-signal"),
 	approvalChanged: makeEvent<ApprovalChanged, ApprovalChanged>("approval-changed"),
+	autoclickerChanged: makeEvent<AutoclickerChanged, AutoclickerChanged>("autoclicker-changed"),
 	bluetoothChanged: makeEvent<BluetoothChanged, BluetoothChanged>("bluetooth-changed"),
 	brightnessChanged: makeEvent<BrightnessChanged, BrightnessChanged>("brightness-changed"),
 	calendarChanged: makeEvent<CalendarChanged, CalendarChanged>("calendar-changed"),
@@ -442,6 +447,7 @@ export type AppsSnapshot = {
 	downloads: DownloadsChanged | null,
 	transfers: TransfersChanged | null,
 	shelf: ShelfChanged | null,
+	autoclicker: AutoclickerChanged | null,
 	calendar: CalendarChanged | null,
 	brightness: BrightnessChanged | null,
 	agents: AgentsChanged | null,
@@ -450,6 +456,48 @@ export type AppsSnapshot = {
 	updates: UpdatesChanged | null,
 	tiles: TilesChanged | null,
 };
+
+export type AutoclickerChanged = {
+	rev: number,
+	/**  False when `/dev/uinput` cannot be opened for writing. */
+	available: boolean,
+	detail: string,
+	config: AutoclickerConfig,
+	/**  The hotkey is registered with KDE only while armed. */
+	armed: boolean,
+	running: boolean,
+	/**  Counting down the start delay (running is true too). */
+	starting: boolean,
+	/**  Clicks in the current (or last) run. */
+	clicks: number,
+	/**  `off` | `bound` | `none` | `conflict` | `invalid` | `unavailable` | `pending`. */
+	hotkeyState: string,
+	hotkeyDetail: string,
+};
+
+/**
+ *  Saved to `autoclicker.json`. Every field is range-checked by
+ *  `integrations::autoclicker::core::validate`.
+ */
+export type AutoclickerConfig = {
+	/**  Time between clicks (1 ms ..= 1 h). */
+	intervalMs: number,
+	/**  Random ± spread on each interval, in percent (0 ..= 50). */
+	jitterPercent: number,
+	button: ClickButton,
+	kind: ClickKind,
+	mode: TriggerMode,
+	/**  Stop after this many clicks (0 = no limit). */
+	clickLimit: number,
+	/**  Stop after this many seconds (0 = no limit). */
+	timeLimitS: number,
+	/**  Delay before clicking when started from the island's Start button (0 ..= 10 s). */
+	startDelayS: number,
+	/**  KGlobalAccel key text (`F8`, `Ctrl+Alt+K`); `""` = no hotkey. */
+	hotkey: string,
+};
+
+export type AutoclickerOp = { type: "configure"; config: AutoclickerConfig } | { type: "arm"; armed: boolean } | { type: "start" } | { type: "stop" };
 
 /**  Latest-value topic (`BluetoothChanged`); SPEC §3.1 requires a revision on every payload. */
 export type BluetoothChanged = {
@@ -596,6 +644,10 @@ export type ClaudeRegEntry = {
 	/**  Rust-whitelisted registry metadata only; never arbitrary registry JSON or session titles. */
 	data: JsonValue,
 };
+
+export type ClickButton = "left" | "right" | "middle";
+
+export type ClickKind = "single" | "double";
 
 export type ClipContent = { type: "text"; text: string } | { type: "image"; pngDataUrl: string; width: number; height: number } | { type: "files"; uris: string[] };
 
@@ -888,7 +940,7 @@ export type IslandState = {
 /**  SPEC §4.5: the state actor is the ONLY emitter. Latest-value: consumers drop older `rev`s. */
 export type IslandStateChanged = IslandState;
 
-export type IslandView = "terminal" | "monitor" | "ai" | "settings" | "notifications" | "clipboard" | "launcher" | "music" | "quickInfo" | "timer" | "calendar" | "scratchpad" | "downloads" | "controls" | "mixer" | "brightness" | "agents" | "updates" | "shelf";
+export type IslandView = "terminal" | "monitor" | "ai" | "settings" | "notifications" | "clipboard" | "launcher" | "music" | "quickInfo" | "timer" | "calendar" | "scratchpad" | "downloads" | "controls" | "mixer" | "brightness" | "agents" | "updates" | "shelf" | "autoclicker";
 
 /**
  *  TypeScript-side description of arbitrary JSON. `serde_json::Value`'s own specta impl drags in
@@ -1066,7 +1118,7 @@ export type MixerStream = {
 	volumePercent: number | null,
 };
 
-export type ModuleConfig = ({ type: "systemTiles" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "updateBadge" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "quickToggles" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "mixer" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "agentTracker" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "brightness" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "timer" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "scratchpad" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "downloads" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "shelf" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "calendar" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "terminal"; fontSize: number }) & { dnd?: never; equalizer?: never; equalizerBands?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "monitor" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "ai" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "settings" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "notifications"; systemNotificationMirror: boolean; toastTtlMs: number; redactBodies: boolean; dnd: boolean }) & { equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never } | ({ type: "clipboard"; historySize: number; persist: boolean }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; lyrics?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "music"; lyrics: boolean; equalizer: boolean; equalizerBands: number }) & { dnd?: never; fontSize?: never; historySize?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | 
+export type ModuleConfig = ({ type: "systemTiles" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "updateBadge" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "quickToggles" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "mixer" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "agentTracker" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "brightness" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "timer" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "scratchpad" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "downloads" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "shelf" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "autoclicker" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "calendar" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "terminal"; fontSize: number }) & { dnd?: never; equalizer?: never; equalizerBands?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "monitor" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "ai" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "settings" }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "notifications"; systemNotificationMirror: boolean; toastTtlMs: number; redactBodies: boolean; dnd: boolean }) & { equalizer?: never; equalizerBands?: never; fontSize?: never; historySize?: never; lyrics?: never; persist?: never } | ({ type: "clipboard"; historySize: number; persist: boolean }) & { dnd?: never; equalizer?: never; equalizerBands?: never; fontSize?: never; lyrics?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | ({ type: "music"; lyrics: boolean; equalizer: boolean; equalizerBands: number }) & { dnd?: never; fontSize?: never; historySize?: never; persist?: never; redactBodies?: never; systemNotificationMirror?: never; toastTtlMs?: never } | 
 /**  Only valid for an unknown module ID; serialized without a wrapper/tag. */
 ModuleJsonValue;
 
@@ -1816,6 +1868,12 @@ export type TransfersChanged = {
 	detail: string,
 	items: TransferRow[],
 };
+
+/**
+ *  `toggle`: one press of the hotkey starts, the next stops. `hold`: clicks while the
+ *  hotkey is held down.
+ */
+export type TriggerMode = "toggle" | "hold";
 
 export type UiFont = "system" | "openrunde";
 

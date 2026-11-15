@@ -577,6 +577,7 @@ pub fn module_route(id: &str) -> Option<IslandView> {
         "quick-toggles" | "system-tiles" => IslandView::Controls,
         "update-badge" => IslandView::Updates,
         "shelf" => IslandView::Shelf,
+        "autoclicker" => IslandView::Autoclicker,
         _ => return None,
     })
 }

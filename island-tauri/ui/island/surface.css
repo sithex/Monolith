@@ -203,6 +203,11 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .wheel-tick.lit { opacity: 1; }
 .wheel-label { position: absolute; top: 2%; transform: translateX(-50%); font: 500 var(--fs-base)/1 var(--ui-mono); color: var(--tone); }
 .wheel-pointer { position: absolute; left: 50%; bottom: 2px; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-bottom: 10px solid var(--tone); border-top: 0; }
+.timer-units { display: flex; justify-content: center; gap: 8px; }
+.timer-units button { height: 26px; padding: 0 12px; border-radius: var(--radius-2xl); font-size: var(--fs-sm); color: var(--v-dim); background: var(--v-fill); }
+.timer-units button b { font: 600 var(--fs-md)/1 var(--ui-mono); color: inherit; }
+.timer-units button[aria-pressed='true'] { color: var(--tone); background: color-mix(in srgb, var(--tone) 18%, transparent); }
+.timer-units button:disabled { opacity: .45; }
 .countdown { text-align: center; font-size: clamp(40px, 11cqi, 62px); font-weight: 200; font-family: var(--ui-font); letter-spacing: -1px; color: var(--tone); padding: 2px 0; }
 .countdown .digit { display: inline-block; }
 .timer-footer button { background: var(--v-fill); border-radius: var(--radius-2xl); padding: 4px 12px; }

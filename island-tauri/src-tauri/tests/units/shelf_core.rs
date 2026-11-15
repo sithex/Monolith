@@ -154,7 +154,7 @@ fn shelf_launcher_app_is_appended_to_a_saved_v2_registry_last() {
     assert_eq!(
         ids,
         // (`from_json` normalizes orders as before; the user's relative order is kept.)
-        [("terminal", 0, true), ("settings", 1, true), ("downloads", 2, false), ("shelf", 3, true)]
+        [("terminal", 0, true), ("settings", 1, true), ("downloads", 2, false), ("shelf", 3, true), ("autoclicker", 4, true)]
     );
     // Already there (even disabled by the user): left exactly as saved.
     let off = saved.replace(
@@ -162,7 +162,7 @@ fn shelf_launcher_app_is_appended_to_a_saved_v2_registry_last() {
         r#"{"type":"downloads"}},{"id":"shelf","enabled":false,"order":10,"config":{"type":"shelf"}}]"#,
     );
     let (kept, _) = Registry::from_json(&off).unwrap();
-    assert_eq!(kept.modules().len(), 4);
+    assert_eq!(kept.modules().len(), 5);
     assert!(!kept.modules()[3].enabled);
     assert!(Registry::defaults().modules().iter().any(|m| m.id.as_str() == "shelf" && m.enabled));
     assert_eq!(module_route("shelf"), Some(IslandView::Shelf));

@@ -113,3 +113,29 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
   .month-day { min-height: 70px; }
   .track-header h2 { font-size: var(--fs-lg); }
 }
+
+/* ---- Autoclicker ---------------------------------------------------------- */
+.autoclicker-app { --tone: var(--app-autoclicker, #ff6482); }
+.ac-hero { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; }
+.ac-status { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ac-status > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ac-status strong { font-size: var(--fs-lg, 15px); font-weight: 600; }
+.ac-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--v-track); }
+.ac-hero[data-running] .ac-dot { background: var(--tone); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tone) 25%, transparent); animation: ac-pulse 1s ease-in-out infinite; }
+@keyframes ac-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--tone) 8%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .ac-hero[data-running] .ac-dot { animation: none; } }
+.ac-go { flex: none; height: 32px; padding: 0 18px; border-radius: var(--radius-2xl); font-weight: 600; color: var(--tone); background: color-mix(in srgb, var(--tone) 18%, transparent); }
+.ac-hero[data-running] .ac-go { color: #fff; background: var(--tone); }
+.ac-card { display: flex; flex-direction: column; padding: 4px 14px; }
+.ac-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 0; }
+.ac-row + .ac-row { border-top: .5px solid var(--v-stroke); }
+.ac-row-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ac-row-label strong { font-weight: 500; }
+.ac-row-label small { font-size: var(--fs-sm); }
+.ac-row-control { display: flex; align-items: center; justify-content: flex-end; flex: none; max-width: 60%; }
+.ac-speed { display: flex; align-items: center; gap: 8px; }
+.ac-number { display: inline-flex; align-items: center; gap: 6px; }
+.ac-number input { width: 84px; height: 28px; padding: 0 8px; text-align: right; border-radius: var(--radius-md); border: .5px solid var(--v-stroke); background: var(--v-fill); color: var(--ui-text); font: inherit; font-variant-numeric: tabular-nums; }
+.ac-number input::-webkit-inner-spin-button { opacity: .5; }
+.ac-range { width: 160px; }
+.autoclicker-app .shortcut-recorder { align-items: flex-end; }

@@ -36,6 +36,7 @@ pub enum IslandView {
     Agents,
     Updates,
     Shelf,
+    Autoclicker,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, specta::Type)]

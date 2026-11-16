@@ -84,6 +84,8 @@ pub enum SkipReason {
     Echo,
     /// At capacity with every entry pinned.
     Full,
+    /// Pinned entries leave too little of the total byte budget for this entry.
+    OverBudget,
 }
 
 /// Result of `HistoryStore::offer`.

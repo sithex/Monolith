@@ -1,4 +1,5 @@
 use std::collections::{HashSet, VecDeque};
+use std::sync::Arc;
 
 use super::config::HistoryConfig;
 use super::error::Error;
@@ -43,7 +44,7 @@ pub struct HistoryStore {
 #[derive(Debug)]
 struct Entry {
     id: String,
-    payload: ClipPayload,
+    payload: Arc<ClipPayload>,
     pinned: bool,
     copied_at_ms: f64,
     source_app: Option<String>,
@@ -145,7 +146,7 @@ impl HistoryStore {
             }
             store.entries.push_back(Entry {
                 id,
-                payload,
+                payload: Arc::new(payload),
                 pinned: stored.pinned,
                 copied_at_ms: stored.copied_at_ms,
                 source_app: stored.source_app,
@@ -160,6 +161,15 @@ impl HistoryStore {
                 .iter()
                 .rposition(|e| !e.pinned)
                 .unwrap_or(store.entries.len() - 1);
+            store.entries.remove(pos);
+        }
+
+        // Cap to the total byte budget the same way, but never drop a pinned entry: when the
+        // pinned entries alone exceed it they stay and new offers are refused (`OverBudget`).
+        while store.retained_bytes() > store.config.max_total_bytes {
+            let Some(pos) = store.entries.iter().rposition(|e| !e.pinned) else {
+                break;
+            };
             store.entries.remove(pos);
         }
 
@@ -193,7 +203,7 @@ impl HistoryStore {
                 .filter(|e| include_unpinned || e.pinned)
                 .map(|e| persist::StoredEntry {
                     id: e.id.clone(),
-                    payload: persist::StoredPayload::from(&e.payload),
+                    payload: persist::StoredPayload::from(&*e.payload),
                     pinned: e.pinned,
                     copied_at_ms: e.copied_at_ms,
                     source_app: e.source_app.clone(),
@@ -201,6 +211,35 @@ impl HistoryStore {
                 .collect(),
         };
         serde_json::to_string(&file).map_err(|e| Error::Corrupt(format!("serialize: {e}")))
+    }
+
+    /// Copy of the state `to_persisted(false)` would write (pinned entries and the id
+    /// counter), cheap enough to take under a lock: payloads are shared, not copied.
+    pub fn persist_snapshot(&self) -> persist::PersistSnapshot {
+        persist::PersistSnapshot::new(
+            self.next_id,
+            self.entries
+                .iter()
+                .filter(|e| e.pinned)
+                .map(|e| {
+                    (
+                        persist::SnapshotEntry {
+                            id: e.id.clone(),
+                            payload: e.payload.clone(),
+                            copied_at_ms: e.copied_at_ms,
+                            source_app: e.source_app.clone(),
+                        },
+                        e.hash,
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    /// Sum of every retained entry's payload bytes (pinned included); this is what
+    /// `HistoryConfig::max_total_bytes` bounds.
+    pub fn retained_bytes(&self) -> usize {
+        self.entries.iter().map(|e| payload_bytes(&e.payload)).sum()
     }
 
     pub fn is_paused(&self) -> bool {
@@ -289,20 +328,37 @@ impl HistoryStore {
             return OfferOutcome::Reordered { id };
         }
 
-        // Capacity: evict the oldest unpinned entry; if all are pinned, full.
-        if self.entries.len() >= self.config.capacity {
-            match self.entries.iter().rposition(|e| !e.pinned) {
-                Some(pos) => {
-                    self.entries.remove(pos);
-                }
-                None => return OfferOutcome::Skipped(SkipReason::Full),
+        // Admission: both the entry count and the total byte budget must fit. Plan the
+        // evictions (oldest unpinned first) before removing anything, so a rejected offer
+        // never costs the user an entry; pinned entries are never evicted.
+        let size = payload_bytes(&input.content);
+        let mut count = self.entries.len();
+        let mut bytes = self.retained_bytes();
+        let mut victims = Vec::new();
+        for pos in (0..self.entries.len()).rev() {
+            if count < self.config.capacity && bytes + size <= self.config.max_total_bytes {
+                break;
             }
+            if !self.entries[pos].pinned {
+                count -= 1;
+                bytes -= payload_bytes(&self.entries[pos].payload);
+                victims.push(pos);
+            }
+        }
+        if count >= self.config.capacity {
+            return OfferOutcome::Skipped(SkipReason::Full);
+        }
+        if bytes + size > self.config.max_total_bytes {
+            return OfferOutcome::Skipped(SkipReason::OverBudget);
+        }
+        for pos in victims {
+            self.entries.remove(pos);
         }
 
         let id = self.alloc_id();
         self.entries.push_front(Entry {
             id: id.clone(),
-            payload: input.content,
+            payload: Arc::new(input.content),
             pinned: false,
             copied_at_ms: now_ms as f64,
             source_app: input.source_app,
@@ -372,7 +428,7 @@ impl HistoryStore {
     /// Fetch the full content for an id.
     pub fn get(&self, id: &str) -> Option<ClipContent> {
         let entry = self.entries.iter().find(|e| e.id == id)?;
-        Some(match &entry.payload {
+        Some(match &*entry.payload {
             ClipPayload::Text(text) => ClipContent::Text { text: text.clone() },
             ClipPayload::Image { png, width, height } => ClipContent::Image {
                 png_data_url: png_data_url(png),
@@ -471,13 +527,17 @@ fn kind_of(payload: &ClipPayload) -> ClipKind {
     }
 }
 
+/// Retained payload size: text bytes, raw PNG bytes, or the summed file-URI bytes.
+fn payload_bytes(payload: &ClipPayload) -> usize {
+    match payload {
+        ClipPayload::Text(text) => text.len(),
+        ClipPayload::Image { png, .. } => png.len(),
+        ClipPayload::Files(uris) => uris.iter().map(String::len).sum(),
+    }
+}
+
 fn saturating_bytes(payload: &ClipPayload) -> u32 {
-    let total: u64 = match payload {
-        ClipPayload::Text(text) => text.len() as u64,
-        ClipPayload::Image { png, .. } => png.len() as u64,
-        ClipPayload::Files(uris) => uris.iter().map(|u| u.len() as u64).sum(),
-    };
-    total.min(u32::MAX as u64) as u32
+    payload_bytes(payload).min(u32::MAX as usize) as u32
 }
 
 fn png_data_url(png: &[u8]) -> String {

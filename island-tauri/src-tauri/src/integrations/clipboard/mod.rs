@@ -5,11 +5,15 @@ mod control_copy;
 pub mod history;
 #[cfg(target_os = "linux")]
 mod linux_wayland;
+#[cfg(test)]
+mod measure;
 mod persistence;
 #[cfg(test)]
 mod tests;
 #[cfg(not(target_os = "linux"))]
 mod unsupported;
+#[cfg(test)]
+mod writer_tests;
 
 use crate::{
     contract::{clipboard as wire, settings::Settings},
@@ -41,6 +45,28 @@ struct Inner {
     persist: bool,
     rev: u32,
     pending: VecDeque<wire::ClipSummary>,
+    /// What was last queued for `clipboard.json`; `None` = nothing known to be on disk.
+    persisted: Option<history::PersistKey>,
+}
+impl Inner {
+    /// Hand the current persisted state (pinned entries + id counter) to the writer, unless it
+    /// is exactly what was queued last. Only the id counter moving (a plain new copy) may wait
+    /// briefly to be coalesced; any change to the pinned entries is written at once.
+    fn queue_save(&mut self, writer: &persistence::Writer) -> Result<(), IslandError> {
+        let snapshot = self.store.persist_snapshot();
+        let retry = writer.take_failed();
+        let urgent = match &self.persisted {
+            Some(last) if !retry => {
+                if last == snapshot.key() {
+                    return Ok(());
+                }
+                !last.same_entries(snapshot.key())
+            }
+            _ => true,
+        };
+        self.persisted = Some(snapshot.key().clone());
+        writer.save(snapshot, urgent)
+    }
 }
 pub(super) struct Shared {
     inner: Mutex<Inner>,
@@ -49,7 +75,7 @@ pub(super) struct Shared {
     epoch: AtomicU32,
     status: watch::Sender<wire::ClipboardStatus>,
     wake: Notify,
-    file: PathBuf,
+    writer: persistence::Writer,
     /// Non-blocking nudge for the running watcher's poll loop (a clone of its wake socket).
     /// Pause/resume must wake it so the epoch fence is posted BEFORE the next selection event;
     /// otherwise the first copy after a resume is discarded as "queued while paused".
@@ -81,6 +107,7 @@ impl Clipboard {
                     persist: settings.clipboard_persist,
                     rev: 0,
                     pending: VecDeque::with_capacity(128),
+                    persisted: None,
                 }),
                 enabled: AtomicBool::new(false),
                 paused: AtomicBool::new(false),
@@ -101,7 +128,7 @@ impl Clipboard {
                 })
                 .0,
                 wake: Notify::new(),
-                file: data.join("clipboard.json"),
+                writer: persistence::Writer::new(data.join("clipboard.json")),
                 #[cfg(target_os = "linux")]
                 watcher_wake: Mutex::new(None),
             }),
@@ -129,6 +156,7 @@ impl Clipboard {
                     persist: false,
                     rev: 0,
                     pending: VecDeque::new(),
+                    persisted: None,
                 }),
                 enabled: AtomicBool::new(false),
                 paused: AtomicBool::new(false),
@@ -139,7 +167,7 @@ impl Clipboard {
                 })
                 .0,
                 wake: Notify::new(),
-                file: data.join("clipboard.json"),
+                writer: persistence::Writer::new(data.join("clipboard.json")),
                 #[cfg(target_os = "linux")]
                 watcher_wake: Mutex::new(None),
             }),
@@ -169,6 +197,7 @@ impl Clipboard {
                 running.stop()?;
             }
         }
+        let queued;
         {
             let mut inner = self.shared.inner()?;
             if cfg != inner.config {
@@ -182,10 +211,17 @@ impl Clipboard {
             let was_persist = inner.persist;
             inner.persist = settings.clipboard_persist;
             if inner.persist {
-                persistence::save(&self.shared.file, &inner.store)?;
+                // A no-op when the persisted state is unchanged (e.g. an unrelated settings edit).
+                inner.queue_save(&self.shared.writer)?;
             } else if was_persist {
-                persistence::remove(&self.shared.file)?;
+                inner.persisted = None;
+                self.shared.writer.remove()?;
             }
+            queued = inner.persist || was_persist;
+        }
+        if queued {
+            // Settings changes report write failures, as before; the history lock is not held.
+            self.shared.writer.flush()?;
         }
         self.shared.enabled.store(enabled, Ordering::Release);
         self.shared.status.send_modify(|s| {
@@ -262,13 +298,22 @@ impl Clipboard {
         &self,
         change: impl FnOnce(&mut HistoryStore) -> Result<(), IslandError>,
     ) -> Result<(), IslandError> {
-        let mut inner = self.shared.inner()?;
-        change(&mut inner.store)?;
-        inner.rev = inner.rev.wrapping_add(1);
-        // Queue contains only Added; do not resurrect a removed/changed entry during delivery.
-        inner.pending.clear();
-        if inner.persist {
-            persistence::save(&self.shared.file, &inner.store)?;
+        let persist;
+        {
+            let mut inner = self.shared.inner()?;
+            change(&mut inner.store)?;
+            inner.rev = inner.rev.wrapping_add(1);
+            // Queue contains only Added; do not resurrect a removed/changed entry during delivery.
+            inner.pending.clear();
+            persist = inner.persist;
+            if persist {
+                inner.queue_save(&self.shared.writer)?;
+            }
+        }
+        if persist {
+            // Pin, delete and clear are durable before they are acknowledged and still report a
+            // failed write to the caller, as before; the history lock is no longer held.
+            self.shared.writer.flush()?;
         }
         Ok(())
     }
@@ -321,14 +366,23 @@ impl Clipboard {
                 "clipboard",
                 policy,
                 stop.subscribe(),
-                move || pump(shared.clone(), out.clone(), stop.subscribe(), revision.clone()),
+                move || {
+                    pump(
+                        shared.clone(),
+                        out.clone(),
+                        stop.subscribe(),
+                        revision.clone(),
+                    )
+                },
                 move |health| {
                     report.pump_health(health, &saved);
                     // The pump is down and cannot forward this change itself.
                     if health != PumpHealth::Running {
                         let status = report.status.borrow().clone();
                         let rev = tell_rev.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
-                        if let Err(error) = tell.status(&wire::ClipboardStatusChanged { rev, status }) {
+                        if let Err(error) =
+                            tell.status(&wire::ClipboardStatusChanged { rev, status })
+                        {
                             tracing::warn!(%error, "Clipboard status delivery failed");
                         }
                     }
@@ -347,15 +401,18 @@ impl Clipboard {
             task.abort();
         }
         self.shared.inner()?.pending.clear();
-        if let Some(mut worker) = lock(&self.worker)?.take() {
-            worker.stop()?;
-        }
+        let stopped = match lock(&self.worker)?.take() {
+            Some(mut worker) => worker.stop(),
+            None => Ok(()),
+        };
         self.shared.status.send_modify(|s| {
             s.enabled = false;
             s.available = false;
             s.detail = "stopped".into();
         });
-        Ok(())
+        // Everything queued reaches the disk before shutdown returns.
+        let flushed = self.shared.writer.flush();
+        stopped.and(flushed)
     }
 }
 impl Drop for Clipboard {
@@ -580,7 +637,7 @@ impl Shared {
         // Capture runs on hi-clipboard, never the actor. Preserve pinned ordering
         // and the allocation counter as well as explicit pin/delete/clear changes.
         if changed && inner.persist {
-            persistence::save(&self.file, &inner.store)?;
+            inner.queue_save(&self.writer)?;
         }
         Ok(())
     }

@@ -24,4 +24,5 @@ pub use error::Error;
 pub use model::{
     ClipContent, ClipInput, ClipKind, ClipPayload, ClipSummary, OfferOutcome, SkipReason,
 };
+pub use persist::{PersistKey, PersistSnapshot};
 pub use store::HistoryStore;

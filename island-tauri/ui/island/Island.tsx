@@ -12,6 +12,7 @@ import { SideControls } from './SideControls';
 import { CommandPalette } from './CommandPalette';
 import { VoiceControls } from './VoiceControls';
 import { ColorPickerPanel } from './components/ColorField';
+import { InstantTooltip } from './components/InstantTooltip';
 import { AppsView as AppsViewInner } from '../views/AppsView';
 import { configureAppTopics, useLauncher, useMedia } from '../stores/apps';
 import type { IslandView } from '../ipc/client';
@@ -203,5 +204,5 @@ export function Island() {
       initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       exit={reduced ? { opacity: 0, transition: fadeOnly } : { opacity: 0, y: 10, transition: tween(DUR.fast) }}
       transition={tween(0.24)}>{error}</motion.div>}</AnimatePresence>
-  </IslandSurface><SideControls navigate={navigate} fail={fail} view={view} back={{ view: previous, label: viewLabels[previous], go: goBack }} /><ColorPickerPanel /><Toast previews={false} /></main></MotionConfig>;
+  </IslandSurface><SideControls navigate={navigate} fail={fail} view={view} back={{ view: previous, label: viewLabels[previous], go: goBack }} /><ColorPickerPanel /><Toast previews={false} /><InstantTooltip /></main></MotionConfig>;
 }

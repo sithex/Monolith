@@ -108,7 +108,7 @@ export function AutoclickerApp({ model, intents }: { model: AutoclickerChanged; 
         <div><strong>{status}</strong><small className="muted" aria-live="off">{model.running || model.clicks > 0
           ? <><span className="sr-only">{session}</span><RollingText text={session} reduced={reduced} fast /></> : session}</small></div>
       </div>
-      <button type="button" className="ac-go" disabled={!model.available} onClick={() => send(model.running ? { type: 'stop' } : { type: 'start' })}>
+      <button type="button" className="ac-go" data-variant={model.running ? 'danger' : 'primary'} disabled={!model.available} onClick={() => send(model.running ? { type: 'stop' } : { type: 'start' })}>
         {model.running ? 'Stop' : c.startDelayS ? `Start in ${c.startDelayS}s` : 'Start'}</button>
     </section>
     {model.available && model.detail && <p className="warning app-caption" role="alert">{model.detail}</p>}

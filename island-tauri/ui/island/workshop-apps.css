@@ -15,13 +15,13 @@
 .service-notice[data-kind='off'] > svg, .service-notice[data-kind='loading'] > svg { color: var(--ui-text-hint); }
 .service-notice-text { margin: 0; font-size: var(--fs-body); overflow-wrap: anywhere; }
 .service-notice-code { font-size: var(--fs-sm); opacity: .75; }
-.service-notice-action .settings-cross-link.settings-cross-link--text { display: inline-flex; align-items: center; padding: 5px 12px; border: 1px solid var(--ui-border); border-radius: var(--radius-4xl); text-decoration: none; font-size: var(--fs-sm); }
+.service-notice-action .settings-cross-link.settings-cross-link--text { display: inline-flex; align-items: center; }
 .service-notice--inline { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 6px 8px; padding: 2px 0; text-align: left; }
 .service-notice--inline > svg { width: 16px; height: 16px; }
 .service-notice--inline .service-notice-text { flex: 1 1 160px; min-width: 0; }
 .app-banner { background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--radius-3xl); padding: 10px 12px; font-size: var(--fs-body); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .app-banner svg { width: 18px; height: 18px; }
-.app-banner button { margin-left: auto; color: var(--ui-accent); }
+.app-banner button { margin-left: auto; }
 .row-content { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .row-content strong { font-size: var(--fs-body); font-weight: 600; }
 .row-content small { display: block; color: var(--ui-text-hint); }
@@ -71,7 +71,7 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .shelf-row .row-actions { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 .shelf-footer { display: flex; align-items: center; gap: 10px; }
 .shelf-footer .app-caption { flex: 1; margin: 0; }
-.shelf-clear { flex: none; color: var(--ui-accent); }
+.shelf-clear { flex: none; }
 .kind-icon { color: var(--ui-accent); display: grid; place-items: center; flex-shrink: 0; }
 .notification-card .app-toolbar { align-items: start; }
 .notification-card .app-toolbar strong { padding-top: 6px; overflow-wrap: anywhere; }
@@ -124,8 +124,7 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .ac-hero[data-running] .ac-dot { background: var(--tone); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tone) 25%, transparent); animation: ac-pulse 1s ease-in-out infinite; }
 @keyframes ac-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--tone) 8%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .ac-hero[data-running] .ac-dot { animation: none; } }
-.ac-go { flex: none; height: 32px; padding: 0 18px; border-radius: var(--radius-3xl); font-weight: 600; color: var(--tone); background: color-mix(in srgb, var(--tone) 18%, transparent); }
-.ac-hero[data-running] .ac-go { color: #fff; background: var(--tone); }
+.ac-go { flex: none; height: 32px; }
 .ac-card { display: flex; flex-direction: column; padding: 4px 14px; }
 .ac-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 44px; padding: 6px 0; }
 .ac-row + .ac-row { border-top: .5px solid var(--v-stroke); }

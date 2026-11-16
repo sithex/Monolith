@@ -89,11 +89,11 @@ test('light-tone.css has an override for every white-overlay rule in the island 
   for (const v of ['--v-fill', '--v-fill-hi', '--v-fill-soft', '--v-stroke', '--v-stroke-hi', '--v-hover', '--v-track', '--ui-ink']) assert.match(light, new RegExp(`${v}:`));
 });
 
-test('inline white fallbacks (tile icons, fader glyph) are CSS variables the light tone redefines', () => {
+test('light tone: inline tile ink follows the tone; faders use the shared accent', () => {
   const light = src('ui/island/tokens/light-tone.css');
   assert.match(src('ui/island/Launcher.tsx'), /var\(--tile-ink, rgb\(255 255 255 \/ \.85\)\)/);
-  assert.match(src('ui/island/components/VolumeMixer.tsx'), /var\(--fader-ink, rgb\(255 255 255 \/ \.6\)\)/);
-  assert.match(light, /--tile-ink:/); assert.match(light, /--fader-ink:/);
+  assert.match(src('ui/island/components/controls.css'), /\.fader-fill[^}]*background: var\(--ui-accent\)/);
+  assert.match(light, /--tile-ink:/);
 });
 
 test('the original schemes keep xterm exactly as before (no ANSI override, same four keys)', () => {

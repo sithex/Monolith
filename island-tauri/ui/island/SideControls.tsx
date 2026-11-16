@@ -70,7 +70,7 @@ function SideBubble({ button, diameter, gap, progress, interactive, navigate, li
         onPointerEnter={e => { if (e.pointerType === 'mouse') { stale.current = undefined; setHovered(true); } }}
         onPointerMove={rearm} onPointerLeave={() => { stale.current = undefined; setHovered(false); }}
         data-back={returning}
-        aria-label={returning ? `Back to ${back!.label}` : button.label ?? (button.action.type === 'appGrid' ? 'Open apps' : quick ? actionLabel(button.action) : `Open ${actionLabel(button.action)}`)} aria-pressed={quick ? lit : undefined} aria-disabled={!interactive} title={returning ? `Back to ${back!.label}` : button.label ?? actionLabel(button.action)}
+        aria-label={returning ? `Back to ${back!.label}` : button.label ?? (button.action.type === 'appGrid' ? 'Open apps' : quick ? actionLabel(button.action) : `Open ${actionLabel(button.action)}`)} aria-pressed={quick ? lit : undefined} aria-disabled={!interactive} data-tooltip={returning ? `Back to ${back!.label}` : button.label ?? actionLabel(button.action)}
         animate={{ scale: lifted ? 1.04 : 1 }} whileTap={interactive && !reducedIcon ? { scale: .97 } : {}}
         transition={SPRING.snappy()} onClick={() => {
           if (!interactive) return;

@@ -33,12 +33,12 @@ export function ShelfApp({ model, removeAfterDrag, intents, off }: { model: Shel
         {item.present && <button aria-label={`Open ${item.name}`} onClick={() => intents.shelf({ type: 'open', id: item.id })}>Open</button>}
         {item.present && <button aria-label={`Reveal ${item.name}`} onClick={() => intents.shelf({ type: 'reveal', id: item.id })}>Reveal</button>}
         <button aria-label={`Copy path of ${item.name}`} onClick={() => intents.copy(item.path)}>Copy path</button>
-        <button aria-label={`Remove ${item.name} from the shelf`} onClick={() => intents.shelf({ type: 'remove', id: item.id })}>Remove</button>
+        <button data-variant="danger" aria-label={`Remove ${item.name} from the shelf`} onClick={() => intents.shelf({ type: 'remove', id: item.id })}>Remove</button>
       </div>
     </li>)}</ul> : <Empty icon="shelf">Drag files onto the closed notch to park them here.</Empty>}
     <div className="shelf-footer">
       <p className="muted app-caption">{model.enabled ? 'Only the paths are kept, never the files. Names with line breaks are refused.' : off}</p>
-      {items.length > 0 && <button className="shelf-clear" onClick={() => intents.shelf({ type: 'clear' })}>Clear all</button>}
+      {items.length > 0 && <button className="shelf-clear" data-variant="danger" onClick={() => intents.shelf({ type: 'clear' })}>Clear all</button>}
     </div>
   </div>;
 }

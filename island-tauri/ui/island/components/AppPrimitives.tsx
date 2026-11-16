@@ -48,6 +48,34 @@ export function DraftRange({ value, onCommit, throttleMs = 90, live = true, onDr
     onKeyDown={e => { active.current = true; rest.onKeyDown?.(e); }} onKeyUp={e => { end(); rest.onKeyUp?.(e); }}
     onChange={e => change(Number(e.target.value))} />;
 }
+export function Fader({ value, label, muted, onCommit }: { value: number; label: string; muted: boolean; onCommit(v: number): void }) {
+  const [draft, setDraft] = useState(value), [dragging, setDragging] = useState(false), [direct, setDirect] = useState(false);
+  const track = useRef<HTMLDivElement>(null), last = useRef(0), pending = useRef<number | null>(null), timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commit = useRef(onCommit); commit.current = onCommit;
+  useEffect(() => { if (!dragging) { setDraft(value); setDirect(false); } }, [value, dragging]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const flush = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } if (pending.current !== null) { commit.current(pending.current); pending.current = null; last.current = performance.now(); } };
+  const set = (v: number) => {
+    v = Math.max(0, Math.min(100, Math.round(v))); setDirect(true); setDraft(v); pending.current = v;
+    const wait = 60 - (performance.now() - last.current);
+    if (wait <= 0) flush(); else if (!timer.current) timer.current = setTimeout(flush, wait);
+  };
+  const fromPointer = (y: number) => { const r = track.current?.getBoundingClientRect(); if (r) set((r.bottom - y) / r.height * 100); };
+  return <div className="fader" role="slider" tabIndex={0} aria-label={`${label} volume`} aria-orientation="vertical" aria-valuemin={0} aria-valuemax={100} aria-valuenow={draft} aria-valuetext={`${draft}%`} data-muted={muted}
+    onPointerDown={e => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); setDragging(true); fromPointer(e.clientY); }}
+    onPointerMove={e => { if (dragging) fromPointer(e.clientY); }}
+    onPointerUp={() => { setDragging(false); flush(); }} onPointerCancel={() => { setDragging(false); flush(); }}
+    onWheel={e => { e.stopPropagation(); set(draft - Math.sign(e.deltaY || -e.deltaX) * 2); }}
+    onKeyDown={e => {
+      const step = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 2 : e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? -2 : e.key === 'PageUp' ? 10 : e.key === 'PageDown' ? -10 : 0;
+      if (step || e.key === 'Home' || e.key === 'End') { e.preventDefault(); e.stopPropagation(); set(e.key === 'Home' ? 0 : e.key === 'End' ? 100 : draft + step); }
+    }}>
+    <div className="fader-track" ref={track}>
+      <div className="fader-fill" data-direct={dragging || direct} style={{ transform: `scaleY(${draft / 100})` }} />
+      <span className="fader-thumb" style={{ bottom: `${draft}%` }} aria-hidden="true" />
+    </div>
+  </div>;
+}
 import { Icon } from './Icon';
 import type { IconName, Service } from '../models';
 import { describeServiceReason, type ServiceReasonSource } from '../service-reasons';

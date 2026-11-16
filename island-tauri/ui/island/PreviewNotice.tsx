@@ -15,7 +15,7 @@ export function PreviewNotice({ fail }: { fail(error: unknown): void }) {
     <button className="notice-open" data-testid="open" onClick={() => {
       void dispatch({ type: 'selectView', view: item ? (item.appName === 'Agents' ? 'agents' : 'notifications') : 'terminal' }).catch(fail);
     }}><strong>{label}</strong><span className="muted">{item ? item.appName : 'Your session, one click away'} ↗</span></button>
-    <button className="notice-dismiss" aria-label="Dismiss preview" title="Dismiss preview" onClick={e => {
+    <button className="notice-dismiss" aria-label="Dismiss preview" data-tooltip="Dismiss preview" onClick={e => {
       e.stopPropagation(); void dispatch({ type: 'dismissPreview', rev: state.rev }).catch(fail);
     }}>×</button>
   </div>;

@@ -35,7 +35,7 @@ export function SettingsLink({ rowId, label, variant = 'gear' }: {
   const [error, setError] = useState('');
   return <>
     <button type="button" className={`settings-cross-link settings-cross-link--${variant}`}
-      aria-label={label} title={label} onClick={() => {
+      aria-label={label} data-tooltip={variant === 'gear' ? label : undefined} onClick={() => {
         setError('');
         void openSetting(rowId).catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
       }}>

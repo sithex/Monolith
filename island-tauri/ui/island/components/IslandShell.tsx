@@ -15,7 +15,7 @@ export function IslandShell({ title, children, intents, home = false, back, acti
   const id = useId(), reduced = useReducedMotionAll();
   return <section className="island-shell" aria-labelledby={id}>
     <header className="title-row">
-      <button className="icon-button" aria-label={home ? 'Hermes home' : back ? `Back to ${back.label}` : 'Back to Hermes'} title={home ? undefined : back ? `Back to ${back.label}` : 'Back'}
+      <button className="icon-button" aria-label={home ? 'Hermes home' : back ? `Back to ${back.label}` : 'Back to Hermes'} data-tooltip={home ? undefined : back ? `Back to ${back.label}` : 'Back'}
         onClick={() => { if (home) return; if (back) back.go(); else intents.navigate('terminal'); }}><Icon name={home ? 'terminal' : 'back'} /></button>
       <h2 id={id} className="title-slot"><AnimatePresence mode="popLayout" initial={false}>
         <motion.span key={title} initial={reduced ? false : { opacity: 0, y: 6, filter: 'blur(4px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}

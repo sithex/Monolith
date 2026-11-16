@@ -1,0 +1,108 @@
+/* One action family. Existing class aliases preserve public DOM/test selectors.
+   Selection chips, navigation, tiles, colour controls and lyric lines are not actions. */
+button { color: inherit; cursor: pointer; border: 0; background: none; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+button:disabled { opacity: .4; cursor: default; }
+:where(.island, .notch-notifications, .color-pop) button {
+  font: var(--fw-regular) var(--fs-body)/1.2 var(--ui-font);
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  background: var(--v-fill-hi); color: var(--ui-text); cursor: pointer;
+  transition: background-color var(--dur-fast) ease, transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) ease;
+}
+.island :is(button[data-variant='primary'], button.primary, button.is-primary, button.style-once, button.timer-start), .color-pop .color-pop-done { background: var(--ui-accent); color: var(--ui-on-accent); font-weight: var(--fw-strong); }
+.island :is(button[data-variant='secondary'], button.pill-button):not(.primary) { background: var(--v-fill-hi); color: var(--ui-text); }
+.island :is(button[data-variant='quiet'], button.link, button.icon-button, button.fader-mute, button.approval-expand, button.approval-open, button.approval-dismiss, button.notice-dismiss, button.sound-preview, button.settings-cross-link, button.al-link, button.al-copy, button.lyrics-toggle, button.transport-skip, button.topline-title, button.clock, button.collapse), .color-pop :is(.color-pop-x, .color-pop-link) { background: transparent; color: var(--ui-text-secondary); }
+.island :is(button[data-variant='danger'], button.danger, button.danger-soft, button.style-deny, button.app-rule-remove, button.voice-mute[data-muted='true']) { background: color-mix(in srgb, var(--ui-danger) 16%, transparent); color: var(--ui-danger); }
+@media (hover: hover) and (pointer: fine) {
+  .island button:hover:not(:disabled) { background: var(--v-hover); }
+  .island :is(button[data-variant='primary'], button.primary, button.is-primary, button.style-once, button.timer-start):hover:not(:disabled), .color-pop .color-pop-done:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-accent) 88%, var(--ui-ink)); }
+  .island :is(button[data-variant='quiet'], button.link, button.icon-button):hover:not(:disabled) { color: var(--ui-text); }
+  .island :is(button[data-variant='danger'], button.danger, button.danger-soft, button.style-deny, button.app-rule-remove, button.voice-mute[data-muted='true']):hover:not(:disabled) { background: color-mix(in srgb, var(--ui-danger) 24%, transparent); }
+}
+.island button:active:not(:disabled) { transform: scale(.97); transition-duration: var(--dur-fast), var(--dur-press), var(--dur-fast); }
+.island button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.island button:disabled { opacity: .4; cursor: default; }
+.island .settings-card > header button.link, .island button.lyrics-off { font-size: var(--fs-sm); }
+.island button.lyrics-off { background: transparent; color: var(--ui-text-secondary); }
+/* Media transport keeps its round glyph buttons: a solid play/pause disc between two bare skip glyphs. */
+.island .now-playing .transport button { border-radius: var(--radius-full); background: transparent; color: var(--ui-text); }
+.island .now-playing .transport button.transport-main { background: var(--ui-text); color: var(--ui-background); }
+@media (hover: hover) and (pointer: fine) {
+  .island .now-playing .transport button.transport-skip:hover:not(:disabled) { background: var(--v-hover); }
+  .island .now-playing .transport button.transport-main:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-text) 88%, var(--ui-accent)); }
+}
+.island :is(.approval-dismiss, .notice-dismiss, .app-rule-remove) { font-size: var(--fs-title); line-height: 1; }
+.island button.al-copy, .island button.al-link { padding: 0 var(--space-1); font-size: var(--fs-sm); line-height: 1.2; }
+.island .icon-button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; }
+.icon-button svg { width: 15px; height: 15px; }
+.color-pop .color-pop-x { font-size: var(--fs-title); line-height: 1; }
+.color-pop button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+
+/* Notification action buttons use the same family inside the notch and its existing popups. */
+.notch-notifications button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: -2px; }
+.island .settings-search button, .island .command-palette header button,
+:is(.island, .notch-notifications) :is(button.notification-close, button.notification-overflow) { background: transparent; color: var(--ui-text-secondary); }
+:is(.island, .notch-notifications) .colour-card-copy button[data-copied='true'] { background: var(--ui-accent); color: var(--ui-on-accent); }
+@media (hover: hover) and (pointer: fine) {
+  .notch-notifications button:hover:not(:disabled) { background: var(--v-hover); }
+  .color-pop :is(.color-pop-x, .color-pop-link):hover:not(:disabled) { background: var(--v-hover); color: var(--ui-text); }
+  .island .notification-content:hover:not(:disabled), .notch-notifications .notification-content:hover:not(:disabled) { background: transparent; }
+}
+.notch-notifications button:active:not(:disabled) { transform: scale(.97); }
+
+/* Shared slider skin, horizontal native input and vertical pointer fader adapter.
+   Native range semantics and DraftRange's commit/throttle contract are unchanged. */
+@property --fill { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
+.island input[type='range'] {
+  appearance: none; -webkit-appearance: none; height: 24px; padding: 0; margin: 0;
+  min-width: 0; border: 0; border-radius: var(--radius-full); cursor: ew-resize; outline: none;
+  overflow: visible; background: transparent;
+  transition: --fill var(--dur-base) var(--ease-out);
+}
+.island input[type='range'][data-dragging='true'] { transition: none; }
+.island input[type='range']::-webkit-slider-runnable-track {
+  height: 4px; border-radius: var(--radius-full); border: 0;
+  background: linear-gradient(to right, var(--ui-accent) 0 var(--fill), var(--v-track) var(--fill) 100%);
+}
+.island input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px;
+  border: 2px solid var(--ui-accent); border-radius: var(--radius-full); background: var(--ui-text);
+}
+.island input[type='range']:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.island input[type='range']:disabled { opacity: .4; cursor: default; }
+.settings-row input[type='range'] { width: 46%; max-width: 220px; }
+.settings-row output, .slider-row output, .player-volume > small, .fader-pct, .control-value {
+  flex: 0 0 9ch; width: 9ch; white-space: nowrap; text-align: right;
+  color: var(--ui-text-secondary); font-size: var(--fs-body); font-variant-numeric: tabular-nums;
+}
+.fader { position: relative; width: 40px; height: 160px; flex: none; min-height: 64px; max-height: 160px; display: flex; justify-content: center; cursor: ns-resize; touch-action: none; outline: none; padding: var(--space-2) 0; box-sizing: border-box; }
+.fader-track { position: relative; width: 4px; height: 100%; border-radius: var(--radius-full); background: var(--v-track); }
+.fader-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: var(--ui-accent); border-radius: var(--radius-full); transform-origin: bottom; transition: transform var(--dur-base) var(--ease-out); }
+.fader-fill[data-direct='true'], html[data-nav-via='key'] .fader-fill { transition: none; }
+.fader-thumb { position: absolute; width: 16px; height: 16px; left: 50%; transform: translate(-50%, 50%); border: 2px solid var(--ui-accent); border-radius: var(--radius-full); background: var(--ui-text); box-sizing: border-box; pointer-events: none; }
+.fader[data-muted='true'] { opacity: .5; }
+.fader:focus-visible .fader-track { outline: 2px solid var(--ui-focus); outline-offset: 4px; }
+.fader-pct { font-weight: var(--fw-strong); height: 20px; flex: none; text-align: center; }
+.island .fader-mute { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; }
+.island .fader-mute[aria-pressed='true'] { color: var(--ui-danger); }
+.fader-mute svg { width: 15px; height: 15px; }
+
+.number-stepper { display: inline-flex; align-items: center; gap: var(--space-1); flex: none; white-space: nowrap; }
+.island .number-stepper button { width: 28px; height: 28px; padding: 0; font-size: var(--fs-title); }
+.island .number-stepper input {
+  appearance: textfield; width: 8ch; min-width: 0; height: 28px; box-sizing: border-box;
+  padding: 0 var(--space-1); border: 1px solid var(--v-stroke-hi); border-radius: var(--radius-sm);
+  background: var(--v-fill); color: var(--ui-text); font: var(--fs-body)/1 var(--ui-mono); text-align: right;
+}
+.number-stepper input::-webkit-inner-spin-button, .number-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.number-stepper input:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.number-stepper input:disabled { opacity: .4; }
+.number-stepper .control-value { flex-basis: 7ch; width: 7ch; text-align: left; }
+.instant-tooltip {
+  position: fixed; z-index: 10000; pointer-events: none; box-sizing: border-box;
+  padding: var(--space-1) var(--space-2); border: 1px solid var(--v-stroke-hi); border-radius: var(--radius-sm);
+  background: var(--ui-background); color: var(--ui-text); font: var(--fs-body)/1.3 var(--ui-font);
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) { .island button, .island input[type='range'], .fader-fill { transition: none; } }
+html[data-reduce-motion='true'] :is(.island button, .island input[type='range'], .fader-fill) { transition: none; }

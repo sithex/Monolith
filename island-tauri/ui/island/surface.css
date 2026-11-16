@@ -102,20 +102,11 @@ html[data-glass='true'] .island .card, html[data-glass='true'] .island .settings
 html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(--ui-background) calc(100% - var(--glass-strength) * 100%), transparent); }
 .island-content { display: flex; flex-direction: column; flex: 1; min-height: 0; transform-origin: 50% 0; }
 
-/* ---- Generic controls --------------------------------------------------- */
-/* One press language (Nov 9): in at --dur-press, back out a little slower; 0.97, no opacity dip. */
-.island button { transition: background-color var(--dur-fast) ease, transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) ease; }
-@media (hover: hover) and (pointer: fine) { .island button:hover:not(:disabled) { background: var(--v-hover); } }
-.island button:active:not(:disabled) { transform: scale(.97); transition-duration: var(--dur-fast), var(--dur-press), var(--dur-fast); }
-.island button:disabled { opacity: .4; }
+/* Generic action controls and slider skins live in components/controls.css. */
 .island .card, .island .app-banner { background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: var(--radius-3xl); }
-.island .primary { background: var(--ui-accent); color: var(--ui-on-accent); }
-.island .primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-accent) 88%, white); }
 .island select { background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: var(--radius-lg); }
 .title-row { height: 36px; padding: 0 var(--space-1) 0 0; }
 .title-row h2 { font-size: var(--fs-title); font-weight: 600; }
-.icon-button { width: 28px; height: 28px; border-radius: var(--radius-lg); color: var(--ui-text-secondary); }
-.icon-button svg { width: 15px; height: 15px; }
 
 /* Switch (checkbox role) */
 .island input.switch { appearance: none; -webkit-appearance: none; width: 38px; height: 22px; border-radius: var(--radius-lg); background: var(--v-track);
@@ -126,19 +117,6 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .island input.switch:checked::after { transform: translateX(16px); }
 .island input.switch:disabled { opacity: .4; cursor: default; }
 
-/* Capsule range: the volume mixer's fader laid horizontally. 24 px capsule track,
-   no knob, white .92 fill from the left (DraftRange sets --fill), track white .14.
-   Programmatic changes ease .22 s; while dragging the fill follows the pointer. */
-@property --fill { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
-.island input[type='range'] { appearance: none; -webkit-appearance: none; height: 24px; border-radius: var(--radius-lg); cursor: ew-resize; outline: none; overflow: hidden;
-  background: linear-gradient(to right, rgb(255 255 255 / .92) 0 var(--fill), var(--v-track) var(--fill) 100%);
-  transition: --fill .22s cubic-bezier(.33, 1, .68, 1), opacity .18s ease, box-shadow .18s ease; }
-.island input[type='range'][data-dragging='true'] { transition: opacity .18s ease, box-shadow .18s ease; }
-.island input[type='range']::-webkit-slider-runnable-track { height: 24px; background: transparent; border: 0; }
-.island input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 2px; height: 24px; margin: 0; border: 0; background: transparent; box-shadow: none; }
-.island input[type='range']:hover:not(:disabled) { box-shadow: 0 0 0 1px var(--v-stroke-hi); }
-.island input[type='range']:focus-visible { box-shadow: 0 0 0 2px var(--ui-focus); }
-.island input[type='range']:disabled { opacity: .4; cursor: default; }
 
 /* ---- Side buttons (44 pt circles, centred glyph) ------------------------ */
 .live-side-button, .round-button { padding: 0; display: grid; place-items: center; line-height: 0; }
@@ -148,8 +126,6 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 /* ---- Launcher tiles ------------------------------------------------------ */
 .launcher { display: flex; flex-direction: column; gap: 10px; }
 .launcher-toolbar { margin: 0 0 2px; min-height: 28px; font-size: var(--fs-body); color: var(--ui-text-secondary); gap: 6px; }
-.launcher-toolbar .pill-button { border-radius: var(--radius-3xl); padding: var(--space-1) var(--space-3); font-size: var(--fs-body); font-weight: 600; background: var(--v-fill); }
-.launcher-toolbar .pill-button.primary { background: var(--ui-accent); color: var(--ui-on-accent); }
 /* More island width adds columns, never oversized tiles. The minimum still
    contracts for exceptionally narrow panes; shown and Hidden grids share it. */
 .app-grid { display: grid; grid-template-columns: repeat(auto-fill, 100px); justify-content: center; gap: var(--space-2); padding: 0; position: relative; }
@@ -191,7 +167,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .timer-app { --tone: var(--v-orange); display: flex; flex-direction: column; gap: var(--space-3); }
 .timer-tabs button { font-size: var(--fs-body); font-weight: 600; height: 24px; padding: 0; color: var(--ui-text-hint); border-bottom: 2px solid transparent; border-radius: 0; background: none; }
 .timer-tabs button[aria-selected='true'] { color: var(--ui-text); border-color: var(--tone); }
-.timer-start { border-radius: var(--radius-3xl); height: 28px; padding: 0 var(--space-4); font-size: var(--fs-body); font-weight: 600; color: var(--tone); background: color-mix(in srgb, var(--tone) 18%, transparent); }
+.timer-start { height: 28px; }
 .wheel { position: relative; height: 82px; overflow: hidden; cursor: grab; touch-action: none; outline: none;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12%, #000 88%, transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 12%, #000 88%, transparent 100%); }
 .wheel:active { cursor: grabbing; }
@@ -209,7 +185,6 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .timer-units button:disabled { opacity: .45; }
 .countdown { text-align: center; font-size: clamp(40px, 11cqi, 62px); font-weight: 200; font-family: var(--ui-font); letter-spacing: -1px; color: var(--tone); padding: 2px 0; }
 .countdown .digit { display: inline-block; }
-.timer-footer button { background: var(--v-fill); border-radius: var(--radius-3xl); padding: var(--space-1) var(--space-3); }
 
 /* ---- Mixer: vertical faders --------------------------------------------- */
 .mixer { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -220,16 +195,6 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .fader-name { height: 32px; display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; max-width: 100%; color: var(--ui-text-secondary); }
 .fader-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fader-name svg { width: 15px; height: 15px; flex: none; }
-.fader { position: relative; width: 40px; flex: 1; min-height: 64px; max-height: 160px; display: flex; justify-content: center; cursor: ns-resize; touch-action: none; outline: none; }
-.fader-track { position: relative; width: 28px; height: 100%; border-radius: 14px; background: var(--v-track); overflow: hidden; }
-.fader-fill { position: absolute; left: 0; right: 0; bottom: 0; background: rgb(255 255 255 / .92); border-radius: 0; will-change: height; }
-.fader[data-muted='true'] .fader-fill { background: rgb(255 255 255 / .35); }
-.fader:focus-visible .fader-track { box-shadow: 0 0 0 2px var(--ui-focus); }
-.fader-glyph { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; color: rgb(0 0 0 / .55); pointer-events: none; mix-blend-mode: normal; }
-.fader-pct { font-size: var(--fs-body); font-weight: 600; font-variant-numeric: tabular-nums; height: 20px; }
-.fader-mute { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; border-radius: var(--radius-lg); color: var(--ui-text-secondary); }
-.fader-mute[aria-pressed='true'] { color: var(--ui-danger); }
-.fader-mute svg { width: 15px; height: 15px; }
 .mixer select { flex: 1; }
 
 /* ---- Settings ------------------------------------------------------------ */
@@ -291,16 +256,12 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-row + .settings-row { border-top: 1px solid var(--v-stroke); }
 .settings-row > .label { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .settings-row > .label small { color: var(--ui-text-secondary); font-size: var(--fs-sm); line-height: 1.3; }
-.settings-row input[type='range'] { width: 46%; max-width: 220px; }
-.settings-row output { width: 52px; text-align: right; color: var(--ui-text-secondary); font-size: var(--fs-body); font-variant-numeric: tabular-nums; }
 .segmented { display: inline-flex; padding: 2px; border-radius: var(--radius-lg); background: var(--v-fill); gap: 2px; }
-.segmented button { padding: 4px 10px; font-size: var(--fs-body); border-radius: var(--radius-lg); color: var(--ui-text-secondary); }
+.segmented button { background: transparent; padding: 4px 10px; font-size: var(--fs-body); border-radius: var(--radius-lg); color: var(--ui-text-secondary); }
 .segmented button[aria-pressed='true'] { background: var(--v-fill-hi); color: var(--ui-text); }
-.settings-row .link { color: var(--ui-accent); padding: var(--space-1) 0; background: none; }
 
 .denied-editor { padding: 0 0 var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .denied-editor textarea { width: 100%; resize: vertical; background: rgb(0 0 0 / .25); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); padding: 8px 10px; font: var(--fs-body)/1.4 var(--ui-font); }
-.settings-card .pill-button { border-radius: var(--radius-3xl); padding: 4px 14px; font-size: var(--fs-body); font-weight: 600; }
 
 /* Apps that size with the island */
 .app-pane { container-type: inline-size; }
@@ -385,11 +346,7 @@ html[data-glide='in'] .island { transition: transform .3s var(--ease-out); }
 .calendar-sub-form { display: flex; gap: var(--space-2); }
 .calendar-sub-form input { flex: 1; min-width: 0; background: rgb(0 0 0 / .25); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); padding: 8px 10px; font-size: var(--fs-body); outline: none; }
 .calendar-sub-form input:focus { border-color: color-mix(in srgb, var(--ui-accent) 70%, transparent); }
-.calendar-sub-form button { border-radius: var(--radius-lg); padding: 6px 14px; font-size: var(--fs-body); font-weight: 600; background: var(--v-fill); }
-.calendar-sub-form button.primary { background: var(--ui-accent); color: var(--ui-on-accent); }
 .calendar-sub-error { color: var(--ui-danger); font-size: var(--fs-body); margin: 0; flex-basis: 100%; }
 .calendar-sub.connected { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; padding: var(--space-2) var(--space-3); background: var(--v-fill); border: .5px solid var(--v-stroke); border-radius: var(--radius-3xl); }
 .calendar-sub-dot { width: 8px; height: 8px; border-radius: 50%; background: #30d158; box-shadow: 0 0 8px #30d158; flex: none; }
 .calendar-sub-text { display: flex; flex-direction: column; gap: 1px; font-size: var(--fs-body); }
-.calendar-sub.connected button { font-size: var(--fs-body); padding: 4px 10px; border-radius: var(--radius-lg); background: var(--v-fill); }
-.calendar-sub.connected button.danger { background: color-mix(in srgb, var(--v-red) 30%, transparent); color: #fff; }

@@ -7,6 +7,7 @@ import { NotchControls } from '../island/NotchControls';
 import { LayoutEditor } from '../island/LayoutEditor';
 import { SchemePicker } from '../island/SchemePicker';
 import { DraftRange } from '../island/components/AppPrimitives';
+import { NumberStepper } from '../island/components/NumberStepper';
 import { TerminalCommandSettings } from '../island/TerminalCommandSettings';
 import { SCHEMES } from '../island/tokens/schemes';
 import { DEFAULT_APPEARANCE, SETTINGS_CARDS, SETTINGS_SECTIONS, SECTION_STORAGE_KEY, cardSpec, exportSettings, normalize, parseImport, resetPatch, searchRows, savedSection, settingLocation, titleRepeats, type RowSpec, type Tab } from './settings-model';
@@ -183,7 +184,9 @@ export function SettingsView() {
     else if (bounds && key) {
       const [min, max, step, unit] = bounds, offset = key === 'offsetX' || key === 'offsetY';
       const number = Number(settings[key] ?? min);
-      control = <><DraftRange aria-label={label} min={min} max={max} step={step} value={number}
+      control = ['terminalScrollback', 'clipboardHistorySize', 'equalizerBands'].includes(key)
+        ? <NumberStepper aria-label={label} min={min} max={max} step={step} value={number} unit={unit} onCommit={(v, final) => { if (final) patch({ [key]: v }); }} />
+        : <><DraftRange aria-label={label} min={min} max={max} step={step} value={number}
         {...(offset ? { live: false, onDraft: (v: number | null) => setOffsetPreview(v === null ? null : { x: key === 'offsetX' ? v : settings.offsetX, y: key === 'offsetY' ? v : settings.offsetY }) } : {})}
         {...(id === 'glassStrength' ? { throttleMs: 60, onDraft: (v: number | null) => { if (v !== null) document.documentElement.style.setProperty('--glass-strength', String(v / 100)); } } : {})}
         onCommit={(v, final) => { if (final) patch({ [key]: v }); }} /><output>{offset && offsetPreview ? (key === 'offsetX' ? offsetPreview.x : offsetPreview.y) : number}{unit}</output></>;

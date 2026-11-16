@@ -58,7 +58,7 @@ test('transport and lyrics use the shared press scale with independent short lyr
   assert.match(mediaCss, /\.am-lyrics li \{[^}]*transition: transform \.7s/);
   assert.match(mediaCss, /transition: opacity \.55s ease, transform var\(--dur-press\) var\(--ease-out\)/);
   assert.match(mediaCss, /transition-duration: \.55s, var\(--dur-press\), var\(--dur-base\), \.55s/);
-  assert.match(mediaCss, /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.island \.now-playing \.transport/);
+  assert.match(readFileSync(new URL('../ui/island/components/controls.css', import.meta.url), 'utf8'), /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.island button:hover/);
 });
 
 test('artwork retains keyed outgoing content and fades opacity without layout or scale motion', () => {

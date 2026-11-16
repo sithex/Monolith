@@ -117,7 +117,7 @@ export function UpdatesApp({ snapshot, onRefresh, onInstall }: { snapshot: Updat
         {(failure || empty) && snapshot.ageSecs !== null && <p className="updates-age">{age}</p>}
         {snapshot.stale && <span className="updates-stale">Stale · showing last known results</span>}
       </div>
-      <button type="button" className={`updates-refresh${checking ? ' is-checking' : ''}`} aria-label="Check updates" title="Check updates" aria-busy={checking} disabled={checking} onClick={() => void refresh()}><RefreshGlyph /></button>
+      <button type="button" className={`updates-refresh${checking ? ' is-checking' : ''}`} aria-label="Check updates" data-tooltip="Check updates" aria-busy={checking} disabled={checking} onClick={() => void refresh()}><RefreshGlyph /></button>
     </header>
     {actionError && <p className="updates-action-error" role="alert">{actionError}</p>}
     {snapshot.needsReboot && <p className="updates-reboot"><span aria-hidden="true">↻</span> A restart may be needed after updating</p>}

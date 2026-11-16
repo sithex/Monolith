@@ -112,7 +112,7 @@ export function LayoutEditor() {
             return <motion.div key={b.id} layout={!dragging} className="le-button" data-selected={selected === b.id} data-dragging={dragging}
               style={{ left: b.rect.x, top: b.rect.y, width: b.rect.width, height: b.rect.height, zIndex: dragging ? 5 : 1, x: dragging ? drag.x : 0, y: dragging ? drag.y : 0 }}
               transition={{ type: 'spring', visualDuration: 0.3, bounce: 0.2 }}>
-              <button className="round-button live-side-button" aria-label={`Edit ${model.label ?? actionLabel(model.action)}`} title={model.label ?? actionLabel(model.action)} style={{ cursor: 'grab', touchAction: 'none' }}
+              <button className="round-button live-side-button" aria-label={`Edit ${model.label ?? actionLabel(model.action)}`} data-tooltip={model.label ?? actionLabel(model.action)} style={{ cursor: 'grab', touchAction: 'none' }}
                 onPointerDown={e => {
                   if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId);
                   const start = { x: e.clientX, y: e.clientY }; let moved = false;
@@ -130,7 +130,7 @@ export function LayoutEditor() {
                 }}><Icon name={actionIcon(model.action)} /></button>
             </motion.div>; })}
         </div>}
-        {geometry && <button className="le-resize" aria-label="Drag to resize the island" title="Drag to resize"
+        {geometry && <button className="le-resize" aria-label="Drag to resize the island" data-tooltip="Drag to resize"
           style={{ left: `calc(50% + ${(island.x + W - stageW / 2) * scale - 13}px)`, top: (island.y + H) * scale - 13 }}
           onPointerDown={resizeStart}><Icon name="resize" /></button>}
         <AnimatePresence>{draft && <motion.output className="le-size-badge" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{draft.width} × {draft.maxHeight}</motion.output>}</AnimatePresence>

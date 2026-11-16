@@ -141,7 +141,7 @@ export function ColorPickerPanel() {
       aria-valuetext={hex}><i style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }} /></div>
     <div className="color-pop-hue" onPointerDown={hue} role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={Math.round(hsv.h)}>
       <i style={{ left: `${hsv.h / 3.6}%`, background: `hsl(${hsv.h} 100% 50%)` }} /></div>
-    <div className="color-pop-presets">{presets.map(c => <button key={c} type="button" aria-label={`Use ${c}`} title={c} style={{ background: c }} data-on={c.toLowerCase() === hex}
+    <div className="color-pop-presets">{presets.map(c => <button key={c} type="button" aria-label={`Use ${c}`} data-tooltip={c} style={{ background: c }} data-on={c.toLowerCase() === hex}
       onClick={() => { const n = hexToHsv(c); setHsv(n); commit(c.toLowerCase()); }} />)}</div>
     <form className="color-pop-row" onSubmit={e => { e.preventDefault(); const v = text.trim().toLowerCase(); const full = v.startsWith('#') ? v : `#${v}`; if (isHex(full)) { setHsv(hexToHsv(full)); commit(full); } }}>
       <input aria-label="Hex colour" spellCheck={false} maxLength={7} value={text} data-invalid={!isHex(text.startsWith('#') ? text : `#${text}`)}

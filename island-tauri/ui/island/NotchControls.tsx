@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Settings, SettingsPatch } from '../ipc/client';
 import { DraftRange, Dropdown } from './components/AppPrimitives';
+import { NumberStepper } from './components/NumberStepper';
 import { ColorSwatch } from './components/ColorField';
 import { CompanionPicker } from './companionCharacters';
 import { monitorChoices, rowSpec, toggleMonitor } from '../views/settings-model';
@@ -38,7 +39,7 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
     {flag('hoverPeek', 'notchHoverPeek')}
     {flag('copyProgress', 'notchCopyProgress')}
     {flag('shelfEnabled', 'shelfEnabled')}
-    {row('shelfMaxItems', <><DraftRange aria-label="Shelf size" min={1} max={50} step={1} value={settings.shelfMaxItems ?? 12} onCommit={(value, final) => { if (final) patch({ shelfMaxItems: value }); }} /><output>{settings.shelfMaxItems ?? 12}</output></>)}
+    {row('shelfMaxItems', <NumberStepper aria-label="Shelf size" min={1} max={50} step={1} value={settings.shelfMaxItems ?? 12} onCommit={(value, final) => { if (final) patch({ shelfMaxItems: value }); }} />)}
     {flag('shelfRemoveAfterDrag', 'shelfRemoveAfterDrag')}
     {color('notchColor', 'panelClockColor', background)}
     {row('notchWidth', <><DraftRange aria-label="Notch width" min={110} max={320} step={2} value={settings.notchWidth ?? 144} onCommit={(value, final) => { if (final) patch({ notchWidth: value }); }} /><output>{settings.notchWidth ?? 144}px</output></>)}

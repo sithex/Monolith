@@ -107,15 +107,18 @@ test('side-button hover is explicit state cleared by the real X11 leave, not a s
   assert.match(side, /addEventListener\('island-pointer-left', clear\)/);
   assert.doesNotMatch(css, /\.live-side-button:hover/);
   assert.match(css, /\.live-side-button\[data-hover='true'\]/);
-  assert.match(src('ui/island/workshop.css'), /button:hover:not\(\.live-side-button\)/);
+  assert.match(src('ui/island/components/controls.css'), /\.island button:hover:not\(:disabled\)/);
+  assert.doesNotMatch(src('ui/island/components/controls.css'), /(?:^|\n)button:hover/);
   assert.match(src('src-tauri/src/window/mod.rs'), /connect_leave_notify_event[\s\S]*island-pointer-left/);
 });
 
 test('Now Playing transport uses drawn glyphs with a solid play/pause disc', () => {
-  const np = src('ui/island/components/NowPlaying.tsx'), css = src('ui/island/media.css');
+  const np = src('ui/island/components/NowPlaying.tsx'), css = src('ui/island/components/controls.css');
   assert.doesNotMatch(np, /'Ⅱ'|'▶'|\|‹|›\|/);
   assert.match(np, /<TransportGlyph kind="play" \/><TransportGlyph kind="pause" \/>/);
-  assert.match(css, /\.island \.now-playing \.transport \.transport-main \{[^}]*background: var\(--ui-text\)/, 'beats the transparent transport button rule');
+  assert.match(css, /\.island \.now-playing \.transport button\.transport-main \{[^}]*background: var\(--ui-text\)/, 'beats the shared button fill');
+  assert.match(css, /\.island \.now-playing \.transport button \{[^}]*border-radius: var\(--radius-full\)/);
+  assert.match(src('ui/island/surface.css'), /\.segmented button \{ background: transparent;/, 'unselected segments stay unfilled so the selected one reads');
 });
 
 test('the solid top strip eases into the glass instead of a hard 42 px edge', () => {

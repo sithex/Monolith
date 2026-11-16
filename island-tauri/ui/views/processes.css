@@ -18,10 +18,6 @@
 .process-row .num, .process-detail .num { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--fs-body); }
 .process-row .num[data-hot='true'] { color: var(--ui-accent); font-weight: 600; }
 .process-actions { display: flex; justify-content: flex-end; gap: var(--space-1); }
-.process-actions button { padding: 3px 9px; border-radius: var(--radius-lg); font-size: var(--fs-sm); background: var(--v-fill); color: var(--ui-text); }
-.process-actions button:hover { background: var(--v-fill-hi); }
-.process-actions button.danger-soft { color: var(--ui-danger); }
-.process-actions button.danger { background: color-mix(in srgb, var(--v-red, #ff6b6b) 70%, transparent); color: #fff; }
 .process-detail { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding: 4px 0 6px; }
 .process-detail code { font-size: var(--fs-sm); color: var(--ui-text-hint); overflow-wrap: anywhere; user-select: text; }
 .process-detail ul { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow: auto; }

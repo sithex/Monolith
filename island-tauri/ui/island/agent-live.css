@@ -48,8 +48,6 @@
 .al-step-error { color: var(--ui-danger); background: rgba(239,91,91,.14); }
 .al-spark { flex-shrink: 0; }
 .al-spark polyline { fill: none; stroke: var(--ai-tint, var(--ai-claude)); stroke-width: 1.2; stroke-linejoin: round; }
-.ai-dashboard button.al-link, .ai-dashboard button.al-copy { padding: 0 var(--space-1); font-size: var(--fs-sm); line-height: 13px; color: var(--ui-text-hint); }
-.ai-dashboard button.al-link:hover, .ai-dashboard button.al-copy:hover { color: var(--ui-text, #eee); }
 
 /* header + alerts */
 .al-head-row { display: flex; align-items: center; gap: 6px; min-width: 0; height: 18px; }
@@ -85,7 +83,7 @@
 .al-agent { padding: var(--space-1) 0; border-top: 1px solid rgba(255,255,255,.06); }
 .al-agent:first-of-type { border-top: 0; padding-top: 0; }
 .al-fading { opacity: .55; }
-.ai-dashboard button.al-agent-line { display: flex; align-items: center; gap: var(--space-1); width: 100%; padding: 1px 2px; color: var(--ui-text, #eee); text-align: left; min-width: 0; }
+.ai-dashboard button.al-agent-line { display: flex; align-items: center; gap: var(--space-1); width: 100%; padding: 1px 2px; color: var(--ui-text); background: transparent; text-align: left; min-width: 0; }
 .al-caret { width: 8px; color: var(--ui-text-hint); font-size: var(--fs-sm); }
 .al-agent-line .al-dot { margin-right: 0; }
 .al-role { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

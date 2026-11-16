@@ -16,7 +16,7 @@ export function SoundPicker({ label, value, emptyLabel, previewEmpty = '', disab
   return <div className="sound-picker">
     <Dropdown label={label} value={value} disabled={disabled} options={soundOptions(ids, emptyLabel)}
       onChange={id => { preview(id || previewEmpty); onChange(id); }} />
-    <button type="button" className="icon-button sound-preview" aria-label={`Play ${label.toLowerCase()}`} title="Play" disabled={disabled}
+    <button type="button" className="icon-button sound-preview" aria-label={`Play ${label.toLowerCase()}`} data-tooltip="Play" disabled={disabled}
       onClick={() => preview(value || previewEmpty)}>
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" /></svg>
     </button>

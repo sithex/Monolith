@@ -13,7 +13,7 @@
   padding: 10px 14px; color: var(--ui-text-hint); font-size: var(--fs-sm); flex: none;
 }
 .island .command-palette header { font-size: var(--fs-body); }
-.island .command-palette header button { color: var(--ui-text-hint); background: transparent; border: 1px solid var(--skin-border); border-radius: var(--radius-sm); padding: 2px 6px; cursor: pointer; }
+
 .island .command-palette input {
   flex: none; box-sizing: border-box; width: calc(100% - 24px); height: 40px; margin: 0 12px 8px; padding: 8px 10px;
   background: var(--skin-surface); border: 1px solid var(--skin-border); border-radius: var(--radius-lg); color: var(--skin-text); font: inherit; font-size: var(--fs-base);

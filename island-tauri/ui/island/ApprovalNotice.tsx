@@ -46,7 +46,7 @@ export function ApprovalNotice({ fail }: { fail(error: unknown): void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [state.rev, fail]);
   if (!view) return null;
-  const dismiss = <button className="approval-dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={e => {
+  const dismiss = <button className="approval-dismiss" aria-label="Dismiss" data-tooltip="Dismiss (Esc)" onClick={e => {
     e.stopPropagation(); void dispatch({ type: 'dismissPreview', rev: state.rev }).catch(fail);
   }}>×</button>;
   const openTerminal = <button className="approval-open" data-testid="approval-open" onClick={() => {

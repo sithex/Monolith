@@ -1,53 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { DisplayView, MixerChannel, MixerModel, AppViewIntents } from '../app-presentations';
 import type { Service } from '../models';
-import { DraftRange, Dropdown, Empty, ServiceCard } from './AppPrimitives';
+import { DraftRange, Dropdown, Empty, Fader, ServiceCard } from './AppPrimitives';
 import { Icon } from './Icon';
 import { RollingText } from './RollingText';
 import { useReducedMotionAll } from './motion-preference';
 
-/**
- * Vertical capsule fader: 28 px track, no knob, filled from the bottom.
- * Dragging follows the pointer directly with a local draft and throttled commits;
- * external changes ease with the shared base duration.
- */
-function Fader({ value, label, muted, onCommit }: { value: number; label: string; muted: boolean; onCommit(v: number): void }) {
-  const [draft, setDraft] = useState(value), [dragging, setDragging] = useState(false), [direct, setDirect] = useState(false);
-  const track = useRef<HTMLDivElement>(null), last = useRef(0), pending = useRef<number | null>(null), timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const commit = useRef(onCommit); commit.current = onCommit;
-  useEffect(() => { if (!dragging) { setDraft(value); setDirect(false); } }, [value, dragging]);
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  const flush = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } if (pending.current !== null) { commit.current(pending.current); pending.current = null; last.current = performance.now(); } };
-  const set = (v: number) => {
-    v = Math.max(0, Math.min(100, Math.round(v))); setDirect(true); setDraft(v); pending.current = v;
-    const wait = 60 - (performance.now() - last.current);
-    if (wait <= 0) flush(); else if (!timer.current) timer.current = setTimeout(flush, wait);
-  };
-  const fromPointer = (y: number) => { const r = track.current?.getBoundingClientRect(); if (r) set((r.bottom - y) / r.height * 100); };
-  return <div className="fader" role="slider" tabIndex={0} aria-label={`${label} volume`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={draft} aria-valuetext={`${draft}%`} data-muted={muted}
-    onPointerDown={e => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); setDragging(true); fromPointer(e.clientY); }}
-    onPointerMove={e => { if (dragging) fromPointer(e.clientY); }}
-    onPointerUp={() => { setDragging(false); flush(); }} onPointerCancel={() => { setDragging(false); flush(); }}
-    onWheel={e => { e.stopPropagation(); set(draft - Math.sign(e.deltaY || -e.deltaX) * 2); }}
-    onKeyDown={e => {
-      const step = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 2 : e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? -2 : e.key === 'PageUp' ? 10 : e.key === 'PageDown' ? -10 : 0;
-      if (step) { e.preventDefault(); e.stopPropagation(); set(draft + step); }
-    }}>
-    <div className="fader-track" ref={track}>
-      <div className="fader-fill" data-direct={dragging || direct} style={{ transform: `scaleY(${draft / 100})` }} />
-      <svg className="fader-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-        style={{ color: draft > 12 ? 'rgb(0 0 0 / .55)' : 'var(--fader-ink, rgb(255 255 255 / .6))' }}><path d="M4 9h4l5-5v16l-5-5H4z" /></svg>
-    </div>
-  </div>;
-}
 function Column({ channel, master, intents }: { channel: MixerChannel; master?: boolean; intents: Pick<AppViewIntents, 'mixer'> }) {
   const volume = channel.volumePercent, muted = channel.muted;
   const commit = (percent: number) => intents.mixer(channel.name !== null ? { type: 'sinkVolume', name: channel.name, percent } : { type: 'streamVolume', index: channel.index, percent });
   const [shown, setShown] = useState(volume ?? 0);
   const reduced = useReducedMotionAll();
   useEffect(() => { if (volume !== null) setShown(volume); }, [volume]);
-  return <div className={`fader-col ${master ? 'master' : ''}`} title={channel.label}>
-    <div className="fader-name"><Icon name={master ? 'volume' : 'music'} /><span>{channel.label}</span></div>
+  return <div className={`fader-col ${master ? 'master' : ''}`}>
+    <div className="fader-name"><Icon name={master ? 'volume' : 'music'} /><span title={channel.label}>{channel.label}</span></div>
     {volume === null ? <p className="muted" style={{ flex: 1 }}>Unknown</p> : <Fader value={Math.min(100, volume)} label={channel.label} muted={muted} onCommit={v => { setShown(v); commit(v); }} />}
     <span className="fader-pct">{volume === null ? '—' : <><span className="sr-only">{Math.round(shown)}%</span>
       <span aria-hidden="true"><RollingText text={String(Math.round(shown))} reduced={reduced} fast />%</span></>}</span>

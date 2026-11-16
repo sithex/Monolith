@@ -5,14 +5,6 @@
 }
 .island .confirmation-action[data-arming='true'] { opacity: .4; cursor: default; }
 
-.island .fader-fill {
-  height: 100%;
-  transform-origin: bottom;
-  will-change: auto;
-  transition: transform var(--dur-base) var(--ease-out);
-}
-.island .fader-fill[data-direct='true'],
-html[data-nav-via='key'] .island .fader-fill { transition: none; }
 .island .ai-meter > .motion-meter-fill,
 .island .ai-share-track > i {
   width: 100%;
@@ -35,10 +27,6 @@ html[data-nav-via='key'] .island .fader-fill { transition: none; }
 .island .processes .process-name:hover:not(:disabled),
 .island .processes .process-head button:hover:not(:disabled),
 .island .timer-app .timer-tabs button:hover:not(:disabled) { background: transparent; }
-@media (hover: hover) and (pointer: fine) {
-  .island .processes .process-actions button:hover:not(:disabled) { background: var(--v-fill-hi); }
-  .island .processes .process-actions .danger:hover:not(:disabled) { background: color-mix(in srgb, var(--v-red, #ff6b6b) 80%, transparent); }
-}
 
 /* Rail names are always-visible labels since Phase 4 (labeled rail); no tooltip state. */
 html[data-reduce-motion='true'] .island :is(.fader-fill, .motion-meter-fill, .ai-share-track > i, .monitor-meter > i) { transition: none; }

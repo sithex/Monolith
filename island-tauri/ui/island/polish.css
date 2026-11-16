@@ -72,8 +72,7 @@
 .le-selected { overflow: hidden; }
 .le-selected[data-settled='true'] { overflow: visible; }
 /* "Hermes" in the top line is a home button, styled exactly like the old label. */
-.island .topline .topline-title { appearance: none; border: 0; padding: 2px 6px; margin: -2px -6px; border-radius: var(--radius-lg); background: transparent; font: inherit; color: inherit; cursor: pointer; }
-.island .topline .topline-title:hover:not(:disabled) { background: var(--v-hover); color: var(--ui-text); }
+.island .topline .topline-title { padding: 2px 6px; margin: -2px -6px; font: inherit; color: inherit; }
 .le-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); margin: 6px 0 8px; }
 .le-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); height: 82px; padding: var(--space-2) var(--space-1); border-radius: var(--radius-3xl);
   background: rgb(255 255 255 / .05); border: 1px solid rgb(255 255 255 / .07); color: var(--ui-text); font-size: var(--fs-body); font-weight: 600; }
@@ -102,7 +101,6 @@ html .live-side-button[data-lit='true']:active { background: color-mix(in srgb, 
 html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; }
 @keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .island .settings-card, .island .card { transition: background-color .2s ease, border-color .2s ease, box-shadow .2s ease; }
-.island .icon-button:hover:not(:disabled) { color: var(--ui-text); }
 .title-row h2 { transition: opacity .18s ease; }
 @media (prefers-reduced-motion: reduce) {
   .island .app-pane:not(.terminal-pane):not([hidden]) > * { animation: none; }
@@ -117,8 +115,7 @@ html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; 
 .terminal-command p { margin: 0; font-size: var(--fs-sm); line-height: 1.5; }
 .terminal-command code { font: inherit; overflow-wrap: anywhere; }
 .terminal-command-presets, .terminal-command-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.terminal-command-presets .pill-button { font-family: var(--ui-mono); background: var(--v-fill); }
-.terminal-command .link { color: var(--ui-accent); font-size: var(--fs-body); }
+.terminal-command-presets .pill-button { font-family: var(--ui-mono); }
 
 /* ---- In-island colour picker (replaces the native GTK chooser, which Wayland stacks behind the island) ---- */
 .island .color-swatch { width: 36px; height: 26px; padding: var(--space-1); border-radius: var(--radius-lg); border: 1px solid var(--ui-border); background: transparent; cursor: pointer; flex: none; }
@@ -128,12 +125,11 @@ html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; 
 .color-pop { z-index: 60; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: var(--space-3); border-radius: var(--radius-4xl);
   background: var(--ui-background); color: var(--ui-text); border: 1px solid var(--island-border, var(--ui-border)); box-shadow: var(--ui-shadow);
   font-family: var(--ui-font); font-size: var(--fs-body); user-select: none; -webkit-user-select: none; }
-.color-pop button { font: inherit; color: inherit; }
+
 .color-pop-head { display: flex; align-items: center; gap: var(--space-2); height: 22px; }
 .color-pop-head strong { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .color-pop-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .3); flex: none; }
-.color-pop-x { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; font-size: var(--fs-title) !important; line-height: 1; color: var(--ui-text-hint) !important; cursor: pointer; }
-.color-pop-x:hover { background: var(--v-hover, rgb(255 255 255 / .08)); color: var(--ui-text) !important; }
+.color-pop-x { width: 22px; height: 22px; padding: 0; }
 .color-pop-sv { position: relative; height: 138px; flex: none; border-radius: var(--radius-lg); cursor: crosshair; touch-action: none;
   background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent) !important; background-blend-mode: normal; }
 .color-pop-sv { box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .12); }
@@ -149,17 +145,15 @@ html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; 
   color: var(--ui-text); font: var(--fs-body) var(--ui-mono); user-select: text; -webkit-user-select: text; outline: none; }
 .color-pop-row input:focus { border-color: var(--ui-accent); }
 .color-pop-row input[data-invalid='true'] { border-color: #ff453a; }
-.color-pop-link { height: 28px; padding: 0 6px; border: 0; background: transparent; color: var(--ui-text-hint) !important; cursor: pointer; white-space: nowrap; }
-.color-pop-link:hover { color: var(--ui-text) !important; }
-.color-pop-done { height: 28px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-lg); background: var(--ui-accent); color: var(--ui-on-accent, #000) !important; font-weight: 600 !important; cursor: pointer; }
+.color-pop-link { height: 28px; white-space: nowrap; }
+.color-pop-done { height: 28px; }
 
 /* Hermes page voice controls (title row, right): saved-voice picker + TTS mute. */
 .voice-controls { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .voice-controls .dropdown { flex: 0 1 168px; width: 168px; }
 .island .voice-controls .dropdown-trigger { min-height: 28px; padding: 4px 8px 4px 10px; border-radius: var(--radius-lg); font-size: var(--fs-body); }
 .voice-controls .dropdown-menu { left: auto; min-width: 100%; z-index: 40; }
-.island .voice-controls .voice-mute[data-muted='true'] { color: var(--ui-danger); background: rgb(255 69 58 / .14); }
-.island .voice-controls .voice-mute[data-muted='true']:hover:not(:disabled) { background: rgb(255 69 58 / .22); }
+
 
 /* Album scheme (Nov 5): registered colours so a track change crossfades the palette instead
    of snapping. Only the Album theme routes --skin-* through these (Island.tsx). */
@@ -196,12 +190,10 @@ html[data-theme='album'][data-reduce-motion='true'] { transition-duration: 0s; }
 .island .app-pane input[type='search']::placeholder { color: var(--ui-text-secondary); }
 .island .app-pane input[type='search']:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 .settings-search input:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
-.settings-search button { position: absolute; right: 6px; padding: 2px 6px; color: var(--ui-text-secondary); background: none; font-size: var(--fs-body); }
+.settings-search button { position: absolute; right: var(--space-2); padding: 0 var(--space-1); }
 .settings-card > header { display: flex; align-items: baseline; gap: var(--space-2); margin: 10px 0 2px; }
 .settings-card > header > h3 { flex: 1; margin: 0; font-size: var(--fs-sm); font-weight: 600; color: var(--ui-text-secondary); text-transform: uppercase; letter-spacing: .4px; }
-.settings-card > header .link, .settings-card > header small { font-size: var(--fs-sm); background: none; padding: 0; }
-.settings-card > header .link { color: var(--ui-text-secondary); }
-.settings-card > header .link:hover, .settings-card > header .link[data-armed='true'] { color: var(--ui-accent); }
+.settings-card > header small { font-size: var(--fs-sm); padding: 0; }
 .settings-card > header small { color: var(--ui-text-secondary); }
 .settings-empty { padding: var(--space-5) var(--space-3); text-align: center; color: var(--ui-text-secondary); font-size: var(--fs-body); }
 .settings-text-field { flex: 0 1 180px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; padding: var(--space-1) 0; }

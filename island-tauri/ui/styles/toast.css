@@ -4,4 +4,4 @@
 .notification-toast .toast-app { opacity: .65; font-size: var(--fs-sm, 11px); text-transform: uppercase; letter-spacing: .1em; }
 .notification-toast strong { font-size: var(--fs-title, 15px); overflow-wrap: anywhere; }
 .notification-toast p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-body, 13px); }
-.notification-toast button { margin-top: auto; color: inherit; border: 1px solid currentColor; border-radius: var(--radius-lg, 10px); padding: 5px 12px; background: transparent; cursor: pointer; }
+.notification-toast button { margin-top: auto; }

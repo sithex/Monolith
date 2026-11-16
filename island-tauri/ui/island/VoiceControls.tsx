@@ -34,7 +34,7 @@ export function VoiceControls({ shown, active, fail }: { shown: boolean; active:
     {panel.voicesAvailable && panel.choices.length > 0 && <Dropdown label="Hermes voice" value={panel.active} placeholder="Voice"
       disabled={busy} options={panel.choices.map(name => ({ value: name, label: name }))} onChange={name => run({ type: 'select', name })} />}
     {panel.muteAvailable && <button type="button" className="icon-button voice-mute" data-muted={panel.muted} aria-pressed={panel.muted} disabled={busy}
-      aria-label={panel.muted ? 'Unmute Hermes voice' : 'Mute Hermes voice'} title={panel.muted ? 'Voice muted' : 'Mute voice'}
+      aria-label={panel.muted ? 'Unmute Hermes voice' : 'Mute Hermes voice'} data-tooltip={panel.muted ? 'Voice muted' : 'Mute voice'}
       onClick={() => run({ type: 'toggleMute' })}><Icon name={panel.muted ? 'volumeOff' : 'volume'} /></button>}
   </div>;
 }

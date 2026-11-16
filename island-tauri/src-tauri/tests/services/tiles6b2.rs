@@ -163,6 +163,41 @@ async fn tiles_private_keepawake_output_network_colour_screenshot_and_voice() {
             && c[1].as_str().unwrap().starts_with("Set")));
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn tailscale_manual_refresh_retries_unavailable_and_discovers_recovery() {
+    let f = Fakes::new("tiles-tail-retry");
+    let mut state = f.state();
+    state["tailscale"] = json!(null);
+    f.set(state);
+    let s = Service(TilesService::start(
+        f.runner(),
+        None,
+        None,
+        Arc::new(Clipboard::default()),
+    ));
+    wait(&s.0, |v| v.voice.available).await;
+    assert!(!s.0.current().tailscale.available);
+    for expected in 2..=3 {
+        let observed = s.0.request(TilesOp::Refresh).await.unwrap();
+        assert!(!observed.tailscale.available);
+        assert_eq!(
+            f.calls().iter().filter(|c| c[0] == "tailscale").count(),
+            expected
+        );
+    }
+    let mut state = f.state();
+    state["tailscale"] = json!({"BackendState":"Running"});
+    f.set(state);
+    assert!(
+        s.0.request(TilesOp::Refresh)
+            .await
+            .unwrap()
+            .tailscale
+            .available
+    );
+    assert_eq!(f.calls().iter().filter(|c| c[0] == "tailscale").count(), 4);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tiles_keepawake_deadline_releases_without_another_command() {
     let bus = PrivateBus::start("tiles-timed");
     let mut mock = ExtraMock::start(&bus);

@@ -192,6 +192,45 @@ fn network(properties: &Properties) -> wire::NetworkTile {
         wifi_enabled: tile.wifi_enabled,
     }
 }
+/// Healthy status stays fresh at 30 s; failed discovery backs off to at most five minutes.
+#[derive(Default)]
+struct TailscaleSchedule {
+    next_at: u64,
+    failures: u32,
+}
+impl TailscaleSchedule {
+    fn due(&self, now: u64, explicit: bool) -> bool {
+        explicit || now >= self.next_at
+    }
+
+    fn observed(&mut self, now: u64, available: bool, explicit: bool) {
+        if available || explicit {
+            self.failures = 0;
+        }
+        let delay = if available {
+            30_000
+        } else {
+            self.failures = self.failures.saturating_add(1).min(5);
+            (30_000u64 << (self.failures - 1)).min(300_000)
+        };
+        self.next_at = now.saturating_add(delay);
+    }
+}
+
+async fn refresh_tailscale(
+    runner: &Runner,
+    schedule: &mut TailscaleSchedule,
+    now: impl Fn() -> u64,
+    explicit: bool,
+) -> Option<wire::TailscaleTile> {
+    if !schedule.due(now(), explicit) {
+        return None;
+    }
+    let tile = tailscale(runner).await;
+    schedule.observed(now(), tile.available, explicit);
+    Some(tile)
+}
+
 async fn tailscale(runner: &Runner) -> wire::TailscaleTile {
     let result = runner
         .run(
@@ -362,9 +401,11 @@ async fn worker(
     let mut awake = core::KeepAwake::new();
     let mut cookie: Option<Cookie> = None;
     let mut retry: Option<u64> = None;
-    value.tailscale = tailscale(&runner).await;
+    let mut tail_schedule = TailscaleSchedule::default();
+    if let Some(tile) = refresh_tailscale(&runner, &mut tail_schedule, now, false).await {
+        value.tailscale = tile;
+    }
     value.voice = voice(voices(&runner).await);
-    let mut next_tail = now().saturating_add(30_000);
     let mut jobs = JoinSet::new();
     loop {
         if *stop.borrow() {
@@ -398,7 +439,7 @@ async fn worker(
             .auto_off_at_ms()
             .into_iter()
             .chain(retry)
-            .chain(Some(next_tail))
+            .chain(Some(tail_schedule.next_at))
             .min();
         tokio::select! {
             _=stop.changed()=>break,
@@ -417,7 +458,7 @@ async fn worker(
                 if off || retry.is_some_and(|at|now()>=at) {if let Some(held)=&cookie {
                     match held.release().await {Ok(())=>{cookie=None;retry=None;},Err(_)=>{retry=Some(now().saturating_add(1000));}}
                 }}
-                if now()>=next_tail {value.tailscale=tailscale(&runner).await;next_tail=now().saturating_add(30_000);}
+                if let Some(tile)=refresh_tailscale(&runner,&mut tail_schedule,now,false).await {value.tailscale=tile;}
             }
             result=jobs.join_next(),if !jobs.is_empty()=>{match result {
                 Some(Ok(Job::Colour(result)))=>{value.picker_busy=false;match result{Ok(colour)=>{value.last_colour=Some(colour);value.action_error=None;},Err(error)=>value.action_error=Some(error.message)}},
@@ -427,7 +468,7 @@ async fn worker(
             request=rx.recv()=>{
                 let Some(request)=request else{break;};if request.reply.is_closed(){continue;}
                 let result=async {match request.op {
-                    wire::TilesOp::Refresh=>{value.tailscale=tailscale(&runner).await;value.voice=voice(voices(&runner).await);}
+                    wire::TilesOp::Refresh=>{if let Some(tile)=refresh_tailscale(&runner,&mut tail_schedule,now,true).await {value.tailscale=tile;}value.voice=voice(voices(&runner).await);}
                     wire::TilesOp::KeepAwake{on,duration_ms}=>{
                         if duration_ms.is_some_and(|d|d==0 || d>604_800_000){return Err(IslandError::invalid("Keep awake duration invalid"));}
                         if on {
@@ -475,4 +516,40 @@ async fn worker(
     }
     sources.shutdown().await;
     service.publish(empty("stopped"));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tailscale_backoff_caps_and_recovers() {
+        let mut schedule = TailscaleSchedule::default();
+        let mut now = 0;
+        for delay in [30_000, 60_000, 120_000, 240_000, 300_000, 300_000] {
+            assert!(schedule.due(now, false));
+            schedule.observed(now, false, false);
+            assert_eq!(schedule.next_at - now, delay);
+            assert!(!schedule.due(schedule.next_at - 1, false));
+            now = schedule.next_at;
+        }
+        schedule.observed(now, true, false);
+        assert_eq!(schedule.next_at - now, 30_000);
+        schedule.observed(now + 30_000, false, false);
+        assert_eq!(schedule.next_at - now, 60_000, "recovery resets failures");
+    }
+
+    #[test]
+    fn tailscale_explicit_refresh_bypasses_and_resets_backoff() {
+        let mut schedule = TailscaleSchedule::default();
+        for _ in 0..6 {
+            schedule.observed(0, false, false);
+        }
+        assert!(!schedule.due(1, false));
+        assert!(schedule.due(1, true));
+        schedule.observed(1, false, true);
+        assert_eq!(schedule.next_at, 30_001);
+        schedule.observed(30_001, false, false);
+        assert_eq!(schedule.next_at, 90_001);
+    }
 }

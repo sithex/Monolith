@@ -17,5 +17,5 @@ body,
   background: #1b1b1b; /* fully opaque: the screenshot test reads alpha from these pixels */
   color: #f5efe0;
   border: 1px solid #ffd84a;
-  font: 600 14px system-ui, sans-serif;
+  font: 600 var(--fs-base, 14px) system-ui, sans-serif;
 }

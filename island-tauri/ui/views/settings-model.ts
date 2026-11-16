@@ -3,19 +3,24 @@
 // restores and the rows a search can find never drift apart. Pure: no React, no IPC.
 import type { Appearance, Settings, SettingsPatch } from '../ipc/client';
 
+// Labeled rail, ordered by use (Phase 4, Nov 16).
 export const SETTINGS_SECTIONS = [
   { id: 'general', name: 'General' },
+  { id: 'appearance', name: 'Appearance' },
+  { id: 'notch', name: 'Notch' },
+  { id: 'companion', name: 'Companion' },
   { id: 'notifications', name: 'Notifications' },
-  { id: 'look', name: 'Look' },
-  { id: 'notch', name: 'Notch & companion' },
+  { id: 'apps', name: 'Apps' },
   { id: 'terminal', name: 'Terminal' },
-  { id: 'apps', name: 'Apps & widgets' },
-  { id: 'island', name: 'Island & backup' },
+  { id: 'advanced', name: 'Advanced' },
 ] as const;
 export type Tab = typeof SETTINGS_SECTIONS[number]['id'];
 export const SECTION_STORAGE_KEY = 'monolith-settings-section';
 export const sectionName = (id: Tab) => SETTINGS_SECTIONS.find(s => s.id === id)!.name;
-export const savedSection = (value: string | null): Tab => SETTINGS_SECTIONS.find(s => s.id === value)?.id ?? 'general';
+/** Section ids saved before the Nov 16 regrouping, mapped to where most of their cards went. */
+const RENAMED_SECTIONS: ReadonlyMap<string, Tab> = new Map<string, Tab>([['look', 'appearance'], ['island', 'advanced']]);
+export const savedSection = (value: string | null): Tab => SETTINGS_SECTIONS.find(s => s.id === value)?.id
+  ?? (value === null ? undefined : RENAMED_SECTIONS.get(value)) ?? 'general';
 export type SettingKey = keyof Settings;
 export type RowSpec = {
   id: string; label: string; hint?: string; synonyms?: string; keys: readonly SettingKey[];
@@ -107,22 +112,22 @@ const ROW_CATALOG: readonly { id: string; title: string; tab: string; rows: read
     { id: 'shelfMaxItems', label: 'Shelf size', hint: 'Most files kept on the shelf; the oldest go first', synonyms: 'drop shelf limit items', keys: ['shelfMaxItems'], when: on('shelfEnabled') },
     { id: 'shelfRemoveAfterDrag', label: 'Remove after dragging out', hint: 'A file dragged from the shelf into another app leaves the shelf', synonyms: 'drop shelf drag out', keys: ['shelfRemoveAfterDrag'], when: on('shelfEnabled') },
     { id: 'companion', label: 'Companion', hint: 'A small face in the notch whose eyes follow your pointer', keys: ['companionEnabled'] },
-    { id: 'companionCharacter', label: 'Character', hint: 'Companion character', keys: ['companionCharacter'], when: on('companionEnabled') },
+    { id: 'companionCharacter', label: 'Character', keys: ['companionCharacter'], when: on('companionEnabled') },
     { id: 'companionReactive', label: 'Reactive companion', hint: 'The companion reacts to Hermes working, waiting and finishing', keys: ['companionReactive'], when: on('companionEnabled') },
     { id: 'companionMonitor', label: 'Companion monitor', hint: 'Which notch shows the companion', keys: ['companionMonitor'], when: on('companionEnabled') },
-    { id: 'notchColor', label: 'Notch color', keys: ['panelClockColor'] },
-    { id: 'notchWidth', label: 'Width', hint: 'Notch width', keys: ['notchWidth'] },
+    { id: 'notchColor', label: 'Notch colour', keys: ['panelClockColor'] },
+    { id: 'notchWidth', label: 'Width', keys: ['notchWidth'] },
     { id: 'notchBorder', label: 'Notch border', keys: ['notchBorderEnabled'] },
-    { id: 'notchBorderColor', label: 'Notch border color', keys: ['notchBorderColor'] },
+    { id: 'notchBorderColor', label: 'Notch border colour', keys: ['notchBorderColor'] },
     { id: 'notchBorderOpacity', label: 'Border opacity', keys: ['notchBorderOpacity'] },
     { id: 'notchBorderWidth', label: 'Border thickness', keys: ['notchBorderWidth'] },
   ] },
   { id: 'text', title: 'Text', tab: 'appearance', rows: [
-    { id: 'uiFont', label: 'UI font', hint: 'System or OpenRunde', keys: ['uiFont'] },
+    { id: 'uiFont', label: 'UI font', synonyms: 'system openrunde typeface', keys: ['uiFont'] },
     { id: 'terminalFontSize', label: 'Terminal font size', keys: ['terminalFontSize'] },
     { id: 'terminalFontFamily', label: 'Terminal font', hint: 'Installed fonts; Default = DejaVu Sans Mono', keys: ['terminalFontFamily'] },
     { id: 'terminalScrollback', label: 'Terminal scrollback', hint: 'Lines kept above the screen', keys: ['terminalScrollback'] },
-    { id: 'terminalCursorStyle', label: 'Terminal cursor', hint: 'Block, bar or underline', keys: ['terminalCursorStyle'] },
+    { id: 'terminalCursorStyle', label: 'Terminal cursor', synonyms: 'block bar underline caret', keys: ['terminalCursorStyle'] },
     { id: 'terminalCursorBlink', label: 'Blinking cursor', keys: ['terminalCursorBlink'] },
   ] },
   { id: 'layoutEditor', title: 'Layout', tab: 'layout', reset: false, rows: [
@@ -170,20 +175,18 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
   { id: 'clock', title: 'Clock', tab: 'general', rows: [...rows('showDate'),
     { id: 'hourFormat', label: 'Time format', synonyms: 'time 24h 12h am pm clock', keys: ['hourFormat'] }] },
   { id: 'shortcuts', title: 'Shortcuts', tab: 'general', rows: rows('openShortcut', 'paletteShortcut') },
+  { id: 'scheme', title: 'Colour scheme', tab: 'appearance', resetsAppearance: true, rows: rows('scheme', 'hermesThemeSync', 'overrides') },
+  { id: 'surface', title: 'Surface', tab: 'appearance', rows: rows('translucent', 'glassStrength', 'borderEnabled') },
+  { id: 'motion', title: 'Motion', tab: 'appearance', rows: rows('reduceMotion', 'animationSpeed') },
+  { id: 'text', title: 'UI font', tab: 'appearance', rows: rows('uiFont') },
+  { id: 'layoutEditor', title: 'Island layout', tab: 'appearance', reset: false, rows: rows('sideButtons', 'islandSize') },
+  { id: 'notch', title: 'Notch', tab: 'notch', rows: rows('everyMonitor', 'notchMonitors', 'waitingPulse', 'hoverPeek', 'copyProgress', 'shelfEnabled', 'shelfMaxItems', 'shelfRemoveAfterDrag', 'notchColor', 'notchWidth', 'notchBorder', 'notchBorderColor', 'notchBorderOpacity', 'notchBorderWidth') },
+  { id: 'companion', title: 'Companion', tab: 'companion', rows: rows('companion', 'companionCharacter', 'companionReactive', 'companionMonitor') },
   { id: 'notifications', title: 'Notifications', tab: 'notifications', rows: rows('notificationsEnabled', 'systemNotificationMirror', 'silenceKdePopups', 'approvalsInNotch', 'redactBodies', 'deniedApps', 'appRules') },
   { id: 'gameMode', title: 'Focus', tab: 'notifications', rows: rows('dnd', 'gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers') },
   { id: 'sounds', title: 'Sounds', tab: 'notifications', rows: rows('notificationSound', 'notificationSoundId', 'clickSounds') },
   { id: 'popups', title: 'Popups', tab: 'notifications', rows: [
     { id: 'toastTtlMs', label: 'Popup duration', hint: 'How long notification popups stay visible', synonyms: 'toast timeout duration', keys: ['toastTtlMs'] }] },
-  { id: 'scheme', title: 'Colour scheme', tab: 'look', resetsAppearance: true, rows: rows('scheme', 'hermesThemeSync', 'overrides') },
-  { id: 'surface', title: 'Surface', tab: 'look', rows: rows('translucent', 'glassStrength', 'borderEnabled') },
-  { id: 'motion', title: 'Motion', tab: 'look', rows: rows('reduceMotion', 'animationSpeed') },
-  { id: 'text', title: 'UI font', tab: 'look', rows: rows('uiFont') },
-  { id: 'notch', title: 'Notch', tab: 'notch', rows: rows('everyMonitor', 'notchMonitors', 'waitingPulse', 'hoverPeek', 'copyProgress', 'shelfEnabled', 'shelfMaxItems', 'shelfRemoveAfterDrag', 'notchColor', 'notchWidth', 'notchBorder', 'notchBorderColor', 'notchBorderOpacity', 'notchBorderWidth') },
-  { id: 'companion', title: 'Companion', tab: 'notch', rows: rows('companion', 'companionCharacter', 'companionReactive', 'companionMonitor') },
-  { id: 'display', title: 'Display', tab: 'notch', rows: [...rows('displayBackend'),
-    { id: 'displayId', label: 'Island display', hint: 'Blank follows the default display; saved output names are retained', keys: ['displayId'] }] },
-  { id: 'terminal', title: 'Terminal', tab: 'terminal', rows: rows('terminalCommand', 'terminalFontFamily', 'terminalFontSize', 'terminalScrollback', 'terminalCursorStyle', 'terminalCursorBlink') },
   { id: 'apps', title: 'Apps', tab: 'apps', rows: rows('hardwareMonitor', 'arrangeApps') },
   { id: 'clipboard', title: 'Clipboard', tab: 'apps', rows: [
     { id: 'clipboardHistory', label: 'Clipboard history', hint: 'Opt in to collecting copied text and images', keys: ['clipboardHistory'] },
@@ -193,7 +196,7 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
   { id: 'weather', title: 'Weather', tab: 'apps', rows: [
     { id: 'weatherEnabled', label: 'Weather', hint: 'Enable weather updates for the selected location', keys: ['weatherEnabled'] },
     { id: 'weatherLocation', label: 'Weather location', hint: 'Choose a city; clear to remove the saved location', keys: ['weatherLocation'] },
-    { id: 'weatherUnit', label: 'Temperature unit', hint: 'Fahrenheit or Celsius', keys: ['weatherUnit'] }] },
+    { id: 'weatherUnit', label: 'Temperature unit', synonyms: 'fahrenheit celsius', keys: ['weatherUnit'] }] },
   { id: 'battery', title: 'Battery', tab: 'apps', rows: [
     { id: 'batteryAlerts', label: 'Battery alerts', keys: ['batteryAlerts'] },
     { id: 'batteryLowPercent', label: 'Low battery threshold', keys: ['batteryLowPercent'] },
@@ -202,9 +205,11 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
     { id: 'lyricsEnabled', label: 'Synced lyrics', hint: 'Opt in to LRCLIB lookups that send track title, artist, album and duration', keys: ['lyricsEnabled'] },
     { id: 'equalizerEnabled', label: 'Live equalizer', hint: 'Opt in to capturing the playing output stream, never the microphone', keys: ['equalizerEnabled'] },
     { id: 'equalizerBands', label: 'Equalizer bands', hint: 'Whole bands, from 8 to 32', keys: ['equalizerBands'] }] },
-  { id: 'layoutEditor', title: 'Island layout', tab: 'island', reset: false, rows: rows('sideButtons', 'islandSize') },
-  { id: 'position', title: 'Position', tab: 'island', rows: rows('offsetX', 'offsetY') },
-  { id: 'backup', title: 'Backup', tab: 'island', reset: false, rows: rows('exportSettings', 'importSettings') },
+  { id: 'terminal', title: 'Terminal', tab: 'terminal', rows: rows('terminalCommand', 'terminalFontFamily', 'terminalFontSize', 'terminalScrollback', 'terminalCursorStyle', 'terminalCursorBlink') },
+  { id: 'display', title: 'Display', tab: 'advanced', rows: [...rows('displayBackend'),
+    { id: 'displayId', label: 'Island display', hint: 'Blank follows the default display; saved output names are retained', keys: ['displayId'] }] },
+  { id: 'position', title: 'Position', tab: 'advanced', rows: rows('offsetX', 'offsetY') },
+  { id: 'backup', title: 'Backup', tab: 'advanced', reset: false, rows: rows('exportSettings', 'importSettings') },
 ];
 
 export function settingLocation(id: string): { card: CardSpec; row: RowSpec } | null {
@@ -226,6 +231,9 @@ export const cardSpec = (id: string): CardSpec => {
   if (!card) throw new Error(`Unknown settings card ${id}`);
   return card;
 };
+/** A card heading that only repeats its page title ("Terminal" on Terminal) or its one row's
+ * label ("UI font") is hidden visually; it stays as the card's accessible name. */
+export const titleRepeats = (card: CardSpec) => normalize(card.title) === normalize(sectionName(card.tab));
 
 /** Every setting key a card's Reset restores (union of its rows' keys, schema order kept). */
 export function cardKeys(cardId: string): SettingKey[] {

@@ -14,7 +14,7 @@ html[data-tone='light'] {
   --v-stroke-hi: color-mix(in srgb, var(--ui-text) 18%, transparent);
   --v-hover: color-mix(in srgb, var(--ui-text) 9%, transparent);
   --v-track: color-mix(in srgb, var(--ui-text) 16%, transparent);
-  --v-dim: var(--ui-dim);
+  --ui-ink: #000000;
 }
 html[data-tone='light'][data-glass='true'] { --v-fill: var(--v-fill-soft); }
 
@@ -51,7 +51,6 @@ html[data-tone='light'] .app-tile svg { color: var(--tone, color-mix(in srgb, va
 html[data-tone='light'] .app-tile:hover:not(:disabled) { border-color: color-mix(in srgb, var(--ui-text) 12%, transparent); }
 html[data-tone='light'] .hidden-grid { background: color-mix(in srgb, var(--ui-text) 2.5%, transparent); }
 html[data-tone='light'] .hidden-grid[data-over='true'] { outline-color: color-mix(in srgb, var(--ui-text) 35%, transparent); background: color-mix(in srgb, var(--ui-text) 6%, transparent); }
-html[data-tone='light'] .timer-tabs button { color: color-mix(in srgb, var(--ui-text) 50%, transparent); }
 html[data-tone='light'] .mixer-divider { background: color-mix(in srgb, var(--ui-text) 12%, transparent); }
 html[data-tone='light'] .fader-fill { background: color-mix(in srgb, var(--ui-text) 92%, transparent); }
 html[data-tone='light'] .fader[data-muted='true'] .fader-fill { background: color-mix(in srgb, var(--ui-text) 35%, transparent); }

@@ -40,18 +40,7 @@ html[data-nav-via='key'] .island .fader-fill { transition: none; }
   .island .processes .process-actions .danger:hover:not(:disabled) { background: color-mix(in srgb, var(--v-red, #ff6b6b) 80%, transparent); }
 }
 
-/* JS owns the first-open delay and warm rail; CSS hover must not bypass it. */
-.island .settings-rail button .settings-rail-name {
-  visibility: hidden; opacity: 0; transition: none;
-}
-.island .settings-rail button:focus-visible .settings-rail-name { visibility: visible; opacity: 1; }
-@media (hover: hover) and (pointer: fine) {
-  .island .settings-rail button[data-tooltip-open='true'] .settings-rail-name { visibility: visible; opacity: 1; }
-}
-/* On narrow islands these names are inline labels, not tooltips. */
-@container (max-width: 420px) {
-  .island .settings-rail button .settings-rail-name { visibility: visible; opacity: 1; }
-}
+/* Rail names are always-visible labels since Phase 4 (labeled rail); no tooltip state. */
 html[data-reduce-motion='true'] .island :is(.fader-fill, .motion-meter-fill, .ai-share-track > i, .monitor-meter > i) { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .island .fader-fill, .island .ai-meter > .motion-meter-fill,

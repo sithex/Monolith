@@ -1,13 +1,13 @@
 /* Colour scheme picker: one row per family; families with variants expand in place (Nov 6).
    The base row/dots/selected-pill styles stay in polish.css; this file adds the group label,
    the disclosure chevron and the indented variant list. */
-.scheme-group-label { padding: 12px 12px 4px; font: 600 var(--fs-xs) var(--ui-font); letter-spacing: .09em; text-transform: uppercase; color: var(--v-dim); }
+.scheme-group-label { padding: var(--space-3) var(--space-3) var(--space-1); font: 600 var(--fs-sm) var(--ui-font); letter-spacing: .09em; text-transform: uppercase; color: var(--ui-text-secondary); }
 .island .scheme-family-row { grid-template-columns: 52px 1fr auto 14px; }
-.scheme-chevron { width: 12px; height: 12px; fill: none; stroke: var(--v-dim); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+.scheme-chevron { width: 12px; height: 12px; fill: none; stroke: var(--ui-text-secondary); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
   transition: transform .24s cubic-bezier(.22, 1, .36, 1); }
 .scheme-family-row[aria-expanded='true'] .scheme-chevron { transform: rotate(90deg); }
 .scheme-family-row[aria-expanded='true'] .scheme-name { font-weight: 600; }
-.scheme-family-row[data-active='true'] .scheme-name { color: var(--ui-primary); }
+.scheme-family-row[data-active='true'] .scheme-name { color: var(--ui-accent); }
 /* Variants hang off a quiet rail so the expansion reads as belonging to its family row. */
 .scheme-variants { display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin: 2px 0 4px 26px; padding-left: 8px;
   border-left: 1px solid color-mix(in srgb, var(--ui-border) 70%, transparent); }

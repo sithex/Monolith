@@ -13,9 +13,9 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .island { --bw: 1px; }
 .island[data-notching='true'] { --bw: 0px; }
 .island[data-state='still'] .topline { justify-content: center; padding: 0; }
-.topline { position: relative; display: flex; align-items: center; height: 42px; min-height: 42px; gap: 14px; padding: 0 18px; font-size: var(--fs-md); }
+.topline { position: relative; display: flex; align-items: center; height: 42px; min-height: 42px; gap: 14px; padding: 0 18px; font-size: var(--fs-body); }
 .clock { padding: 2px 0; display: flex; flex-direction: column; align-items: center; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.clock small { color: var(--ui-dim); font-size: var(--fs-xs); }
+.clock small { color: var(--ui-text-hint); font-size: var(--fs-sm); }
 .topline[data-notch-clock='false'] .clock { order: -1; }
 /* WebKit rasterizes Open Runde Bold ~15% lighter than Plasma's Qt text; the thin stroke matches the notch clock's weight. */
 .topline[data-notch-clock='true'] .clock { position: absolute; top: calc(-1 * var(--bw) - 2px); left: 50%; width: var(--native-pill-width); height: var(--native-pill-height);
@@ -38,14 +38,14 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .island:has(> .topline[data-notch-clock='true']) .island-shell > .title-row > * { pointer-events: auto; }
 .island:not([data-state='hover']) .topline[data-notch-clock='true'] .topline-title { visibility: hidden; }
 .preview { padding: 20px 24px; flex: 1; }
-.preview h2 { font-size: var(--fs-xl); font-weight: 500; }
+.preview h2 { font-size: var(--fs-xl); font-weight: 600; }
 .preview button { margin-top: 20px; width: 100%; }
 .terminal-wrap { display: flex; flex: 1; min-height: 0; padding: 0 10px 10px; }
 
 .island[data-morphing='true'] > .terminal-wrap { will-change: transform, opacity, filter; }
 .island[data-state='large'][data-morphing='true'] > .terminal-wrap { position: absolute; top: 42px; left: 50%; margin-left: calc(var(--open-content-width) / -2); width: var(--open-content-width); height: var(--open-content-height); flex: none; }
 .view-stage { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; }
-.view-tabs { display: flex; min-height: 36px; align-items: center; gap: 4px; border-bottom: 1px solid var(--ui-border); font-size: var(--fs-md); }
+.view-tabs { display: flex; min-height: 36px; align-items: center; gap: var(--space-1); border-bottom: 1px solid var(--ui-border); font-size: var(--fs-body); }
 .view-tabs button[aria-current='page'] { color: var(--ui-accent); background: var(--ui-surface); }
 .island-shell { border: 0; box-shadow: none; flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .shell-content { flex: 1; min-height: 0; padding: 0; display: flex; }
@@ -80,14 +80,14 @@ legend { margin: 8px 0; font-weight: 600; }
 .card.stat-groups p { margin: 0; }
 .card.stat-groups p + h3 { margin-top: 16px; }
 .cost-rows { margin: 8px 0 0; display: flex; flex-direction: column; }
-.cost-rows > div { display: flex; align-items: baseline; gap: 12px; padding: 4px 0; border-top: 1px solid var(--ui-border); }
+.cost-rows > div { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-1) 0; border-top: 1px solid var(--ui-border); }
 .cost-rows > div:first-child { border-top: 0; }
-.cost-rows dt { font-size: var(--fs-md); }
-.cost-rows dt small { display: block; color: var(--ui-dim); font-size: var(--fs-sm); }
+.cost-rows dt { font-size: var(--fs-body); }
+.cost-rows dt small { display: block; color: var(--ui-text-hint); font-size: var(--fs-sm); }
 .cost-rows dd { margin: 0 0 0 auto; font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
-.dashboard .card p, .monitor .card p { font-size: var(--fs-md); }
+.dashboard .card p, .monitor .card p { font-size: var(--fs-body); }
 .island-error { position: absolute; left: 50%; bottom: 14px; translate: -50% 0; z-index: 40; box-sizing: border-box; max-width: calc(100% - 48px);
-  padding: 8px 14px; border-radius: var(--radius-2xl); font-size: var(--fs-md); line-height: 1.35; overflow-wrap: anywhere; cursor: pointer; user-select: text;
+  padding: 8px 14px; border-radius: var(--radius-3xl); font-size: var(--fs-body); line-height: 1.35; overflow-wrap: anywhere; cursor: pointer; user-select: text;
   color: var(--ui-text); background: color-mix(in srgb, var(--ui-error) 14%, var(--ui-raised));
   border: 1px solid color-mix(in srgb, var(--ui-error) 45%, transparent); box-shadow: 0 8px 24px #0007; }
 .island-error::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--ui-error); }

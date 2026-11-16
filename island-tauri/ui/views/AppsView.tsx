@@ -10,6 +10,7 @@ import { createEpochTopic } from '../stores/epoch-topic';
 import { createVisiblePoller } from './visible-poller';
 import { createMediaVisibility } from './media-visibility';
 import * as adapt from './app-adapters';
+import { relativeTime } from '../island/formatters';
 import { ClipboardView } from '../island/components/ClipboardView';
 import { NowPlaying } from '../island/components/NowPlaying';
 import { TimerApp } from '../island/components/TimerApp';
@@ -83,7 +84,7 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
       enqueueEpochCommand(appStores.scratchpad,run,async()=>{ const epoch=appStores.scratchpad.epoch(); const result=await appApi.scratchpadCommand(request); if(epoch===appStores.scratchpad.epoch()&&request.type==='create')setSelected(request.id); return result; });
     } }} />;
     if (view === 'downloads' && downloads) {
-      const value = adapt.adaptDownloads(downloads), moving = adapt.adaptTransfers(transfers), reveal = (id: string) => run(() => appApi.transferReveal(id));
+      const value = adapt.adaptDownloads(downloads, relativeTime), moving = adapt.adaptTransfers(transfers), reveal = (id: string) => run(() => appApi.transferReveal(id));
       content = value.available ? <DownloadsApp items={value.value} transfers={moving} intents={{ download: op => run(() => appApi.downloadsOpen(op.name, op.type)), transfer: reveal }} />
         : <div className="app-stack"><TransfersCard items={moving} onReveal={reveal}/><ServiceNotice icon="download" source="downloads" reason={value.reason}/></div>;
     }
@@ -101,7 +102,7 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
     }} /></div>;
     if (view === 'agents' && agents) { const value = adapt.adaptAgents(agents); content = value.available ? <AgentRunChips update={value.value} intents={{ agent: id => setNotice(id ? `Run ${id}` : 'More active runs') }} /> : <ServiceNotice icon="spark" source="agents" reason={value.reason}/>; }
     if (view === 'updates' && updates) content = <UpdatesApp snapshot={updates} onRefresh={async () => { const epoch = appStores.updates.epoch(); const value = await appApi.updatesRefresh(); appStores.updates.apply(value,epoch); }} onInstall={manager => appApi.updatesInstall(manager)} />;
-    if (view === 'notifications') content = <NotificationsView model={{ ...adapt.adaptNotifications(notifications,settings.dnd,settings.redactBodies), unavailable: adapt.notificationsDown(serviceStatus('notifications')) }} intents={{ notification: op => run(() => op.type === 'clearAll' ? notificationsClear() : notificationsDismiss(op.id)) }} />;
+    if (view === 'notifications') content = <NotificationsView model={{ ...adapt.adaptNotifications(notifications,settings.dnd,settings.redactBodies,relativeTime), unavailable: adapt.notificationsDown(serviceStatus('notifications')) }} intents={{ notification: op => run(() => op.type === 'clearAll' ? notificationsClear() : notificationsDismiss(op.id)) }} />;
     if (view === 'clipboard') content = <ClipboardView model={{ ...clips, paused: clips.status?.paused ?? false, items: clips.items.map(c => ({ ...c, ageLabel: 'Captured' })) }} intents={{ clipboard: op => {
       if (op.type === 'search') { try { clipboardHistory.setQuery(op.query); } catch (error) { setNotice(String(error)); } return; }
       const epoch = clipboardHistory.epoch();

@@ -20,10 +20,10 @@ test('notch appearance controls emit independent color and border settings',()=>
  const controls=children(NotchControls({settings:{panelClockColor:'#123456',notchBorderEnabled:true,notchBorderColor:'#abcdef',notchBorderOpacity:.6,notchBorderWidth:2.5},background:'#000000',accent:'#00ff00',patch:p=>calls.push(p)}));
  const input=label=>controls.find(e=>e.props?.['aria-label']===label||e.props?.label===label);
  // Colours use the in-island picker swatch (the native GTK chooser opens behind the island on Wayland).
- assert.equal(input('Notch color').props.value,'#123456');
- input('Notch color').props.onPick('#112233');
+ assert.equal(input('Notch colour').props.value,'#123456');
+ input('Notch colour').props.onPick('#112233');
  input('Notch border').props.onChange({target:{checked:false}});
- input('Notch border color').props.onPick('#fedcba');
+ input('Notch border colour').props.onPick('#fedcba');
  input('Notch border opacity').props.onCommit(30,true);
  input('Notch border thickness').props.onCommit(1.5,true);
  assert.deepEqual(calls,[{panelClockColor:'#112233'},{notchBorderEnabled:false},{notchBorderColor:'#fedcba'},{notchBorderOpacity:.3},{notchBorderWidth:1.5}]);

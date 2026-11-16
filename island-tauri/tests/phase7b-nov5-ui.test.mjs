@@ -37,8 +37,8 @@ test('shownRows is the active section without a query and the search hits (any s
   const s = { translucent: false };
   const general = model.shownRows('general', '', s);
   assert.ok(!general.has('gameMode') && general.has('openShortcut') && !general.has('reduceMotion'));
-  assert.ok(model.shownRows('look', '', s).has('glassStrength'));
-  const hits = model.shownRows('island', 'scrollback', s);
+  assert.ok(model.shownRows('appearance', '', s).has('glassStrength'));
+  const hits = model.shownRows('advanced', 'scrollback', s);
   assert.deepEqual([...hits], ['terminalScrollback']);
 });
 

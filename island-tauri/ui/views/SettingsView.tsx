@@ -9,7 +9,7 @@ import { SchemePicker } from '../island/SchemePicker';
 import { DraftRange } from '../island/components/AppPrimitives';
 import { TerminalCommandSettings } from '../island/TerminalCommandSettings';
 import { SCHEMES } from '../island/tokens/schemes';
-import { DEFAULT_APPEARANCE, SETTINGS_CARDS, SETTINGS_SECTIONS, SECTION_STORAGE_KEY, cardSpec, exportSettings, normalize, parseImport, resetPatch, searchRows, savedSection, settingLocation, type RowSpec, type Tab } from './settings-model';
+import { DEFAULT_APPEARANCE, SETTINGS_CARDS, SETTINGS_SECTIONS, SECTION_STORAGE_KEY, cardSpec, exportSettings, normalize, parseImport, resetPatch, searchRows, savedSection, settingLocation, titleRepeats, type RowSpec, type Tab } from './settings-model';
 import { commands, type FontFamily } from '../ipc/bindings';
 import { dispatch } from '../ipc/island-state';
 import { useNotifications } from '../ipc/notifications';
@@ -22,7 +22,6 @@ import { ClipboardPatterns, DisplayChoice, WeatherLocation } from './settings/Wi
 import { takePendingSettingJump } from './settings/SettingsLink';
 import { SectionIcon } from './settings/SectionIcon';
 import { useConfirmationGuard } from './settings/use-confirmation-guard';
-import { useRailTooltip } from './settings/use-rail-tooltip';
 
 const message = (e: unknown) => e instanceof Error ? e.message : String(e);
 function Row({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
@@ -31,10 +30,12 @@ function Row({ id, label, hint, children }: { id: string; label: string; hint?: 
 export function Card({ title, children }: { title?: string; children: ReactNode }) {
   return <section className="settings-card">{title && <h3>{title}</h3>}{children}</section>;
 }
-/** Inline two-tap reset, never a modal. */
-export function ResetHeader({ title, onReset }: { title: string; onReset?(): Promise<void> }) {
+/** Inline two-tap reset, never a modal. `quiet`: the title only repeats the page title or the
+ * card's one label, so it is kept for screen readers and the Reset link stands alone. */
+export function ResetHeader({ title, onReset, quiet = false }: { title: string; onReset?(): Promise<void>; quiet?: boolean }) {
   const confirmation = useConfirmationGuard<boolean>(), [busy, setBusy] = useState(false);
-  return <header onPointerLeave={confirmation.disarm}><h3>{title}</h3>
+  if (quiet && !onReset) return null;
+  return <header onPointerLeave={confirmation.disarm} data-quiet={quiet || undefined}><h3 className={quiet ? 'sr-only' : undefined}>{title}</h3>
     {onReset && (confirmation.pending
       ? <><small>Reset?</small><button type="button" className="link confirmation-action" data-armed="true" data-arming={!confirmation.ready} aria-label={`Confirm reset ${title}`} disabled={busy || !confirmation.ready}
           onClick={() => { if (!confirmation.accept()) return; setBusy(true); void onReset().finally(() => setBusy(false)); }}>Confirm</button></>
@@ -121,7 +122,6 @@ export function SettingsView() {
   const [outputs, setOutputs] = useState<string[] | null>(null), [jumpTarget, setJumpTarget] = useState<string | null>(null), [highlight, setHighlight] = useState<string | null>(null);
   const [fonts, setFonts] = useState<FontFamily[] | null>(null), [fontError, setFontError] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const railTooltip = useRailTooltip();
   const notifications = useNotifications();
   const jumpTo = (id: string) => { const target = settingLocation(id); if (target) { setTab(target.card.tab); setQuery(''); setJumpTarget(id); } };
   useEffect(() => { try { localStorage.setItem(SECTION_STORAGE_KEY, tab); } catch { /* Storage may be unavailable. */ } }, [tab]);
@@ -149,7 +149,8 @@ export function SettingsView() {
   }, [highlight]);
   const patch = (p: SettingsPatch) => { setError(''); void saveSettings(p).catch(e => setError(message(e))); };
   const searching = normalize(query) !== '';
-  const wantOutputs = tab === 'notch';
+  // Monitor names feed notchMonitors (Notch), companionMonitor (Companion) and displayId (Advanced).
+  const wantOutputs = tab === 'notch' || tab === 'companion' || tab === 'advanced';
   useEffect(() => {
     if (!wantOutputs || outputs !== null) return;
     let live = true; displayOutputs().then(names => { if (live) setOutputs(names); }, () => { if (live) setOutputs([]); });
@@ -170,7 +171,7 @@ export function SettingsView() {
       if (cardSpec(cardId).resetsAppearance && appearance !== DEFAULT_APPEARANCE) await saveAppearance(DEFAULT_APPEARANCE);
     } catch (e) { setError(message(e)); }
   };
-  const header = (cardId: string) => { const card = cardSpec(cardId); return <ResetHeader title={card.title} onReset={card.reset === false ? undefined : reset(cardId)} />; };
+  const header = (cardId: string) => { const card = cardSpec(cardId); return <ResetHeader title={card.title} quiet={titleRepeats(card)} onReset={card.reset === false ? undefined : reset(cardId)} />; };
   const isLinux = typeof navigator !== 'undefined' && /Linux/i.test(navigator.userAgent) && !/Android/i.test(navigator.userAgent);
   const runningBackend = document.documentElement.dataset.displayBackend === 'wayland' ? 'wayland' : 'x11';
   const segmented = (key: 'hourFormat' | 'weatherUnit' | 'terminalCursorStyle' | 'uiFont' | 'displayBackend', label: string, options: [string, string][]) =>
@@ -221,10 +222,9 @@ export function SettingsView() {
     </div>
     {error && <p role="alert">{error}</p>}
     <div className="settings-layout">
-      <nav className="settings-rail" aria-label="Settings sections" onPointerLeave={railTooltip.reset}>{SETTINGS_SECTIONS.map(section => <button key={section.id} type="button" data-section={section.id}
-        data-tooltip-open={railTooltip.shown === section.id} onPointerEnter={() => railTooltip.enter(section.id)} onPointerLeave={railTooltip.leave}
+      <nav className="settings-rail" aria-label="Settings sections">{SETTINGS_SECTIONS.map(section => <button key={section.id} type="button" data-section={section.id}
         aria-label={section.name} aria-current={tab === section.id ? 'page' : undefined} onClick={() => { setTab(section.id); setQuery(''); }}>
-        <SectionIcon section={section.id} /><span className="settings-rail-name" role="tooltip">{section.name}</span>
+        <SectionIcon section={section.id} /><span className="settings-rail-name">{section.name}</span>
       </button>)}</nav>
       <div className="settings-content" data-fit-scroll="">
         {searching ? <>
@@ -237,13 +237,13 @@ export function SettingsView() {
           <h2 className="settings-section-title">{SETTINGS_SECTIONS.find(section => section.id === tab)!.name}</h2>
           {SETTINGS_CARDS.filter(card => card.tab === tab).map(card => {
             if (card.id === 'notch' || card.id === 'companion') return <NotchControls key={card.id} settings={settings} background={settings.background || palette.surface} accent={settings.accent || palette.accent} patch={patch}
-              outputs={outputs} show={id => card.rows.some(row => row.id === id)} header={header(card.id)} />;
+              outputs={outputs} show={id => card.rows.some(row => row.id === id)} note={card.id === 'notch'} label={card.title} header={header(card.id)} />;
             if (card.id === 'layoutEditor') return <LayoutEditor key={card.id} />;
             return <section key={card.id} className="settings-card" aria-label={card.title}>{header(card.id)}{card.id === 'backup' ? <Backup settings={settings} appearance={appearance} /> : card.rows.map(renderRow)}</section>;
           })}
         </>}
       </div>
     </div>
-    {tab === 'island' && <OffsetGhost preview={offsetPreview} current={{ x: settings.offsetX, y: settings.offsetY }} />}
+    {tab === 'advanced' && <OffsetGhost preview={offsetPreview} current={{ x: settings.offsetX, y: settings.offsetY }} />}
   </div>;
 }

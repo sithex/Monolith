@@ -6,9 +6,9 @@
   width: 28px;
   height: 28px;
   padding: 5px;
-  color: var(--ui-dim);
+  color: var(--ui-text-hint);
   background: transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 .settings-cross-link.settings-cross-link--gear svg { width: 16px; height: 16px; color: inherit; }
 .settings-cross-link.settings-cross-link--text {

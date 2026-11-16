@@ -47,7 +47,7 @@ function ColourCard({ hex, popup, perform, inNotch }: { hex: string; popup: Popu
     <div className="colour-card-body">
       {/* The swatch springs up out of a drop, like ink landing. */}
       <motion.span className="colour-card-swatch" style={{ background: hex }} aria-hidden="true"
-        initial={{ scale: .45, opacity: 0, borderRadius: 28 }} animate={{ scale: 1, opacity: 1, borderRadius: 14 }}
+        initial={{ scale: .45, opacity: 0, borderRadius: 28 }} animate={{ scale: 1, opacity: 1, borderRadius: 16 }}
         transition={{ type: 'spring', stiffness: 420, damping: 22, opacity: { duration: .12 } }} />
       <div className="colour-card-values">
         <strong className="colour-card-hex">{hex.toUpperCase()}</strong>

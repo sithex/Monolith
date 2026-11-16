@@ -6,9 +6,11 @@ import { CompanionPicker } from './companionCharacters';
 import { monitorChoices, rowSpec, toggleMonitor } from '../views/settings-model';
 
 /** Hook-free shared notch/companion controls; every preference has a stable jump target. */
-export function NotchControls({ settings, background, accent, patch, outputs = null, show = () => true, header }: {
+export function NotchControls({ settings, background, accent, patch, outputs = null, show = () => true, header, note = true, label = 'Notch appearance' }: {
   settings: Settings; background: string; accent: string; patch(value: SettingsPatch): void;
   outputs?: string[] | null; show?(rowId: string): boolean; header?: ReactNode;
+  /** The "taskbar notch only" note; shown once, on the Notch card. */
+  note?: boolean; label?: string;
 }) {
   const row = (id: string, control: ReactNode, hint?: string) => {
     const spec = rowSpec(id);
@@ -24,8 +26,8 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
     <input type="checkbox" className="switch" aria-label={id === 'companion' ? 'Notch companion' : rowSpec(id).label} checked={key === 'showNotchOnEveryMonitor' ? settings[key] === true : settings[key] !== false} onChange={e => patch({ [key]: e.target.checked })} />);
   const saved = settings.notchMonitors ?? [], known = outputs ?? [], choices = monitorChoices(saved, known);
   const companionOptions = [{ value: '', label: 'Every notch' }, ...[...new Set([...known, ...(settings.companionMonitor ? [settings.companionMonitor] : [])])].map(name => ({ value: name, label: name }))];
-  return <section className="settings-card" aria-label="Notch appearance">{header ?? <h3>Notch</h3>}
-    <p className="muted">Taskbar notch only. The open island keeps its own appearance. Preferences can be edited while a feature is off.</p>
+  return <section className="settings-card" aria-label={label}>{header ?? <h3>Notch</h3>}
+    {note && <p className="muted">Taskbar notch only. The open island keeps its own appearance. Preferences can be edited while a feature is off.</p>}
     {flag('everyMonitor', 'showNotchOnEveryMonitor')}
     {row('notchMonitors', <div className="settings-checklist" role="group" aria-label="Notch monitors">
       {choices.length ? choices.map(c => <label key={c.name} data-connected={c.connected} title={c.connected ? undefined : 'Not connected now'}>

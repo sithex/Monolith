@@ -72,30 +72,6 @@ test('process confirmation auto-disarms and stale handlers cannot signal after e
     assert.deepEqual(h.calls, []); assert.ok(textButton(h.render(), 'Kill'));
   } finally { h.dispose(); }
 });
-test('rail waits once, skips the delay for neighbours, and resets on leaving', t => {
-  const advance = clock(t);
-  globals({ matchMedia: () => ({ matches: true }) }, () => {
-    const d = driver(), hook = d.load('ui/views/settings/use-rail-tooltip.ts').useRailTooltip;
-    try {
-      let rail = d.render(hook); rail.enter('general'); advance(299); assert.equal(d.render(hook).shown, null);
-      advance(1); rail = d.render(hook); assert.equal(rail.shown, 'general');
-      rail.leave(); rail.enter('look'); rail = d.render(hook); assert.equal(rail.shown, 'look');
-      rail.reset(); rail.enter('terminal'); advance(299); assert.equal(d.render(hook).shown, null);
-      advance(1); assert.equal(d.render(hook).shown, 'terminal');
-    } finally { d.dispose(); }
-  });
-});
-test('sweeping an unopened rail cancels pending tips and touch never schedules them', t => {
-  const advance = clock(t); let hover = true;
-  globals({ matchMedia: () => ({ matches: hover }) }, () => {
-    const d = driver(), hook = d.load('ui/views/settings/use-rail-tooltip.ts').useRailTooltip;
-    try {
-      let rail = d.render(hook); rail.enter('general'); advance(150); rail.leave(); rail.enter('look');
-      advance(150); assert.equal(d.render(hook).shown, null);
-      rail.reset(); hover = false; rail.enter('general'); advance(1000); assert.equal(d.render(hook).shown, null);
-    } finally { d.dispose(); }
-  });
-});
 test('timer reduced-motion digits fade without transforms; the ambient roll ignores keyboard modality', () => {
   const d = driver({}, (path, source) => path === 'ui/island/components/TimerApp.tsx' ? `${source}\nexport { RollingText, MinuteWheel };` : source);
   try {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useReducedMotionAll } from './motion-preference';
 import { describeServiceReason } from '../service-reasons';
+import { relativeAge } from '../formatters';
 import type { PackageUpdate, UpdateManager, UpdatesChanged } from '../../ipc/bindings';
 
 // Browser-only CSS import also leaves this component usable by the Node SSR checks.
@@ -27,10 +28,7 @@ export function versionBump(oldVersion: string, newVersion: string): string | nu
 
 export function checkedLabel(ageSecs: number | null): string {
   if (ageSecs === null || !Number.isFinite(ageSecs) || ageSecs < 0) return 'No successful check yet';
-  if (ageSecs < 60) return 'Checked just now';
-  if (ageSecs < 3600) return `Checked ${Math.floor(ageSecs / 60)} min ago`;
-  if (ageSecs < 86400) return `Checked ${Math.floor(ageSecs / 3600)} hr ago`;
-  return `Checked ${Math.floor(ageSecs / 86400)} days ago`;
+  return `Checked ${relativeAge(ageSecs)}`;
 }
 
 export function groupUpdates(items: PackageUpdate[], query: string) {

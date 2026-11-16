@@ -8,7 +8,7 @@ const model = load('ui/views/settings-model.ts');
 const src = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const allRows = model.SETTINGS_CARDS.flatMap(card => card.rows);
 const rowIds = groups => groups.flatMap(group => group.rows.map(row => row.id));
-const sections = ['general', 'notifications', 'look', 'notch', 'terminal', 'apps', 'island'];
+const sections = ['general', 'appearance', 'notch', 'companion', 'notifications', 'apps', 'terminal', 'advanced'];
 const newKeys = ['autostart', 'showInTaskbar', 'hourFormat', 'hoverDelay', 'toastTtlMs', 'clipboardHistory',
   'clipboardHistorySize', 'clipboardPersist', 'clipboardDenyPatterns', 'weatherEnabled', 'weatherLocation',
   'weatherUnit', 'batteryAlerts', 'batteryLowPercent', 'batteryCriticalPercent', 'lyricsEnabled',
@@ -76,16 +76,16 @@ test('sidebar: search indexes every label, card title, section, schema key, and 
     assert.ok(model.shownRows(card.tab, '', off).has(row.id), `${row.id} remains editable with parent off`);
   }
   assert.ok(rowIds(model.searchRows('MÁSCOT', off)).includes('companionCharacter'));
-  assert.ok(rowIds(model.searchRows('look blur', off)).includes('glassStrength'));
-  assert.deepEqual(model.searchRows('look blur unmatchable-token', off), []);
+  assert.ok(rowIds(model.searchRows('appearance blur', off)).includes('glassStrength'));
+  assert.deepEqual(model.searchRows('appearance blur unmatchable-token', off), []);
 });
 
-test('sidebar: CSS reserves a 40px rail, gives content flex:1/min-width:0, and adapts at 420px', () => {
+test('sidebar: CSS reserves a 150px labeled rail, gives content flex:1/min-width:0, and adapts at 420px', () => {
   const css = src('ui/island/surface.css');
   const rule = selector => css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]+)\\}`))?.[1] ?? '';
   assert.match(rule('.settings-layout'), /display:\s*flex\s*;/);
-  assert.match(rule('.settings-rail'), /width:\s*40px\s*;/);
-  assert.match(rule('.settings-rail'), /flex:\s*0\s+0\s+40px\s*;/);
+  assert.match(rule('.settings-rail'), /width:\s*150px\s*;/);
+  assert.match(rule('.settings-rail'), /flex:\s*0\s+0\s+150px\s*;/);
   assert.match(rule('.settings-content'), /flex:\s*1\s*;/);
   assert.match(rule('.settings-content'), /min-width:\s*0\s*;/);
   assert.match(rule('.settings-content'), /overflow-y:\s*auto\s*;/);
@@ -98,7 +98,76 @@ test('sidebar: CSS reserves a 40px rail, gives content flex:1/min-width:0, and a
 
 test('sidebar: saved sections validate supported IDs and reject old tabs/corrupt storage', () => {
   for (const id of sections) assert.equal(model.savedSection(id), id);
-  for (const value of [null, '', 'appearance', 'layout', 'unknown', 'Terminal', '__proto__']) assert.equal(model.savedSection(value), 'general');
+  for (const value of [null, '', 'layout', 'unknown', 'Terminal', '__proto__', 'toString', 'constructor']) assert.equal(model.savedSection(value), 'general');
+});
+
+test('phase 4: sections saved before the regrouping open where their cards went', () => {
+  assert.equal(model.savedSection('look'), 'appearance');
+  assert.equal(model.savedSection('island'), 'advanced');
+});
+
+// The approved Phase 4 table (STATE.md, Nov 16). Enumerates every card and every row so that a
+// moved, dropped or duplicated control fails here by name.
+const PHASE4_TABLE = {
+  general: { shortcuts: ['openShortcut', 'paletteShortcut'] },
+  appearance: { scheme: ['scheme', 'hermesThemeSync', 'overrides'], surface: ['translucent', 'glassStrength', 'borderEnabled'],
+    motion: ['reduceMotion', 'animationSpeed'], text: ['uiFont'], layoutEditor: ['sideButtons', 'islandSize'] },
+  notch: { notch: ['everyMonitor', 'notchMonitors', 'waitingPulse', 'hoverPeek', 'copyProgress', 'shelfEnabled', 'shelfMaxItems',
+    'shelfRemoveAfterDrag', 'notchColor', 'notchWidth', 'notchBorder', 'notchBorderColor', 'notchBorderOpacity', 'notchBorderWidth'] },
+  companion: { companion: ['companion', 'companionCharacter', 'companionReactive', 'companionMonitor'] },
+  apps: { apps: ['hardwareMonitor', 'arrangeApps'] },
+  terminal: { terminal: ['terminalCommand', 'terminalFontFamily', 'terminalFontSize', 'terminalScrollback', 'terminalCursorStyle', 'terminalCursorBlink'] },
+  advanced: { display: ['displayBackend', 'displayId'], position: ['offsetX', 'offsetY'], backup: ['exportSettings', 'importSettings'] },
+};
+test('phase 4: every card sits in its approved section with exactly its approved rows; nothing lost', () => {
+  for (const [section, cards] of Object.entries(PHASE4_TABLE)) for (const [cardId, ids] of Object.entries(cards)) {
+    const card = model.SETTINGS_CARDS.find(c => c.id === cardId);
+    assert.ok(card, `card ${cardId} exists`);
+    assert.equal(card.tab, section, `card ${cardId} is in ${section}`);
+    assert.deepEqual(card.rows.map(row => row.id), ids, `rows of ${cardId}`);
+  }
+  // Cards the table leaves out (General/Notifications/Apps feature cards) did not change section.
+  const listed = new Set(Object.values(PHASE4_TABLE).flatMap(cards => Object.keys(cards)));
+  for (const card of model.SETTINGS_CARDS.filter(c => !listed.has(c.id))) {
+    assert.ok(['general', 'notifications', 'apps'].includes(card.tab), `${card.id} stays in general/notifications/apps`);
+  }
+  const gameMode = model.SETTINGS_CARDS.filter(c => c.rows.some(r => r.id.startsWith('gameMode')));
+  assert.ok(gameMode.length && gameMode.every(c => c.tab === 'notifications'), 'game mode stays in Notifications');
+  // Same row count as before the move (counted from the Nov 16 baseline: no row added or removed).
+  assert.equal(allRows.length, new Set(allRows.map(r => r.id)).size);
+  for (const section of model.SETTINGS_SECTIONS) assert.ok(model.SETTINGS_CARDS.some(c => c.tab === section.id), `${section.id} is not empty`);
+});
+
+test('phase 4: duplicate hints are gone and repeated card titles are visually quiet', () => {
+  for (const id of ['companionCharacter', 'notchWidth', 'uiFont', 'terminalCursorStyle', 'weatherUnit']) {
+    assert.equal(model.rowSpec(id).hint, undefined, `${id} hint only repeated its label or control`);
+  }
+  // The removed hint words remain searchable.
+  for (const [q, id] of [['openrunde', 'uiFont'], ['underline', 'terminalCursorStyle'], ['celsius', 'weatherUnit']]) {
+    assert.ok(rowIds(model.searchRows(q, {})).includes(id), `${q} -> ${id}`);
+  }
+  const quiet = model.SETTINGS_CARDS.filter(model.titleRepeats).map(c => c.id).sort();
+  assert.deepEqual(quiet, ['apps', 'companion', 'notch', 'notifications', 'terminal']);
+  // A quiet header is lifted onto the page-title line, so it must be the section's first card.
+  for (const id of quiet) {
+    const card = model.cardSpec(id);
+    assert.equal(model.SETTINGS_CARDS.find(c => c.tab === card.tab).id, id, `${id} is the first card of its section`);
+  }
+  const css = src('ui/island/surface.css');
+  assert.match(css, /\.settings-card > header\[data-quiet\]\s*\{[^}]*position:\s*absolute[^}]*bottom:\s*calc\(100% \+ 16px\)/);
+});
+
+test('phase 4: rail names are visible labels (no tooltip gating) and the notch note renders once', () => {
+  const motion = src('ui/island/motion-system.css');
+  assert.doesNotMatch(motion, /settings-rail-name\s*\{[^}]*visibility:\s*hidden/);
+  const css = src('ui/island/surface.css');
+  const name = css.match(/\n\.settings-rail-name\s*\{([^}]+)\}/)?.[1] ?? '';
+  assert.doesNotMatch(name, /visibility:\s*hidden|position:\s*absolute/);
+  assert.match(name, /text-overflow:\s*ellipsis/);
+  const view = src('ui/views/SettingsView.tsx');
+  assert.doesNotMatch(view, /useRailTooltip|role="tooltip"/);
+  assert.match(view, /note=\{card\.id === 'notch'\}/);
+  assert.match(src('ui/island/NotchControls.tsx'), /\{note && <p className="muted">Taskbar notch only/);
 });
 
 class FixtureCustomEvent extends Event { constructor(name, init) { super(name); this.detail = init?.detail; } }
@@ -216,7 +285,7 @@ test('sidebar runtime: openSetting queues before navigation finishes and superse
 
 test('sidebar runtime: island section exposes offset controls with exact ranges and commits', async () => {
   await fixture(async h => {
-    h.render(); h.select('island');
+    h.render(); h.select('advanced');
     for (const [id, label, min, max] of [['offsetX', 'Horizontal offset', -400, 400], ['offsetY', 'Vertical offset', -200, 200]]) {
       const control = labeled(h.tree, label);
       assert.deepEqual([control.props.min, control.props.max], [min, max]);
@@ -252,7 +321,7 @@ test('sidebar runtime: hour, weather unit, UI font and cursor enums emit exact c
     for (const [section, label, key, choices] of [
       ['general', 'Time format', 'hourFormat', [['12 hour', 'h12'], ['24 hour', 'h24']]],
       ['apps', 'Temperature unit', 'weatherUnit', [['Fahrenheit', 'fahrenheit'], ['Celsius', 'celsius']]],
-      ['look', 'UI font', 'uiFont', [['System', 'system'], ['OpenRunde', 'openrunde']]],
+      ['appearance', 'UI font', 'uiFont', [['System', 'system'], ['OpenRunde', 'openrunde']]],
       ['terminal', 'Terminal cursor', 'terminalCursorStyle', [['Block', 'block'], ['Bar', 'bar'], ['Underline', 'underline']]],
     ]) {
       h.select(section); const group = nodes(h.tree).find(node => node.props?.role === 'group' && node.props['aria-label'] === label);

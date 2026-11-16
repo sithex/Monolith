@@ -184,7 +184,7 @@ test('Settings exposes working display backend controls only for desktop Linux a
       const d=driver({'ui/stores/index.ts':{useSettings:()=>settings,useAppearance:()=> 'green',usePalette:()=>({}),saveSettings:async p=>calls.push(p)},'ui/ipc/client.ts':{displayOutputs:async()=>[]}});
       try {globals({navigator:{userAgent:ua},document:{documentElement:{dataset:{displayBackend:running}}}},()=>{
         const View=d.load('ui/views/SettingsView.tsx').SettingsView;
-        let tree=d.render(View);labeled(tree,'Notch & companion').props.onClick();tree=d.render(View);const group=labeled(tree,'Display server');
+        let tree=d.render(View);labeled(tree,'Advanced').props.onClick();tree=d.render(View);const group=labeled(tree,'Display server');
         if(ua.includes('X11; Linux')) {
           assert.ok(group);const wayland=textButton(group,'Wayland'),x11=textButton(group,'X11');
           assert.equal(wayland.props['aria-pressed'],settings.displayBackend==='wayland');assert.equal(x11.props['aria-pressed'],settings.displayBackend==='x11');
@@ -330,7 +330,7 @@ test('Settings search shows matching results from every section, empty state, Es
     assert.match([nodes(tree).find(n=>n.props?.className==='settings-empty').props.children].flat().join(''),/No settings match/);
     let prevented=0;labeled(tree,'Search settings').props.onKeyDown({key:'Escape',preventDefault(){prevented++;},stopPropagation(){}});tree=d.render(View);
     assert.equal(prevented,1);assert.equal(labeled(tree,'Search settings').props.value,'');
-    labeled(tree,'Look').props.onClick();tree=d.render(View);
+    labeled(tree,'Appearance').props.onClick();tree=d.render(View);
     const motion=nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Motion');
     assert.ok(motion?.props.onReset,'Motion card has a Reset');
     await motion.props.onReset();

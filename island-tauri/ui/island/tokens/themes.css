@@ -26,27 +26,37 @@
   --ui-font: 'OpenRunde', 'Noto Sans', system-ui, sans-serif;
   --ui-mono: 'DejaVu Sans Mono', monospace;
   --ui-radius: 24px;
-  --ui-card-radius: 18px;
+  --ui-card-radius: var(--radius-3xl);
   --ui-tile-radius: 17px;
-  /* Type and corner scales: use these instead of raw px. */
-  --fs-2xs: 9px;
-  --fs-xs: 10px;
+  /* Design scale. Use these instead of raw px; tests/phase7b-design-tokens.test.mjs enforces it and
+     lists the measured exceptions (timer digits, notch clock, launcher tiles, lyrics, faders). */
   --fs-sm: 11px;
-  --fs-md: 12px;
   --fs-body: 13px;
   --fs-base: 14px;
   --fs-title: 15px;
   --fs-lg: 18px;
   --fs-xl: 22px;
   --fs-2xl: 28px;
-  --radius-xs: 4px;
+  --fw-regular: 400;
+  --fw-strong: 600;
   --radius-sm: 6px;
-  --radius-md: 8px;
   --radius-lg: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 14px;
   --radius-3xl: 16px;
   --radius-4xl: 20px;
+  --radius-full: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  /* Text roles. Secondary and hint derive from the tone ink (white on dark backgrounds, black on
+     light ones; light-tone.css flips it) at a fixed opacity, not from the scheme's comment colour:
+     64 % keeps hint text at 4.5:1 or better on page, card and selected-card fills in every
+     bundled scheme. --ui-dim stays for borders, the terminal and the notch. */
+  --ui-ink: #ffffff;
+  --ui-text-secondary: color-mix(in srgb, var(--ui-ink) 72%, transparent);
+  --ui-text-hint: color-mix(in srgb, var(--ui-ink) 64%, transparent);
+  --ui-danger: var(--ui-error);
   --ui-focus: var(--ui-accent);
 }
 [data-theme='neutral'] {

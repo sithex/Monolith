@@ -102,16 +102,26 @@ test('approval brightness follows the existing deadline, resets for replacement 
 });
 
 test('dropdown direction/origins and picker reveals use transform/opacity, never zero scale or animated height', () => {
-  const css = src('ui/island/motion-transient.css');
-  assert.match(css, /transient-dropdown-in[^}]*translateY\(-4px\) scale\(\.97\)/s);
-  assert.match(css, /transient-dropdown-up[^}]*translateY\(4px\) scale\(\.97\)/s);
-  assert.match(css, /data-up='true'\] \.dropdown-menu \{\s*transform-origin: center bottom/);
-  assert.match(css, /font-picker\[data-up='true'\] \.font-menu[\s\S]*?transform-origin: right bottom/);
+  const css = src('ui/island/motion-transient.css'), dd = src('ui/island/components/dropdown.css');
+  // The dropdown card moved to components/dropdown.css: from the trigger, 4 px, scale .96, never zero.
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /dropdown/);
+  assert.match(dd, /@keyframes dropdown-in-down \{ from \{ opacity: 0; transform: translateY\(-4px\) scale\(\.96\); \} to \{ opacity: 1; transform: none; \} \}/);
+  assert.match(dd, /@keyframes dropdown-in-up \{ from \{ opacity: 0; transform: translateY\(4px\) scale\(\.96\); \} to \{ opacity: 1; transform: none; \} \}/);
+  assert.match(dd, /@keyframes dropdown-out-down \{ from \{ opacity: 1; transform: none; \} to \{ opacity: 0; transform: translateY\(-4px\) scale\(\.96\); \} \}/);
+  assert.match(dd, /@keyframes dropdown-out-up \{ from \{ opacity: 1; transform: none; \} to \{ opacity: 0; transform: translateY\(4px\) scale\(\.96\); \} \}/);
+  assert.match(dd, /\.island \.dropdown-menu \{[^}]*transform-origin: center top;[^}]*animation: dropdown-in-down calc\(220ms \/ var\(--motion-speed, 1\)\) var\(--ease-out\) both;/);
+  assert.match(dd, /\.island \.dropdown\[data-up='true'\] \.dropdown-menu \{[^}]*transform-origin: center bottom; animation-name: dropdown-in-up;/);
+  assert.match(dd, /\.dropdown-menu\[data-state='closing'\] \{[^}]*animation: dropdown-out-down calc\(150ms \/ var\(--motion-speed, 1\)\)/);
+  assert.match(dd, /font-picker\[data-up='true'\] \.font-menu[^{]*\{ transform-origin: right bottom; \}/);
+  // Animate only transform/opacity: no keyframe touches height, width or filters.
+  for (const [, body] of dd.matchAll(/@keyframes [\w-]+ \{([^\n]*)\}/g))
+    assert.doesNotMatch(body, /height|width|filter|top|left/, body);
   assert.match(css, /\n\.island \.scheme-custom \{ transform-origin: left top/);
   const scheme = src('ui/island/SchemePicker.tsx');
   // Accordion rows push siblings, so height animates there (controller decision, Nov 9); never under reduced motion.
   assert.match(scheme, /const expand = keyboard \|\| reduced \? \{ duration: 0 \}/);
   assert.match(scheme, /key="custom"[^>]*exit="closed"[^>]*variants=\{variants\}/);
-  for (const file of ['SchemePicker.tsx', 'CommandPalette.tsx', 'ApprovalNotice.tsx', 'components/ColorField.tsx', 'components/AppPrimitives.tsx'])
+  for (const file of ['SchemePicker.tsx', 'CommandPalette.tsx', 'ApprovalNotice.tsx', 'components/ColorField.tsx', 'components/AppPrimitives.tsx', 'components/Dropdown.tsx'])
     assert.doesNotMatch(src(`ui/island/${file}`), /scale:\s*0(?:\s*[,}])/);
+  assert.doesNotMatch(dd.replace(/\/\*[\s\S]*?\*\//g, ''), /scale\(0[)\s,]/);
 });

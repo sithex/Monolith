@@ -32,15 +32,15 @@ css = "\n".join((root / path).read_text() for path in [
     "ui/island/surface.css", "ui/island/polish.css", "ui/island/command-palette.css",
     "ui/island/approval-notice.css", "ui/island/notifications/notification-cards.css",
     "ui/island/motion-transient.css", "ui/island/tokens/scheme-picker.css",
-    "ui/views/settings/settings-controls.css",
+    "ui/views/settings/settings-controls.css", "ui/island/components/dropdown.css",
 ])
 html = f"""<!doctype html><html data-nav-via="pointer"><style>{css}</style>
 <style>.island {{ position:relative; width:900px; height:850px; }}
 .dropdown {{ width:220px; margin:60px; }} .dropdown-menu {{ width:200px; height:100px; }}
 </style><body><div class="island">
-<div class="dropdown" id="down"><button>Trigger</button><div class="dropdown-menu"></div></div>
-<div class="dropdown" id="up" data-up="true"><button>Trigger</button><div class="dropdown-menu"></div></div>
-<div class="dropdown font-picker" id="font" data-up="true"><button>Font</button><div class="dropdown-menu font-menu"></div></div>
+<div class="dropdown" id="down"><button>Trigger</button><div class="dropdown-menu" data-state="open"></div></div>
+<div class="dropdown" id="up" data-up="true"><button>Trigger</button><div class="dropdown-menu" data-state="open"></div></div>
+<div class="dropdown font-picker" id="font" data-up="true"><button>Font</button><div class="dropdown-menu font-menu" data-state="open"></div></div>
 <div class="command-results"><button aria-selected="true" id="row">Command</button></div>
 <div class="approval-notice"><div class="approval-actions" id="choices" data-armed="false"><button class="approval-choice" id="choice">Once</button></div></div>
 <div class="notification-timer"><span id="timer" style="animation-duration:5s;--remaining:.8"></span></div>
@@ -106,9 +106,10 @@ assert result["osReduced"] == os_reduced, result
 for key, direction in [("down", -4), ("up", 4), ("font", 4)]:
     item = result[key]
     assert abs(item["y"] - (0 if os_reduced else direction)) < .01, item
-    assert abs(item["x"] - (1 if os_reduced else .97)) < .001, item
-    assert item["duration"] == ("0.12s" if os_reduced else "0.18s"), item
-    assert item["name"] == ("transient-fade-in" if os_reduced else "transient-dropdown-in" if key == "down" else "transient-dropdown-up"), item
+    assert abs(item["x"] - (1 if os_reduced else .96)) < .001, item
+    assert item["name"] == ("none" if os_reduced else "dropdown-in-down" if key == "down" else "dropdown-in-up"), item
+    if not os_reduced:
+        assert item["duration"] == "0.22s", item
     ox, oy = [float(v.removesuffix("px")) for v in item["origin"].split()]
     assert abs(oy - (0 if key == "down" else item["height"])) < 1, item
     if key == "font":
@@ -116,9 +117,9 @@ for key, direction in [("down", -4), ("up", 4), ("font", 4)]:
 assert float(result["dim"]) == .55 and float(result["armed"]) == 1, result
 assert all(float(v.strip().removesuffix("s")) == 0 for v in result["keyTransition"].split(",")), result
 assert result["keyAnimation"] == result["reducedKeyAnimation"] == "none", result
-assert result["reducedMenu"] == {"name": "transient-fade-in", "duration": "0.12s"}, result
+assert result["reducedMenu"]["name"] == "none", result
 assert result["timer"] == {"duration": "5s", "ease": "linear"}, result
 assert 0 < result["timerLater"] < result["timerStart"] < .8, result
 print(json.dumps(result, indent=2))
-print("PASS: directions, trigger origins, keyboard instantness, arm brightness, reduced fade and linear countdown")
+print("PASS: directions, trigger origins, keyboard instantness, arm brightness, instant reduced menus and linear countdown")
 runtime.cleanup()

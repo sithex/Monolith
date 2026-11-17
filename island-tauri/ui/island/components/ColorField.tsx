@@ -117,17 +117,33 @@ function dock(anchorY: number) {
   return { x: Math.max(MARGIN, island.right - PANEL_W - 12), y, side: 'inside' as const };
 }
 
-function useDrag(onMove: (fx: number, fy: number) => void, onEnd: () => void) {
+function useDrag(onMove: (fx: number, fy: number) => void, onEnd: () => void, scope: string) {
+  const cleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => { cleanup.current?.(); cleanup.current = null; }, [scope]);
   return (e: ReactPointerEvent<HTMLElement>) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || !e.isPrimary || cleanup.current) return;
     e.preventDefault();
-    const el = e.currentTarget; el.setPointerCapture(e.pointerId);
-    const at = (ev: { clientX: number; clientY: number }) => { const r = el.getBoundingClientRect();
-      onMove(Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (ev.clientY - r.top) / r.height))); };
+    const el = e.currentTarget, pointer = e.pointerId, rect = el.getBoundingClientRect();
+    el.focus(); el.setPointerCapture(pointer);
+    const at = (ev: { clientX: number; clientY: number }) => onMove(
+      Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width)),
+      Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height)));
+    const move = (ev: PointerEvent) => { if (ev.pointerId === pointer) at(ev); };
+    const clear = () => {
+      el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up); el.removeEventListener('lostpointercapture', up);
+      cleanup.current = null;
+      if (el.hasPointerCapture(pointer)) el.releasePointerCapture(pointer);
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointer) return;
+      if (ev.type === 'pointerup') at(ev);
+      clear(); onEnd();
+    };
+    cleanup.current = clear;
+    el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
     at(e);
-    const move = (ev: PointerEvent) => at(ev);
-    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); onEnd(); };
-    el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   };
 }
 
@@ -166,9 +182,11 @@ export function ColorPickerPanel() {
   }, [id]);
   const hex = hsvToHex(hsv);
   const commit = (value = hsvToHex(hsvRef.current)) => { colorPicker.get()?.onPick(value); setText(value); };
-  const pick = (value: string) => { setHsv(hexToHsv(value)); commit(value.toLowerCase()); };
-  const sv = useDrag((fx, fy) => setHsv(c => { const n = { ...c, s: fx, v: 1 - fy }; setText(hsvToHex(n)); return n; }), () => commit());
-  const hue = useDrag(fx => setHsv(c => { const n = { ...c, h: Math.min(359.9, fx * 360) }; setText(hsvToHex(n)); return n; }), () => commit());
+  const preview = (next: Hsv) => { hsvRef.current = next; setHsv(next); setText(hsvToHex(next)); };
+  const pick = (value: string) => { preview(hexToHsv(value)); commit(value.toLowerCase()); };
+  const dragScope = `${id}:${tab}`;
+  const sv = useDrag((fx, fy) => preview({ ...hsvRef.current, s: fx, v: 1 - fy }), () => commit(), dragScope);
+  const hue = useDrag(fx => preview({ ...hsvRef.current, h: Math.min(359.9, fx * 360) }), () => commit(), dragScope);
   const root = typeof document !== 'undefined' ? getComputedStyle(document.documentElement) : null;
   const presets = ['accent', 'text', 'background', 'surface', 'dim'].map(r => root?.getPropertyValue(`--skin-${r}`).trim() ?? '').filter(isHex)
     .concat(['#ffffff', '#000000', '#ffd60a', '#80ff36', '#30d5c8', '#5e9eff', '#bf5af2', '#ff453a']).map(c => c.toLowerCase()).filter((c, i, a) => a.indexOf(c) === i).slice(0, 12);
@@ -197,12 +215,25 @@ export function ColorPickerPanel() {
     </div>
     <div className="color-pop-body" role="tabpanel" id={`color-body-${tab}`} aria-labelledby={`color-tab-${tab}`}>
       {tab === 'Grid' && <ColorGrid hex={hex} onPick={pick} />}
-      {tab === 'Spectrum' && <>
-    <div className="color-pop-sv" style={{ background: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider"
-      aria-valuetext={hex}><i style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }} /></div>
-    <div className="color-pop-hue" onPointerDown={hue} role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={Math.round(hsv.h)}>
+      {tab === 'Spectrum' && <div className="color-pop-spectrum">
+    <div className="color-pop-sv" style={{ background: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider" tabIndex={0}
+      aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hsv.s * 100)}
+      aria-valuetext={`${Math.round(hsv.s * 100)}% saturation, ${Math.round(hsv.v * 100)}% brightness, ${hex}`}
+      onKeyDown={e => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+        e.preventDefault();
+        const delta = e.shiftKey ? .1 : .01;
+        preview({ ...hsvRef.current, s: Math.max(0, Math.min(1, hsv.s + (e.key === 'ArrowRight' ? delta : e.key === 'ArrowLeft' ? -delta : 0))),
+          v: Math.max(0, Math.min(1, hsv.v + (e.key === 'ArrowUp' ? delta : e.key === 'ArrowDown' ? -delta : 0))) }); commit();
+      }}><i style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }} /></div>
+    <div className="color-pop-hue" onPointerDown={hue} tabIndex={0} onKeyDown={e => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+      e.preventDefault();
+      const delta = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 1);
+      preview({ ...hsvRef.current, h: e.key === 'Home' ? 0 : e.key === 'End' ? 359.9 : (hsvRef.current.h + delta + 360) % 360 }); commit();
+    }} role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={Math.round(hsv.h)}>
       <i style={{ left: `${hsv.h / 3.6}%`, background: `hsl(${hsv.h} 100% 50%)` }} /></div>
-      </>}
+      </div>}
     </div>
     <div className="color-pop-presets">{presets.map(c => <button key={c} type="button" aria-label={`Use ${c}`} data-tooltip={c} style={{ background: c }} data-on={c.toLowerCase() === hex}
       onClick={() => { const n = hexToHsv(c); setHsv(n); commit(c.toLowerCase()); }} />)}</div>

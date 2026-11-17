@@ -153,8 +153,10 @@ test('phase 4: duplicate hints are gone and repeated card titles are visually qu
     const card = model.cardSpec(id);
     assert.equal(model.SETTINGS_CARDS.find(c => c.tab === card.tab).id, id, `${id} is the first card of its section`);
   }
+  // Reset moved to the page-title line (one per section); no card lifts a header out of itself any more.
   const css = src('ui/island/surface.css');
-  assert.match(css, /\.settings-card > header\[data-quiet\]\s*\{[^}]*position:\s*absolute[^}]*bottom:\s*calc\(100% \+ 16px\)/);
+  assert.doesNotMatch(css, /data-quiet/);
+  assert.match(css, /\n\.settings-section-head \{ display: flex; align-items: center;/);
 });
 
 test('phase 4: rail names are visible labels (no tooltip gating) and the notch note renders once', () => {

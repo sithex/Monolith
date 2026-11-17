@@ -209,11 +209,6 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .island .settings-rail > button:hover { background: var(--v-hover); color: var(--ui-text); }
 .settings-rail svg { width: 20px; height: 20px; flex: none; }
 .settings-rail-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); color: inherit; }
-/* A card heading that only repeats the page title keeps just its Reset link, right-aligned. */
-/* A quiet header holds only Reset: it sits on the page-title line above its card (14px column
-   gap + 2px to centre on the title), so the card starts with its first row instead of an empty header line. */
-.settings-card:has(> header[data-quiet]) { position: relative; }
-.settings-card > header[data-quiet] { position: absolute; right: 14px; bottom: calc(100% + 16px); margin: 0; justify-content: flex-end; }
 /* Column with the same 14px card gap as .app-stack had before the rail wrapped the cards. */
 /* Reaches into the page's 12px right padding so its scrollbar paints there, not on the cards;
    the cards' right edge lines up with the search field above. */
@@ -221,6 +216,12 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
   display: flex; flex-direction: column; gap: 14px; }
 .settings-content > * { flex-shrink: 0; }
 .settings-section-title { font-size: var(--fs-body); font-weight: 600; margin: 0; color: var(--ui-text); }
+/* Page-title line: the title, then the section's one quiet Reset. The button is taller than the
+   title, so its negative block margin keeps the line at the title's height and the first card in place. */
+.settings-section-head { display: flex; align-items: center; gap: var(--space-3); }
+.settings-section-head > .settings-section-title { flex: 1; min-width: 0; }
+.settings-section-reset { display: flex; align-items: center; gap: var(--space-2); margin-block: calc(var(--space-2) * -1); }
+.settings-section-reset small { font-size: var(--fs-sm); color: var(--ui-text-secondary); }
 .settings-panel > .settings-search { flex: none; }
 .settings-results { margin-bottom: 16px; }
 .settings-results h3 { color: var(--ui-accent); font-size: var(--fs-body); margin: 0 0 8px; }

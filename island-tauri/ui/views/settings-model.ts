@@ -161,8 +161,8 @@ const refinements: Record<string, Partial<RowSpec>> = {
 const rows = (...ids: string[]): RowSpec[] => ids.map(id => {
   const original = catalogue.get(id);
   if (!original) throw new Error(`Unknown settings row ${id}`);
-  // Keep dependent controls reachable even while their feature is off. Editing them
-  // changes the saved preference, never implicitly enables the parent feature.
+  // Dependent rows stay on the page while their feature is off, so search and jump links
+  // always land on them. SETTINGS_GROUPS decides which of them dim under a parent switch.
   const { when: _when, ...row } = original;
   return { ...row, ...refinements[id] };
 });
@@ -244,6 +244,60 @@ export function resetPatch(cardId: string, defaults: Settings): SettingsPatch {
   const patch: Record<string, unknown> = {};
   for (const key of cardKeys(cardId)) patch[key] = defaults[key];
   return patch as SettingsPatch;
+}
+
+/** Cards a section's Reset covers: all of its cards except those whose own controls own their state. */
+export const sectionResetCards = (tab: Tab) => SETTINGS_CARDS.filter(card => card.tab === tab && card.reset !== false);
+/** Every setting key "Reset section" restores: exactly what its cards' own Resets restored. */
+export function sectionKeys(tab: Tab): SettingKey[] {
+  return [...new Set(sectionResetCards(tab).flatMap(card => cardKeys(card.id)))];
+}
+/** The patch that resets one section to the Rust defaults (`settings_defaults`). */
+export function sectionResetPatch(tab: Tab, defaults: Settings): SettingsPatch {
+  return Object.assign({}, ...sectionResetCards(tab).map(card => resetPatch(card.id, defaults))) as SettingsPatch;
+}
+/** Whether "Reset section" also returns the colour scheme to the default. */
+export const sectionResetsAppearance = (tab: Tab) => sectionResetCards(tab).some(card => card.resetsAppearance === true);
+
+// ── Group rows ───────────────────────────────────────────────────────────────────────────
+/**
+ * Parent switch rows with the rows that depend on them. While `enabled` is false the children
+ * stay on the page, dimmed and out of Tab and pointer reach; their stored values are untouched.
+ * A group's rows are consecutive in one card: parents first, then children.
+ */
+export type GroupSpec = {
+  id: string; label: string; parents: readonly string[]; children: readonly string[];
+  enabled(settings: Partial<Settings>): boolean;
+};
+const yes = (key: SettingKey) => (s: Partial<Settings>) => s[key] === true;
+export const SETTINGS_GROUPS: readonly GroupSpec[] = [
+  { id: 'shelf', label: 'Drop shelf', parents: ['shelfEnabled'], children: ['shelfMaxItems', 'shelfRemoveAfterDrag'], enabled: on('shelfEnabled') },
+  { id: 'notchBorder', label: 'Notch border', parents: ['notchBorder'], children: ['notchBorderColor', 'notchBorderOpacity', 'notchBorderWidth'], enabled: on('notchBorderEnabled') },
+  // Game mode runs when either switch is on, so its options only go quiet while both are off.
+  { id: 'gameMode', label: 'Game mode', parents: ['gameModeAuto', 'gameMode'], children: ['gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers'],
+    enabled: s => s.gameModeAuto === true || s.gameMode === true },
+  { id: 'clipboard', label: 'Clipboard history', parents: ['clipboardHistory'], children: ['clipboardHistorySize', 'clipboardPersist', 'clipboardDenyPatterns'], enabled: yes('clipboardHistory') },
+  { id: 'battery', label: 'Battery alerts', parents: ['batteryAlerts'], children: ['batteryLowPercent', 'batteryCriticalPercent'], enabled: yes('batteryAlerts') },
+];
+export const groupSpec = (id: string): GroupSpec => {
+  const group = SETTINGS_GROUPS.find(g => g.id === id);
+  if (!group) throw new Error(`Unknown settings group ${id}`);
+  return group;
+};
+/** The group whose switched-off parent currently dims this row, or null. */
+export function dimmedBy(rowId: string, settings: Partial<Settings>): GroupSpec | null {
+  const group = SETTINGS_GROUPS.find(g => g.children.includes(rowId));
+  return group && !group.enabled(settings) ? group : null;
+}
+export type RowSegment = { row: RowSpec } | { group: GroupSpec; parents: RowSpec[]; children: RowSpec[] };
+/** A card's rows in page order, each group gathered at its first parent row. */
+export function cardSegments(card: CardSpec): RowSegment[] {
+  const pick = (ids: readonly string[]) => ids.flatMap(id => card.rows.filter(row => row.id === id));
+  return card.rows.flatMap((row): RowSegment[] => {
+    const group = SETTINGS_GROUPS.find(g => g.parents.includes(row.id) || g.children.includes(row.id));
+    if (!group) return [{ row }];
+    return row.id === group.parents[0] ? [{ group, parents: pick(group.parents), children: pick(group.children) }] : [];
+  });
 }
 
 const visible = (row: RowSpec, settings: Partial<Settings>) => row.when ? row.when(settings) : true;

@@ -164,6 +164,43 @@ export function initialOpenFamily(value: Appearance, families: readonly Family[]
   const f = families.find(f => f.schemes.some(s => s.id === value));
   return f && f.schemes.length > 1 ? f.id : null;
 }
+/** A scheme's full name on its own tile: variants carry their family ("Gruvbox Dark"); Monolith presets do not. */
+export function schemeLabel(scheme: Scheme, families: readonly Family[] = schemeFamilies()): string {
+  const family = families.find(f => f.id === scheme.family);
+  if (!family || family.schemes.length < 2 || family.group !== 'community') return scheme.name;
+  return family.name.endsWith(scheme.name) ? family.name : `${family.name} ${scheme.name}`;
+}
+/** Swatch grids in page order: the built-in schemes, then the community themes under their label. */
+export function schemeGrids(families: readonly Family[] = schemeFamilies()): { id: Family['group']; schemes: Scheme[] }[] {
+  return (['monolith', 'community'] as const).map(id => ({ id, schemes: families.filter(f => f.group === id).flatMap(f => f.schemes) })).filter(g => g.schemes.length > 0);
+}
+/**
+ * Roving focus over the swatch grids: Left/Right step through every swatch, Up/Down keep the
+ * column and cross from one grid to the next, Home/End jump to the ends. `sizes` is the swatch
+ * count of each grid, `index` the focused swatch counted across all of them (-1: none).
+ */
+export function gridTarget(key: string, index: number, sizes: readonly number[], columns: number): number | null {
+  const count = sizes.reduce((a, b) => a + b, 0), cols = Math.max(1, columns);
+  if (count === 0) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) return null;
+  if (index < 0) return 0;
+  if (key === 'ArrowRight') return Math.min(count - 1, index + 1);
+  if (key === 'ArrowLeft') return Math.max(0, index - 1);
+  let grid = 0, start = 0;
+  while (index >= start + sizes[grid]!) start += sizes[grid++]!;
+  const size = sizes[grid]!, offset = index - start, column = offset % cols;
+  if (key === 'ArrowDown') {
+    if (offset + cols < size) return index + cols;
+    if (Math.floor(offset / cols) < Math.floor((size - 1) / cols)) return start + size - 1;
+    return grid + 1 < sizes.length ? start + size + Math.min(column, sizes[grid + 1]! - 1) : index;
+  }
+  if (offset - cols >= 0) return index - cols;
+  if (grid === 0) return index;
+  const previous = sizes[grid - 1]!, lastRow = Math.floor((previous - 1) / cols) * cols;
+  return start - previous + Math.min(previous - 1, lastRow + column);
+}
 /** True when a palette's background is light: the island then swaps its white overlays for ink ones (tokens/light-tone.css). */
 export const isLightPalette = (roles: Pick<SchemeRoles, 'background'>) => HEX.test(roles.background) && luma(roles.background) > .55;
 

@@ -10,7 +10,7 @@ import { DraftRange } from '../island/components/AppPrimitives';
 import { NumberStepper } from '../island/components/NumberStepper';
 import { TerminalCommandSettings } from '../island/TerminalCommandSettings';
 import { SCHEMES } from '../island/tokens/schemes';
-import { DEFAULT_APPEARANCE, SETTINGS_CARDS, SETTINGS_SECTIONS, SECTION_STORAGE_KEY, cardSpec, exportSettings, normalize, parseImport, resetPatch, searchRows, savedSection, settingLocation, titleRepeats, type RowSpec, type Tab } from './settings-model';
+import { DEFAULT_APPEARANCE, SETTINGS_CARDS, SETTINGS_SECTIONS, SECTION_STORAGE_KEY, cardSegments, cardSpec, exportSettings, normalize, parseImport, searchRows, savedSection, sectionKeys, sectionResetPatch, sectionResetsAppearance, settingLocation, titleRepeats, type RowSpec, type Tab } from './settings-model';
 import { commands, type FontFamily } from '../ipc/bindings';
 import { dispatch } from '../ipc/island-state';
 import { useNotifications } from '../ipc/notifications';
@@ -22,6 +22,7 @@ import { rulesSummary } from './settings/app-rules';
 import { ClipboardPatterns, DisplayChoice, WeatherLocation } from './settings/WidgetControls';
 import { takePendingSettingJump } from './settings/SettingsLink';
 import { SectionIcon } from './settings/SectionIcon';
+import { settingsGroup } from './settings/SettingsGroup';
 import { useConfirmationGuard } from './settings/use-confirmation-guard';
 
 const message = (e: unknown) => e instanceof Error ? e.message : String(e);
@@ -31,17 +32,15 @@ function Row({ id, label, hint, children }: { id: string; label: string; hint?: 
 export function Card({ title, children }: { title?: string; children: ReactNode }) {
   return <section className="settings-card">{title && <h3>{title}</h3>}{children}</section>;
 }
-/** Inline two-tap reset, never a modal. `quiet`: the title only repeats the page title or the
- * card's one label, so it is kept for screen readers and the Reset link stands alone. */
-export function ResetHeader({ title, onReset, quiet = false }: { title: string; onReset?(): Promise<void>; quiet?: boolean }) {
+/** One quiet "Reset section" on the page-title line. Inline two-tap confirm, never a modal. */
+export function SectionReset({ name, onReset }: { name: string; onReset(): Promise<void> }) {
   const confirmation = useConfirmationGuard<boolean>(), [busy, setBusy] = useState(false);
-  if (quiet && !onReset) return null;
-  return <header onPointerLeave={confirmation.disarm} data-quiet={quiet || undefined}><h3 className={quiet ? 'sr-only' : undefined}>{title}</h3>
-    {onReset && (confirmation.pending
-      ? <><small>Reset?</small><button type="button" className="link confirmation-action" data-armed="true" data-arming={!confirmation.ready} aria-label={`Confirm reset ${title}`} disabled={busy || !confirmation.ready}
+  return <div className="settings-section-reset" onPointerLeave={confirmation.disarm}>
+    {confirmation.pending
+      ? <><small>{`Reset all ${name} settings?`}</small><button type="button" data-variant="quiet" className="confirmation-action" data-armed="true" data-arming={!confirmation.ready} aria-label={`Confirm reset ${name}`} disabled={busy || !confirmation.ready}
           onClick={() => { if (!confirmation.accept()) return; setBusy(true); void onReset().finally(() => setBusy(false)); }}>Confirm</button></>
-      : <button type="button" className="link" aria-label={`Reset ${title}`} disabled={busy} onClick={() => confirmation.arm(true)}>Reset</button>)}
-  </header>;
+      : <button type="button" data-variant="quiet" aria-label={`Reset ${name} section`} disabled={busy} onClick={() => confirmation.arm(true)}>Reset section</button>}
+  </div>;
 }
 function DeniedApps({ value, onSave }: { value: string; onSave(apps: string[]): void }) {
   const [open, setOpen] = useState(false), [draft, setDraft] = useState(value);
@@ -138,7 +137,7 @@ export function SettingsView() {
     // Stable IDs, not labels: repeated words and custom notch rows are unambiguous.
     const container = document.querySelector<HTMLElement>(`.settings-panel [data-setting-id="${jumpTarget}"]`);
     container?.scrollIntoView({ block: 'center', behavior: settings.reduceMotion || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
-    const control = container?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled), textarea, select') ?? container;
+    const control = container?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled), textarea:not(:disabled), select:not(:disabled)') ?? container;
     control?.focus({ preventScroll: true }); setHighlight(jumpTarget); setJumpTarget(null);
   }, [jumpTarget, tab, settings.reduceMotion]);
   useEffect(() => {
@@ -165,14 +164,17 @@ export function SettingsView() {
   }, [wantFonts, fonts]);
   const seenApps = [...notifications.map(n => n.appName), ...(settings.notificationDeniedApps ?? [])];
   const appRules = settings.notificationAppRules ?? [];
-  const reset = (cardId: string) => async () => {
+  // Reset section: every card of the open section that has resettable keys, in one patch.
+  const resetSection = async () => {
     setError('');
     try {
-      const defaults = await settingsDefaults(); await saveSettings(resetPatch(cardId, defaults));
-      if (cardSpec(cardId).resetsAppearance && appearance !== DEFAULT_APPEARANCE) await saveAppearance(DEFAULT_APPEARANCE);
+      const defaults = await settingsDefaults(); await saveSettings(sectionResetPatch(tab, defaults));
+      if (sectionResetsAppearance(tab) && appearance !== DEFAULT_APPEARANCE) await saveAppearance(DEFAULT_APPEARANCE);
     } catch (e) { setError(message(e)); }
   };
-  const header = (cardId: string) => { const card = cardSpec(cardId); return <ResetHeader title={card.title} quiet={titleRepeats(card)} onReset={card.reset === false ? undefined : reset(cardId)} />; };
+  // A heading that only repeats the page title stays as the card's accessible name.
+  const header = (cardId: string) => { const card = cardSpec(cardId); return titleRepeats(card) ? <h3 className="sr-only">{card.title}</h3> : <header><h3>{card.title}</h3></header>; };
+  const sectionName = SETTINGS_SECTIONS.find(section => section.id === tab)!.name;
   const isLinux = typeof navigator !== 'undefined' && /Linux/i.test(navigator.userAgent) && !/Android/i.test(navigator.userAgent);
   const runningBackend = document.documentElement.dataset.displayBackend === 'wayland' ? 'wayland' : 'x11';
   const segmented = (key: 'hourFormat' | 'weatherUnit' | 'terminalCursorStyle' | 'uiFont' | 'displayBackend', label: string, options: [string, string][]) =>
@@ -237,12 +239,16 @@ export function SettingsView() {
               <span>{row.label}</span>{row.hint && <small>{row.hint}</small>}</button>)}</div>)}
           </section>; })}
         </> : <>
-          <h2 className="settings-section-title">{SETTINGS_SECTIONS.find(section => section.id === tab)!.name}</h2>
+          <header className="settings-section-head">
+            <h2 className="settings-section-title">{sectionName}</h2>
+            {sectionKeys(tab).length > 0 && <SectionReset key={tab} name={sectionName} onReset={resetSection} />}
+          </header>
           {SETTINGS_CARDS.filter(card => card.tab === tab).map(card => {
             if (card.id === 'notch' || card.id === 'companion') return <NotchControls key={card.id} settings={settings} background={settings.background || palette.surface} accent={settings.accent || palette.accent} patch={patch}
               outputs={outputs} show={id => card.rows.some(row => row.id === id)} note={card.id === 'notch'} label={card.title} header={header(card.id)} />;
             if (card.id === 'layoutEditor') return <LayoutEditor key={card.id} />;
-            return <section key={card.id} className="settings-card" aria-label={card.title}>{header(card.id)}{card.id === 'backup' ? <Backup settings={settings} appearance={appearance} /> : card.rows.map(renderRow)}</section>;
+            return <section key={card.id} className="settings-card" aria-label={card.title}>{header(card.id)}{card.id === 'backup' ? <Backup settings={settings} appearance={appearance} /> : cardSegments(card).map(segment => 'row' in segment ? renderRow(segment.row)
+              : settingsGroup(segment.group, segment.group.enabled(settings), segment.parents.map(renderRow), segment.children.map(renderRow)))}</section>;
           })}
         </>}
       </div>

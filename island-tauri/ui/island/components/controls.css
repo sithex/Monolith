@@ -22,7 +22,7 @@ button:disabled { opacity: .4; cursor: default; }
 .island button:active:not(:disabled) { transform: scale(.97); transition-duration: var(--dur-fast), var(--dur-press), var(--dur-fast); }
 .island button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
 .island button:disabled { opacity: .4; cursor: default; }
-.island .settings-card > header button.link, .island button.lyrics-off { font-size: var(--fs-sm); }
+.island button.lyrics-off { font-size: var(--fs-sm); }
 .island button.lyrics-off { background: transparent; color: var(--ui-text-secondary); }
 /* Media transport keeps its round glyph buttons: a solid play/pause disc between two bare skip glyphs. */
 .island .now-playing .transport button { border-radius: var(--radius-full); background: transparent; color: var(--ui-text); }

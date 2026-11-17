@@ -18,8 +18,7 @@
   from { opacity: 0; transform: translateY(4px) scale(.97); }
   to { opacity: 1; transform: none; }
 }
-.island .scheme-variants, .island .scheme-custom { transform-origin: left top; }
-.island .scheme-chevron { transition: transform var(--dur-base) var(--ease-out); }
+.island .scheme-custom { transform-origin: left top; }
 .notch-notifications > div { transform-origin: center top; }
 
 .island .approval-choice:not(:disabled) { opacity: .55; transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out); }
@@ -27,15 +26,12 @@
 
 /* Arrow navigation must never trail the input, even on a fine pointer device. */
 html[data-nav-via='key'] .island .dropdown-menu { animation: none; }
-html[data-nav-via='key'] .island .scheme-chevron { transition: none; }
 @keyframes transient-fade-in { from { opacity: 0; } to { opacity: 1; } }
 html[data-reduce-motion='true'] .island .dropdown .dropdown-menu {
   animation: transient-fade-in min(120ms, var(--dur-press)) var(--ease-out);
   animation-duration: min(120ms, var(--dur-press)) !important;
 }
-html[data-reduce-motion='true'] .island .scheme-chevron { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   :root .island .dropdown .dropdown-menu { animation: transient-fade-in min(120ms, var(--dur-press)) var(--ease-out); }
-  .island .scheme-chevron { transition: none; }
 }
 html[data-nav-via='key'] .island .dropdown .dropdown-menu { animation-name: none; }

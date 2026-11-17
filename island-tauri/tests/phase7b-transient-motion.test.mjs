@@ -107,7 +107,7 @@ test('dropdown direction/origins and picker reveals use transform/opacity, never
   assert.match(css, /transient-dropdown-up[^}]*translateY\(4px\) scale\(\.97\)/s);
   assert.match(css, /data-up='true'\] \.dropdown-menu \{\s*transform-origin: center bottom/);
   assert.match(css, /font-picker\[data-up='true'\] \.font-menu[\s\S]*?transform-origin: right bottom/);
-  assert.match(css, /scheme-variants, \.island \.scheme-custom \{ transform-origin: left top/);
+  assert.match(css, /\n\.island \.scheme-custom \{ transform-origin: left top/);
   const scheme = src('ui/island/SchemePicker.tsx');
   // Accordion rows push siblings, so height animates there (controller decision, Nov 9); never under reduced motion.
   assert.match(scheme, /const expand = keyboard \|\| reduced \? \{ duration: 0 \}/);

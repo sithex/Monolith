@@ -155,14 +155,3 @@ test('picker keyboard model: arrows, Home and End move through the visible rows'
   assert.equal(navTarget('Home', 3, 5), 0); assert.equal(navTarget('End', 1, 5), 4);
   assert.equal(navTarget('a', 1, 5), null); assert.equal(navTarget('ArrowDown', 0, 0), null);
 });
-
-test('picker markup: disclosure semantics, one open family, reduced motion', () => {
-  const picker = src('ui/island/SchemePicker.tsx');
-  assert.match(picker, /aria-expanded=\{isOpen\}/);
-  assert.match(picker, /aria-controls=/);
-  assert.match(picker, /setOpen\(isOpen \? null : f\.id\)/, 'a single `open` id: opening one family closes the other');
-  assert.match(picker, /ArrowRight/); assert.match(picker, /ArrowLeft/);
-  assert.match(picker, /reduceMotion === true/); assert.match(picker, /duration: 0/);
-  assert.match(picker, /<button type="button"/, 'real buttons: Enter and Space toggle natively');
-  assert.match(src('ui/island/tokens/scheme-picker.css'), /data-reduce-motion='true'\] \.scheme-chevron/);
-});

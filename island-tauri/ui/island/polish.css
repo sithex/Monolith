@@ -2,22 +2,11 @@
    Loaded after island.css (which pulls in the workshop + surface layers) so it wins. */
 
 /* ---- Colour scheme list (concept.png) ---------------------------------- */
-.scheme-list { display: flex; flex-direction: column; gap: 2px; padding: var(--space-1) 0 var(--space-2); }
-.scheme-row { position: relative; display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 10px; height: 44px; padding: 0 var(--space-3);
-  border-radius: var(--radius-lg); text-align: left; background: transparent; color: var(--ui-text); isolation: isolate; }
-.island .scheme-row:hover:not(:disabled) { background: rgb(255 255 255 / .045); }
-.island .scheme-row:active:not(:disabled) { transform: scale(.985); }
-.scheme-selected { position: absolute; inset: 0; z-index: -1; border-radius: var(--radius-lg); background: rgb(255 255 255 / .085); box-shadow: inset 0 0 0 .75px rgb(255 255 255 / .14); }
 .scheme-dots { display: flex; align-items: center; }
 .scheme-dots i { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 2px var(--ui-background), 0 1px 3px rgb(0 0 0 / .5); }
 .scheme-dots i + i { margin-left: -4px; }
-.scheme-name { font-size: var(--fs-base); font-weight: 600; }
-.scheme-row[aria-checked='true'] .scheme-name { font-weight: 600; color: var(--ui-accent); }
-.scheme-note { font: var(--fs-sm) var(--ui-mono); color: var(--ui-text-secondary); letter-spacing: .2px; white-space: nowrap; }
-.scheme-item { display: flex; flex-direction: column; }
-.scheme-item > .scheme-row { width: 100%; }
-/* Custom scheme seeds: three swatches under the selected Custom row. */
-.scheme-custom { display: flex; align-items: center; gap: 14px; padding: 8px 12px 6px 74px; overflow: hidden; }
+/* Custom scheme seeds: three swatches under the swatch grid while Custom is selected. */
+.scheme-custom { display: flex; align-items: center; gap: 14px; padding: var(--space-2) var(--space-1) var(--space-1); overflow: hidden; }
 .scheme-seed { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-body); color: var(--ui-text); cursor: pointer; }
 .scheme-seed input[type='color'] { width: 30px; height: 24px; padding: 2px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); background: transparent; cursor: pointer; }
 .scheme-seed code { font: var(--fs-sm) var(--ui-mono); color: var(--ui-text-secondary); }
@@ -209,7 +198,7 @@ html[data-theme='album'][data-reduce-motion='true'] { transition-duration: 0s; }
 .settings-checklist label[data-connected='false'] { color: var(--ui-text-secondary); }
 .settings-import { padding: 0 0 var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .settings-import textarea { width: 100%; box-sizing: border-box; resize: vertical; background: rgb(0 0 0 / .25); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); padding: 8px 10px; font: var(--fs-sm)/1.4 var(--ui-mono); }
-.scheme-row[data-testid='appearance-album'] .scheme-dots i { transition: background-color var(--album-fade, 600ms) ease; }
+.scheme-swatch[data-testid='appearance-album'] .scheme-dots i { transition: background-color var(--album-fade, 600ms) ease; }
 
 
 /* ---- Staggered entry (Nov 15) -------------------------------------------- */

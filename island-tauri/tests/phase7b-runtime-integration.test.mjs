@@ -331,26 +331,27 @@ test('Settings search shows matching results from every section, empty state, Es
     let prevented=0;labeled(tree,'Search settings').props.onKeyDown({key:'Escape',preventDefault(){prevented++;},stopPropagation(){}});tree=d.render(View);
     assert.equal(prevented,1);assert.equal(labeled(tree,'Search settings').props.value,'');
     labeled(tree,'Appearance').props.onClick();tree=d.render(View);
-    const motion=nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Motion');
-    assert.ok(motion?.props.onReset,'Motion card has a Reset');
-    await motion.props.onReset();
-    assert.deepEqual(saved,[{reduceMotion:false,animationSpeed:100}]);
-    tree=d.render(View);
-    await nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Colour scheme').props.onReset();
-    assert.deepEqual(saved[1],{customAccent:'',customBackground:'',customText:'',hermesThemeSync:false,accent:'',background:'',borderColor:''});
-    assert.deepEqual(appearances,['skin'],'scheme reset returns to the default scheme');
-    assert.equal(nodes(tree).find(n=>n.type?.name==='ResetHeader'&&n.props.title==='Backup'),undefined);
+    // One Reset per section: Appearance resets its Colour scheme, Surface, Motion and UI font cards together.
+    assert.equal(nodes(tree).some(n=>n.type?.name==='ResetHeader'||(n.type==='button'&&n.props.children==='Reset'&&n.props.className==='link')),false,'no per-card Reset is left');
+    const section=nodes(tree).filter(n=>n.type?.name==='SectionReset');
+    assert.equal(section.length,1);assert.equal(section[0].props.name,'Appearance');
+    await section[0].props.onReset();
+    assert.deepEqual(saved,[{customAccent:'',customBackground:'',customText:'',hermesThemeSync:false,accent:'',background:'',borderColor:'',translucent:undefined,glassStrength:undefined,borderEnabled:undefined,reduceMotion:false,animationSpeed:100,uiFont:undefined}]);
+    assert.deepEqual(appearances,['skin'],'the section holding the scheme returns to the default scheme');
+    labeled(tree,'General').props.onClick();tree=d.render(View);await component(tree,'SectionReset').props.onReset();
+    assert.deepEqual(appearances,['skin'],'a section without the scheme card leaves the scheme alone');
+    assert.ok(!('customAccent' in saved[1])&&'swipeNavigation' in saved[1]&&!('terminalCommand' in saved[1]),'General resets only its own keys');
   })();}finally{d.dispose();for(const [k,v] of Object.entries(before))if(v)Object.defineProperty(globalThis,k,v);else delete globalThis[k];}
 });
-test('ResetHeader asks inline and waits for the safety arm window before resetting',async t=>{
+test('SectionReset asks inline and waits for the safety arm window before resetting',async t=>{
   const d=driver(),calls=[];let now=100;
   t.mock.method(performance,'now',()=>now);
   t.mock.timers.enable({apis:['setTimeout']});
-  const H=d.load('ui/views/SettingsView.tsx').ResetHeader,props={title:'Motion',onReset:async()=>calls.push('reset')};
+  const H=d.load('ui/views/SettingsView.tsx').SectionReset,props={name:'Motion',onReset:async()=>calls.push('reset')};
   try {
     let tree=d.render(H,props);
-    labeled(tree,'Reset Motion').props.onClick();assert.deepEqual(calls,[],'first tap only arms');
-    tree=d.render(H,props);assert.ok(nodes(tree).some(n=>n.type==='small'&&n.props.children==='Reset?'));
+    labeled(tree,'Reset Motion section').props.onClick();assert.deepEqual(calls,[],'first tap only arms');
+    tree=d.render(H,props);assert.ok(nodes(tree).some(n=>n.type==='small'&&n.props.children==='Reset all Motion settings?'));
     const early=labeled(tree,'Confirm reset Motion');assert.equal(early.props.disabled,true);
     early.props.onClick();assert.deepEqual(calls,[],'double-click cannot reset');
     now+=600;t.mock.timers.tick(600);tree=d.render(H,props);

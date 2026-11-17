@@ -4,7 +4,8 @@ import { DraftRange, Dropdown } from './components/AppPrimitives';
 import { NumberStepper } from './components/NumberStepper';
 import { ColorSwatch } from './components/ColorField';
 import { CompanionPicker } from './companionCharacters';
-import { monitorChoices, rowSpec, toggleMonitor } from '../views/settings-model';
+import { groupSpec, monitorChoices, rowSpec, toggleMonitor } from '../views/settings-model';
+import { settingsGroup } from '../views/settings/SettingsGroup';
 
 /** Hook-free shared notch/companion controls; every preference has a stable jump target. */
 export function NotchControls({ settings, background, accent, patch, outputs = null, show = () => true, header, note = true, label = 'Notch appearance' }: {
@@ -25,10 +26,15 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
   </div>);
   const flag = (id: string, key: 'notchWaitingPulse' | 'notchHoverPeek' | 'notchCopyProgress' | 'shelfEnabled' | 'shelfRemoveAfterDrag' | 'companionReactive' | 'showNotchOnEveryMonitor' | 'companionEnabled' | 'notchBorderEnabled') => row(id,
     <input type="checkbox" className="switch" aria-label={id === 'companion' ? 'Notch companion' : rowSpec(id).label} checked={key === 'showNotchOnEveryMonitor' ? settings[key] === true : settings[key] !== false} onChange={e => patch({ [key]: e.target.checked })} />);
+  // Group row: the parent switch with its dependent rows indented under it (dimmed while off).
+  const group = (id: string, parents: ReactNode[], children: ReactNode[]) => {
+    const spec = groupSpec(id);
+    return [...parents, ...children].some(Boolean) && settingsGroup(spec, spec.enabled(settings), parents, children);
+  };
   const saved = settings.notchMonitors ?? [], known = outputs ?? [], choices = monitorChoices(saved, known);
   const companionOptions = [{ value: '', label: 'Every notch' }, ...[...new Set([...known, ...(settings.companionMonitor ? [settings.companionMonitor] : [])])].map(name => ({ value: name, label: name }))];
   return <section className="settings-card" aria-label={label}>{header ?? <h3>Notch</h3>}
-    {note && <p className="muted">Taskbar notch only. The open island keeps its own appearance. Preferences can be edited while a feature is off.</p>}
+    {note && <p className="muted">Taskbar notch only. The open island keeps its own appearance.</p>}
     {flag('everyMonitor', 'showNotchOnEveryMonitor')}
     {row('notchMonitors', <div className="settings-checklist" role="group" aria-label="Notch monitors">
       {choices.length ? choices.map(c => <label key={c.name} data-connected={c.connected} title={c.connected ? undefined : 'Not connected now'}>
@@ -38,15 +44,15 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
     {flag('waitingPulse', 'notchWaitingPulse')}
     {flag('hoverPeek', 'notchHoverPeek')}
     {flag('copyProgress', 'notchCopyProgress')}
-    {flag('shelfEnabled', 'shelfEnabled')}
-    {row('shelfMaxItems', <NumberStepper aria-label="Shelf size" min={1} max={50} step={1} value={settings.shelfMaxItems ?? 12} onCommit={(value, final) => { if (final) patch({ shelfMaxItems: value }); }} />)}
-    {flag('shelfRemoveAfterDrag', 'shelfRemoveAfterDrag')}
+    {group('shelf', [flag('shelfEnabled', 'shelfEnabled')], [
+      row('shelfMaxItems', <NumberStepper aria-label="Shelf size" min={1} max={50} step={1} value={settings.shelfMaxItems ?? 12} onCommit={(value, final) => { if (final) patch({ shelfMaxItems: value }); }} />),
+      flag('shelfRemoveAfterDrag', 'shelfRemoveAfterDrag')])}
     {color('notchColor', 'panelClockColor', background)}
     {row('notchWidth', <><DraftRange aria-label="Notch width" min={110} max={320} step={2} value={settings.notchWidth ?? 144} onCommit={(value, final) => { if (final) patch({ notchWidth: value }); }} /><output>{settings.notchWidth ?? 144}px</output></>)}
-    {flag('notchBorder', 'notchBorderEnabled')}
-    {color('notchBorderColor', 'notchBorderColor', accent)}
-    {row('notchBorderOpacity', <><DraftRange aria-label="Notch border opacity" min={0} max={100} step={1} value={Math.round((settings.notchBorderOpacity ?? .1) * 100)} onCommit={value => patch({ notchBorderOpacity: value / 100 })} /><output>{Math.round((settings.notchBorderOpacity ?? .1) * 100)}%</output></>)}
-    {row('notchBorderWidth', <><DraftRange aria-label="Notch border thickness" min={0} max={4} step={.1} value={settings.notchBorderWidth ?? .8} onCommit={value => patch({ notchBorderWidth: value })} /><output>{settings.notchBorderWidth ?? .8}px</output></>)}
+    {group('notchBorder', [flag('notchBorder', 'notchBorderEnabled')], [
+      color('notchBorderColor', 'notchBorderColor', accent),
+      row('notchBorderOpacity', <><DraftRange aria-label="Notch border opacity" min={0} max={100} step={1} value={Math.round((settings.notchBorderOpacity ?? .1) * 100)} onCommit={value => patch({ notchBorderOpacity: value / 100 })} /><output>{Math.round((settings.notchBorderOpacity ?? .1) * 100)}%</output></>),
+      row('notchBorderWidth', <><DraftRange aria-label="Notch border thickness" min={0} max={4} step={.1} value={settings.notchBorderWidth ?? .8} onCommit={value => patch({ notchBorderWidth: value })} /><output>{settings.notchBorderWidth ?? .8}px</output></>)])}
     {flag('companion', 'companionEnabled')}
     {row('companionCharacter', <CompanionPicker value={settings.companionCharacter ?? 'blob'} onPick={id => patch({ companionCharacter: id })} />)}
     {flag('companionReactive', 'companionReactive')}

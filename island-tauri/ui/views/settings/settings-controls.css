@@ -1,6 +1,19 @@
 /* Settings controls (b2/settings): shortcut recorder, font picker, per-app notification rules.
    Kept to the one-line 30px control look of the other settings inputs (871784d). */
 
+/* ── Group rows ────────────────────────────────────────────────────── */
+/* A parent switch with its dependent rows indented under it on a quiet rail. While the parent
+   is off the fieldset is disabled (no Tab stop, no pointer) and the rows' content dims to the
+   control family's disabled strength; the row box itself stays full strength so a search jump's
+   highlight ring is still plain to see. */
+.settings-row + .settings-group, .settings-group + .settings-row, .settings-group + .settings-group { border-top: 1px solid var(--v-stroke); }
+.settings-group-children { min-width: 0; margin: 0 0 var(--space-1) var(--space-3); padding: 0 0 0 var(--space-3); border: 0; border-left: 1px solid var(--v-stroke); }
+.settings-group-children > .settings-row { border-top: 1px solid var(--v-stroke); }
+.settings-group-children:disabled { pointer-events: none; }
+.settings-group-children:disabled > .settings-row > * { opacity: .4; }
+/* The row already dims its content once; a disabled control inside must not dim a second time. */
+.island .settings-group-children:disabled :is(button, input, textarea):disabled { opacity: 1; }
+
 /* ── Shortcut recorder ─────────────────────────────────────────────── */
 .shortcut-recorder { flex: 0 1 220px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; padding: var(--space-1) 0; }
 .shortcut-line { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }

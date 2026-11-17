@@ -416,7 +416,7 @@ fn notification_body(row: &SessionRow) -> Option<String> {
         label.pop();
         label.push('…');
     }
-    Some(format!("{label} · {}", row.id))
+    Some(format!("{label} · {}", short_id(&row.id)))
 }
 
 /// Short id: strip a leading `local-` prefix, then take the first 8 chars

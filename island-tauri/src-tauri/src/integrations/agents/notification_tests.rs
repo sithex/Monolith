@@ -47,6 +47,16 @@ fn naming_title_model_fallback_and_unicode_boundary() {
             .as_deref(),
         Some("model-small · run-2")
     );
+    // Real Hermes ids are `local-` + 64 hex: the body carries the same 8-char short id as the chips.
+    r.id = "local-93aac2d89093b1c39f5ae87bd0d8d492d1067779bd47b5e3707a4014ef9d1360".into();
+    r.title = Some("Review audio routing".into());
+    assert_eq!(
+        tracker.update(vec![r.clone()], 110.).notification_events[0]
+            .body
+            .as_deref(),
+        Some("Review audio routing · 93aac2d8")
+    );
+    r.title = Some(" \n ".into());
     r.id = "run-3".into();
     r.model = None;
     assert_eq!(
@@ -69,8 +79,9 @@ fn naming_title_model_fallback_and_unicode_boundary() {
 #[test]
 fn named_completions_use_selected_row_and_disambiguate_equal_names() {
     let mut tracker = Tracker::new();
-    let a = row("same-prefix-one");
-    let b = row("same-prefix-two");
+    // Equal names stay apart through the 8-char short id (64-hex ids: ~1 in 4e9 overlap).
+    let a = row("aaaa1111-one");
+    let b = row("bbbb2222-two");
     let start = tracker.update(vec![a.clone(), b.clone()], 110.);
     assert_ne!(
         start.notification_events[0].body,
@@ -87,7 +98,7 @@ fn named_completions_use_selected_row_and_disambiguate_equal_names() {
     ));
     assert_eq!(
         update.notification_events[0].body.as_deref(),
-        Some("Updated title · same-prefix-one")
+        Some("Updated title · aaaa1111")
     );
     assert_eq!(update.events.len(), update.notification_events.len());
 }

@@ -48,7 +48,11 @@
 .now-playing[data-lyrics='true'] .transport { gap: 18px; }
 .np-backdrop { position: absolute; inset: -6px; z-index: -1; overflow: hidden; border-radius: 22px; opacity: .34; pointer-events: none;
   -webkit-mask-image: radial-gradient(ellipse at 30% 35%, #000 25%, transparent 78%); mask-image: radial-gradient(ellipse at 30% 35%, #000 25%, transparent 78%); }
-.np-backdrop .bounded-image { width: 100%; height: 100%; object-fit: cover; filter: blur(56px) saturate(1.6); transform: scale(1.35); }
+/* The art is blurred at a quarter of its size and scaled back up, so the browser blurs 1/16 of the pixels. The
+   numbers keep the old picture exactly: blur 56 = 14 x 4; scale 1.35 = 5.4 / 4; the box keeps its top-left
+   (10 px margin) and is shifted by 70 % of its own size, which is where scaling 1.35x about the centre lands it. */
+.np-backdrop .bounded-image { width: 25%; height: 25%; max-height: 45px; border-radius: calc(var(--radius-lg) / 5.4); object-fit: cover;
+  filter: blur(14px) saturate(1.6); transform-origin: 0 0; transform: translate(-70%, -70%) scale(5.4); }
 .island .now-playing .lyrics-toggle { width: 30px; height: 30px; flex: none; display: grid; place-items: center; padding: 0; }
 .island .now-playing .lyrics-toggle svg { width: 17px; height: 17px; }
 .island .now-playing .lyrics-toggle[aria-pressed='true'] { color: var(--ui-text); background: rgb(255 255 255 / .12); }

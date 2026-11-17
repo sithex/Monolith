@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { displayOutputs, settingsDefaults, terminalCopy, type Appearance, type Settings, type SettingsPatch } from '../ipc/client';
@@ -115,14 +115,17 @@ const RANGES: Partial<Record<keyof Settings, [number, number, number, string]>> 
   clipboardHistorySize: [10, 500, 1, ' entries'], batteryLowPercent: [5, 50, 1, '%'], batteryCriticalPercent: [1, 30, 1, '%'],
   equalizerBands: [8, 32, 1, ' bands'], offsetX: [-400, 400, 1, 'px'], offsetY: [-200, 200, 1, 'px'],
 };
-export function SettingsView() {
-  const settings = useSettings(), appearance = useAppearance(), palette = usePalette();
+export function SettingsView({ active = true }: { active?: boolean } = {}) {
+  const settings = useSettings(active), appearance = useAppearance(active), palette = usePalette(active);
   const [error, setError] = useState(''), [tab, setTab] = useState<Tab>(() => { try { return savedSection(localStorage.getItem(SECTION_STORAGE_KEY)); } catch { return 'general'; } }), [query, setQuery] = useState('');
   const [offsetPreview, setOffsetPreview] = useState<{ x: number; y: number } | null>(null);
   const [outputs, setOutputs] = useState<string[] | null>(null), [jumpTarget, setJumpTarget] = useState<string | null>(null), [highlight, setHighlight] = useState<string | null>(null);
   const [fonts, setFonts] = useState<FontFamily[] | null>(null), [fontError, setFontError] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const notifications = useNotifications();
+  const notifications = useNotifications(active);
+  // The pane stays mounted (section, search text, drafts and scroll position live in it), but while it is
+  // hidden it hands React the element it last drew, so the tree below does not re-render for background changes.
+  const drawn = useRef<ReactNode>(null);
   const jumpTo = (id: string) => { const target = settingLocation(id); if (target) { setTab(target.card.tab); setQuery(''); setJumpTarget(id); } };
   useEffect(() => { try { localStorage.setItem(SECTION_STORAGE_KEY, tab); } catch { /* Storage may be unavailable. */ } }, [tab]);
   useEffect(() => {
@@ -162,6 +165,8 @@ export function SettingsView() {
     let live = true; commands.fontFamilies().then(r => { if (live) setFonts(r.status === 'ok' ? r.data : []); }, () => { if (live) setFonts([]); });
     return () => { live = false; };
   }, [wantFonts, fonts]);
+  // A pending jump (palette search, "Open setting" links) still renders while hidden, as before.
+  if (!active && drawn.current !== null && !jumpTarget) return drawn.current;
   const seenApps = [...notifications.map(n => n.appName), ...(settings.notificationDeniedApps ?? [])];
   const appRules = settings.notificationAppRules ?? [];
   // Reset section: every card of the open section that has resettable keys, in one patch.
@@ -220,7 +225,7 @@ export function SettingsView() {
     return <Row key={id} id={id} label={label} hint={hint}>{control}</Row>;
   };
   const results = searching ? searchRows(query, settings) : [];
-  return <div className="settings-panel app-stack" aria-label="Island settings" data-own-privacy="" data-reduce-motion={settings.reduceMotion ? 'true' : undefined} data-highlight={highlight ?? ''}>
+  return drawn.current = <div className="settings-panel app-stack" aria-label="Island settings" data-own-privacy="" data-reduce-motion={settings.reduceMotion ? 'true' : undefined} data-highlight={highlight ?? ''}>
     <div className="settings-search" role="search"><input type="search" aria-label="Search settings" placeholder="Search all settings" value={query} spellCheck={false} autoComplete="off"
       onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && query) { e.preventDefault(); e.stopPropagation(); setQuery(''); } }} />
       {query && <button type="button" aria-label="Clear search" onClick={() => setQuery('')}><svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" strokeWidth="2" /></svg></button>}

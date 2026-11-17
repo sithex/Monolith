@@ -214,12 +214,14 @@ html[data-nav-via='key'] .island .app-pane .app-stack > *, .island .view-stage[d
 
 /* ---- Lit quick actions glow (Nov 15) -------------------------------------- */
 /* A lit side button wears a soft accent ring that breathes. Only transform/opacity animate
-   (compositor), and only on lit buttons, which only show while the island is open. */
+   (compositor). The loop and its compositor layer (will-change) exist only while the island is
+   open (data-open, set by SideControls); closed, the ring is a static, hidden-with-its-button style. */
 .live-side-button { position: relative; }
 .live-side-button::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
-  border: 1.5px solid var(--ui-accent); opacity: 0; transform: scale(.88); will-change: transform, opacity;
+  border: 1.5px solid var(--ui-accent); opacity: 0; transform: scale(.88);
   transition: opacity .3s var(--v-ease, ease), transform .35s var(--v-ease, ease); }
-.live-side-button[data-lit='true']::after { opacity: .5; transform: scale(1); animation: lit-ring calc(2.6s / var(--motion-speed, 1)) ease-in-out .35s infinite; }
+.live-side-button[data-lit='true']::after { opacity: .5; transform: scale(1); }
+.live-side-button[data-lit='true'][data-open='true']::after { will-change: transform, opacity; animation: lit-ring calc(2.6s / var(--motion-speed, 1)) ease-in-out .35s infinite; }
 @keyframes lit-ring { 0%, 100% { transform: scale(1); opacity: .5; } 50% { transform: scale(1.12); opacity: .12; } }
-html[data-reduce-motion='true'] .live-side-button[data-lit='true']::after { animation: none; }
-@media (prefers-reduced-motion: reduce) { .live-side-button[data-lit='true']::after { animation: none; } }
+html[data-reduce-motion='true'] .live-side-button[data-lit='true'][data-open='true']::after { animation: none; will-change: auto; }
+@media (prefers-reduced-motion: reduce) { .live-side-button[data-lit='true'][data-open='true']::after { animation: none; will-change: auto; } }

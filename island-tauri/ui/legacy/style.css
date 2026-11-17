@@ -1,27 +1,27 @@
 @font-face {
   font-family: "OpenRunde";
-  src: url("../src/assets/fonts/OpenRunde-Regular.woff") format("woff");
+  src: url("../src/assets/fonts/OpenRunde-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: block;
 }
 @font-face {
   font-family: "OpenRunde";
-  src: url("../src/assets/fonts/OpenRunde-Medium.woff") format("woff");
+  src: url("../src/assets/fonts/OpenRunde-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: block;
 }
 @font-face {
   font-family: "OpenRunde";
-  src: url("../src/assets/fonts/OpenRunde-Semibold.woff") format("woff");
+  src: url("../src/assets/fonts/OpenRunde-Semibold.woff2") format("woff2");
   font-weight: 600;
   font-style: normal;
   font-display: block;
 }
 @font-face {
   font-family: "OpenRunde";
-  src: url("../src/assets/fonts/OpenRunde-Bold.woff") format("woff");
+  src: url("../src/assets/fonts/OpenRunde-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: block;

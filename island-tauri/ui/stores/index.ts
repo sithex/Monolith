@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { useGatedStore } from './gated';
 import { createTopic } from './topic';
 import { bootstrap, visualGet, onVisualChanged, settingsPatch, appearanceSet,
   type Settings, type SettingsPatch, type Palette, type Appearance, type VisualChanged,
@@ -20,9 +21,9 @@ export const acceptVisual = (snapshot: VisualChanged) => {
   paletteStore.apply(snapshot.palette, snapshot.rev);
   appearanceStore.apply(snapshot.appearance, snapshot.rev);
 };
-export const useSettings = () => useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot);
-export const usePalette = () => useSyncExternalStore(paletteStore.subscribe, paletteStore.getSnapshot);
-export const useAppearance = () => useSyncExternalStore(appearanceStore.subscribe, appearanceStore.getSnapshot);
+export const useSettings = (active = true) => useGatedStore(settingsStore.subscribe, settingsStore.getSnapshot, active);
+export const usePalette = (active = true) => useGatedStore(paletteStore.subscribe, paletteStore.getSnapshot, active);
+export const useAppearance = (active = true) => useGatedStore(appearanceStore.subscribe, appearanceStore.getSnapshot, active);
 export const useMonitor = () => useSyncExternalStore(monitorStore.subscribe, monitorStore.getSnapshot);
 export const useAi = () => useSyncExternalStore(aiStore.subscribe, aiStore.getSnapshot);
 export async function loadStores() {

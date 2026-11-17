@@ -78,7 +78,8 @@ test('AI unknown prices stay null and invalid numbers cannot poison charts',()=>
 test('AI visible polling is sixty seconds, starts on every activation and guards stale timer callbacks',()=>{
   const source=readFileSync(new URL('../ui/views/AiStatsView.tsx',import.meta.url),'utf8');
   assert.match(source,/useGamePollingActive\(active\)/);
-  assert.match(source,/if \(!active\) return/);
+  assert.match(source,/if \(active\) setNow/, 'the clock is no longer a 1 s interval in this view: only the labels tick');
+  assert.doesNotMatch(source,/setInterval/);
   assert.match(source,/createVisiblePoller\([\s\S]*60_000/);
   assert.match(source,/poller.setVisible\(active\)/);
   assert.match(source,/poller.dispose\(\)/);

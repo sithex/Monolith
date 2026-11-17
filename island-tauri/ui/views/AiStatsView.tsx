@@ -44,12 +44,7 @@ export function AiUsageView({ active }: { active: boolean }) {
   error => setNotice(String(error)), callback => window.setTimeout(callback, 60_000), timer => window.clearTimeout(timer as number)));
   useEffect(() => { poller.setVisible(active); }, [active, poller]);
   useEffect(() => () => poller.dispose(), [poller]);
-  useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    const clock = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => { window.clearInterval(clock); };
-  }, [active]);
+  useEffect(() => { if (active) setNow(Date.now()); }, [active]);
   const connect = (provider: AiProvider) => {
     void aiConnect(provider).then(result => setNotice(result.launched ? 'Complete sign-in in the secure Hermes terminal. Launch does not prove sign-in.' : result.error ?? 'Sign-in unavailable')).catch(error => setNotice(String(error)));
   };
@@ -58,7 +53,7 @@ export function AiUsageView({ active }: { active: boolean }) {
       {([['overview', 'Overview'], ['sessions', 'Sessions']] as const).map(([id, name]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)}>{name}</button>)}
     </div>
     {tab === 'overview'
-      ? <AiDashboard dashboard={dashboardFromUsage(data, period, now)} period={period} onPeriodChange={setPeriod} onConnect={connect} now={now}/>
+      ? <AiDashboard dashboard={dashboardFromUsage(data, period, now)} period={period} onPeriodChange={setPeriod} onConnect={connect} now={now} active={active}/>
       : <AiInsights insights={insightsFromUsage(data, period)} period={period} onPeriodChange={setPeriod}/>}
     {notice && <p role="status">{notice}</p>}
   </div>;

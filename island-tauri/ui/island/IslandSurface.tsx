@@ -10,6 +10,7 @@ import { notchMorphPath, notchMorphSpan, notchProgress, NOTCH_MORPH_SPAN } from 
 import { useLayout, useLauncher } from '../stores/apps';
 import { UI_SPRING } from './components/IslandShell';
 import { createGeometryReporter, fitSurface, effectiveLayout, visibleLayout, nativePill, presetSize, sideColumnExtent } from './geometry';
+import { createFitObservers } from './fit-observers';
 import { pointerIntent } from './navigation';
 import type { IslandView } from '../ipc/bindings';
 import { arrivalTime, axisSpring, motionSpeed, glassFadePlan, glassOpenness, GLASS_OPEN, handOffFade, scaled, surfaceRadius, WITHDRAW_LEAD } from './motion-profile';
@@ -64,24 +65,24 @@ export function IslandSurface({ children, fail, paletteOpen = false, scheme }: {
   useLayoutEffect(() => {
     const root = outer.current;
     if (!fitsContent || !root) { setContentH(null); setContentW(null); return; }
-    let frame = 0, watched: Element | null = null;
-    const ro = new ResizeObserver(() => schedule());
+    let frame = 0;
+    const fit = createFitObservers(root, () => schedule());
     const measure = () => {
       frame = 0;
       const pane = root.querySelector<HTMLElement>('.view-pane > .app-pane:not([hidden])');
       const child = pane?.firstElementChild as HTMLElement | null | undefined;
       if (!pane || !child) return;
-      if (watched !== child) { if (watched) ro.unobserve(watched); ro.observe(child); watched = child; }
       const cs = getComputedStyle(pane), wrap = root.querySelector<HTMLElement>('.terminal-wrap');
       const chrome = (root.querySelector<HTMLElement>('.topline')?.offsetHeight ?? 42) + (wrap?.offsetHeight ?? 0) - pane.offsetHeight + 2;
       // A view with its own scroller (Settings' .settings-content) reports only its visible
       // height; add what that scroller hides so the island still grows to fit (up to its max).
       const scroller = child.querySelector<HTMLElement>('[data-fit-scroll]');
+      const row = child.querySelector<HTMLElement>('[data-fit-width]');
+      fit.retarget(child, scroller, row);
       const hidden = scroller ? Math.max(0, scroller.scrollHeight - scroller.clientHeight) : 0;
       const want = Math.ceil(chrome + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + child.offsetHeight + hidden);
       setContentH(h => h !== null && Math.abs(h - want) < 2 ? h : want);
       // Width a row needs unclipped: its children's extent, plus everything around the row.
-      const row = child.querySelector<HTMLElement>('[data-fit-width]');
       let wantW: number | null = null;
       if (row && row.children.length) {
         // Measured against the page and the content wrap, never the island's live width: while the
@@ -94,10 +95,8 @@ export function IslandSurface({ children, fail, paletteOpen = false, scheme }: {
       setContentW(w => w !== null && wantW !== null && Math.abs(w - wantW) < 2 ? w : wantW);
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };
-    const mo = new MutationObserver(schedule);
-    mo.observe(root.querySelector('.view-pane') ?? root, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
     schedule();
-    return () => { ro.disconnect(); mo.disconnect(); if (frame) cancelAnimationFrame(frame); };
+    return () => { fit.dispose(); if (frame) cancelAnimationFrame(frame); };
   }, [fitsContent, state.view]);
   useLayoutEffect(() => { owner.current?.schedule(!animating.current);  }, [state.rev, state.mode, state.view, settings, layout.rev, launcher.rev, contentH, contentW]);
   const preset = layout.layout.preset;

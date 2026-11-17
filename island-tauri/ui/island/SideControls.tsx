@@ -16,8 +16,8 @@ import { DUR, EASE_OUT, SPRING, sideDropPath, tween, WITHDRAW_SECONDS } from './
 /** Where a side button's Back goes: the page you came from (Island's back history). */
 export type SideBack = { view: IslandView; label: string; go(): void };
 
-function SideBubble({ button, diameter, gap, progress, interactive, navigate, lit, fail, back }: {
-  button: LayoutButton; diameter: number; gap: number; progress: MotionValue<number>; interactive: boolean; navigate(view: IslandView): void; lit: boolean; fail(error: unknown): void; back: SideBack | null;
+function SideBubble({ button, diameter, gap, progress, interactive, open, navigate, lit, fail, back }: {
+  button: LayoutButton; diameter: number; gap: number; progress: MotionValue<number>; interactive: boolean; open: boolean; navigate(view: IslandView): void; lit: boolean; fail(error: unknown): void; back: SideBack | null;
 }) {
   const side = button.side, reach = 14 + gap + diameter / 2;
   const x = useTransform(progress, [0, 1], [side === 'left' ? reach : side === 'right' ? -reach : 0, 0], { clamp: false });
@@ -64,7 +64,7 @@ function SideBubble({ button, diameter, gap, progress, interactive, navigate, li
     style={{ position: 'fixed', width: diameter, height: diameter, borderRadius: diameter / 2, visibility, pointerEvents: interactive ? 'auto' : 'none' }}>
     <svg className="side-neck" aria-hidden="true" width={diameter} height={diameter}><motion.path d={neck} style={{ opacity }} /></svg>
     <motion.div className="side-emergence" style={{ x, y, scale, opacity }}>
-      <motion.button ref={face} data-testid={`side-${button.id}`} className="round-button live-side-button" tabIndex={interactive ? 0 : -1} data-quick={quick} data-lit={lit} data-hover={lifted}
+      <motion.button ref={face} data-testid={`side-${button.id}`} className="round-button live-side-button" tabIndex={interactive ? 0 : -1} data-quick={quick} data-lit={lit} data-open={open} data-hover={lifted}
         // Leaving the whole island straight from a button gets no DOM leave either, so WebKit
         // still counts the pointer as inside and sends no new `pointerenter` on the way back.
         onPointerEnter={e => { if (e.pointerType === 'mouse') { stale.current = undefined; setHovered(true); } }}
@@ -116,6 +116,6 @@ export function SideControls({ navigate, fail, view, back }: { navigate(view: Is
   }, [active, reduced, progress]);
   useLayoutEffect(() => { window.dispatchEvent(new Event('island-surfaces-changed')); }, [ready, active, layout.rev, launcher.rev]);
   return <>{model.buttons.map(button => <SideBubble key={button.id} button={button} diameter={model.buttonDiameter} gap={model.gap}
-    progress={progress} interactive={active && ready} navigate={navigate} lit={quickActive(button.action, live)} fail={fail}
+    progress={progress} interactive={active && ready} open={active} navigate={navigate} lit={quickActive(button.action, live)} fail={fail}
     back={sideBackFor(button.action, view, back)} />)}</>;
 }

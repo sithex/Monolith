@@ -1,5 +1,6 @@
 // Subscribe before bootstrap; the pure core bounds replay, active rows and tombstones.
 import { useSyncExternalStore } from "react";
+import { useGatedStore } from "../stores/gated";
 import { onNotificationReceived, onNotificationClosed, onNotificationSnapshot, onNotificationPopups, notificationPopup, type NotificationPopups, type PopupOp, type IslandNotification } from "./client";
 import { createNotificationStore } from "./notifications-core";
 
@@ -26,8 +27,8 @@ export function seedNotifications(initial: IslandNotification[]) {
   const { droppedBootstrap } = store.diagnostics();
   if (droppedBootstrap) console.warn(`Notification bootstrap overflow: ${droppedBootstrap} deltas dropped (stale content suppressed)`);
 }
-export function useNotifications() {
-  return useSyncExternalStore(store.subscribe, store.getSnapshot);
+export function useNotifications(active = true) {
+  return useGatedStore(store.subscribe, store.getSnapshot, active);
 }
 
 let popups: NotificationPopups = { rev: 0, items: [] };

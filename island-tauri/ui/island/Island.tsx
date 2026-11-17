@@ -20,16 +20,17 @@ import { SettingsView as SettingsViewInner } from '../views/SettingsView';
 import { MonitorView as MonitorViewInner } from '../views/MonitorView';
 import { AiStatsView as AiStatsViewInner } from '../views/AiStatsView';
 import { Toast } from '../widgets/Toast';
-// xterm is about half the island's JavaScript. It loads in its own chunk, fetched as soon as
-// the first frame has painted; once loaded the component never suspends again, so the
-// terminal (and its PTY) is still created exactly once.
+import { useTerminalWarmup } from './terminal-warmup';
+// xterm is about half the island's JavaScript. It loads in its own chunk, never at module load:
+// on the first sign of intent (the island leaves its closed state, or the terminal is started) or,
+// failing that, when the page is idle after its first paint (see useTerminalWarmup). Once loaded
+// the component never suspends again, so the terminal (and its PTY) is still created exactly once.
 const loadTerminal = () => import('../views/TerminalView');
 const TerminalView = lazy(() => loadTerminal().then(m => ({ default: memo(m.TerminalView) })));
 // Every island state change (hover, rev, view) re-renders this root. The panes read their own
 // stores, so they re-render only when their props (or their stores) actually change.
 const AppsView = memo(AppsViewInner), SettingsView = memo(SettingsViewInner);
 const MonitorView = memo(MonitorViewInner), AiStatsView = memo(AiStatsViewInner);
-if (typeof window !== 'undefined') window.setTimeout(() => { void loadTerminal(); }, 0);
 import { PreviewNotice } from './PreviewNotice';
 import { NotchNotifications, NotificationCards, useNotificationHover } from './notifications/NotificationCards';
 import { ApprovalNotice, useApprovalHover } from './ApprovalNotice';
@@ -56,6 +57,7 @@ const playClick = createClickSound();
 const motionSpeedDefault = (percent: number | undefined) => !percent || percent === 100 ? undefined : { duration: 0.3 * 100 / Math.min(200, Math.max(50, percent)) };
 export function Island() {
   const state = useIslandState(), settings = useSettings(), palette = usePalette(), appearance = useAppearance(), approvalHover = useApprovalHover(), notificationHover = useNotificationHover();
+  useTerminalWarmup(loadTerminal, state.mode, state.terminalStarted);
   const launcher = useLauncher(), media = useMedia();
   // Publish only committed settings. Re-render before paint so children rebuild their
   // transitions at the new speed, including on the first mount.
@@ -191,7 +193,7 @@ export function Island() {
             </div>
             <div className="app-pane" hidden={view !== 'monitor'}><MonitorView active={active && view === 'monitor'} /></div>
             <div className="app-pane" hidden={view !== 'ai'}><AiStatsView active={active && view === 'ai'} /></div>
-            <div className="app-pane" hidden={view !== 'settings'}><SettingsView /></div>
+            <div className="app-pane" hidden={view !== 'settings'}><SettingsView active={active && view === 'settings'} /></div>
             <div className="app-pane" hidden={['terminal','monitor','ai','settings','launcher'].includes(view)}><AppsView view={view} active={active && !['terminal','monitor','ai','settings','launcher'].includes(view)} /></div>
           </div>
         </IslandShell>

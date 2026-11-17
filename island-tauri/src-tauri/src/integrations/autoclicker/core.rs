@@ -159,6 +159,49 @@ pub fn to_json(c: &AutoclickerConfig) -> String {
     serde_json::to_string_pretty(c).unwrap_or_default()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn autoclicker_new_install_defaults_to_ten_per_second() {
+        // 100 ms is responsive without flooding an app with 1000 events a second.
+        assert_eq!(defaults().interval_ms, 100);
+        assert_eq!(Saved::default().config.interval_ms, 100);
+        assert_eq!(load("{}").config.interval_ms, 100);
+    }
+
+    #[test]
+    fn autoclicker_saved_thousand_per_second_loads_unchanged() {
+        let saved = Saved {
+            config: AutoclickerConfig {
+                interval_ms: 1,
+                jitter_percent: 7,
+                target: ClickTarget::Key,
+                key: "Space".into(),
+                click_limit: 42,
+                ..defaults()
+            },
+            lifetime_clicks: 1234,
+            lifetime_ms: 5678,
+        };
+        let text = store(&saved);
+        let restored = load(&text);
+        assert_eq!(restored, saved);
+        assert_eq!(restored.config.interval_ms, 1);
+        assert_eq!(store(&restored), text);
+    }
+
+    #[test]
+    fn autoclicker_legacy_saved_rate_is_not_replaced_by_new_install_default() {
+        let restored = load(r#"{"intervalMs":1,"target":"key","key":"Space"}"#);
+        assert_eq!(restored.config.interval_ms, 1);
+        assert_eq!(restored.config.target, ClickTarget::Key);
+        assert_eq!(restored.config.key, "Space");
+        assert_eq!(restored.lifetime_clicks, 0);
+    }
+}
+
 /// xorshift64*: cheap, good enough to humanise intervals, never used for anything secret.
 pub struct Jitter(u64);
 impl Jitter {

@@ -190,10 +190,10 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .mixer { display: flex; flex-direction: column; gap: var(--space-3); }
 .mixer-strip { display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; scrollbar-width: thin; }
 .mixer-divider { width: 1px; background: rgb(255 255 255 / .12); flex: none; margin: 8px 0; }
-.fader-col { width: 96px; flex: none; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
-.fader-col.master { width: 72px; }
-.fader-name { height: 32px; display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; max-width: 100%; color: var(--ui-text-secondary); }
-.fader-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fader-col { min-width: 96px; flex: 1 0 96px; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.fader-col.master { min-width: 72px; flex: 0 0 72px; }
+.fader-name { min-height: 32px; flex: 1; display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; max-width: 100%; color: var(--ui-text-secondary); }
+.fader-name span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .fader-name svg { width: 15px; height: 15px; flex: none; }
 .mixer select { flex: 1; }
 

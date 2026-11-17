@@ -11,6 +11,8 @@ import { useReducedMotionPreference } from './components/motion-preference';
 import type { IconName } from './models';
 export const viewLabels: Record<IslandView,string> = { terminal:'Hermes',monitor:'System monitor',ai:'AI Agents',settings:'Settings',launcher:'Apps',notifications:'Notifications',clipboard:'Clipboard',music:'Now playing',quickInfo:'Quick info',timer:'Timer',calendar:'Calendar',scratchpad:'Scratchpad',downloads:'Downloads',controls:'Controls',mixer:'Volume mixer',brightness:'Brightness',agents:'Agent runs',updates:'Package updates',shelf:'Shelf',autoclicker:'Autoclicker' };
 export const viewIcons: Partial<Record<IslandView,IconName>> = { terminal:'terminal',monitor:'monitor',ai:'spark',settings:'settings',notifications:'bell',clipboard:'clipboard',music:'music',timer:'timer',calendar:'calendar',scratchpad:'note',downloads:'download',controls:'controls',mixer:'volume',brightness:'sun',agents:'spark',updates:'download',quickInfo:'weather',launcher:'grid',shelf:'shelf',autoclicker:'cursor' };
+// Launcher-only distinction; configured side actions keep their existing glyphs.
+export const launcherIcons: Partial<Record<IslandView,IconName>> = { ...viewIcons, agents: 'runs' };
 // Tile tints (Nov 9): every app has its own system colour (motion-launcher.css --app-*);
 // Hermes keeps the theme accent. Tiles stay neutral, only the glyph is coloured.
 const tint: Partial<Record<IslandView,string>> = Object.fromEntries((['monitor','ai','agents','settings','notifications','clipboard','music','timer','calendar',
@@ -255,7 +257,7 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
           if (to >= 0) { e.preventDefault(); void send({ type: 'move', id, to }); }
         }}
         onClick={e => { if (suppressClick.current) return; if (!state.editing && zone === 'shown' && item.known && view) { launchFrom(e?.currentTarget); navigate(view); } }}>
-        <Icon name={view ? viewIcons[view] ?? 'grid' : 'grid'} /><span>{name}</span>
+        <Icon name={view ? launcherIcons[view] ?? 'grid' : 'grid'} /><span>{name}</span>
       </button>
       <AnimatePresence>{state.editing && !item.locked && <motion.button key="badge" initial={{ scale: quiet ? 1 : 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: quiet ? 1 : 0.9, opacity: 0 }} transition={tween(keyboard ? 0 : DUR.fast)}
         className={`tile-badge ${zone === 'shown' ? 'remove' : 'add'}`} aria-label={zone === 'shown' ? `Hide ${name}` : `Show ${name}`}
@@ -285,7 +287,7 @@ export function Launcher({ navigate, fail }: { navigate(view: IslandView): void;
     </LayoutGroup>
     {ghost && dragged && createPortal(<motion.div key={ghost.id} className="drag-ghost launcher-drag-ghost" initial={{ x: ghost.x, y: ghost.y, scale: 1 }} animate={ghostMotion} style={{ left: 0, top: 0, width: ghost.w, transformOrigin: '0 0' }}>
       <motion.div initial={false} animate={{ scale: drag && !quiet ? 1.08 : 1 }} transition={quiet ? { duration: 0 } : SPRING.ui()}>
-        <div className="app-tile" style={{ ['--tone' as string]: tone(dragged.view) }}><Icon name={dragged.view ? viewIcons[dragged.view] ?? 'grid' : 'grid'} /><span>{label(dragged)}</span></div>
+        <div className="app-tile" style={{ ['--tone' as string]: tone(dragged.view) }}><Icon name={dragged.view ? launcherIcons[dragged.view] ?? 'grid' : 'grid'} /><span>{label(dragged)}</span></div>
       </motion.div></motion.div>, document.body)}
     <span role="status" className="sr-only">{state.editing ? 'Editing apps' : 'App editing closed'}</span>
   </div>;

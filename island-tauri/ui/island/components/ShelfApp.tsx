@@ -30,9 +30,9 @@ export function ShelfApp({ model, removeAfterDrag, intents, off }: { model: Shel
       <span className="kind-icon tone-green" aria-hidden="true"><Icon name={item.folder ? 'grid' : 'note'}/></span>
       <div className="row-content"><strong>{item.name}</strong><small className="shelf-path">{item.path}</small>{!item.present && <small className="warning">Moved or deleted</small>}</div>
       <div className="row-actions">
-        {item.present && <button aria-label={`Open ${item.name}`} onClick={() => intents.shelf({ type: 'open', id: item.id })}>Open</button>}
-        {item.present && <button aria-label={`Reveal ${item.name}`} onClick={() => intents.shelf({ type: 'reveal', id: item.id })}>Reveal</button>}
-        <button aria-label={`Copy path of ${item.name}`} onClick={() => intents.copy(item.path)}>Copy path</button>
+        {item.present && <button data-variant="primary" aria-label={`Open ${item.name}`} onClick={() => intents.shelf({ type: 'open', id: item.id })}>Open</button>}
+        {item.present && <button data-variant="quiet" aria-label={`Reveal ${item.name}`} onClick={() => intents.shelf({ type: 'reveal', id: item.id })}>Reveal</button>}
+        <button data-variant={item.present ? 'quiet' : 'primary'} aria-label={`Copy path of ${item.name}`} onClick={() => intents.copy(item.path)}>Copy path</button>
         <button data-variant="danger" aria-label={`Remove ${item.name} from the shelf`} onClick={() => intents.shelf({ type: 'remove', id: item.id })}>Remove</button>
       </div>
     </li>)}</ul> : <Empty icon="shelf">Drag files onto the closed notch to park them here.</Empty>}

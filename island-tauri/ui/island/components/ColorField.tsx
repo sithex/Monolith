@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react';
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { useIslandState } from '../../ipc/island-state';
 import { useReducedMotionAll } from './motion-preference';
 import { DUR, tween } from '../motion-profile';
@@ -126,6 +126,17 @@ function savePreference(key: string, value: string) {
   try { localStorage.setItem(key, value); } catch { /* Picking still works without storage. */ }
 }
 
+export function ColorTabPanel({ tab, instant, children }: { tab: Tab; instant: boolean; children: ReactNode }) {
+  const present = useIsPresent();
+  const transition = instant ? { duration: 0 } : { ...tween(DUR.fast), duration: Math.min(.18, tween(DUR.fast).duration) };
+  return <motion.div className="color-pop-tab-panel" role="tabpanel" id={`color-body-${tab}`} aria-labelledby={`color-tab-${tab}`}
+    aria-hidden={!present || undefined} inert={!present}
+    initial={{ opacity: instant ? 1 : 0, transform: instant ? 'translateX(0px)' : 'translateX(4px)' }}
+    animate={{ opacity: 1, transform: 'translateX(0px)' }} exit="hidden"
+    variants={{ hidden: ({ instant: skip }: { instant: boolean }) => ({ opacity: 0, transform: skip ? 'translateX(0px)' : 'translateX(-4px)', transition: skip ? { duration: 0 } : transition }) }}
+    transition={transition}>{children}</motion.div>;
+}
+
 export const PANEL_W = 280, PANEL_H = 420;
 const GAP = 14, MARGIN = 8;
 export function dock(anchorY: number) {
@@ -191,7 +202,9 @@ export function ColorPickerPanel() {
   const recentRef = useRef(recent);
   const remember = (value: string) => { const next = addRecentColor(recentRef.current, value); recentRef.current = next; setRecent(next); savePreference(RECENT_KEY, JSON.stringify(next)); };
   const [tab, setTab] = useState<Tab>(readTab);
-  const selectTab = (next: Tab) => { setTab(next); savePreference(TAB_KEY, next); };
+  const [tabViaKey, setTabViaKey] = useState(false);
+  const instantTab = reduced || keyboard || tabViaKey;
+  const selectTab = (next: Tab, viaKey = false) => { setTabViaKey(viaKey); setTab(next); savePreference(TAB_KEY, next); };
   const [pos, setPos] = useState<ReturnType<typeof dock> | null>(null);
   const hsvRef = useRef(hsv); hsvRef.current = hsv;
   const id = request?.id;
@@ -274,17 +287,19 @@ export function ColorPickerPanel() {
         </svg>
       </button>}
       <button type="button" className="color-pop-x" aria-label="Close colour picker" onClick={closePanel}>×</button></div>
-    <div className="color-pop-tabs" role="tablist" aria-label="Colour controls">
+    <div className="color-pop-tabs" data-instant={instantTab} role="tablist" aria-label="Colour controls">
       <span className="color-pop-pill" aria-hidden="true" style={{ transform: `translateX(${TABS.indexOf(tab) * 100}%)` }} />
       {TABS.map((name, i) => <button key={name} type="button" role="tab" id={`color-tab-${name}`} aria-controls={`color-body-${name}`}
-        aria-selected={tab === name} tabIndex={tab === name ? 0 : -1} onClick={() => selectTab(name)}
+        aria-selected={tab === name} tabIndex={tab === name ? 0 : -1} onClick={e => selectTab(name, e.detail === 0)}
         onKeyDown={e => {
           const next = e.key === 'ArrowRight' ? (i + 1) % 3 : e.key === 'ArrowLeft' ? (i + 2) % 3 : e.key === 'Home' ? 0 : e.key === 'End' ? 2 : -1;
           if (next < 0) return;
-          e.preventDefault(); selectTab(TABS[next]!); document.getElementById(`color-tab-${TABS[next]}`)?.focus();
+          e.preventDefault(); selectTab(TABS[next]!, true); document.getElementById(`color-tab-${TABS[next]}`)?.focus();
         }}>{name}</button>)}
     </div>
-    <div className="color-pop-body" role="tabpanel" id={`color-body-${tab}`} aria-labelledby={`color-tab-${tab}`}>
+    <div className="color-pop-body">
+      <AnimatePresence initial={false} custom={{ instant: instantTab }}>
+      <ColorTabPanel key={tab} tab={tab} instant={instantTab}>
       {tab === 'Grid' && <ColorGrid hex={hex} onPick={pick} />}
       {tab === 'Sliders' && <div className="color-pop-sliders">
         {(['r', 'g', 'b'] as const).map((key, i) => {
@@ -323,6 +338,8 @@ export function ColorPickerPanel() {
     }} role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={Math.round(hsv.h)}>
       <i style={{ left: `${hsv.h / 3.6}%`, background: `hsl(${hsv.h} 100% 50%)` }} /></div>
       </div>}
+      </ColorTabPanel>
+      </AnimatePresence>
     </div>
     <div className="color-pop-collection" role="group" aria-label="Recent colours">
       <span className="color-pop-caption">Recent colours</span>

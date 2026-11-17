@@ -84,3 +84,7 @@ html[data-nav-via='key'] .color-pop-pill, html[data-reduce-motion='true'] .color
 /* 24 + 32 + 200 + 35 + 35 + 28 + five 8px gaps + 24px padding + 2px border = 420px. */
 .color-pop { overflow: auto; overscroll-behavior: contain; }
 .color-pop-row { flex: none; margin-top: 0; height: 28px; }
+
+.color-pop-tab-panel { position: absolute; inset: 0; }
+.color-pop-tab-panel[aria-hidden='true'] { pointer-events: none; }
+.color-pop-tabs[data-instant='true'] .color-pop-pill { transition: none; }

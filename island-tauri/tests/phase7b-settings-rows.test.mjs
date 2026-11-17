@@ -318,3 +318,66 @@ test('reset section runtime: one quiet Reset on the title line of every section;
     assert.doesNotMatch(view, /ResetHeader|className="link"[^>]*>Reset</);
   }, { settings: {}, defaults, appearance: 'dracula' });
 });
+
+// Cards marked `reset: false` keep their state behind their own controls (layout editor, backup).
+// Their rows hold no setting key today, so dropping the filter would change no real patch. The first
+// test pins the filter; the second presses the real button with keys planted in the driver's own
+// copy of the model: the layout rows as if they were settings, and General's old launch-command card.
+test('reset section: a card marked reset: false is never among the cards a section resets', () => {
+  const kept = model.SETTINGS_CARDS.filter(card => card.reset === false);
+  assert.deepEqual(kept.map(card => `${card.tab}/${card.id}`), ['appearance/layoutEditor', 'advanced/backup']);
+  for (const card of kept) assert.ok(!model.sectionResetCards(card.tab).includes(card), `${card.id} stays out of ${card.tab}`);
+});
+
+test('reset section runtime: Reset on Appearance and on General never writes a key held by a reset: false card', async () => {
+  const PLANTED = { appearance: ['sideButtons', 'islandSize'], general: ['terminalCommand'] };
+  const keys = [...model.sectionKeys('appearance'), ...model.sectionKeys('general'), ...Object.values(PLANTED).flat()];
+  await settingsFixture(async h => {
+    const fixture = h.load('ui/views/settings-model.ts');
+    fixture.cardSpec('layoutEditor').rows.forEach((row, index) => { row.keys = [PLANTED.appearance[index]]; });
+    fixture.SETTINGS_CARDS.push({ id: 'terminalCommand', title: 'Terminal launch', tab: 'general', reset: false, rows: [fixture.rowSpec('terminalCommand')] });
+    assert.deepEqual(fixture.cardKeys('layoutEditor'), PLANTED.appearance); assert.deepEqual(fixture.cardKeys('terminalCommand'), PLANTED.general);
+    h.render();
+    for (const [tab, planted] of Object.entries(PLANTED)) {
+      const reset = nodes(h.select(tab)).find(node => node.type?.name === 'SectionReset');
+      h.saved.length = 0; await reset.props.onReset();
+      assert.equal(h.saved.length, 1, `${tab} saves one patch`);
+      for (const key of planted) assert.ok(!(key in h.saved[0]), `${tab} Reset leaves ${key} alone`);
+      assert.deepEqual(Object.keys(h.saved[0]), model.sectionKeys(tab), `${tab} still resets every other card`);
+    }
+  }, { settings: {}, defaults: Object.fromEntries(keys.map(key => [key, `default:${key}`])) });
+});
+
+// ── Weather location field group ─────────────────────────────────────────────────────────
+const text = node => node == null || typeof node === 'boolean' ? '' : typeof node !== 'object' ? String(node)
+  : Array.isArray(node) ? node.map(text).join('') : text(node.props?.children);
+
+test('weather location: status, Clear, field and Find are one form on a two-column grid', () => {
+  const place = { name: 'Palm Coast', latitude: 29.58497, longitude: -81.20784, country: 'United States' };
+  const d = driver({ 'ui/ipc/bindings.ts': { commands: { weatherGeocode: async () => ({ status: 'ok', data: [] }) } } });
+  try {
+    const Location = d.load('ui/views/settings/WidgetControls.tsx').WeatherLocation;
+    for (const value of [place, null]) {
+      const form = d.render(Location, { value, onSave: async () => {} });
+      assert.equal(form.type, 'form'); assert.equal(form.props.className, 'settings-draft-field settings-place');
+      // Source order is reading order: row one is the saved place and its Clear, row two the field and Find.
+      const [status, clear, field, find, ...rest] = [form.props.children].flat().filter(Boolean);
+      assert.deepEqual(rest, [], 'results and errors appear only after a search');
+      assert.equal(status.props.className, 'settings-place-status');
+      if (value) {
+        assert.equal(text(nodes(status).find(node => node.type === 'span' && node !== status)), 'Palm Coast · United States');
+        assert.equal(text(nodes(status).find(node => node.type === 'small')), '29.58497, -81.20784');
+      } else assert.equal(text(status), 'No location selected');
+      assert.equal(text(clear), 'Clear location'); assert.equal(clear.props.disabled, !value);
+      assert.equal(clear.props.type, 'button', 'Clear never submits the search'); assert.equal(clear.props['data-variant'], 'quiet');
+      assert.equal(field.type, 'input'); assert.equal(field.props['aria-label'], 'Find weather location');
+      assert.equal(text(find), 'Find'); assert.equal(find.props.type, 'submit'); assert.equal(find.props['data-variant'], 'secondary');
+      assert.equal(nodes(form).filter(node => node.props?.className === 'link').length, 0, 'the Phase 3 variants, not bare links');
+    }
+  } finally { d.dispose(); }
+  const css = src('ui/island/surface.css');
+  assert.match(rule(css, '.settings-panel .settings-place'), /display: grid; grid-template-columns: minmax\(0, 1fr\) auto; align-items: center;/);
+  for (const selector of ['.settings-place-results', '.settings-place .settings-field-error']) assert.match(rule(css, selector), /grid-column: 1 \/ -1;/, `${selector} spans the group`);
+  assert.match(rule(css, ".settings-place > button[type='submit']"), /align-self: stretch/, 'Find is as tall as the field');
+  assert.doesNotMatch(css, /\.settings-draft-field form \{/, 'no nested form is left to lay out');
+});

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { load } from './phase7b-loader.mjs';
-const { SCHEMES, schemeFamilies, initialOpenFamily, navTarget, isLightPalette, schemePalette } = load('ui/island/tokens/schemes.ts');
+const { SCHEMES, schemeFamilies, isLightPalette, schemePalette } = load('ui/island/tokens/schemes.ts');
 const { xtermTheme } = load('ui/views/terminal-colours.ts');
 const src = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const HEX = /^#[0-9a-f]{6}$/;
@@ -136,22 +136,4 @@ test('picker model: one row per family, Monolith presets grouped, variants in or
   assert.equal(families[0].id, 'skin', 'Hermes skin stays first');
   assert.ok(families.findIndex(f => f.id === 'monolith') < families.findIndex(f => f.id === 'catppuccin'), 'Monolith group precedes the community ones');
   assert.equal(families.filter(f => f.group === 'monolith').at(-1).id, 'album', 'community rows come after every Monolith row');
-});
-
-test('picker model: the active scheme\'s family starts expanded', () => {
-  const families = schemeFamilies();
-  assert.equal(initialOpenFamily('catppuccin-latte', families), 'catppuccin');
-  assert.equal(initialOpenFamily('rose-pine-dawn', families), 'rosepine');
-  assert.equal(initialOpenFamily('ocean', families), 'monolith');
-  assert.equal(initialOpenFamily('green', families), 'monolith');
-  assert.equal(initialOpenFamily('dracula', families), null, 'a single-variant family has nothing to expand');
-  assert.equal(initialOpenFamily('skin', families), null);
-  assert.equal(initialOpenFamily('album', families), null);
-});
-
-test('picker keyboard model: arrows, Home and End move through the visible rows', () => {
-  assert.equal(navTarget('ArrowDown', 2, 5), 3); assert.equal(navTarget('ArrowDown', 4, 5), 4);
-  assert.equal(navTarget('ArrowUp', 2, 5), 1); assert.equal(navTarget('ArrowUp', 0, 5), 0);
-  assert.equal(navTarget('Home', 3, 5), 0); assert.equal(navTarget('End', 1, 5), 4);
-  assert.equal(navTarget('a', 1, 5), null); assert.equal(navTarget('ArrowDown', 0, 0), null);
 });

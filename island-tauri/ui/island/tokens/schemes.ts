@@ -159,11 +159,6 @@ export function schemeFamilies(schemes: readonly Scheme[] = SCHEMES): Family[] {
   }
   return [...out.values()];
 }
-/** The family the picker opens on: the active scheme's, if it has variants to show. */
-export function initialOpenFamily(value: Appearance, families: readonly Family[] = schemeFamilies()): string | null {
-  const f = families.find(f => f.schemes.some(s => s.id === value));
-  return f && f.schemes.length > 1 ? f.id : null;
-}
 /** A scheme's full name on its own tile: variants carry their family ("Gruvbox Dark"); Monolith presets do not. */
 export function schemeLabel(scheme: Scheme, families: readonly Family[] = schemeFamilies()): string {
   const family = families.find(f => f.id === scheme.family);
@@ -207,17 +202,4 @@ export const isLightPalette = (roles: Pick<SchemeRoles, 'background'>) => HEX.te
 /** The palette a scheme imposes on every role, or null to follow the Hermes skin. */
 export function schemePalette(id: Appearance, seeds: CustomSeeds): SchemeRoles | null {
   return id === 'custom' ? customPalette(seeds) : schemeById(id).palette;
-}
-
-/**
- * Arrow-key focus movement over the visible picker rows (family headers + scheme radios).
- * Returns the index to focus, or null when the key is not a navigation key.
- */
-export function navTarget(key: string, index: number, count: number): number | null {
-  if (count === 0) return null;
-  if (key === 'ArrowDown') return Math.min(count - 1, index + 1);
-  if (key === 'ArrowUp') return Math.max(0, index - 1);
-  if (key === 'Home') return 0;
-  if (key === 'End') return count - 1;
-  return null;
 }

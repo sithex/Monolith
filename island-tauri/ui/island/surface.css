@@ -233,11 +233,18 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-panel [data-setting-highlight] { background: var(--v-fill-hi); outline: 1px solid var(--ui-accent); outline-offset: -1px; animation: settings-highlight 1.2s ease-out; }
 @keyframes settings-highlight { from { background: color-mix(in srgb, var(--ui-accent) 24%, transparent); } to { background: var(--v-fill-hi); } }
 .settings-panel .settings-draft-field { flex: 0 1 280px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
-.settings-panel .settings-draft-field form { display: flex; gap: 6px; }
 .settings-panel .settings-draft-field input { flex: 1; min-width: 0; height: 30px; box-sizing: border-box; }
 .settings-panel .settings-draft-field textarea { width: 100%; box-sizing: border-box; background: var(--v-fill); color: var(--ui-text); border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); }
 .settings-panel .settings-draft-field .link { align-self: flex-end; }
-.settings-place-results { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); }
+/* Weather location, one field group: the saved place over the search field (left column), Clear over
+   Find (right column, one width). Search results and errors span both columns under the field. */
+.settings-panel .settings-place { flex-basis: 320px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.settings-place-status { min-width: 0; display: flex; flex-direction: column; line-height: 1.3; overflow-wrap: anywhere; }
+.settings-place-status small { color: var(--ui-text-secondary); font-size: var(--fs-sm); }
+.settings-place > button[type='submit'] { align-self: stretch; }
+.settings-place-results { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); }
+.island .settings-place-results button { text-align: left; }
+.settings-place .settings-field-error { grid-column: 1 / -1; margin: 0; }
 @container (max-width: 420px) {
   .settings-layout { flex-direction: column; gap: var(--space-2); }
   .settings-rail { width: auto; flex: none; flex-direction: row; overflow-x: auto; gap: var(--space-1); padding: 2px; }

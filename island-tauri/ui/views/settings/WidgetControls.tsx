@@ -31,24 +31,25 @@ export function WeatherLocation({ value, onSave }: { value: GeoPlace | null; onS
     try { await onSave({ weatherLocation: place }); setPlaces([]); }
     catch (e) { setError(message(e)); }
   };
-  return <div className="settings-draft-field">
-    <span className="muted">{value ? `${value.name} · ${value.latitude}, ${value.longitude} · ${value.country}` : 'No location selected'}</span>
-    <form onSubmit={event => {
-      event.preventDefault(); const id = ++generation.current; setError(''); setBusy(true);
-      void commands.weatherGeocode(query.trim()).then(result => {
-        if (id !== generation.current) return;
-        if (result.status === 'error') throw new Error(message(result.error));
-        setPlaces(result.data); if (!result.data.length) setError('No matching places');
-      }).catch(e => { if (id === generation.current) setError(message(e)); }).finally(() => { if (id === generation.current) setBusy(false); });
-    }}>
-      <input type="search" aria-label="Find weather location" placeholder="City or place" value={query} maxLength={256} onChange={event => setQuery(event.target.value)} />
-      <button type="submit" className="link" disabled={busy || !query.trim()}>{busy ? 'Searching…' : 'Find'}</button>
-    </form>
+  // One field group on a two-column grid: the saved place over the search field, their actions beside them.
+  return <form className="settings-draft-field settings-place" onSubmit={event => {
+    event.preventDefault(); const id = ++generation.current; setError(''); setBusy(true);
+    void commands.weatherGeocode(query.trim()).then(result => {
+      if (id !== generation.current) return;
+      if (result.status === 'error') throw new Error(message(result.error));
+      setPlaces(result.data); if (!result.data.length) setError('No matching places');
+    }).catch(e => { if (id === generation.current) setError(message(e)); }).finally(() => { if (id === generation.current) setBusy(false); });
+  }}>
+    <span className="settings-place-status" aria-live="polite">{value
+      ? <><span>{value.name} · {value.country}</span><small>{value.latitude}, {value.longitude}</small></>
+      : <span className="muted">No location selected</span>}</span>
+    <button type="button" data-variant="quiet" disabled={!value} onClick={() => { void save(null); }}>Clear location</button>
+    <input type="search" aria-label="Find weather location" placeholder="City or place" value={query} maxLength={256} onChange={event => setQuery(event.target.value)} />
+    <button type="submit" data-variant="secondary" disabled={busy || !query.trim()}>{busy ? 'Searching…' : 'Find'}</button>
     {places.length > 0 && <div className="settings-place-results" aria-label="Weather locations">{places.map((place, index) =>
-      <button type="button" className="link" key={index} onClick={() => { void save(place); }}>{place.name} · {place.latitude}, {place.longitude} · {place.country}</button>)}</div>}
-    <button type="button" className="link" disabled={!value} onClick={() => { void save(null); }}>Clear location</button>
+      <button type="button" data-variant="quiet" key={index} onClick={() => { void save(place); }}>{place.name} · {place.latitude}, {place.longitude} · {place.country}</button>)}</div>}
     {error && <p className="settings-field-error" role="alert">{error}</p>}
-  </div>;
+  </form>;
 }
 
 export function DisplayChoice({ value, outputs, onChange }: { value: Settings['displayId']; outputs: string[] | null; onChange(value: string | null): void }) {

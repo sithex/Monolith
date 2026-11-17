@@ -24,6 +24,10 @@ export const colorPicker = {
 
 const HEX = /^#[0-9a-f]{6}$/i;
 export const isHex = (v: string) => HEX.test(v);
+export function parseHexInput(value: string): string | null {
+  const text = value.trim().toLowerCase(), full = text.startsWith('#') ? text : `#${text}`;
+  return isHex(full) ? full : null;
+}
 type Hsv = { h: number; s: number; v: number };
 type Rgb = { r: number; g: number; b: number };
 const channel = (value: number) => Math.round(Math.max(0, Math.min(255, Number.isFinite(value) ? value : 0)));
@@ -213,6 +217,13 @@ export function ColorPickerPanel() {
   };
   const preview = (next: Hsv) => { hsvRef.current = next; setHsv(next); setText(hsvToHex(next)); };
   const pick = (value: string) => { preview(hexToHsv(value)); commit(value.toLowerCase()); };
+  const submitHex = () => { const value = parseHexInput(text); if (value) pick(value); };
+  const hexField = (label: string) => <input aria-label={label} spellCheck={false} maxLength={7} value={text}
+    aria-invalid={!parseHexInput(text)} data-invalid={!parseHexInput(text)}
+    onChange={e => {
+      const value = e.target.value; setText(value); const full = parseHexInput(value);
+      if (full) { const next = hexToHsv(full); hsvRef.current = next; setHsv(next); }
+    }} onBlur={submitHex} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitHex(); } }} />;
   const dragScope = `${id}:${tab}`;
   const sv = useDrag((fx, fy) => preview({ ...hsvRef.current, s: fx, v: 1 - fy }), () => commit(), dragScope);
   const hue = useDrag(fx => preview({ ...hsvRef.current, h: Math.min(359.9, fx * 360) }), () => commit(), dragScope);
@@ -264,9 +275,7 @@ export function ColorPickerPanel() {
               onChange={e => changeChannel(key, Number(e.target.value), true)} />
           </div>;
         })}
-        <label className="color-pop-slider-hex">Hex <input aria-label="Sliders hex colour" spellCheck={false} maxLength={7} value={text}
-          onChange={e => { const value = e.target.value; setText(value); const full = value.startsWith('#') ? value : `#${value}`; if (isHex(full)) { const next = hexToHsv(full); hsvRef.current = next; setHsv(next); } }}
-          onBlur={() => { const full = text.startsWith('#') ? text : `#${text}`; if (isHex(full)) pick(full); }} /></label>
+        <label className="color-pop-slider-hex">Hex {hexField('Sliders hex colour')}</label>
       </div>}
       {tab === 'Spectrum' && <div className="color-pop-spectrum">
     <div className="color-pop-sv" style={{ background: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider" tabIndex={0}
@@ -300,12 +309,10 @@ export function ColorPickerPanel() {
       <div className="color-pop-presets">{presets.map(c => <button key={c} type="button" aria-label={`Use ${c}`} data-tooltip={c} style={{ background: c }} data-on={c === hex}
         onClick={() => pick(c)} />)}</div>
     </div>
-    <form className="color-pop-row" onSubmit={e => { e.preventDefault(); const v = text.trim().toLowerCase(); const full = v.startsWith('#') ? v : `#${v}`; if (isHex(full)) { setHsv(hexToHsv(full)); commit(full); } }}>
-      <input aria-label="Hex colour" spellCheck={false} maxLength={7} value={text} data-invalid={!isHex(text.startsWith('#') ? text : `#${text}`)}
-        onChange={e => { const v = e.target.value; setText(v); const full = v.startsWith('#') ? v : `#${v}`; if (isHex(full)) { setHsv(hexToHsv(full)); } }}
-        onBlur={() => { const full = text.startsWith('#') ? text : `#${text}`; if (isHex(full) && full.toLowerCase() !== request.value.toLowerCase()) commit(full.toLowerCase()); }} />
-      {request.onReset && <button type="button" className="color-pop-link" onClick={() => { request.onReset?.(); colorPicker.close(); }}>{request.resetLabel ?? 'Follow skin'}</button>}
-      <button type="button" className="color-pop-done" onClick={() => { const full = text.startsWith('#') ? text : `#${text}`; if (isHex(full)) commit(full.toLowerCase()); colorPicker.close(); }}>Done</button>
+    <form className="color-pop-row" onSubmit={e => { e.preventDefault(); submitHex(); }}>
+      {hexField('Hex colour')}
+      {request.onReset && <button type="button" className="color-pop-link" title={request.resetLabel ?? 'Follow skin'} onClick={() => { request.onReset?.(); colorPicker.close(); }}>{request.resetLabel ?? 'Follow skin'}</button>}
+      <button type="button" className="color-pop-done" onClick={() => { submitHex(); colorPicker.close(); }}>Done</button>
     </form>
   </motion.div>}</AnimatePresence>;
 }

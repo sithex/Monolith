@@ -77,3 +77,6 @@ html[data-nav-via='key'] .color-pop-pill, html[data-reduce-motion='true'] .color
 .color-pop-row input { min-width: 70px; }
 .color-pop-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .color-pop input[data-invalid='true'] { border-color: var(--ui-danger); }
+
+.color-pop .color-pop-pipette { display: grid; place-items: center; flex: none; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ui-accent); cursor: pointer; }
+.color-pop-pipette:disabled { opacity: .5; cursor: default; }

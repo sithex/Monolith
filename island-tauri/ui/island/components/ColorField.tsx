@@ -180,6 +180,7 @@ export function ColorPickerPanel() {
   const reduced = useReducedMotionAll();
   const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
   const [hsv, setHsv] = useState<Hsv>({ h: 0, s: 0, v: 0 });
+  const [sampling, setSampling] = useState(false);
   const [text, setText] = useState('');
   const [recent, setRecent] = useState<string[]>(readRecent);
   const recentRef = useRef(recent);
@@ -217,6 +218,18 @@ export function ColorPickerPanel() {
   };
   const preview = (next: Hsv) => { hsvRef.current = next; setHsv(next); setText(hsvToHex(next)); };
   const pick = (value: string) => { preview(hexToHsv(value)); commit(value.toLowerCase()); };
+  // Settings store opaque #rrggbb values, so this picker deliberately has no opacity control.
+  const hasEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in window;
+  const sampleScreen = async () => {
+    if (!hasEyeDropper || sampling) return;
+    const owner = colorPicker.get(); setSampling(true);
+    try {
+      const { EyeDropper } = window as unknown as { EyeDropper: new () => { open(): Promise<{ sRGBHex: string }> } };
+      const result = await new EyeDropper().open();
+      if (colorPicker.get() === owner && isHex(result.sRGBHex)) pick(result.sRGBHex);
+    } catch { /* Cancelling a sample leaves the current colour in place. */ }
+    finally { setSampling(false); }
+  };
   const submitHex = () => { const value = parseHexInput(text); if (value) pick(value); };
   const hexField = (label: string) => <input aria-label={label} spellCheck={false} maxLength={7} value={text}
     aria-invalid={!parseHexInput(text)} data-invalid={!parseHexInput(text)}
@@ -246,6 +259,11 @@ export function ColorPickerPanel() {
     }) }}
     transition={keyboard ? { duration: 0 } : tween(DUR.fast)}>
     <div className="color-pop-head"><span className="color-pop-dot" style={{ background: hex }} /><strong>{request.label}</strong>
+      {hasEyeDropper && <button type="button" className="color-pop-pipette" aria-label="Pick colour from screen" disabled={sampling} onClick={sampleScreen}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m2 22 1-1h3l9-9M3 21v-3l9-9m3-3 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
+        </svg>
+      </button>}
       <button type="button" className="color-pop-x" aria-label="Close colour picker" onClick={() => colorPicker.close()}>×</button></div>
     <div className="color-pop-tabs" role="tablist" aria-label="Colour controls">
       <span className="color-pop-pill" aria-hidden="true" style={{ transform: `translateX(${TABS.indexOf(tab) * 100}%)` }} />

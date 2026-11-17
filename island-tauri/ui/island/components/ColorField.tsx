@@ -100,6 +100,17 @@ export function ColorGrid({ hex, onPick }: { hex: string; onPick(hex: string): v
   </div>;
 }
 
+const RECENT_KEY = 'monolith.colorPicker.recent';
+export function recentColors(values: unknown): string[] {
+  return Array.isArray(values) ? [...new Set(values.filter((value): value is string => typeof value === 'string' && isHex(value)).map(value => value.toLowerCase()))].slice(0, 12) : [];
+}
+export function addRecentColor(values: unknown, value: string): string[] {
+  return recentColors(isHex(value) ? [value, ...recentColors(values)] : values);
+}
+function readRecent(): string[] {
+  try { return recentColors(JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]')); } catch { return []; }
+}
+
 const TABS = ['Grid', 'Spectrum', 'Sliders'] as const;
 type Tab = typeof TABS[number];
 const TAB_KEY = 'monolith.colorPicker.tab';
@@ -166,6 +177,9 @@ export function ColorPickerPanel() {
   const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
   const [hsv, setHsv] = useState<Hsv>({ h: 0, s: 0, v: 0 });
   const [text, setText] = useState('');
+  const [recent, setRecent] = useState<string[]>(readRecent);
+  const recentRef = useRef(recent);
+  const remember = (value: string) => { const next = addRecentColor(recentRef.current, value); recentRef.current = next; setRecent(next); savePreference(RECENT_KEY, JSON.stringify(next)); };
   const [tab, setTab] = useState<Tab>(readTab);
   const selectTab = (next: Tab) => { setTab(next); savePreference(TAB_KEY, next); };
   const [pos, setPos] = useState<ReturnType<typeof dock> | null>(null);
@@ -193,7 +207,10 @@ export function ColorPickerPanel() {
   }, [id]);
   const hex = hsvToHex(hsv), rgb = hexToRgb(hex);
   const rgbDragging = useRef(false);
-  const commit = (value = hsvToHex(hsvRef.current)) => { colorPicker.get()?.onPick(value); setText(value); };
+  const commit = (value = hsvToHex(hsvRef.current)) => {
+    if (!colorPicker.get() || !isHex(value)) return;
+    value = value.toLowerCase(); colorPicker.get()?.onPick(value); setText(value); remember(value);
+  };
   const preview = (next: Hsv) => { hsvRef.current = next; setHsv(next); setText(hsvToHex(next)); };
   const pick = (value: string) => { preview(hexToHsv(value)); commit(value.toLowerCase()); };
   const dragScope = `${id}:${tab}`;
@@ -271,8 +288,18 @@ export function ColorPickerPanel() {
       <i style={{ left: `${hsv.h / 3.6}%`, background: `hsl(${hsv.h} 100% 50%)` }} /></div>
       </div>}
     </div>
-    <div className="color-pop-presets">{presets.map(c => <button key={c} type="button" aria-label={`Use ${c}`} data-tooltip={c} style={{ background: c }} data-on={c.toLowerCase() === hex}
-      onClick={() => { const n = hexToHsv(c); setHsv(n); commit(c.toLowerCase()); }} />)}</div>
+    <div className="color-pop-collection" role="group" aria-label="Recent colours">
+      <span className="color-pop-caption">Recent colours</span>
+      <div className="color-pop-recent">
+        {recent.map(c => <button key={c} type="button" aria-label={`Recent ${c}`} style={{ background: c }} data-on={c === hex} onClick={() => pick(c)} />)}
+        <button type="button" className="color-pop-add" aria-label="Pin current colour to recent colours" onClick={() => remember(hex)}>+</button>
+      </div>
+    </div>
+    <div className="color-pop-collection" role="group" aria-label="Theme preset colours">
+      <span className="color-pop-caption">Theme presets</span>
+      <div className="color-pop-presets">{presets.map(c => <button key={c} type="button" aria-label={`Use ${c}`} data-tooltip={c} style={{ background: c }} data-on={c === hex}
+        onClick={() => pick(c)} />)}</div>
+    </div>
     <form className="color-pop-row" onSubmit={e => { e.preventDefault(); const v = text.trim().toLowerCase(); const full = v.startsWith('#') ? v : `#${v}`; if (isHex(full)) { setHsv(hexToHsv(full)); commit(full); } }}>
       <input aria-label="Hex colour" spellCheck={false} maxLength={7} value={text} data-invalid={!isHex(text.startsWith('#') ? text : `#${text}`)}
         onChange={e => { const v = e.target.value; setText(v); const full = v.startsWith('#') ? v : `#${v}`; if (isHex(full)) { setHsv(hexToHsv(full)); } }}

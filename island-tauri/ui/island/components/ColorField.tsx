@@ -61,7 +61,7 @@ export function ColorSwatch({ id, label, value, onPick, onReset, resetLabel, cla
   const ref = useRef<HTMLButtonElement>(null);
   // Keep the open panel's callbacks current (settings round-trips re-render the caller).
   useEffect(() => { const a = colorPicker.get(); if (open && a) { a.onPick = onPick; a.onReset = onReset; a.value = value; } });
-  return <button ref={ref} type="button" id={id} className={`color-swatch ${className}`} aria-label={label} aria-expanded={open} data-open={open}
+  return <button ref={ref} type="button" id={id} className={`color-swatch ${className}`} aria-label={label} aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? 'color-picker-panel' : undefined} data-open={open}
     style={{ ['--swatch' as string]: value }}
     onClick={() => {
       if (open) { colorPicker.close(); return; }
@@ -126,10 +126,15 @@ function savePreference(key: string, value: string) {
   try { localStorage.setItem(key, value); } catch { /* Picking still works without storage. */ }
 }
 
-const PANEL_W = 248, PANEL_H = 312, GAP = 14, MARGIN = 8;
-function dock(anchorY: number) {
+export const PANEL_W = 280, PANEL_H = 420;
+const GAP = 14, MARGIN = 8;
+export function dock(anchorY: number) {
+  const width = Math.max(1, Math.min(PANEL_W, innerWidth - 2 * MARGIN));
+  const height = Math.max(1, Math.min(PANEL_H, innerHeight - 2 * MARGIN));
+  const clampX = (x: number) => Math.max(MARGIN, Math.min(x, innerWidth - width - MARGIN));
+  const clampY = (y: number) => Math.max(MARGIN, Math.min(y, innerHeight - height - MARGIN));
   const island = document.querySelector<HTMLElement>('.island[data-state]')?.getBoundingClientRect();
-  if (!island) return { x: innerWidth - PANEL_W - MARGIN, y: MARGIN, side: 'inside' as const };
+  if (!island) return { x: clampX(innerWidth - width - MARGIN), y: MARGIN, width, height, side: 'inside' as const };
   let right = island.right, left = island.left;
   for (const b of document.querySelectorAll<HTMLElement>('[data-side-button]')) {
     if (getComputedStyle(b).visibility === 'hidden') continue;
@@ -137,10 +142,10 @@ function dock(anchorY: number) {
     if (r.top < island.bottom && r.left >= island.right - 1) right = Math.max(right, r.right);
     if (r.top < island.bottom && r.right <= island.left + 1) left = Math.min(left, r.left);
   }
-  const y = Math.max(island.top, Math.min(anchorY - 70, island.bottom - PANEL_H, innerHeight - PANEL_H - MARGIN));
-  if (right + GAP + PANEL_W <= innerWidth - MARGIN) return { x: right + GAP, y, side: 'right' as const };
-  if (left - GAP - PANEL_W >= MARGIN) return { x: left - GAP - PANEL_W, y, side: 'left' as const };
-  return { x: Math.max(MARGIN, island.right - PANEL_W - 12), y, side: 'inside' as const };
+  const y = clampY(Math.max(island.top, Math.min(anchorY - 70, island.bottom - height)));
+  if (right + GAP + width <= innerWidth - MARGIN) return { x: right + GAP, y, width, height, side: 'right' as const };
+  if (left - GAP - width >= MARGIN) return { x: left - GAP - width, y, width, height, side: 'left' as const };
+  return { x: clampX(island.right - width - 12), y, width, height, side: 'inside' as const };
 }
 
 function useDrag(onMove: (fx: number, fy: number) => void, onEnd: () => void, scope: string) {
@@ -190,6 +195,7 @@ export function ColorPickerPanel() {
   const [pos, setPos] = useState<ReturnType<typeof dock> | null>(null);
   const hsvRef = useRef(hsv); hsvRef.current = hsv;
   const id = request?.id;
+  const closePanel = () => { const anchor = colorPicker.get()?.id; colorPicker.close(); if (anchor) document.getElementById(anchor)?.focus({ preventScroll: true }); };
   useEffect(() => { if (request) { const next = hexToHsv(request.value); setHsv(next); setText(request.value.toLowerCase()); } }, [id]);
   useLayoutEffect(() => {
     if (!request) { setPos(null); return; }
@@ -206,10 +212,13 @@ export function ColorPickerPanel() {
   useEffect(() => { window.dispatchEvent(new Event('island-surfaces-changed')); }, [pos?.x, pos?.y, !!request]);
   useEffect(() => {
     if (!request) return;
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); colorPicker.close(); } };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); closePanel(); } };
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   }, [id]);
+  useEffect(() => {
+    if (request && pos) document.querySelector<HTMLElement>('.color-pop [role="tab"][aria-selected="true"]')?.focus({ preventScroll: true });
+  }, [id, !!pos]);
   const hex = hsvToHex(hsv), rgb = hexToRgb(hex);
   const rgbDragging = useRef(false);
   const commit = (value = hsvToHex(hsvRef.current)) => {
@@ -249,22 +258,22 @@ export function ColorPickerPanel() {
     .concat(['#ffffff', '#000000', '#ffd60a', '#80ff36', '#30d5c8', '#5e9eff', '#bf5af2', '#ff453a']).map(c => c.toLowerCase()).filter((c, i, a) => a.indexOf(c) === i).slice(0, 12);
   // Re-report once the exit animation has removed the panel, or its blur/input rect lingers.
   return <AnimatePresence custom={{ keyboard, reduced }} onExitComplete={() => window.dispatchEvent(new Event('island-surfaces-changed'))}>{request && pos && <motion.div key={request.id} className="color-pop" data-island-extension="color-picker" data-dock={pos.side}
-    role="dialog" aria-label={`${request.label} picker`}
-    style={{ position: 'fixed', left: pos.x, top: pos.y, width: PANEL_W, height: PANEL_H,
-      transformOrigin: `${Math.max(0, Math.min(PANEL_W, request.anchorX - pos.x))}px ${Math.max(0, Math.min(PANEL_H, request.anchorY - pos.y))}px` }}
+    id="color-picker-panel" role="dialog" aria-modal="false" aria-label={`${request.label} picker`}
+    style={{ position: 'fixed', left: pos.x, top: pos.y, width: pos.width, height: pos.height,
+      transformOrigin: `${Math.max(0, Math.min(pos.width, request.anchorX - pos.x))}px ${Math.max(0, Math.min(pos.height, request.anchorY - pos.y))}px` }}
     initial={{ opacity: 0, x: reduced || keyboard ? 0 : pos.side === 'left' ? 12 : -12, scale: reduced || keyboard ? 1 : .97 }} animate={{ opacity: 1, x: 0, scale: 1 }}
     exit="closed" variants={{ closed: ({ keyboard, reduced }: { keyboard: boolean; reduced: boolean }) => ({
       opacity: 0, x: reduced || keyboard ? 0 : pos.side === 'left' ? 8 : -8, scale: reduced || keyboard ? 1 : .98,
-      transition: keyboard ? { duration: 0 } : tween(DUR.fast),
+      transition: reduced || keyboard ? { duration: 0 } : tween(DUR.fast),
     }) }}
-    transition={keyboard ? { duration: 0 } : tween(DUR.fast)}>
+    transition={reduced || keyboard ? { duration: 0 } : tween(DUR.base)}>
     <div className="color-pop-head"><span className="color-pop-dot" style={{ background: hex }} /><strong>{request.label}</strong>
       {hasEyeDropper && <button type="button" className="color-pop-pipette" aria-label="Pick colour from screen" disabled={sampling} onClick={sampleScreen}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m2 22 1-1h3l9-9M3 21v-3l9-9m3-3 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
         </svg>
       </button>}
-      <button type="button" className="color-pop-x" aria-label="Close colour picker" onClick={() => colorPicker.close()}>×</button></div>
+      <button type="button" className="color-pop-x" aria-label="Close colour picker" onClick={closePanel}>×</button></div>
     <div className="color-pop-tabs" role="tablist" aria-label="Colour controls">
       <span className="color-pop-pill" aria-hidden="true" style={{ transform: `translateX(${TABS.indexOf(tab) * 100}%)` }} />
       {TABS.map((name, i) => <button key={name} type="button" role="tab" id={`color-tab-${name}`} aria-controls={`color-body-${name}`}
@@ -329,8 +338,8 @@ export function ColorPickerPanel() {
     </div>
     <form className="color-pop-row" onSubmit={e => { e.preventDefault(); submitHex(); }}>
       {hexField('Hex colour')}
-      {request.onReset && <button type="button" className="color-pop-link" title={request.resetLabel ?? 'Follow skin'} onClick={() => { request.onReset?.(); colorPicker.close(); }}>{request.resetLabel ?? 'Follow skin'}</button>}
-      <button type="button" className="color-pop-done" onClick={() => { submitHex(); colorPicker.close(); }}>Done</button>
+      {request.onReset && <button type="button" className="color-pop-link" title={request.resetLabel ?? 'Follow skin'} onClick={() => { request.onReset?.(); closePanel(); }}>{request.resetLabel ?? 'Follow skin'}</button>}
+      <button type="button" className="color-pop-done" onClick={() => { submitHex(); closePanel(); }}>Done</button>
     </form>
   </motion.div>}</AnimatePresence>;
 }

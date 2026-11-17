@@ -49,11 +49,13 @@ test('count settings use the shared stepper, retaining schema ranges and commit-
   assert.doesNotMatch(notch, /<DraftRange aria-label="Shelf size"/);
 });
 
-test('sliders: one token skin, thin accent track, visible thumb and nonwrapping fixed values', () => {
-  const shared = css();
-  assert.match(shared, /::-webkit-slider-runnable-track\s*\{\s*height: 4px/);
-  assert.match(shared, /linear-gradient\(to right, var\(--ui-accent\)/);
-  assert.match(shared, /::-webkit-slider-thumb\s*\{[^}]*width: 16px; height: 16px[^}]*background: var\(--ui-text\)/);
+test('sliders: one token skin, full-thickness pill fill, slim grips and nonwrapping fixed values', () => {
+  const shared = src('ui/island/components/range.css');
+  assert.match(shared, /\.pill-range-track\s*\{[^}]*inset: 3px 0[^}]*background: var\(--v-track\)/);
+  assert.match(shared, /\.pill-range-fill\s*\{[^}]*inset: 0; background: var\(--ui-accent\)[^}]*transform: scaleX\(var\(--fill-ratio\)\)/);
+  assert.match(shared, /::-webkit-slider-thumb\s*\{[^}]*width: 0; height: 20px/);
+  assert.match(shared, /\.fader-track\s*\{[^}]*width: 36px/);
+  assert.match(shared, /\.fader-thumb\s*\{[^}]*width: 20px; height: 3px/);
   assert.match(shared, /\.settings-row output[^}]*flex: 0 0 9ch; width: 9ch; white-space: nowrap/);
   assert.match(src('ui/island/components/AppPrimitives.tsx'), /className="fader-thumb"/);
   for (const path of ['surface.css', 'tokens/light-tone.css', 'media.css']) assert.doesNotMatch(src(`ui/island/${path}`), /::-webkit-slider-|\.fader-fill\s*\{/);

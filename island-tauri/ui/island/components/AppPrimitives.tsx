@@ -41,12 +41,20 @@ export function DraftRange({ value, onCommit, throttleMs = 90, live = true, onDr
   const [dragging, setDragging] = useState(false);
   const lo = Number(rest.min ?? 0), hi = Number(rest.max ?? 100);
   const fill = hi > lo ? Math.max(0, Math.min(100, (draft - lo) / (hi - lo) * 100)) : 0;
-  return <input {...rest} type="range" value={draft} data-dragging={dragging}
-    style={{ ...rest.style, ['--fill' as string]: `${fill}%` }}
-    onPointerDown={e => { active.current = true; setDragging(true); rest.onPointerDown?.(e); }}
-    onPointerUp={e => { setDragging(false); end(); rest.onPointerUp?.(e); }} onPointerCancel={() => { setDragging(false); end(); }} onBlur={e => { setDragging(false); end(); rest.onBlur?.(e); }}
-    onKeyDown={e => { active.current = true; rest.onKeyDown?.(e); }} onKeyUp={e => { end(); rest.onKeyUp?.(e); }}
-    onChange={e => change(Number(e.target.value))} />;
+  return <span className={`pill-range${rest.className ? ` ${rest.className}` : ''}`} data-dragging={dragging}
+    style={{ ...rest.style, ['--fill-ratio' as string]: fill / 100 }}>
+    <span className="pill-range-track" aria-hidden="true">
+      <span className="pill-range-fill" />
+      <span className="pill-range-grip" />
+    </span>
+    <input {...rest} type="range" value={draft} data-dragging={dragging}
+      onPointerDown={e => { active.current = true; setDragging(true); rest.onPointerDown?.(e); }}
+      onPointerUp={e => { setDragging(false); end(); rest.onPointerUp?.(e); }}
+      onPointerCancel={e => { setDragging(false); end(); rest.onPointerCancel?.(e); }}
+      onBlur={e => { setDragging(false); end(); rest.onBlur?.(e); }}
+      onKeyDown={e => { active.current = true; rest.onKeyDown?.(e); }} onKeyUp={e => { end(); rest.onKeyUp?.(e); }}
+      onChange={e => change(Number(e.target.value))} />
+  </span>;
 }
 export function Fader({ value, label, muted, onCommit }: { value: number; label: string; muted: boolean; onCommit(v: number): void }) {
   const [draft, setDraft] = useState(value), [dragging, setDragging] = useState(false), [direct, setDirect] = useState(false);
@@ -61,7 +69,8 @@ export function Fader({ value, label, muted, onCommit }: { value: number; label:
     if (wait <= 0) flush(); else if (!timer.current) timer.current = setTimeout(flush, wait);
   };
   const fromPointer = (y: number) => { const r = track.current?.getBoundingClientRect(); if (r) set((r.bottom - y) / r.height * 100); };
-  return <div className="fader" role="slider" tabIndex={0} aria-label={`${label} volume`} aria-orientation="vertical" aria-valuemin={0} aria-valuemax={100} aria-valuenow={draft} aria-valuetext={`${draft}%`} data-muted={muted}
+  return <div className="fader" role="slider" tabIndex={0} aria-label={`${label} volume`} aria-orientation="vertical" aria-valuemin={0} aria-valuemax={100} aria-valuenow={draft} aria-valuetext={`${draft}%`} data-muted={muted} data-dragging={dragging}
+    style={{ ['--fill-ratio' as string]: draft / 100 }}
     onPointerDown={e => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); setDragging(true); fromPointer(e.clientY); }}
     onPointerMove={e => { if (dragging) fromPointer(e.clientY); }}
     onPointerUp={() => { setDragging(false); flush(); }} onPointerCancel={() => { setDragging(false); flush(); }}

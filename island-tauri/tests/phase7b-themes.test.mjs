@@ -92,7 +92,7 @@ test('light-tone.css has an override for every white-overlay rule in the island 
 test('light tone: inline tile ink follows the tone; faders use the shared accent', () => {
   const light = src('ui/island/tokens/light-tone.css');
   assert.match(src('ui/island/Launcher.tsx'), /var\(--tile-ink, rgb\(255 255 255 \/ \.85\)\)/);
-  assert.match(src('ui/island/components/controls.css'), /\.fader-fill[^}]*background: var\(--ui-accent\)/);
+  assert.match(src('ui/island/components/range.css'), /\.fader-fill[^}]*background: var\(--ui-accent\)/);
   assert.match(light, /--tile-ink:/);
 });
 

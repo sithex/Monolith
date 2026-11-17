@@ -129,7 +129,7 @@ test('mixer drag and key input update a transform directly without spring interp
   } finally { d.dispose(); }
 });
 test('system meter CSS uses transforms and disables interpolation for both reduced-motion sources', () => {
-  const css = readFileSync(new URL('../ui/island/motion-system.css', import.meta.url), 'utf8') + readFileSync(new URL('../ui/island/components/controls.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../ui/island/motion-system.css', import.meta.url), 'utf8') + readFileSync(new URL('../ui/island/components/range.css', import.meta.url), 'utf8');
   assert.match(css, /transform-origin: left/); assert.match(css, /transform-origin: bottom/);
   assert.match(css, /transition: transform var\(--dur-slow\) var\(--ease-out\)/);
   assert.match(css, /html\[data-reduce-motion='true'\]/); assert.match(css, /prefers-reduced-motion: reduce/);

@@ -1,0 +1,78 @@
+/* Pill sliders: native horizontal input, vertical pointer adapter. Only paint owned
+   by these two primitives is styled; colour picker's internal ranges stay separate. */
+.pill-range {
+  position: relative; display: inline-block; vertical-align: middle; flex: 1;
+  min-width: 50px; height: 20px; border-radius: var(--radius-lg);
+}
+.pill-range-track {
+  position: absolute; inset: 3px 0; overflow: hidden; pointer-events: none;
+  border-radius: var(--radius-lg); background: var(--v-track);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.pill-range-fill {
+  position: absolute; inset: 0; background: var(--ui-accent);
+  transform: scaleX(var(--fill-ratio)); transform-origin: left;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+/* A translating full-length rail keeps the grip inset at both 0% and 100%. */
+.pill-range-grip {
+  position: absolute; inset: 0 3px;
+  transform: translateX(calc(var(--fill-ratio) * 100%));
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.pill-range-grip::after {
+  content: ''; position: absolute; left: 0; top: 25%; bottom: 25%; width: 3px;
+  border-radius: 1px; background: var(--ui-on-accent); transform: translateX(-50%);
+}
+.island .pill-range > input[type='range'] {
+  position: absolute; inset: 0; width: 100%; height: 100%; min-width: 0;
+  appearance: none; -webkit-appearance: none; padding: 0; margin: 0; border: 0;
+  opacity: 0; background: transparent; cursor: ew-resize; touch-action: pan-y;
+}
+.island .pill-range > input[type='range']::-webkit-slider-runnable-track { height: 20px; background: transparent; border: 0; }
+.island .pill-range > input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 0; height: 20px; border: 0; background: transparent; }
+.island .pill-range > input[type='range']::-moz-range-track { height: 20px; background: transparent; border: 0; }
+.island .pill-range > input[type='range']::-moz-range-thumb { width: 0; height: 20px; border: 0; background: transparent; }
+.pill-range:has(> input:focus-visible) { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.pill-range:has(> input:disabled) { opacity: .4; }
+.island .pill-range > input:disabled { cursor: default; }
+.pill-range[data-dragging='true'] .pill-range-track { transform: scaleY(1.428571); }
+.pill-range[data-dragging='true'] :is(.pill-range-fill, .pill-range-grip) { transition: none; }
+.island .settings-row > .pill-range { flex: 0 1 46%; width: 46%; max-width: 220px; }
+.island .setting-row > .pill-range { flex: 0 1 180px; width: 180px; margin-left: auto; }
+.island .pill-range.ac-range { flex: none; width: 160px; }
+.settings-row output, .slider-row output, .player-volume > small, .fader-pct, .control-value {
+  flex: 0 0 9ch; width: 9ch; white-space: nowrap; text-align: right;
+  color: var(--ui-text-secondary); font-size: var(--fs-body); font-variant-numeric: tabular-nums;
+}
+.fader { position: relative; width: 40px; height: 160px; flex: none; min-height: 64px; max-height: 160px; display: flex; justify-content: center; cursor: ns-resize; touch-action: none; outline: none; padding: var(--space-2) 0; box-sizing: border-box; }
+.fader-track {
+  position: relative; width: 36px; height: 100%; overflow: hidden;
+  border-radius: calc(var(--radius-lg) + 2px); background: var(--v-track);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.fader-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: var(--ui-accent); transform-origin: bottom; transition: transform var(--dur-base) var(--ease-out); }
+.fader-fill[data-direct='true'] { transition: none; }
+.fader-thumb {
+  position: absolute; width: 20px; height: 3px; left: 50%;
+  /* Keep the grip inside the pill at either end. bottom remains the actual value. */
+  transform: translate(-50%, calc(50% + (var(--fill-ratio) - .5) * 12px));
+  border-radius: 1px; background: var(--ui-on-accent); pointer-events: none;
+}
+.fader[data-muted='true'] .fader-fill { background: var(--ui-text-hint); }
+.fader[data-dragging='true'] .fader-track { transform: scaleX(1.08); }
+.fader:focus-visible .fader-track { outline: 2px solid var(--ui-focus); outline-offset: 4px; }
+.fader-pct { font-weight: var(--fw-strong); height: 20px; flex: none; text-align: center; }
+.island .fader-mute { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; }
+.island .fader-mute[aria-pressed='true'] { color: var(--ui-danger); }
+.fader-mute svg { width: 15px; height: 15px; }
+@media (hover: hover) and (pointer: fine) {
+  .pill-range:hover:not(:has(> input:disabled)) .pill-range-track { transform: scaleY(1.428571); }
+  .fader:hover .fader-track { transform: scaleX(1.08); }
+}
+html:is([data-nav-via='key'], [data-reduce-motion='true']) :is(.pill-range-track, .pill-range-fill, .pill-range-grip, .fader-track, .fader-fill) { transition: none; }
+html:is([data-nav-via='key'], [data-reduce-motion='true']) :is(.pill-range .pill-range-track, .fader .fader-track) { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.pill-range-track, .pill-range-fill, .pill-range-grip, .fader-track, .fader-fill) { transition: none; }
+  .pill-range .pill-range-track, .fader .fader-track { transform: none; }
+}

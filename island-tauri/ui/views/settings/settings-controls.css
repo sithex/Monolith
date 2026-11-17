@@ -34,23 +34,12 @@
 .shortcut-recorder .settings-field-error { margin: 4px 0 0; }
 
 /* ── Font picker ───────────────────────────────────────────────────── */
-.settings-row .font-picker { flex: 0 1 220px; }
-.island .font-picker .dropdown-trigger { min-height: 30px; height: 30px; padding: 0 10px 0 12px; font-size: var(--fs-body); }
-.font-picker .dropdown-menu.font-menu { left: auto; right: 0; width: 300px; max-width: calc(100vw - 48px); max-height: none; overflow: hidden; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
 .font-search { display: flex; align-items: center; gap: var(--space-2); }
 .font-search input[type='search'] { flex: 1; min-width: 0; height: 30px; box-sizing: border-box; padding: 4px 10px; border: .5px solid var(--v-stroke-hi);
   border-radius: var(--radius-lg); background: rgb(0 0 0 / .25); color: var(--ui-text); font: var(--fs-body)/1.4 var(--ui-font); }
 .font-search input[type='search']:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 .font-mono-toggle { flex: none; display: flex; align-items: center; gap: var(--space-1); color: var(--ui-text-secondary); font-size: var(--fs-sm); cursor: pointer; }
 .font-mono-toggle input { margin: 0; accent-color: var(--ui-accent); }
-.font-list { position: relative; overflow-y: auto; overscroll-behavior: contain; }
-.font-option { position: absolute; left: 0; right: 0; box-sizing: border-box; display: flex; align-items: center; gap: var(--space-2); padding: 0 10px;
-  border-radius: var(--radius-lg); font-size: var(--fs-body); color: var(--ui-text); cursor: pointer; }
-.font-option span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.font-option[data-focus='true'] { background: var(--v-hover); }
-.font-option[aria-selected='true'] { color: var(--ui-accent); }
-.font-option svg { width: 14px; height: 14px; flex: none; }
-.font-empty { margin: 0; padding: 10px; color: var(--ui-text-secondary); font-size: var(--fs-body); text-align: center; }
 
 /* ── Per-app notification rules ────────────────────────────────────── */
 .app-rules { padding: 0 0 var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
@@ -59,9 +48,6 @@
 .app-rule-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); }
 .app-rule-toggle { flex: none; display: flex; align-items: center; gap: 6px; color: var(--ui-text-secondary); font-size: var(--fs-sm); cursor: pointer; }
 .island .app-rule-toggle input.switch { transform: scale(.82); transform-origin: right center; }
-.app-rule .dropdown { flex: 0 0 132px; }
-.island .app-rule .dropdown-trigger { min-height: 28px; height: 28px; padding: 0 8px 0 10px; font-size: var(--fs-sm); }
-.app-rule .dropdown-menu { left: auto; min-width: 160px; }
 .island .app-rule-remove { flex: none; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; }
 .app-rule-add { display: flex; align-items: center; gap: var(--space-2); }
 .app-rule-combo { position: relative; flex: 1; min-width: 0; }

@@ -1,0 +1,121 @@
+/* Island dropdown (components/Dropdown.tsx, views/settings/FontPicker.tsx): a pill trigger and a
+   popover card of listbox rows. Imported from Island.tsx after every other island stylesheet,
+   so equal-specificity rules here win. Every colour is a theme token. */
+
+/* ---- Trigger pill ---- */
+.dropdown { position: relative; flex: 1; min-width: 0; --dropdown-ease-exit: cubic-bezier(.4, 0, 1, 1); }
+.settings-row .dropdown { flex: 0 1 220px; }
+.island .dropdown-trigger {
+  width: 100%; display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px 0 14px;
+  border: 0; border-radius: var(--radius-full); background: var(--v-fill); color: var(--ui-text);
+  font-size: var(--fs-body); text-align: left; cursor: pointer; white-space: nowrap;
+  transition: background-color calc(140ms / var(--motion-speed, 1)) var(--ease-out), transform calc(140ms / var(--motion-speed, 1)) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .island .dropdown-trigger:hover:not(:disabled) { background: var(--v-fill-hi); }
+}
+.island .dropdown[data-open='true'] .dropdown-trigger { background: var(--v-fill-hi); }
+.island .dropdown-trigger:active:not(:disabled) { transform: scale(.98); }
+.island .dropdown-trigger:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.island .dropdown-trigger[aria-invalid='true'] { box-shadow: inset 0 0 0 1px var(--ui-danger); }
+.dropdown-icon { flex: none; display: grid; place-items: center; color: var(--ui-text); line-height: 0; }
+.dropdown-icon svg { width: 16px; height: 16px; }
+.dropdown-prefix { flex: none; color: var(--ui-text-secondary); font-weight: var(--fw-regular); }
+.dropdown-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text); font-weight: var(--fw-strong); }
+.dropdown-value[data-placeholder='true'] { color: var(--ui-text-secondary); font-weight: var(--fw-regular); }
+.dropdown-chevron { width: 14px; height: 14px; flex: none; color: var(--ui-text-secondary);
+  transition: transform calc(200ms / var(--motion-speed, 1)) var(--ease-out); }
+.dropdown[data-open='true'] .dropdown-chevron { transform: rotate(180deg); }
+
+/* ---- Popover card ---- */
+.island .dropdown-menu {
+  --dropdown-shadow: 0 0 0 .5px color-mix(in srgb, var(--ui-background) 40%, transparent),
+    0 2px 6px color-mix(in srgb, var(--ui-background) 30%, transparent),
+    0 12px 32px color-mix(in srgb, var(--ui-background) 60%, transparent);
+  position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 30;
+  margin: 0; padding: 6px; list-style: none; max-height: 264px; overflow-y: auto; overscroll-behavior: contain;
+  /* --ui-raised is translucent (a colour-mix under 100 %): lay it over the opaque background. */
+  background-color: var(--ui-background); background-image: linear-gradient(var(--ui-raised), var(--ui-raised));
+  border: .5px solid var(--ui-border); border-radius: var(--radius-3xl); box-shadow: var(--dropdown-shadow);
+  transform-origin: center top;
+  animation: dropdown-in-down calc(220ms / var(--motion-speed, 1)) var(--ease-out) both;
+}
+html[data-tone='light'] .island .dropdown-menu {
+  --dropdown-shadow: 0 0 0 .5px color-mix(in srgb, var(--ui-text) 5%, transparent),
+    0 2px 6px color-mix(in srgb, var(--ui-text) 6%, transparent),
+    0 12px 32px color-mix(in srgb, var(--ui-text) 13%, transparent);
+}
+.island .dropdown[data-up='true'] .dropdown-menu {
+  top: auto; bottom: calc(100% + 8px); transform-origin: center bottom; animation-name: dropdown-in-up;
+}
+/* Exit: faster than the entry, and inert (Dropdown.tsx) so it never takes a click. */
+.island .dropdown-menu[data-state='closing'] {
+  pointer-events: none;
+  animation: dropdown-out-down calc(150ms / var(--motion-speed, 1)) var(--dropdown-ease-exit) both;
+}
+.island .dropdown[data-up='true'] .dropdown-menu[data-state='closing'] { animation-name: dropdown-out-up; }
+/* Menus that hang from the trigger's right edge (controls at the right of a row). */
+.island .dropdown[data-align='end'] .dropdown-menu, .island .font-picker .font-menu, .island .app-rule .dropdown-menu { left: auto; right: 0; transform-origin: right top; }
+.island .dropdown[data-align='end'][data-up='true'] .dropdown-menu, .island .font-picker[data-up='true'] .font-menu,
+.island .app-rule .dropdown[data-up='true'] .dropdown-menu { transform-origin: right bottom; }
+/* From the trigger: the card starts 4 px toward it, slightly small, and settles. Never scale(0). */
+@keyframes dropdown-in-down { from { opacity: 0; transform: translateY(-4px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes dropdown-in-up { from { opacity: 0; transform: translateY(4px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes dropdown-out-down { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-4px) scale(.96); } }
+@keyframes dropdown-out-up { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(4px) scale(.96); } }
+
+/* ---- Rows ---- */
+.island .dropdown-menu li {
+  display: flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 10px 0 12px;
+  border-radius: var(--radius-lg); font-size: var(--fs-body); color: var(--ui-text); cursor: pointer;
+}
+.dropdown-menu .dropdown-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong); }
+.dropdown-menu .dropdown-hint { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-text-secondary); text-align: right; }
+.island .dropdown-menu li[data-focus='true'] { background: var(--v-hover); }
+.dropdown-check, .dropdown-check-slot { width: 14px; height: 14px; flex: none; }
+.dropdown-check { color: var(--ui-accent); }
+/* Stagger: 30 ms per row for the first four rows only (0 / 30 / 60 / 90 ms); later rows join
+   the fourth, so the whole reveal never trails more than 90 ms. */
+.island .dropdown-menu[data-state='open'] > li { animation: dropdown-row-in calc(260ms / var(--motion-speed, 1)) var(--ease-out) backwards; }
+.island .dropdown-menu[data-state='open'] > li:nth-child(2) { animation-delay: calc(30ms / var(--motion-speed, 1)); }
+.island .dropdown-menu[data-state='open'] > li:nth-child(3) { animation-delay: calc(60ms / var(--motion-speed, 1)); }
+.island .dropdown-menu[data-state='open'] > li:nth-child(n+4) { animation-delay: calc(90ms / var(--motion-speed, 1)); }
+@keyframes dropdown-row-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+/* ---- Placements ---- */
+.voice-controls .dropdown { flex: 0 1 200px; width: 200px; }
+.island .voice-controls .dropdown-menu { min-width: max(100%, 200px); z-index: 40; }
+.settings-row .font-picker { flex: 0 1 220px; }
+.island .font-picker .dropdown-trigger { min-height: 30px; height: 30px; }
+.island .font-picker .dropdown-menu.font-menu { width: 300px; max-width: calc(100vw - 48px); max-height: none; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+.font-list { position: relative; overflow-y: auto; overscroll-behavior: contain; }
+.font-option { position: absolute; left: 0; right: 0; box-sizing: border-box; display: flex; align-items: center; gap: var(--space-2); padding: 0 10px 0 12px;
+  border-radius: var(--radius-lg); font-size: var(--fs-body); color: var(--ui-text); cursor: pointer; }
+.font-option span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.font-option[data-focus='true'] { background: var(--v-hover); }
+.font-option svg { width: 14px; height: 14px; flex: none; color: var(--ui-accent); }
+.font-empty { margin: 0; padding: 10px; color: var(--ui-text-secondary); font-size: var(--fs-body); text-align: center; }
+.app-rule .dropdown { flex: 0 0 132px; }
+.island .app-rule .dropdown-trigger { min-height: 28px; height: 28px; padding: 0 8px 0 12px; font-size: var(--fs-sm); }
+.island .app-rule .dropdown-menu { min-width: 160px; }
+/* AI Stats card headers are 16 px tall: a compact pill; the card (overflow: hidden) lets the
+   menu out only while one is mounted. */
+.ai-card-header .dropdown { flex: 0 0 auto; width: 96px; }
+.island .ai-card-header .dropdown-trigger { min-height: 20px; height: 20px; gap: var(--space-1); padding: 0 6px 0 10px; font-size: var(--fs-sm); }
+.island .ai-card-header .dropdown-chevron { width: 12px; height: 12px; }
+.ai-dashboard .ai-card:has(.dropdown-menu) { overflow: visible; }
+.island .ai-card-header .dropdown-menu { min-width: 140px; }
+
+/* ---- Keyboard-driven and reduced motion: instant open/close, no stagger, no press ---- */
+html[data-nav-via='key'] .island .dropdown-menu[data-state], html[data-nav-via='key'] .island .dropdown-menu > li,
+html[data-reduce-motion='true'] .island .dropdown-menu[data-state], html[data-reduce-motion='true'] .island .dropdown-menu > li { animation: none; }
+html[data-nav-via='key'] .island .dropdown-menu[data-state='closing'],
+html[data-reduce-motion='true'] .island .dropdown-menu[data-state='closing'] { visibility: hidden; }
+html[data-nav-via='key'] .dropdown-chevron, html[data-reduce-motion='true'] .dropdown-chevron { transition: none; }
+html[data-reduce-motion='true'] .island .dropdown-trigger:active:not(:disabled) { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  :root .island .dropdown-menu[data-state], :root .island .dropdown-menu > li { animation: none; }
+  :root .island .dropdown-menu[data-state='closing'] { visibility: hidden; }
+  :root .dropdown-chevron { transition: none; }
+  :root .island .dropdown-trigger:active:not(:disabled) { transform: none; }
+}

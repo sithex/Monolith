@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode, type InputHTMLAttributes } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type InputHTMLAttributes } from 'react';
 /**
  * Range input that keeps a local draft while the pointer/keyboard is driving it.
  * The authoritative value (Rust) only replaces the draft when the user is not
@@ -80,56 +80,7 @@ import { Icon } from './Icon';
 import type { IconName, Service } from '../models';
 import { describeServiceReason, type ServiceReasonSource } from '../service-reasons';
 import { SettingsLink } from '../../views/settings/SettingsLink';
-/**
- * Island-styled replacement for a native <select> (WebKitGTK draws GTK's own popup,
- * which ignores the island theme). Listbox semantics + keyboard: arrows, Home/End,
- * Enter/Space, Escape (kept from closing the island), click outside closes.
- */
-export function Dropdown({ label, value, options, onChange, disabled = false, placeholder = 'Choose…' }: {
-  label: string; value: string | null; options: { value: string; label: string }[];
-  onChange(value: string): void; disabled?: boolean; placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false), [focus, setFocus] = useState(0), [up, setUp] = useState(false);
-  const root = useRef<HTMLDivElement>(null), button = useRef<HTMLButtonElement>(null);
-  const id = useId();
-  const current = options.find(o => o.value === value);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('pointerdown', away, true);
-    return () => document.removeEventListener('pointerdown', away, true);
-  }, [open]);
-  const show = () => {
-    if (disabled || !options.length) return;
-    // Open upwards when the scroll pane has no room below (the pane clips the menu).
-    const r = root.current?.getBoundingClientRect(), pane = root.current?.closest('.app-pane')?.getBoundingClientRect();
-    const need = Math.min(options.length, 7) * 34 + 12;
-    setUp(!!r && !!pane && pane.bottom - r.bottom < need && r.top - pane.top > pane.bottom - r.bottom);
-    setFocus(Math.max(0, options.findIndex(o => o.value === value))); setOpen(true);
-  };
-  const pick = (v: string) => { setOpen(false); button.current?.focus(); if (v !== value) onChange(v); };
-  return <div className="dropdown" ref={root} data-open={open} data-up={up} onKeyDown={e => {
-    if (!open) { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); show(); } return; }
-    const move = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
-    if (move) { e.preventDefault(); setFocus(f => (f + move + options.length) % options.length); }
-    else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); setFocus(e.key === 'Home' ? 0 : options.length - 1); }
-    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const o = options[focus]; if (o) pick(o.value); }
-    else if (e.key === 'Escape' || e.key === 'Tab') { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); } setOpen(false); }
-  }}>
-    <button ref={button} type="button" className="dropdown-trigger" aria-label={label} aria-haspopup="listbox" aria-expanded={open} aria-controls={id} disabled={disabled || !options.length}
-      onClick={() => open ? setOpen(false) : show()}>
-      <span className="dropdown-value">{current?.label ?? placeholder}</span>
-      <svg className="dropdown-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-    </button>
-    {open && <ul className="dropdown-menu" role="listbox" id={id} aria-label={label}>
-      {options.map((o, i) => <li key={o.value} role="option" aria-selected={o.value === value} data-focus={i === focus}
-        onPointerEnter={() => setFocus(i)} onClick={() => pick(o.value)}>
-        <span>{o.label}</span>
-        {o.value === value && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>}
-      </li>)}
-    </ul>}
-  </div>;
-}
+export { Dropdown } from './Dropdown';
 export function Empty({ icon, children }: { icon: IconName; children: ReactNode }) {
   return <div className="app-empty"><Icon name={icon}/><p>{children}</p></div>;
 }

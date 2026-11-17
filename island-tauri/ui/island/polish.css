@@ -139,9 +139,6 @@ html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; 
 
 /* Hermes page voice controls (title row, right): saved-voice picker + TTS mute. */
 .voice-controls { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.voice-controls .dropdown { flex: 0 1 168px; width: 168px; }
-.island .voice-controls .dropdown-trigger { min-height: 28px; padding: 4px 8px 4px 10px; border-radius: var(--radius-lg); font-size: var(--fs-body); }
-.voice-controls .dropdown-menu { left: auto; min-width: 100%; z-index: 40; }
 
 
 /* Album scheme (Nov 5): registered colours so a track change crossfades the palette instead

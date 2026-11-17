@@ -60,7 +60,7 @@ export function ColorSwatch({ id, label, value, onPick, onReset, resetLabel, cla
   const open = useSyncExternalStore(colorPicker.subscribe, () => colorPicker.get()?.id === id);
   const ref = useRef<HTMLButtonElement>(null);
   // Keep the open panel's callbacks current (settings round-trips re-render the caller).
-  useEffect(() => { const a = colorPicker.get(); if (open && a) { a.onPick = onPick; a.onReset = onReset; a.value = value; } });
+  useEffect(() => { const a = colorPicker.get(); if (open && a) { a.onPick = onPick; a.onReset = onReset; a.value = value; a.label = label; a.resetLabel = resetLabel; } }, [open, onPick, onReset, value, label, resetLabel]);
   return <button ref={ref} type="button" id={id} className={`color-swatch ${className}`} aria-label={label} aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? 'color-picker-panel' : undefined} data-open={open}
     style={{ ['--swatch' as string]: value }}
     onClick={() => {
@@ -309,9 +309,10 @@ export function ColorPickerPanel() {
             <label htmlFor={`color-channel-${key}`}>{key.toUpperCase()}</label>
             <input id={`color-channel-${key}`} type="range" aria-label={label} min={0} max={255} step={1} value={rgb[key]}
               style={{ background: `linear-gradient(to right, ${rgbToHex(low)}, ${rgbToHex(high)})` }}
-              onPointerDown={e => { rgbDragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); }}
+              onPointerDown={e => { if (e.button !== 0 || !e.isPrimary) return; rgbDragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); }}
               onChange={e => changeChannel(key, Number(e.target.value), !rgbDragging.current)}
               onPointerUp={() => { rgbDragging.current = false; commit(); }} onPointerCancel={() => { rgbDragging.current = false; commit(); }}
+              onLostPointerCapture={() => { if (rgbDragging.current) { rgbDragging.current = false; commit(); } }}
               onBlur={() => { if (rgbDragging.current) { rgbDragging.current = false; commit(); } }} />
             <input type="number" aria-label={`${label} value`} min={0} max={255} step={1} value={rgb[key]}
               onChange={e => changeChannel(key, Number(e.target.value), true)} />
@@ -320,23 +321,23 @@ export function ColorPickerPanel() {
         <label className="color-pop-slider-hex">Hex {hexField('Sliders hex colour')}</label>
       </div>}
       {tab === 'Spectrum' && <div className="color-pop-spectrum">
-    <div className="color-pop-sv" style={{ background: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider" tabIndex={0}
-      aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hsv.s * 100)}
-      aria-valuetext={`${Math.round(hsv.s * 100)}% saturation, ${Math.round(hsv.v * 100)}% brightness, ${hex}`}
-      onKeyDown={e => {
-        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-        e.preventDefault();
-        const delta = e.shiftKey ? .1 : .01;
-        preview({ ...hsvRef.current, s: Math.max(0, Math.min(1, hsv.s + (e.key === 'ArrowRight' ? delta : e.key === 'ArrowLeft' ? -delta : 0))),
-          v: Math.max(0, Math.min(1, hsv.v + (e.key === 'ArrowUp' ? delta : e.key === 'ArrowDown' ? -delta : 0))) }); commit();
-      }}><i style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }} /></div>
-    <div className="color-pop-hue" onPointerDown={hue} tabIndex={0} onKeyDown={e => {
-      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
-      e.preventDefault();
-      const delta = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 1);
-      preview({ ...hsvRef.current, h: e.key === 'Home' ? 0 : e.key === 'End' ? 359.9 : (hsvRef.current.h + delta + 360) % 360 }); commit();
-    }} role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={Math.round(hsv.h)}>
-      <i style={{ left: `${hsv.h / 3.6}%`, background: `hsl(${hsv.h} 100% 50%)` }} /></div>
+        <div className="color-pop-sv" style={{ backgroundColor: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider" tabIndex={0}
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hsv.s * 100)}
+          aria-valuetext={`${Math.round(hsv.s * 100)}% saturation, ${Math.round(hsv.v * 100)}% brightness, ${hex}`}
+          onKeyDown={e => {
+            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+            e.preventDefault();
+            const delta = e.shiftKey ? .1 : .01;
+            preview({ ...hsvRef.current, s: Math.max(0, Math.min(1, hsvRef.current.s + (e.key === 'ArrowRight' ? delta : e.key === 'ArrowLeft' ? -delta : 0))),
+              v: Math.max(0, Math.min(1, hsvRef.current.v + (e.key === 'ArrowUp' ? delta : e.key === 'ArrowDown' ? -delta : 0))) }); commit();
+          }}><i style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }} /></div>
+        <div className="color-pop-hue" onPointerDown={hue} tabIndex={0} onKeyDown={e => {
+          if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+          e.preventDefault();
+          const delta = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 1);
+          preview({ ...hsvRef.current, h: e.key === 'Home' ? 0 : e.key === 'End' ? 359.9 : (hsvRef.current.h + delta + 360) % 360 }); commit();
+        }} role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={Math.round(hsv.h)}>
+          <i style={{ left: `${hsv.h / 3.6}%`, background: `hsl(${hsv.h} 100% 50%)` }} /></div>
       </div>}
       </ColorTabPanel>
       </AnimatePresence>

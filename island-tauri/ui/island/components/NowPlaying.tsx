@@ -9,6 +9,7 @@ import { Icon } from './Icon';
 import { SettingsLink } from '../../views/settings/SettingsLink';
 import { useReducedMotionAll } from './motion-preference';
 import { mediaProgress } from '../media-progress';
+import { friendlyPlayerName } from '../player-name';
 const duration = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 // Keep SSR/test imports side-effect-free; bundler still extracts the component's CSS chunk.
 if (typeof document !== 'undefined') void import('../media.css');
@@ -19,6 +20,16 @@ export function playerStream(track: Track, streams: MixerChanged['streams']): Mi
   const matches = streams.filter(s => names.includes(s.appName.toLowerCase()) || (s.binary !== null && names.includes(s.binary.split('/').pop()?.toLowerCase())));
   // Never guess between two unrelated streams or accidentally change the default sink.
   return matches.length === 1 ? matches[0]! : null;
+}
+/**
+ * The lyrics stage takes half the page, so it only appears when it has something to show: lyrics, or the opt-in
+ * prompt while lyrics are off. A track with no lyrics (or still loading / failed) gets a one-line note instead.
+ */
+export function lyricsStageVisible(lyrics: NowPlayingModel['lyrics'], enabled: boolean): boolean {
+  return !enabled || lyrics.status === 'synced' || !!lyrics.plain;
+}
+export function lyricsNote(status: NowPlayingModel['lyrics']['status']): string {
+  return status === 'loading' ? 'Loading lyrics…' : status === 'instrumental' ? 'Instrumental' : status === 'error' ? 'Lyrics lookup failed. Turn lyrics off and on to retry.' : 'No lyrics found for this track';
 }
 export function NowPlaying({ model, intents, mixer = null, onStreamVolume, lyricsEnabled = model.lyrics.status !== 'off', onLyricsEnabled }: {
   model: NowPlayingModel; intents: { media(action: MediaCommand): void }; mixer?: MixerChanged | null;
@@ -34,16 +45,18 @@ export function NowPlaying({ model, intents, mixer = null, onStreamVolume, lyric
   const stream = playerStream(track, mixer?.available ? mixer.streams : []);
   const mprisVolume = track.volumeWritable && track.volumePercent != null;
   const volume = mprisVolume ? track.volumePercent : stream?.volumePercent ?? null;
-  return <div ref={root} className="now-playing" data-lyrics={showLyrics} data-reduced={reduced}>
-    {showLyrics && <div className="np-backdrop" aria-hidden="true"><SafeImage src={track.artUrl} alt="" /></div>}
+  const stage = showLyrics && lyricsStageVisible(model.lyrics, lyricsEnabled);
+  return <div ref={root} className="now-playing" data-lyrics={stage} data-reduced={reduced}>
+    {stage && <div className="np-backdrop" aria-hidden="true"><SafeImage src={track.artUrl} alt="" /></div>}
     <div className="np-player app-stack">
-      <div className="track-header"><div className="artwork"><Icon name="music"/><ArtworkCrossfade src={track.artUrl} alt={`${track.title} artwork`} reduced={reduced}/></div><div className="track-description"><div className="track-source"><small className="muted">{track.player}</small><span className="music-indicator" role="img" aria-label={track.playing ? 'Playing indicator' : 'Paused indicator'} data-playing={track.playing} data-static={reduced}>{[0,1,2,3,4].map(i => <i key={i}><b/></i>)}</span><span className="music-settings-links"><SettingsLink rowId="lyricsEnabled" label="Lyrics settings"/><SettingsLink rowId="equalizerEnabled" label="Equalizer settings"/></span></div><h2>{track.title || 'Unknown title'}</h2><p>{track.artist || 'Unknown artist'}</p><small className="muted">{track.album}</small></div></div>
+      <div className="track-header"><div className="artwork"><Icon name="music"/><ArtworkCrossfade src={track.artUrl} alt={`${track.title} artwork`} reduced={reduced}/></div><div className="track-description"><div className="track-source"><small className="muted">{friendlyPlayerName(track.player)}</small><span className="music-indicator" role="img" aria-label={track.playing ? 'Playing indicator' : 'Paused indicator'} data-playing={track.playing} data-static={reduced}>{[0,1,2,3,4].map(i => <i key={i}><b/></i>)}</span><span className="music-settings-links"><SettingsLink rowId="lyricsEnabled" label="Lyrics settings"/><SettingsLink rowId="equalizerEnabled" label="Equalizer settings"/></span></div><h2>{track.title || 'Unknown title'}</h2><p>{track.artist || 'Unknown artist'}</p><small className="muted">{track.album}</small></div></div>
       <TrackProgress track={track} root={root} />
       <div className="transport"><button className="transport-skip" aria-label="Previous track" disabled={!track.canControl || !track.canGoPrevious} onClick={() => intents.media({ type: 'previous' })}><TransportGlyph kind="previous" /></button><button className="transport-main" aria-label={track.playing ? 'Pause' : 'Play'} data-playing={track.playing} disabled={!track.canControl} onClick={() => intents.media({ type: 'playPause' })}><TransportGlyph kind="play" /><TransportGlyph kind="pause" /></button><button className="transport-skip" aria-label="Next track" disabled={!track.canControl || !track.canGoNext} onClick={() => intents.media({ type: 'next' })}><TransportGlyph kind="next" /></button></div>
       <div className="player-volume"><span className="muted">Volume</span>{volume !== null ? <DraftRange aria-label="Player volume" min={0} max={100} step={1} value={Math.min(100, Math.max(0, volume))} onCommit={percent => mprisVolume ? intents.media({ type:'volume',percent }) : stream && onStreamVolume?.(stream.index,percent)} /> : <span className="muted">Unavailable for this player</span>}<small className="muted">{volume === null ? '' : `${Math.round(volume)}%`}</small>
         <button type="button" className="lyrics-toggle" aria-label={showLyrics ? 'Hide lyrics' : 'Show lyrics'} aria-pressed={showLyrics} data-tooltip="Lyrics" onClick={() => setShowLyrics(on => !on)}><Icon name="quote" /></button></div>
     </div>
-    {showLyrics && <LyricsStage model={model} track={track} reduced={reduced} enabled={lyricsEnabled} onEnabled={onLyricsEnabled}
+    {showLyrics && lyricsEnabled && !stage && <div className="np-lyrics-line" role="status"><small className="muted">{lyricsNote(model.lyrics.status)}</small><button type="button" className="lyrics-off" onClick={() => onLyricsEnabled?.(false)}>Turn off</button></div>}
+    {stage && <LyricsStage model={model} track={track} reduced={reduced} enabled={lyricsEnabled} onEnabled={onLyricsEnabled}
       seek={track.canControl && track.canSeek ? positionMs => intents.media({ type: 'seek', positionMs }) : null} />}
   </div>;
 }

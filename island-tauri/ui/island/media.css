@@ -89,6 +89,8 @@
 .lyrics-consent p { margin: 0; font-size: var(--fs-lg); font-weight: 600; line-height: 1.35; color: var(--ui-text); opacity: .8; max-width: 34ch; }
 .lyrics-credit { display: flex; align-items: center; gap: 10px; padding: 6px 12px 0; font-size: var(--fs-sm); color: var(--ui-text-hint); }
 .island .now-playing .lyrics-off { margin-left: auto; }
+/* No lyrics to show: the stage is not rendered; this one line replaces it (inside the single-column page). */
+.np-lyrics-line { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
 @container (max-width: 640px) {
   .now-playing[data-lyrics='true'] { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
   .now-playing[data-lyrics='true'] .track-header { flex-direction: row; align-items: center; gap: 18px; }

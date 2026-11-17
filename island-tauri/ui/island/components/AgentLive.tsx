@@ -178,8 +178,28 @@ export function sourcesLine(v: LiveView): string {
   return `plugin ${s.plugin ?? 'n/a'} · plan ${s.plan ?? 'n/a'} · ${s.db === 'db busy' ? 'db busy (last view)' : 'db ' + (s.db ?? 'n/a')} · log ${s.log ?? 'n/a'}`;
 }
 
+/** A session is "live" for this page when the model resolved one (id), found an agent tree, or has session totals. */
+export function hasLiveSession(v: LiveView): boolean {
+  return Boolean(v.who?.id || v.agents?.main || v.session);
+}
+
+/** Replaces the header, Activity, Context, Cache, Turn, Session and Agents cards while no session resolved. */
+function NoSession({ v }: { v: LiveView }) {
+  const db = v.sources?.db;
+  // `no live session` is the db saying the same thing as the title; only a real problem (busy, unreadable) is worth adding.
+  const dbIssue = db && db !== 'ok' && db !== 'n/a' && db !== 'no live session' ? ` (state.db: ${db})` : '';
+  return <section className="ai-card al-empty" aria-label="Live session">
+    <Header title="No live session" kind="now"/>
+    <p className="al-empty-title">No live Hermes session found{dbIssue}</p>
+    <p className="ai-empty">Start a Hermes session and its activity, context, cache and cost appear here.</p>
+    {v.sources?.plugin === 'not installed' && <p className="ai-empty">Detailed activity also needs the optional habby-metrics plugin, which is not installed.</p>}
+  </section>;
+}
+
 export function AgentLivePage({ view, now, onCopy, note, error, extra }: { view: LiveView | null; now: number; onCopy: (id: string) => void; note?: string; error?: string; extra?: ReactNode }) {
   if (!view) return <div className="ai-dashboard al-live"><section className="ai-card"><Header title="Live" kind="now"/><p className="ai-empty">{error ? `Live data unavailable: ${error}` : 'Loading…'}</p></section>{extra}</div>;
+  const footnote = <p className="ai-footnote" title={`$ = ${EST_TIP}`}>{sourcesLine(view)}{error ? ` · refresh failed: ${error}` : ''}{note ? ` · ${note}` : ''}</p>;
+  if (!hasLiveSession(view)) return <div className="ai-dashboard al-live"><NoSession v={view}/><Alerts v={view}/>{extra}{footnote}</div>;
   return <div className="ai-dashboard al-live">
     <LiveHeader v={view} now={now} onCopy={onCopy}/>
     {view.sources?.plugin === 'not installed' && <section className="ai-card al-plugin-empty">
@@ -192,6 +212,6 @@ export function AgentLivePage({ view, now, onCopy, note, error, extra }: { view:
     <div className="ai-two-columns"><Turn v={view}/><Session v={view}/></div>
     <Agents v={view} now={now}/>
     {extra}
-    <p className="ai-footnote" title={`$ = ${EST_TIP}`}>{sourcesLine(view)}{error ? ` · refresh failed: ${error}` : ''}{note ? ` · ${note}` : ''}</p>
+    {footnote}
   </div>;
 }

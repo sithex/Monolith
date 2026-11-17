@@ -73,11 +73,23 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .shelf-footer .app-caption { flex: 1; margin: 0; }
 .shelf-clear { flex: none; }
 .kind-icon { color: var(--ui-accent); display: grid; place-items: center; flex-shrink: 0; }
-.notification-card .app-toolbar { align-items: start; }
-.notification-card .app-toolbar strong { padding-top: 6px; overflow-wrap: anywhere; }
 .notification-icon { width: 28px; height: 28px; margin-top: 4px; border-radius: var(--radius-lg); }
 .notification-body, .clip-preview { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-body); }
 .notification-body { margin-bottom: 10px; }
+/* History: one group per app with a count, one compact line per row (title, repeat count, age, dismiss). */
+.notification-group { display: flex; flex-direction: column; gap: var(--space-1); }
+.notification-group-head { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; }
+.notification-count { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.notification-rows { gap: var(--space-1); }
+.notification-row { background: var(--ui-surface); border-radius: var(--radius-lg); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); min-width: 0; }
+.notification-row-line { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; }
+.notification-row-line strong { font-size: var(--fs-body); font-weight: 600; overflow-wrap: anywhere; }
+.notification-row-line small { font-size: var(--fs-sm); white-space: nowrap; }
+.notification-row .notification-icon { width: 20px; height: 20px; margin: 0; flex: none; border-radius: var(--radius-sm); }
+.notification-repeat { font-size: var(--fs-sm); color: var(--ui-text-secondary); font-variant-numeric: tabular-nums; }
+.notification-row .icon-button { font-size: var(--fs-title); line-height: 1; }
+.notification-row .notification-body, .notification-row > .muted { margin: 0 var(--space-3) var(--space-2) 0; color: var(--ui-text-secondary); }
+.notification-row .app-footer { padding: 0 var(--space-3) var(--space-2) 0; }
 .clip-preview { max-height: 130px; overflow: auto; padding: 10px 0; }
 .track-header { display: flex; align-items: center; gap: 18px; }
 .track-header h2 { font-size: var(--fs-xl); letter-spacing: -.4px; overflow-wrap: anywhere; }
@@ -143,3 +155,21 @@ textarea:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px
 .ac-advanced { display: flex; flex-direction: column; gap: inherit; overflow: hidden; margin-top: -14px; }
 /* The stack gap moves inside the clip, so a closed wrapper takes no space at all. */
 .ac-advanced > :first-child { margin-top: 14px; }
+/* Controls: the three toggles share one row of compact tiles (icon + indicator on top, name, state). */
+.controls-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.controls-tiles .toggle-card { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3); }
+.controls-tiles .tile-action { display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'icon indicator' 'title title'; align-items: center; row-gap: var(--space-2); min-height: 0; }
+.controls-tiles .tile-action > svg { grid-area: icon; }
+.controls-tiles .tile-action > strong { grid-area: title; }
+.controls-tiles .tile-action > .toggle-indicator, .controls-tiles .tile-action > .power-steps { grid-area: indicator; justify-self: end; }
+/* Power profile: one pip per profile, the current one lit; the whole tile cycles to the next. */
+.power-steps { display: inline-flex; gap: var(--space-1); align-items: center; }
+.power-steps i { width: 6px; height: 15px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--ui-text) 28%, transparent); }
+.power-steps i[data-on='true'] { background: var(--ui-accent); }
+/* Tailscale: a one-line summary that expands to the peer list (native details: click or Enter/Space, never persisted). */
+.tailscale-details > summary { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; list-style: none; color: var(--ui-text-hint); min-height: 28px; }
+.tailscale-details > summary::-webkit-details-marker { display: none; }
+.tailscale-details > summary > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tailscale-details > summary::after { content: '›'; font-size: var(--fs-title); line-height: 1; }
+.tailscale-details[open] > summary::after { transform: rotate(90deg); }
+.controls-app > .controls-grid { grid-template-columns: minmax(0, 1fr); }

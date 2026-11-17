@@ -41,6 +41,7 @@
 .ai-session time { margin-left: auto; color: var(--ai-tint); font-variant-numeric: tabular-nums; }
 .ai-dashboard .ai-session p { margin: 1px 0 0; font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 .ai-dashboard .ai-empty { color: var(--ui-text-hint); font-size: var(--fs-sm); margin: 10px 0 0; }
+.ai-dashboard .al-empty-title { font-size: var(--fs-body); font-weight: 600; margin: 10px 0 0; }
 .ai-trend { min-height: 118px; }
 .ai-bars { height: 59px; display: flex; align-items: flex-end; gap: var(--space-1); }
 .ai-bar-slot { height: 100%; display: flex; align-items: flex-end; flex: 1; min-width: 0; }

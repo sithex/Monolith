@@ -238,7 +238,7 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .settings-panel .settings-draft-field .link { align-self: flex-end; }
 /* Weather location, one field group: the saved place over the search field (left column), Clear over
    Find (right column, one width). Search results and errors span both columns under the field. */
-.settings-panel .settings-place { flex-basis: 320px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.settings-panel .settings-place { flex-basis: 320px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding-top: var(--space-1); }
 .settings-place-status { min-width: 0; display: flex; flex-direction: column; line-height: 1.3; overflow-wrap: anywhere; }
 .settings-place-status small { color: var(--ui-text-secondary); font-size: var(--fs-sm); }
 .settings-place > button[type='submit'] { align-self: stretch; }

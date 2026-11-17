@@ -155,7 +155,8 @@ const refinements: Record<string, Partial<RowSpec>> = {
   copyProgress: { synonyms: 'transfer copy move dolphin files percent kio jobs' },
   glassStrength: { synonyms: 'blur glass transparency opacity' },
   dnd: { synonyms: 'mute quiet silence dnd focus' },
-  terminalCommand: { synonyms: 'xterm console shell executable launch' },
+  // The launch command is the owner's own command line: "Reset section" on Terminal leaves it alone.
+  terminalCommand: { synonyms: 'xterm console shell executable launch', resetKeys: [] },
   arrangeApps: { keys: ['moduleRegistry'], resetKeys: [] },
 };
 const rows = (...ids: string[]): RowSpec[] => ids.map(id => {

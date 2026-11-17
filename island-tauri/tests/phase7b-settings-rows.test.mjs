@@ -292,6 +292,8 @@ test('reset section: each section resets exactly the keys its cards reset before
   const all = tabs.flatMap(tab => model.sectionKeys(tab));
   assert.equal(new Set(all).size, all.length);
   assert.ok(!model.sectionKeys('advanced').includes('moduleRegistry') && !model.sectionKeys('apps').includes('moduleRegistry'), 'the app arrangement keeps its resetKeys: []');
+  assert.ok(!all.includes('terminalCommand'), 'no section Reset wipes the Hermes launch command');
+  assert.ok(model.sectionKeys('terminal').includes('terminalFontSize'), 'Terminal still resets its other rows');
   for (const key of ['shelfMaxItems', 'notchBorderOpacity']) assert.ok(model.sectionKeys('notch').includes(key));
   assert.ok(model.sectionKeys('notifications').includes('gameModeDnd') && !model.sectionKeys('notifications').includes('clipboardHistory'));
 });
@@ -335,7 +337,7 @@ test('reset section runtime: Reset on Appearance and on General never writes a k
   await settingsFixture(async h => {
     const fixture = h.load('ui/views/settings-model.ts');
     fixture.cardSpec('layoutEditor').rows.forEach((row, index) => { row.keys = [PLANTED.appearance[index]]; });
-    fixture.SETTINGS_CARDS.push({ id: 'terminalCommand', title: 'Terminal launch', tab: 'general', reset: false, rows: [fixture.rowSpec('terminalCommand')] });
+    fixture.SETTINGS_CARDS.push({ id: 'terminalCommand', title: 'Terminal launch', tab: 'general', reset: false, rows: [{ ...fixture.rowSpec('terminalCommand'), resetKeys: undefined }] });
     assert.deepEqual(fixture.cardKeys('layoutEditor'), PLANTED.appearance); assert.deepEqual(fixture.cardKeys('terminalCommand'), PLANTED.general);
     h.render();
     for (const [tab, planted] of Object.entries(PLANTED)) {

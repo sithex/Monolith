@@ -229,6 +229,20 @@ test('scheme swatch grid runtime: one radiogroup, selected tile checked and the 
   pickerFixture({ value: 'custom' }, tree => assert.ok(nodes(tree).some(node => node.props?.className === 'scheme-custom'), 'Custom opens its seed colours under the grid'));
 });
 
+test('custom scheme seeds preserve the shared ColorSwatch API for all three colour settings', () => {
+  const patches = [];
+  pickerFixture({ value: 'custom', settings: { customAccent: '#112233', customBackground: '#445566', customText: '#778899' }, patch: value => patches.push(value) }, tree => {
+    const fields = nodes(tree).filter(node => node.type === 'color-swatch');
+    assert.deepEqual(fields.map(node => [node.props.id, node.props.label, node.props.value]), [
+      ['scheme-customAccent', 'Custom accent colour', '#112233'],
+      ['scheme-customBackground', 'Custom background colour', '#445566'],
+      ['scheme-customText', 'Custom text colour', '#778899'],
+    ]);
+    for (const field of fields) field.props.onPick('#abcdef');
+    assert.deepEqual(patches, [{ customAccent: '#abcdef' }, { customBackground: '#abcdef' }, { customText: '#abcdef' }]);
+  });
+});
+
 test('scheme swatch grid keyboard: arrows move focus through the grid and across the two groups; Home/End jump', () => {
   const target = schemes.gridTarget, sizes = [13, 16];
   assert.deepEqual([target('ArrowRight', 0, sizes, 4), target('ArrowRight', 12, sizes, 4), target('ArrowRight', 28, sizes, 4)], [1, 13, 28]);

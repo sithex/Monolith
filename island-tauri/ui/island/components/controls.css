@@ -2,20 +2,20 @@
    Selection chips, navigation, tiles, colour controls and lyric lines are not actions. */
 button { color: inherit; cursor: pointer; border: 0; background: none; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
 button:disabled { opacity: .4; cursor: default; }
-:where(.island, .notch-notifications, .color-pop) button {
+:where(.island, .notch-notifications) button {
   font: var(--fw-regular) var(--fs-body)/1.2 var(--ui-font);
   border: 1px solid transparent; border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-3);
   background: var(--v-fill-hi); color: var(--ui-text); cursor: pointer;
   transition: background-color var(--dur-fast) ease, transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) ease;
 }
-.island :is(button[data-variant='primary'], button.primary, button.is-primary, button.style-once, button.timer-start), .color-pop .color-pop-done { background: var(--ui-accent); color: var(--ui-on-accent); font-weight: var(--fw-strong); }
+.island :is(button[data-variant='primary'], button.primary, button.is-primary, button.style-once, button.timer-start) { background: var(--ui-accent); color: var(--ui-on-accent); font-weight: var(--fw-strong); }
 .island :is(button[data-variant='secondary'], button.pill-button):not(.primary) { background: var(--v-fill-hi); color: var(--ui-text); }
-.island :is(button[data-variant='quiet'], button.link, button.icon-button, button.fader-mute, button.approval-expand, button.approval-open, button.approval-dismiss, button.notice-dismiss, button.sound-preview, button.settings-cross-link, button.al-link, button.al-copy, button.lyrics-toggle, button.transport-skip, button.topline-title, button.clock, button.collapse), .color-pop :is(.color-pop-x, .color-pop-link) { background: transparent; color: var(--ui-text-secondary); }
+.island :is(button[data-variant='quiet'], button.link, button.icon-button, button.fader-mute, button.approval-expand, button.approval-open, button.approval-dismiss, button.notice-dismiss, button.sound-preview, button.settings-cross-link, button.al-link, button.al-copy, button.lyrics-toggle, button.transport-skip, button.topline-title, button.clock, button.collapse) { background: transparent; color: var(--ui-text-secondary); }
 .island :is(button[data-variant='danger'], button.danger, button.danger-soft, button.style-deny, button.app-rule-remove, button.voice-mute[data-muted='true']) { background: color-mix(in srgb, var(--ui-danger) 16%, transparent); color: var(--ui-danger); }
 @media (hover: hover) and (pointer: fine) {
   .island button:hover:not(:disabled) { background: var(--v-hover); }
-  .island :is(button[data-variant='primary'], button.primary, button.is-primary, button.style-once, button.timer-start):hover:not(:disabled), .color-pop .color-pop-done:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-accent) 88%, var(--ui-ink)); }
+  .island :is(button[data-variant='primary'], button.primary, button.is-primary, button.style-once, button.timer-start):hover:not(:disabled) { background: color-mix(in srgb, var(--ui-accent) 88%, var(--ui-ink)); }
   .island :is(button[data-variant='quiet'], button.link, button.icon-button):hover:not(:disabled) { color: var(--ui-text); }
   .island :is(button[data-variant='danger'], button.danger, button.danger-soft, button.style-deny, button.app-rule-remove, button.voice-mute[data-muted='true']):hover:not(:disabled) { background: color-mix(in srgb, var(--ui-danger) 24%, transparent); }
 }
@@ -35,8 +35,6 @@ button:disabled { opacity: .4; cursor: default; }
 .island button.al-copy, .island button.al-link { padding: 0 var(--space-1); font-size: var(--fs-sm); line-height: 1.2; }
 .island .icon-button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; }
 .icon-button svg { width: 15px; height: 15px; }
-.color-pop .color-pop-x { font-size: var(--fs-title); line-height: 1; }
-.color-pop button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
 
 /* Notification action buttons use the same family inside the notch and its existing popups. */
 .notch-notifications button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: -2px; }
@@ -45,7 +43,6 @@ button:disabled { opacity: .4; cursor: default; }
 :is(.island, .notch-notifications) .colour-card-copy button[data-copied='true'] { background: var(--ui-accent); color: var(--ui-on-accent); }
 @media (hover: hover) and (pointer: fine) {
   .notch-notifications button:hover:not(:disabled) { background: var(--v-hover); }
-  .color-pop :is(.color-pop-x, .color-pop-link):hover:not(:disabled) { background: var(--v-hover); color: var(--ui-text); }
   .island .notification-content:hover:not(:disabled), .notch-notifications .notification-content:hover:not(:disabled) { background: transparent; }
 }
 .notch-notifications button:active:not(:disabled) { transform: scale(.97); }

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { load } from './phase7b-loader.mjs';
-const { hexToHsv, hsvToHex, isHex } = load('ui/island/components/ColorField.tsx');
+const { hexToHsv, hsvToHex, isHex, PANEL_W, PANEL_H } = load('ui/island/components/ColorField.tsx');
 const { createClickSound, SUSPEND_AFTER_MS, CLOSE_AFTER_MS } = load('ui/island/click-sound.ts');
 const { geometryReport } = load('ui/island/geometry.ts');
 const src = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -22,10 +22,10 @@ test('no settings page uses the native colour input any more', () => {
 });
 
 test('docked island extensions join the input/blur region only while large', () => {
-  const panel = { dataset: { islandExtension: 'color-picker' }, offsetLeft: 900, offsetTop: 60, offsetWidth: 248, offsetHeight: 312, getClientRects: () => [{}] };
+  const panel = { dataset: { islandExtension: 'color-picker' }, offsetLeft: 900, offsetTop: 60, offsetWidth: PANEL_W, offsetHeight: PANEL_H, getClientRects: () => [{}] };
   const outer = { ownerDocument: { querySelectorAll: sel => sel === '[data-island-extension]' ? [panel] : [] }, getBoundingClientRect: () => ({ x: 100, y: 11, width: 600, height: 500 }) };
   globalThis.getComputedStyle = e => ({ visibility: 'visible', borderRadius: e === panel ? '20px' : '28px' });
-  assert.deepEqual(geometryReport(outer, { rev: 1, mode: 'large' }, true, 1).rects[1], { x: 900, y: 60, width: 248, height: 312, radius: 20 });
+  assert.deepEqual(geometryReport(outer, { rev: 1, mode: 'large' }, true, 1).rects[1], { x: 900, y: 60, width: PANEL_W, height: PANEL_H, radius: 20 });
   assert.equal(geometryReport(outer, { rev: 1, mode: 'still' }, true, 1).rects.length, 1);
 });
 

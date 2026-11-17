@@ -106,37 +106,6 @@ html[data-nav-via='key'] .island .app-pane:not([hidden]) > * { animation: none; 
 .terminal-command-presets, .terminal-command-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .terminal-command-presets .pill-button { font-family: var(--ui-mono); }
 
-/* ---- In-island colour picker (replaces the native GTK chooser, which Wayland stacks behind the island) ---- */
-.island .color-swatch { width: 36px; height: 26px; padding: var(--space-1); border-radius: var(--radius-lg); border: 1px solid var(--ui-border); background: transparent; cursor: pointer; flex: none; }
-.island .color-swatch > span { display: block; width: 100%; height: 100%; border-radius: var(--radius-sm); background: var(--swatch); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
-.island .color-swatch[data-open='true'] { border-color: var(--ui-accent); box-shadow: 0 0 0 1px var(--ui-accent); }
-.scheme-seed .color-swatch { width: 30px; height: 24px; }
-.color-pop { z-index: 60; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: var(--space-3); border-radius: var(--radius-4xl);
-  background: var(--ui-background); color: var(--ui-text); border: 1px solid var(--island-border, var(--ui-border)); box-shadow: var(--ui-shadow);
-  font-family: var(--ui-font); font-size: var(--fs-body); user-select: none; -webkit-user-select: none; }
-
-.color-pop-head { display: flex; align-items: center; gap: var(--space-2); height: 22px; }
-.color-pop-head strong { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.color-pop-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .3); flex: none; }
-.color-pop-x { width: 22px; height: 22px; padding: 0; }
-.color-pop-sv { position: relative; height: 138px; flex: none; border-radius: var(--radius-lg); cursor: crosshair; touch-action: none;
-  background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent) !important; background-blend-mode: normal; }
-.color-pop-sv { box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .12); }
-.color-pop-sv i, .color-pop-hue i { position: absolute; width: 14px; height: 14px; margin: -8px 0 0 -8px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 .5px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .45); pointer-events: none; }
-.color-pop-hue { position: relative; height: 12px; flex: none; border-radius: var(--radius-sm); cursor: ew-resize; touch-action: none;
-  background: linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00); }
-.color-pop-hue i { top: 50%; }
-.color-pop-presets { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-1); }
-.color-pop-presets button { aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .25); }
-.color-pop-presets button[data-on='true'] { box-shadow: 0 0 0 2px var(--ui-accent); }
-.color-pop-row { display: flex; align-items: center; gap: 6px; margin-top: auto; }
-.color-pop-row input { width: 0; flex: 1; height: 28px; padding: 0 var(--space-2); border-radius: var(--radius-lg); border: 1px solid var(--ui-border); background: rgb(255 255 255 / .04);
-  color: var(--ui-text); font: var(--fs-body) var(--ui-mono); user-select: text; -webkit-user-select: text; outline: none; }
-.color-pop-row input:focus { border-color: var(--ui-accent); }
-.color-pop-row input[data-invalid='true'] { border-color: #ff453a; }
-.color-pop-link { height: 28px; white-space: nowrap; }
-.color-pop-done { height: 28px; }
-
 /* Hermes page voice controls (title row, right): saved-voice picker + TTS mute. */
 .voice-controls { display: flex; align-items: center; gap: 6px; min-width: 0; }
 

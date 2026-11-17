@@ -71,8 +71,8 @@ fn grid(s: &Stack, c: &RustConnection, w: u32, e: &mut Wheel, o: (i32, i32)) {
     settled(s, c, w, IslandMode::Large);
 }
 pub(super) fn begin_edit(s: &Stack, e: &mut Wheel, o: (i32, i32)) {
-    // The toolbar's direct "Edit" button (Launcher.tsx); the old options popover is gone.
-    click(s, e, o, ".launcher-toolbar [aria-label='Edit apps']");
+    // Edit lives in the page title bar; the grid toolbar exists only after entering edit.
+    click(s, e, o, ".island-shell [aria-label='Edit apps']");
     until(
         s,
         "7b server entered edit",

@@ -275,25 +275,16 @@ fn settings_section(s: &Stack, eis: &mut Wheel, origin: (i32, i32), section: &st
         ),
     );
 }
-/// Pick a colour scheme through the real picker. Schemes with variants live inside a
-/// collapsible family row (SchemePicker.tsx): open the family first when its radio is hidden.
-fn pick_scheme(s: &Stack, eis: &mut Wheel, origin: (i32, i32), id: &str, family: &str) {
-    let radio = format!("[data-testid=appearance-{id}]");
-    if eval(s, &format!("!document.querySelector({})", json!(radio))) == true {
-        click(
-            s,
-            eis,
-            origin,
-            &format!("[data-testid=scheme-family-{family}]"),
-        );
-        until(
-            s,
-            &format!("7a scheme family {family} expanded"),
-            8,
-            &format!("document.querySelector('[data-testid=scheme-family-{family}]')?.getAttribute('aria-expanded')==='true' && !!document.querySelector({})", json!(radio)),
-        );
-    }
+/// Pick the current swatch tile with real input and verify the radio selection.
+fn pick_scheme(s: &Stack, eis: &mut Wheel, origin: (i32, i32), id: &str) {
+    let radio = format!("[role=radiogroup][aria-label='Colour scheme'] [role=radio][data-testid=appearance-{id}]");
     click(s, eis, origin, &radio);
+    until(
+        s,
+        &format!("7a scheme {id} selected"),
+        8,
+        &format!("document.querySelector({})?.getAttribute('aria-checked')==='true'", json!(radio)),
+    );
 }
 fn view(
     s: &Stack,
@@ -612,10 +603,9 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     // iteration is a real change that must persist without a restart.
     for theme in ["neutral", "skin"] {
         view(&s, &conn, window, &mut eis, origin, "settings");
-        // Colour schemes live in Settings → Look (SettingsView.tsx).
-        settings_section(&s, &mut eis, origin, "look");
-        // skin is a standalone row; neutral lives in the Monolith family.
-        pick_scheme(&s, &mut eis, origin, theme, "monolith");
+        // Every scheme is a directly selectable tile in Settings → Appearance.
+        settings_section(&s, &mut eis, origin, "appearance");
+        pick_scheme(&s, &mut eis, origin, theme);
         until(
             &s,
             "7a appearance changed without restart",
@@ -686,10 +676,10 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                 std::thread::sleep(Duration::from_millis(400));
                 let text = eval(&s, "document.querySelector('.app-pane:not([hidden])').innerText");
                 let text = text.as_str().unwrap().to_lowercase();
-                // Seven-section icon rail.
+                // Eight-section labeled rail.
                 assert_eq!(
                     eval(&s, "[...document.querySelectorAll('.settings-rail [data-section]')].map(b=>b.dataset.section).join(',')"),
-                    "general,notifications,look,notch,terminal,apps,island",
+                    "general,appearance,notch,companion,notifications,apps,terminal,advanced",
                     "settings rail sections"
                 );
                 assert!(
@@ -699,7 +689,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                 // Rendered layout of every section: the rail keeps its width and sits left of the
                 // content, nothing spills past the pane horizontally, every row's control stays
                 // inside its row, and a row's label never overlaps its control.
-                for section in ["general", "notifications", "look", "notch", "terminal", "apps", "island"] {
+                for section in ["general", "appearance", "notch", "companion", "notifications", "apps", "terminal", "advanced"] {
                     eval(&s, &format!("document.querySelector('.settings-rail [data-section={section}]').click()"));
                     std::thread::sleep(Duration::from_millis(450));
                     let g = eval(&s, "(()=>{const R=e=>e.getBoundingClientRect(),rail=R(document.querySelector('.settings-rail')),c=document.querySelector('.settings-content'),cr=R(c),pane=R(document.querySelector('.app-pane:not([hidden])'));\
@@ -708,7 +698,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                         return (out||lap)?(r.dataset.settingId||r.textContent.slice(0,30))+(out?':out':':overlap'):null}).filter(Boolean);\
                         const cards=[...c.querySelectorAll(':scope > .settings-card, :scope > section')].filter(e=>e.offsetParent).map(R);const cardGap=cards.length<2?99:Math.min(...cards.slice(1).map((b,i)=>b.top-cards[i].bottom));\
                         return {rail:rail.width,gap:cr.left-rail.right,cardGap,fitClient:c.clientHeight,fitScroll:c.scrollHeight,spill:c.scrollWidth-c.clientWidth,paneRight:pane.right-cr.right,rows:c.querySelectorAll('.settings-row').length,bad}})()");
-                    assert!((30.0..=56.0).contains(&g["rail"].as_f64().unwrap()), "{section}: rail width {g}");
+                    assert!((g["rail"].as_f64().unwrap() - 150.0).abs() < 1.0, "{section}: rail width {g}");
                     assert!(g["gap"].as_f64().unwrap() >= 0.0, "{section}: content overlaps rail {g}");
                     assert!(g["spill"].as_f64().unwrap() <= 1.0, "{section}: horizontal overflow {g}");
                     assert!(g["paneRight"].as_f64().unwrap() >= -1.0, "{section}: content past the pane {g}");
@@ -744,9 +734,9 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     );
     until(&s, "7a outer surface offset applied event-driven", 8, &format!("(()=>{{const r=document.querySelector('.island').getBoundingClientRect();return Math.abs(r.x-{})<0.1&&Math.abs(r.y-{})<0.1}})()",before.x+24.,before.y+12.));
     settled(&s, &conn, window, IslandMode::Large);
-    settings_section(&s, &mut eis, origin, "look");
+    settings_section(&s, &mut eis, origin, "appearance");
     // Leave a non-default choice persisted so the reload below proves it was read back.
-    pick_scheme(&s, &mut eis, origin, "neutral", "monolith");
+    pick_scheme(&s, &mut eis, origin, "neutral");
     until(
         &s,
         "7a neutral re-selected",

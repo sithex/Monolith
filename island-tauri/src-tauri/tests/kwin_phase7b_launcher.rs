@@ -116,30 +116,47 @@ fn settled(s: &Stack, c: &RustConnection, w: u32, mode: IslandMode) {
     );
 }
 fn point(s: &Stack, origin: (i32, i32), selector: &str) -> (i32, i32) {
-    let p=eval(s,&format!("(()=>{{const q={0};const e=document.querySelector(q);if(!e)throw Error('Missing real input target '+q+'; present: '+[...document.querySelectorAll('[data-testid]')].map(e=>e.dataset.testid).join(' '));e.scrollIntoView({{block:'nearest'}});const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()",json!(selector)));
-    (
-        origin.0 + p[0].as_f64().unwrap() as i32,
-        origin.1 + p[1].as_f64().unwrap() as i32,
-    )
+    // Entering edit and completing a timer both reflow the page. DOM presence is not
+    // actionability: the real pointer takes time to arrive, so do not aim mid-animation.
+    eval(s, &format!("(()=>{{const e=document.querySelector({0});if(!e)throw Error('Missing real input target '+{0});e.scrollIntoView({{block:'nearest'}});return true}})()", json!(selector)));
+    let mut previous = (f64::NAN, f64::NAN);
+    let mut since = Instant::now();
+    let p = wait_for(
+        &format!("7b stable real input target {selector}"),
+        Duration::from_secs(8),
+        || {
+            let p = eval(s, &format!("(()=>{{const e=document.querySelector({});if(!e)return null;const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;return {{x,y,ready:r.width>0&&r.height>0&&!e.disabled&&Number(getComputedStyle(e).opacity)>=.99&&e.contains(document.elementFromPoint(x,y))}}}})()", json!(selector)));
+            let (Some(x), Some(y)) = (p["x"].as_f64(), p["y"].as_f64()) else {
+                since = Instant::now();
+                return None;
+            };
+            // Allow subpixel jiggle, not the tens-of-pixels edit/completion reflow.
+            if p["ready"] != true || !previous.0.is_finite()
+                || (x - previous.0).abs() > 2.0 || (y - previous.1).abs() > 2.0
+            {
+                previous = (x, y);
+                since = Instant::now();
+            }
+            (p["ready"] == true && since.elapsed() >= Duration::from_millis(250))
+                .then_some((x, y))
+        },
+    );
+    (origin.0 + p.0 as i32, origin.1 + p.1 as i32)
 }
 fn click(s: &Stack, e: &mut Wheel, origin: (i32, i32), selector: &str) {
     let p = point(s, origin, selector);
     e.click_at(p.0, p.1);
 }
-/// Pick a colour scheme through the real picker. Schemes with variants live inside a
-/// collapsible family row (SchemePicker.tsx): open the family first when its radio is hidden.
-fn pick_scheme(s: &Stack, e: &mut Wheel, o: (i32, i32), id: &str, family: &str) {
-    let radio = format!("[data-testid=appearance-{id}]");
-    if eval(s, &format!("!document.querySelector({})", json!(radio))) == true {
-        click(s, e, o, &format!("[data-testid=scheme-family-{family}]"));
-        until(
-            s,
-            &format!("7b scheme family {family} expanded"),
-            8,
-            &format!("document.querySelector('[data-testid=scheme-family-{family}]')?.getAttribute('aria-expanded')==='true' && !!document.querySelector({})", json!(radio)),
-        );
-    }
+/// Pick the current swatch tile with real input and verify the radio selection.
+fn pick_scheme(s: &Stack, e: &mut Wheel, o: (i32, i32), id: &str) {
+    let radio = format!("[role=radiogroup][aria-label='Colour scheme'] [role=radio][data-testid=appearance-{id}]");
     click(s, e, o, &radio);
+    until(
+        s,
+        &format!("7b scheme {id} selected"),
+        8,
+        &format!("document.querySelector({})?.getAttribute('aria-checked')==='true'", json!(radio)),
+    );
 }
 /// Select the stable section ID on the Settings rail (ui/views/SettingsView.tsx).
 fn settings_section(s: &Stack, e: &mut Wheel, o: (i32, i32), section: &str) {
@@ -271,8 +288,8 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     let pty = status(&s)["pty"].clone();
     for theme in ["skin", "neutral"] {
         open(&s, &c, w, &mut e, o, "settings");
-        settings_section(&s, &mut e, o, "look");
-        pick_scheme(&s, &mut e, o, theme, "monolith");
+        settings_section(&s, &mut e, o, "appearance");
+        pick_scheme(&s, &mut e, o, theme);
         until(
             &s,
             "7b real theme selection",
@@ -340,7 +357,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
             "document.querySelector('.app-grid')?.dataset.editing==='false'",
         );
         open(&s, &c, w, &mut e, o, "settings");
-        settings_section(&s, &mut e, o, "island");
+        settings_section(&s, &mut e, o, "appearance");
         point(&s, o, ".layout-editor");
         settled(&s, &c, w, IslandMode::Large);
         capture(&s, &c, w, &format!("{theme}-layout"));
@@ -351,7 +368,7 @@ fn launcher_apps_layout_and_draft_use_real_input_in_private_instance() {
     click(&s, &mut e, o, ".terminal");
     e.send("chord 29 22");
     open(&s, &c, w, &mut e, o, "settings");
-    settings_section(&s, &mut e, o, "island");
+    settings_section(&s, &mut e, o, "appearance");
     // First size tile = Compact (360 wide), LayoutEditor.tsx TILES. The editor lays itself out
     // from an async geometry reply, so let the surface and the tile rect settle before pressing.
     settled(&s, &c, w, IslandMode::Large);

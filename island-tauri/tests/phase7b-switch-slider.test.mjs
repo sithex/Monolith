@@ -154,7 +154,7 @@ test('DraftRange pending timers flush on release and are removed when unmounted'
   const count = commits.length; d.dispose(); advance(100); assert.equal(commits.length, count);
 });
 
-test('Fader retains wheel/keyboard math, bounds, aria and slim grip position, with direct pointer following and final flushing', t => {
+test('Fader retains wheel/keyboard math, bounds and aria, with relative pointer dragging, tap-to-set and final flushing', t => {
   const advance = clock(t), d = driver(), { Fader } = d.load('ui/island/components/AppPrimitives.tsx'), commits = [];
   const props = { value: 50, label: 'Output', muted: true, onCommit: v => commits.push(v) };
   const render = () => d.render(Fader, props);
@@ -166,7 +166,6 @@ test('Fader retains wheel/keyboard math, bounds, aria and slim grip position, wi
     const check = value => {
       const tree = render(), all = nodes(tree);
       assert.equal(tree.props['aria-valuenow'], value); assert.equal(tree.props['aria-valuetext'], `${value}%`);
-      assert.equal(all.find(n => n.props?.className === 'fader-thumb').props.style.bottom, `${value}%`);
       assert.equal(all.find(n => n.props?.className === 'fader-fill').props.style.transform, `scaleY(${value / 100})`);
     };
     let stopped = 0;
@@ -182,11 +181,19 @@ test('Fader retains wheel/keyboard math, bounds, aria and slim grip position, wi
     tree = render(); nodes(tree).find(n => n.props?.className === 'fader-track').props.ref.current = { getBoundingClientRect: () => ({ bottom: 200, height: 200 }) };
     let captured;
     tree.props.onPointerDown({ button: 0, pointerId: 7, clientY: 50, currentTarget: { setPointerCapture: n => { captured = n; } } });
-    check(75); assert.equal(captured, 7); assert.equal(render().props['data-dragging'], true);
-    tree = render(); tree.props.onPointerMove({ clientY: 80 }); check(60);
+    check(100); assert.equal(captured, 7); assert.equal(render().props['data-dragging'], true, 'grabbing does not jump');
+    tree = render(); tree.props.onPointerMove({ clientY: 51 }); check(100);
+    tree = render(); tree.props.onPointerMove({ clientY: 130 }); check(60);
+    tree = render(); tree.props.onPointerMove({ clientY: 10 }); check(100);
+    assert.notEqual(nodes(render()).find(n => n.props?.className === 'fader-track').props['data-stretch'], 'none', 'overshoot rubber-bands');
+    tree = render(); tree.props.onPointerMove({ clientY: 130 }); check(60);
     assert.equal(nodes(render()).find(n => n.props?.className === 'fader-fill').props['data-direct'], true);
     render().props.onPointerUp(); assert.equal(commits.at(-1), 60);
     advance(100); assert.equal(commits.at(-1), 60); assert.equal(render().props['data-dragging'], false);
+    assert.equal(nodes(render()).find(n => n.props?.className === 'fader-track').props['data-stretch'], 'none');
+    check(60); // held: the stale backend value (50) does not snap it back while the write settles
+    tree = render(); tree.props.onPointerDown({ button: 0, pointerId: 8, clientY: 150, currentTarget: { setPointerCapture() {} } });
+    render().props.onPointerUp({ clientY: 150 }); check(25); assert.equal(commits.at(-1), 25, 'a tap sets the tapped level');
   } finally { d.dispose(); }
 });
 

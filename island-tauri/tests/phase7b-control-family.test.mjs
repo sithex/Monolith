@@ -54,10 +54,10 @@ test('sliders: one token skin, full-thickness pill fill, slim grips and nonwrapp
   assert.match(shared, /\.pill-range-track\s*\{[^}]*inset: 3px 0[^}]*background: var\(--v-track\)/);
   assert.match(shared, /\.pill-range-fill\s*\{[^}]*inset: 0; background: var\(--ui-accent\)[^}]*transform: scaleX\(var\(--fill-ratio\)\)/);
   assert.match(shared, /::-webkit-slider-thumb\s*\{[^}]*width: 0; height: 20px/);
-  assert.match(shared, /\.fader-track\s*\{[^}]*width: 36px/);
-  assert.match(shared, /\.fader-thumb\s*\{[^}]*width: 20px; height: 3px/);
+  assert.match(shared, /\.fader-track\s*\{[^}]*width: 46px/);
+  assert.doesNotMatch(shared, /\.fader-thumb/, 'iOS fader: no knob');
   assert.match(shared, /\.settings-row output[^}]*flex: 0 0 9ch; width: 9ch; white-space: nowrap/);
-  assert.match(src('ui/island/components/AppPrimitives.tsx'), /className="fader-thumb"/);
+  assert.match(src('ui/island/components/AppPrimitives.tsx'), /className="fader-icon"/);
   for (const path of ['surface.css', 'tokens/light-tone.css', 'media.css']) assert.doesNotMatch(src(`ui/island/${path}`), /::-webkit-slider-|\.fader-fill\s*\{/);
 });
 
@@ -72,9 +72,9 @@ test('shared fader: bounds, keyboard values, labels and shortcut isolation survi
       assert.equal(slider.props.role, 'slider'); assert.equal(slider.props['aria-label'], 'Output volume');
       assert.equal(slider.props['aria-valuenow'], expected); assert.equal(slider.props['aria-valuetext'], `${expected}%`);
       assert.equal(slider.props['aria-orientation'], 'vertical');
-      assert.equal(nodes(slider).find(n => n.props.className === 'fader-thumb').props.style.bottom, `${expected}%`);
+      assert.equal(nodes(slider).find(n => n.props.className === 'fader-fill').props.style.transform, `scaleY(${expected / 100})`);
     }
-    assert.deepEqual(commits, [100,100,0,0,10,12,2]); d.dispose();
+    assert.deepEqual(commits, [100,0,10,12,2], "a key that cannot move past a bound sends no redundant write"); d.dispose();
   });
 });
 

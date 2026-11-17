@@ -226,6 +226,17 @@ impl Model {
             .map_err(|_| IslandError::invalid("Mixer command invalid"))
     }
 }
+/// Read back only what a command can change: a dragged fader sends many volume writes, and a
+/// full sinks + streams + icon reload per write is what made the queue fall behind.
+fn readback_scope(op: &MixerOp) -> RefreshScope {
+    match op {
+        MixerOp::SinkVolume { .. } | MixerOp::SinkMute { .. } => RefreshScope::Sinks,
+        MixerOp::StreamVolume { .. } | MixerOp::StreamMute { .. } | MixerOp::AppVolume { .. } => {
+            RefreshScope::Streams
+        }
+        MixerOp::DefaultSink { .. } | MixerOp::MoveStream { .. } => RefreshScope::Both,
+    }
+}
 fn bad() -> IslandError {
     IslandError::unavailable("Mixer observations invalid or incomplete")
 }
@@ -273,8 +284,9 @@ async fn session(
             result=&mut errors=>{result?;return Err(IslandError::unavailable("pactl subscription closed"));}
             request=rx.recv()=>{
                 let Some(request)=request else{return Ok(());};if request.reply.is_closed(){continue;}
+                let scope=readback_scope(&request.op);
                 let commands=match model.commands(request.op){Ok(c)=>c,Err(e)=>{respond(request.reply,Err(e));continue;}};
-                let result=async {for command in commands {runner.text(&command).await?;} model.load(runner,RefreshScope::Both).await?;Ok(service.publish(model.wire()))}.await;
+                let result=async {for command in commands {runner.text(&command).await?;} model.load(runner,scope).await?;Ok(service.publish(model.wire()))}.await;
                 let failed=result.is_err();respond(request.reply,result);
                 if failed {return Err(IslandError::unavailable("Mixer command/readback failed; group writes may be partial"));}
             }

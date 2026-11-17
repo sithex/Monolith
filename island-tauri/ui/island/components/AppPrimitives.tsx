@@ -56,32 +56,93 @@ export function DraftRange({ value, onCommit, throttleMs = 90, live = true, onDr
       onChange={e => change(Number(e.target.value))} />
   </span>;
 }
-export function Fader({ value, label, muted, onCommit }: { value: number; label: string; muted: boolean; onCommit(v: number): void }) {
+/** Speaker glyph whose waves follow the level, as on iOS: muted/0 → none, then 1–3 waves. */
+function LevelGlyph({ value, muted }: { value: number; muted: boolean }) {
+  const waves = muted || value <= 0 ? 0 : value < 34 ? 1 : value < 67 ? 2 : 3;
+  return <svg className="fader-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3.5 9.5h3.2L11 5.5v13l-4.3-4H3.5z" fill="currentColor" />
+    {muted ? <path d="M15.5 9.5l5 5m0-5-5 5" /> : <>
+      <path d="M14.6 9.6a3.4 3.4 0 0 1 0 4.8" opacity={waves >= 1 ? 1 : .25} />
+      <path d="M17.2 7.2a6.8 6.8 0 0 1 0 9.6" opacity={waves >= 2 ? 1 : .25} />
+      <path d="M19.8 4.8a10.2 10.2 0 0 1 0 14.4" opacity={waves >= 3 ? 1 : .25} />
+    </>}
+  </svg>;
+}
+/** Settle window: after local input the fader keeps its own value until the backend reports it
+ *  (±1 for pactl rounding) or this long passes, so late replies can never replay the drag. */
+const FADER_HOLD_MS = 1200, FADER_COMMIT_MS = 33, FADER_STRETCH_PX = 12;
+/**
+ * iOS Control Centre style vertical volume fader: wide rounded slab, fill from the bottom, no knob,
+ * level glyph inside. Dragging is relative (grab anywhere, no jump), overshoot rubber-bands the slab,
+ * a tap without movement jumps to the tapped level. Pointer input paints directly; commits are
+ * throttled to ~30 Hz and the caller coalesces them (latest wins), so the audio server never backs up.
+ */
+export function Fader({ value, label, muted, onCommit, onDraft }: { value: number; label: string; muted: boolean; onCommit(v: number): void; onDraft?(v: number | null): void }) {
   const [draft, setDraft] = useState(value), [dragging, setDragging] = useState(false), [direct, setDirect] = useState(false);
+  const [stretch, setStretch] = useState(0);  // signed fraction of the slab height
   const track = useRef<HTMLDivElement>(null), last = useRef(0), pending = useRef<number | null>(null), timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hold = useRef<number | null>(null), settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const grab = useRef<{ y: number; v: number; moved: boolean } | null>(null);
+  const draftRef = useRef(draft); draftRef.current = draft;
+  const valueRef = useRef(value); valueRef.current = value;
+  const draggingRef = useRef(false);
   const commit = useRef(onCommit); commit.current = onCommit;
-  useEffect(() => { if (!dragging) { setDraft(value); setDirect(false); } }, [value, dragging]);
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const report = useRef(onDraft); report.current = onDraft;
+  const release = () => { hold.current = null; setDraft(valueRef.current); setDirect(false); report.current?.(null); };
+  const armSettle = () => {
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => { settle.current = null; if (draggingRef.current) armSettle(); else if (hold.current !== null) release(); }, FADER_HOLD_MS);
+  };
+  useEffect(() => {
+    if (draggingRef.current) return;
+    if (hold.current !== null) {
+      if (Math.abs(value - hold.current) > 1) return;  // a stale reply from earlier in the gesture
+      if (settle.current) { clearTimeout(settle.current); settle.current = null; }
+    }
+    release();
+  }, [value]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); if (settle.current) clearTimeout(settle.current); }, []);
   const flush = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } if (pending.current !== null) { commit.current(pending.current); pending.current = null; last.current = performance.now(); } };
   const set = (v: number) => {
-    v = Math.max(0, Math.min(100, Math.round(v))); setDirect(true); setDraft(v); pending.current = v;
-    const wait = 60 - (performance.now() - last.current);
+    v = Math.max(0, Math.min(100, Math.round(v)));
+    setDirect(true); hold.current = v; armSettle(); report.current?.(v);
+    if (v === draftRef.current && pending.current === null) return;
+    draftRef.current = v; setDraft(v); pending.current = v;
+    const wait = FADER_COMMIT_MS - (performance.now() - last.current);
     if (wait <= 0) flush(); else if (!timer.current) timer.current = setTimeout(flush, wait);
   };
+  const height = () => track.current?.getBoundingClientRect().height || 1;
   const fromPointer = (y: number) => { const r = track.current?.getBoundingClientRect(); if (r) set((r.bottom - y) / r.height * 100); };
+  const end = () => {
+    const g = grab.current; grab.current = null; draggingRef.current = false;
+    setDragging(false); setStretch(0); flush(); report.current?.(hold.current);
+    return g;
+  };
+  // Rubber band: overshoot past either end stretches the slab with diminishing returns.
+  const band = (over: number) => Math.sign(over) * FADER_STRETCH_PX * (1 - Math.exp(-Math.abs(over) / 40));
   return <div className="fader" role="slider" tabIndex={0} aria-label={`${label} volume`} aria-orientation="vertical" aria-valuemin={0} aria-valuemax={100} aria-valuenow={draft} aria-valuetext={`${draft}%`} data-muted={muted} data-dragging={dragging}
     style={{ ['--fill-ratio' as string]: draft / 100 }}
-    onPointerDown={e => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); setDragging(true); fromPointer(e.clientY); }}
-    onPointerMove={e => { if (dragging) fromPointer(e.clientY); }}
-    onPointerUp={() => { setDragging(false); flush(); }} onPointerCancel={() => { setDragging(false); flush(); }}
-    onWheel={e => { e.stopPropagation(); set(draft - Math.sign(e.deltaY || -e.deltaX) * 2); }}
+    onPointerDown={e => {
+      if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId);
+      grab.current = { y: e.clientY, v: draftRef.current, moved: false }; draggingRef.current = true; setDragging(true); setDirect(true);
+    }}
+    onPointerMove={e => {
+      const g = grab.current; if (!g) return;
+      const dy = g.y - e.clientY; if (!g.moved && Math.abs(dy) < 3) return; g.moved = true;
+      const px = height(), raw = g.v + dy / px * 100, clamped = Math.max(0, Math.min(100, raw));
+      setStretch(band((raw - clamped) / 100 * px) / px); set(clamped);
+    }}
+    onPointerUp={e => { const g = end(); if (g && !g.moved) { fromPointer(e.clientY); flush(); } }}
+    onPointerCancel={() => { end(); }}
+    onWheel={e => { e.stopPropagation(); set(draftRef.current - Math.sign(e.deltaY || -e.deltaX) * 2); }}
     onKeyDown={e => {
       const step = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 2 : e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? -2 : e.key === 'PageUp' ? 10 : e.key === 'PageDown' ? -10 : 0;
-      if (step || e.key === 'Home' || e.key === 'End') { e.preventDefault(); e.stopPropagation(); set(e.key === 'Home' ? 0 : e.key === 'End' ? 100 : draft + step); }
+      if (step || e.key === 'Home' || e.key === 'End') { e.preventDefault(); e.stopPropagation(); set(e.key === 'Home' ? 0 : e.key === 'End' ? 100 : draftRef.current + step); }
     }}>
-    <div className="fader-track" ref={track}>
+    <div className="fader-track" ref={track} data-stretch={stretch > 0 ? 'up' : stretch < 0 ? 'down' : 'none'}
+      style={{ ['--stretch' as string]: 1 + Math.abs(stretch) }}>
       <div className="fader-fill" data-direct={dragging || direct} style={{ transform: `scaleY(${draft / 100})` }} />
-      <span className="fader-thumb" style={{ bottom: `${draft}%` }} aria-hidden="true" />
+      <span className="fader-icon" data-covered={draft >= 16} aria-hidden="true"><LevelGlyph value={draft} muted={muted} /></span>
     </div>
   </div>;
 }

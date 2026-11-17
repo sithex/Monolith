@@ -117,11 +117,11 @@ test('mixer drag and key input update a transform directly without spring interp
     const props = { value: 20, label: 'Fixture', muted: false, onCommit() {} };
     let tree = d.render(Fader, props);
     nodes(tree).find(n => n.props?.className === 'fader-track').props.ref.current = { getBoundingClientRect: () => ({ bottom: 200, height: 200 }) };
-    tree.props.onPointerDown({ button: 0, pointerId: 1, clientY: 50, currentTarget: { setPointerCapture() {} } });
+    tree.props.onPointerDown({ button: 0, pointerId: 1, clientY: 100, currentTarget: { setPointerCapture() {} } });
     tree = d.render(Fader, props);
     let fill = nodes(tree).find(n => n.props?.className === 'fader-fill');
-    assert.equal(fill.props.style.transform, 'scaleY(0.75)'); assert.equal(fill.props['data-direct'], true);
-    tree.props.onPointerMove({ clientY: 80 }); tree = d.render(Fader, props);
+    assert.equal(fill.props.style.transform, 'scaleY(0.2)'); assert.equal(fill.props['data-direct'], true);
+    tree.props.onPointerMove({ clientY: 20 }); tree = d.render(Fader, props);
     fill = nodes(tree).find(n => n.props?.className === 'fader-fill'); assert.equal(fill.props.style.transform, 'scaleY(0.6)');
     tree.props.onKeyDown({ key: 'ArrowDown', preventDefault() {}, stopPropagation() {} }); tree = d.render(Fader, props);
     fill = nodes(tree).find(n => n.props?.className === 'fader-fill'); assert.equal(fill.props.style.transform, 'scaleY(0.58)');

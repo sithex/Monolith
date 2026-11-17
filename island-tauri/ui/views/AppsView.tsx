@@ -5,7 +5,8 @@ import { useSettings } from '../stores';
 import { useNotifications } from '../ipc/notifications';
 import { appStores, clipboardHistory, useClipboardHistory, useApp, useMedia, useLyrics, useEqualizer, useWeather, usePower, useBluetooth, serviceStatus } from '../stores/apps';
 import { CalendarEventEditor } from './CalendarEventEditor';
-import { enqueueEpochCommand } from './app-lifecycle';
+import { createLatestWins, enqueueEpochCommand } from './app-lifecycle';
+import type { MixerOp } from '../ipc/bindings';
 import { createEpochTopic } from '../stores/epoch-topic';
 import { createVisiblePoller } from './visible-poller';
 import { createMediaVisibility } from './media-visibility';
@@ -48,6 +49,14 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
 
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const run = (work: () => Promise<unknown>) => { queue.current = queue.current.catch(() => undefined).then(work).catch(error => setNotice(String(error))); };
+  const latest = useRef(createLatestWins()).current;
+  // Volume drags send many values; coalesce per channel so only the newest waits behind the one in flight.
+  const mixerCommand = (op: MixerOp) => {
+    const key = op.type === 'sinkVolume' ? `sink:${op.name}` : op.type === 'streamVolume' ? `stream:${op.index}` : null;
+    const send = () => appApi.mixerCommand(op);
+    if (key === null) enqueueEpochCommand(appStores.mixer, run, send);
+    else enqueueEpochCommand(appStores.mixer, work => latest(key, run, work), send);
+  };
   useEffect(() => { timerPoller.setVisible(active && view === 'timer'); }, [active, view, timerPoller]);
   useEffect(() => () => timerPoller.dispose(), [timerPoller]);
   useEffect(() => {
@@ -94,7 +103,7 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
         copy: path => run(async () => { if (!await copyText(path)) throw Error('Could not copy the path'); setNotice('Path copied'); }) }} />;
     if (view === 'autoclicker' && autoclicker) content = <AutoclickerApp model={autoclicker}
       intents={{ autoclicker: op => enqueueEpochCommand(appStores.autoclicker, run, () => appApi.autoclickerCommand(op)) }} />;
-    if (view === 'mixer' && mixer) content = <VolumeMixer model={adapt.adaptMixer(mixer)} intents={{ mixer: op => enqueueEpochCommand(appStores.mixer,run,()=>appApi.mixerCommand(op)) }} />;
+    if (view === 'mixer' && mixer) content = <VolumeMixer model={adapt.adaptMixer(mixer)} intents={{ mixer: mixerCommand }} />;
     if (view === 'brightness' && brightness) content = <Brightness displays={adapt.adaptBrightness(brightness)} intents={{ brightness: op => enqueueEpochCommand(appStores.brightness,run,()=>appApi.brightnessCommand(op)) }} />;
     if (view === 'controls') content = <div className="app-stack" data-testid="controls-runtime"><ControlsApp model={adapt.adaptIndependentControls(toggles,tiles,updates)} intents={{
       toggle: op => enqueueEpochCommand(appStores.toggles,run,()=>appApi.togglesCommand(op)),
@@ -113,7 +122,7 @@ export function AppsView({ view, active }: { view: IslandView; active: boolean }
         if (clipboardHistory.isCurrent(epoch)) { clipboardHistory.invalidate(); if (op.type === 'pause') await clipboardHistory.refreshStatus(); }
       });
     } }} />;
-    if (view === 'music') content = <NowPlaying model={{ nowPlaying: media === null ? null : media.nowPlaying, lyrics: lyrics === null ? { status:'off',lines:[],plain:null,activeIndex:null } : adapt.parseLyrics(lyrics), equalizer: equalizer === null ? { active:false,bands:[] } : adapt.parseEqualizer(equalizer) }} intents={{ media: op => run(() => mediaControl(op)) }} mixer={mixer} onStreamVolume={(index, percent) => enqueueEpochCommand(appStores.mixer,run,()=>appApi.mixerCommand({ type:'streamVolume',index,percent }))} lyricsEnabled={settings.lyricsEnabled} onLyricsEnabled={enabled => run(async () => (await import('../stores')).saveSettings({ lyricsEnabled:enabled }))} />;
+    if (view === 'music') content = <NowPlaying model={{ nowPlaying: media === null ? null : media.nowPlaying, lyrics: lyrics === null ? { status:'off',lines:[],plain:null,activeIndex:null } : adapt.parseLyrics(lyrics), equalizer: equalizer === null ? { active:false,bands:[] } : adapt.parseEqualizer(equalizer) }} intents={{ media: op => run(() => mediaControl(op)) }} mixer={mixer} onStreamVolume={(index, percent) => mixerCommand({ type:'streamVolume',index,percent })} lyricsEnabled={settings.lyricsEnabled} onLyricsEnabled={enabled => run(async () => (await import('../stores')).saveSettings({ lyricsEnabled:enabled }))} />;
     if (view === 'quickInfo') content = <QuickInfo model={adapt.adaptQuickInfo(weather,power,bluetooth?.devices ?? [], { weather: serviceStatus('weather')?.detail ?? 'Unavailable', power: serviceStatus('power')?.detail ?? 'Unavailable', bluetooth: serviceStatus('bluetooth')?.available ? null : serviceStatus('bluetooth')?.detail ?? 'Unavailable' })} />;
     if (view === 'calendar' && calendarData) {
       const first = new Date(month.getFullYear(),month.getMonth(),1); first.setDate(first.getDate()-first.getDay());

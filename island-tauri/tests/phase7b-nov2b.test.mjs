@@ -98,7 +98,12 @@ test('the native notch follows the scheme (hover tint = scheme accent) and the r
   const island = src('ui/island/Island.tsx');
   assert.match(island, /notchSchemeSet\(JSON\.parse\(notchScheme\)\)/);
   assert.match(island, /setProperty\('--notch-text', \(scheme \?\? palette\)\.text\)/);
-  assert.match(src('src-tauri/src/integrations/plasma/runtime.rs'), /let palette = scheme\.or\(skin\);/);
+  {
+    // F3: an explicit scheme palette wins; Skin uses the artwork palette; Pending never invents colours.
+    const rt = src('src-tauri/src/integrations/plasma/runtime.rs');
+    assert.match(rt, /NotchScheme::Palette\(palette\) => Some\(palette\.as_ref\(\)\.clone\(\)\)/);
+    assert.match(rt, /NotchScheme::Skin => skin\.cached\(\)/);
+  }
 });
 
 test('side-button hover is explicit state cleared by the real X11 leave, not a sticky :hover', () => {

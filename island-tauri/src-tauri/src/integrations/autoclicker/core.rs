@@ -159,6 +159,32 @@ pub fn to_json(c: &AutoclickerConfig) -> String {
     serde_json::to_string_pretty(c).unwrap_or_default()
 }
 
+/// xorshift64*: cheap, good enough to humanise intervals, never used for anything secret.
+pub struct Jitter(u64);
+impl Jitter {
+    pub fn new(seed: u64) -> Self {
+        Self(seed | 1)
+    }
+    fn next(&mut self) -> u64 {
+        let mut x = self.0;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.0 = x;
+        x.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+    /// `interval_ms` spread uniformly by ±`percent`, in microseconds, never below 1 ms.
+    pub fn interval_us(&mut self, interval_ms: u32, percent: u32) -> u64 {
+        let base = u64::from(interval_ms) * 1000;
+        if percent == 0 {
+            return base;
+        }
+        let spread = base * u64::from(percent.min(MAX_JITTER_PERCENT)) / 100;
+        let offset = self.next() % (2 * spread + 1);
+        (base + offset).saturating_sub(spread).max(1000)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,31 +225,5 @@ mod tests {
         assert_eq!(restored.config.target, ClickTarget::Key);
         assert_eq!(restored.config.key, "Space");
         assert_eq!(restored.lifetime_clicks, 0);
-    }
-}
-
-/// xorshift64*: cheap, good enough to humanise intervals, never used for anything secret.
-pub struct Jitter(u64);
-impl Jitter {
-    pub fn new(seed: u64) -> Self {
-        Self(seed | 1)
-    }
-    fn next(&mut self) -> u64 {
-        let mut x = self.0;
-        x ^= x >> 12;
-        x ^= x << 25;
-        x ^= x >> 27;
-        self.0 = x;
-        x.wrapping_mul(0x2545_F491_4F6C_DD1D)
-    }
-    /// `interval_ms` spread uniformly by ±`percent`, in microseconds, never below 1 ms.
-    pub fn interval_us(&mut self, interval_ms: u32, percent: u32) -> u64 {
-        let base = u64::from(interval_ms) * 1000;
-        if percent == 0 {
-            return base;
-        }
-        let spread = base * u64::from(percent.min(MAX_JITTER_PERCENT)) / 100;
-        let offset = self.next() % (2 * spread + 1);
-        (base + offset).saturating_sub(spread).max(1000)
     }
 }

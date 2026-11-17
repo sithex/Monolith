@@ -45,6 +45,7 @@ import './icon-motion.css';
 import './tokens/light-tone.css';
 import './tokens/scheme-picker.css';
 import '../views/settings/settings-controls.css';
+import './components/color-picker.css';
 import { schemePalette, schemeById, isLightPalette } from './tokens/schemes';
 import { useHermesThemeSync, themePayload } from './hermes-theme';
 import { notchSchemeSet } from '../ipc/client';

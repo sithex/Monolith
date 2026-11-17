@@ -55,6 +55,17 @@ export function ColorSwatch({ id, label, value, onPick, onReset, resetLabel, cla
     }}><span /></button>;
 }
 
+const TABS = ['Grid', 'Spectrum', 'Sliders'] as const;
+type Tab = typeof TABS[number];
+const TAB_KEY = 'monolith.colorPicker.tab';
+function readTab(): Tab {
+  try { const tab = localStorage.getItem(TAB_KEY); if (TABS.includes(tab as Tab)) return tab as Tab; } catch { /* Storage may be unavailable. */ }
+  return 'Grid';
+}
+function savePreference(key: string, value: string) {
+  try { localStorage.setItem(key, value); } catch { /* Picking still works without storage. */ }
+}
+
 const PANEL_W = 248, PANEL_H = 312, GAP = 14, MARGIN = 8;
 function dock(anchorY: number) {
   const island = document.querySelector<HTMLElement>('.island[data-state]')?.getBoundingClientRect();
@@ -94,6 +105,8 @@ export function ColorPickerPanel() {
   const keyboard = typeof document !== 'undefined' && document.documentElement.dataset.navVia === 'key';
   const [hsv, setHsv] = useState<Hsv>({ h: 0, s: 0, v: 0 });
   const [text, setText] = useState('');
+  const [tab, setTab] = useState<Tab>(readTab);
+  const selectTab = (next: Tab) => { setTab(next); savePreference(TAB_KEY, next); };
   const [pos, setPos] = useState<ReturnType<typeof dock> | null>(null);
   const hsvRef = useRef(hsv); hsvRef.current = hsv;
   const id = request?.id;
@@ -137,10 +150,24 @@ export function ColorPickerPanel() {
     transition={keyboard ? { duration: 0 } : tween(DUR.fast)}>
     <div className="color-pop-head"><span className="color-pop-dot" style={{ background: hex }} /><strong>{request.label}</strong>
       <button type="button" className="color-pop-x" aria-label="Close colour picker" onClick={() => colorPicker.close()}>×</button></div>
+    <div className="color-pop-tabs" role="tablist" aria-label="Colour controls">
+      <span className="color-pop-pill" aria-hidden="true" style={{ transform: `translateX(${TABS.indexOf(tab) * 100}%)` }} />
+      {TABS.map((name, i) => <button key={name} type="button" role="tab" id={`color-tab-${name}`} aria-controls={`color-body-${name}`}
+        aria-selected={tab === name} tabIndex={tab === name ? 0 : -1} onClick={() => selectTab(name)}
+        onKeyDown={e => {
+          const next = e.key === 'ArrowRight' ? (i + 1) % 3 : e.key === 'ArrowLeft' ? (i + 2) % 3 : e.key === 'Home' ? 0 : e.key === 'End' ? 2 : -1;
+          if (next < 0) return;
+          e.preventDefault(); selectTab(TABS[next]); document.getElementById(`color-tab-${TABS[next]}`)?.focus();
+        }}>{name}</button>)}
+    </div>
+    <div className="color-pop-body" role="tabpanel" id={`color-body-${tab}`} aria-labelledby={`color-tab-${tab}`}>
+      {tab === 'Spectrum' && <>
     <div className="color-pop-sv" style={{ background: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider"
       aria-valuetext={hex}><i style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }} /></div>
     <div className="color-pop-hue" onPointerDown={hue} role="slider" aria-label="Hue" aria-valuemin={0} aria-valuemax={360} aria-valuenow={Math.round(hsv.h)}>
       <i style={{ left: `${hsv.h / 3.6}%`, background: `hsl(${hsv.h} 100% 50%)` }} /></div>
+      </>}
+    </div>
     <div className="color-pop-presets">{presets.map(c => <button key={c} type="button" aria-label={`Use ${c}`} data-tooltip={c} style={{ background: c }} data-on={c.toLowerCase() === hex}
       onClick={() => { const n = hexToHsv(c); setHsv(n); commit(c.toLowerCase()); }} />)}</div>
     <form className="color-pop-row" onSubmit={e => { e.preventDefault(); const v = text.trim().toLowerCase(); const full = v.startsWith('#') ? v : `#${v}`; if (isHex(full)) { setHsv(hexToHsv(full)); commit(full); } }}>

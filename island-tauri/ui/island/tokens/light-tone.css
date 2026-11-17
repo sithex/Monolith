@@ -31,12 +31,7 @@ html[data-tone='light'] .le-notch { box-shadow: 0 0 0 .5px color-mix(in srgb, va
 html[data-tone='light'] .le-mini-term { background: color-mix(in srgb, var(--ui-text) 3.5%, transparent); }
 html[data-tone='light'] .island .le-chip { background: color-mix(in srgb, var(--ui-text) 5%, transparent); }
 html[data-tone='light'] .le-tile { background: color-mix(in srgb, var(--ui-text) 5%, transparent); border: 1px solid color-mix(in srgb, var(--ui-text) 7%, transparent); }
-html[data-tone='light'] .island .color-swatch > span { box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ui-text) 18%, transparent); }
-html[data-tone='light'] .color-pop-dot { box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ui-text) 30%, transparent); }
 
-html[data-tone='light'] .color-pop-sv { box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ui-text) 12%, transparent); }
-html[data-tone='light'] .color-pop-presets button { box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ui-text) 25%, transparent); }
-html[data-tone='light'] .color-pop-row input { background: color-mix(in srgb, var(--ui-text) 4%, transparent); }
 
 /* surface.css */
 html[data-tone='light'][data-glass='true'] .island .card,

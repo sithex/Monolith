@@ -37,6 +37,22 @@ export function bindInstantTooltips(doc: Document, win: Window, show: (button: H
   return () => { observer.disconnect(); for (const [node, type, listener] of events) node.removeEventListener(type, listener, true); hide(); };
 }
 
+type Box = { left: number; top: number; right: number; bottom: number; width: number; height: number };
+export type TooltipSide = 'below' | 'left' | 'right';
+const GAP = 6, INSET = 8;
+/** Beside its button: below (above when there is no room) or, for side buttons, outward. */
+export function placeTooltip(button: Box, tip: { width: number; height: number }, bounds: Box, side: TooltipSide) {
+  const maxWidth = bounds.width - 2 * INSET, width = Math.min(tip.width, maxWidth);
+  const clampX = (x: number) => Math.max(bounds.left + INSET, Math.min(bounds.right - width - INSET, x));
+  const clampY = (y: number) => Math.max(bounds.top + INSET, Math.min(bounds.bottom - tip.height - INSET, y));
+  const centredY = clampY(button.top + (button.height - tip.height) / 2);
+  if (side === 'left' && button.left - GAP - width >= bounds.left + INSET) return { left: button.left - GAP - width, top: centredY, maxWidth };
+  if (side === 'right' && button.right + GAP + width <= bounds.right - INSET) return { left: button.right + GAP, top: centredY, maxWidth };
+  const below = button.bottom + GAP, above = button.top - GAP - tip.height;
+  const top = below + tip.height <= bounds.bottom - INSET || above < bounds.top + INSET ? clampY(below) : above;
+  return { left: clampX(button.left + (button.width - width) / 2), top, maxWidth };
+}
+
 export function InstantTooltip() {
   const [target, setTarget] = useState<HTMLButtonElement | null>(null);
   const [position, setPosition] = useState({ left: 0, top: 0, maxWidth: 0 });
@@ -44,18 +60,17 @@ export function InstantTooltip() {
   useEffect(() => bindInstantTooltips(document, window, setTarget), []);
   useLayoutEffect(() => {
     if (!target || !tip.current) return;
-    // Paint within the existing island rectangle. Never tag as data-island-extension:
-    // tooltips neither grow the input region nor intercept a pointer on the desktop.
-    const island = document.querySelector('.island')?.getBoundingClientRect();
-    if (!island) return;
-    const button = target.getBoundingClientRect(), inset = 12;
-    tip.current.style.maxWidth = `${island.width - 2 * inset}px`;
-    const box = tip.current.getBoundingClientRect(), width = Math.min(box.width, island.width - 2 * inset);
-    setPosition({
-      left: Math.max(island.left + inset, Math.min(island.right - width - inset, button.left + (button.width - width) / 2)),
-      top: Math.max(island.top + inset, Math.min(island.bottom - box.height - inset, button.bottom + 4)),
-      maxWidth: island.width - 2 * inset,
-    });
+    // Bound to the surface the button sits on (island body or a docked extension such as the
+    // colour picker); side buttons sit outside both, so they use the window. Clamping a side
+    // button's tip into the island body is what threw it away from the pointer. Never tag the
+    // tip as data-island-extension: it neither grows the input region nor intercepts a pointer.
+    const surface = target.closest('.island, [data-island-extension]');
+    const bounds: Box = surface?.getBoundingClientRect()
+      ?? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight, width: window.innerWidth, height: window.innerHeight };
+    const sideAttr = target.closest<HTMLElement>('[data-side]')?.dataset.side;
+    const side: TooltipSide = sideAttr === 'left' || sideAttr === 'right' ? sideAttr : 'below';
+    tip.current.style.maxWidth = `${bounds.width - 2 * INSET}px`;
+    setPosition(placeTooltip(target.getBoundingClientRect(), tip.current.getBoundingClientRect(), bounds, side));
   }, [target]);
   return target && <div ref={tip} id={ID} role="tooltip" className="instant-tooltip" style={{ ...position, maxWidth: position.maxWidth || undefined }}>
     {target.dataset.tooltip || target.getAttribute('aria-label')}

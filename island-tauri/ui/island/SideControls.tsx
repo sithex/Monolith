@@ -60,7 +60,7 @@ function SideBubble({ button, diameter, gap, progress, interactive, open, naviga
   }, [hovered]);
   const lifted = hovered && interactive;
   const reducedIcon = useReducedMotionAll();
-  return <motion.div data-side-button={button.id} data-interactive={interactive} className="side-anchor" aria-hidden={!interactive}
+  return <motion.div data-side-button={button.id} data-side={side} data-interactive={interactive} className="side-anchor" aria-hidden={!interactive}
     style={{ position: 'fixed', width: diameter, height: diameter, borderRadius: diameter / 2, visibility, pointerEvents: interactive ? 'auto' : 'none' }}>
     <svg className="side-neck" aria-hidden="true" width={diameter} height={diameter}><motion.path d={neck} style={{ opacity }} /></svg>
     <motion.div className="side-emergence" style={{ x, y, scale, opacity }}>

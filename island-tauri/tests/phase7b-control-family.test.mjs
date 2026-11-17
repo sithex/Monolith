@@ -83,9 +83,10 @@ function emitter(extra = {}) {
   return { ...extra, listeners, addEventListener(type, f) { listeners.set(type, f); }, removeEventListener(type) { listeners.delete(type); }, fire(type, event = {}) { listeners.get(type)?.({ type, ...event }); } };
 }
 function fixture() {
+  const island = { getBoundingClientRect: () => ({ left: 20, right: 930, top: 8, bottom: 708, width: 910, height: 700 }) };
   const attrs = new Map([['aria-label', 'Next track'], ['aria-describedby', 'existing-help']]);
   const button = { dataset: {}, disabled: false, textContent: '', isConnected: true,
-    closest(selector) { return selector === 'button' ? this : null; }, contains(node) { return node === this; },
+    closest(selector) { return selector === 'button' ? this : selector === '.island, [data-island-extension]' ? island : null; }, contains(node) { return node === this; },
     getAttribute(name) { return attrs.get(name) ?? null; }, setAttribute(name, value) { attrs.set(name, value); }, removeAttribute(name) { attrs.delete(name); },
     getBoundingClientRect: () => ({ left: 890, right: 920, top: 675, bottom: 700, width: 30, height: 25 }),
   };
@@ -125,7 +126,7 @@ test('tooltip: rendering stays inside island bounds and cannot expand/intercept 
     tree.props.ref.current = { style: {}, getBoundingClientRect: () => ({ width: 100, height: 30 }) }; d.flushEffects();
     tree = d.renderOnly(InstantTooltip, {});
     assert.equal(tree.props.role, 'tooltip'); assert.equal(tree.props.tabIndex, undefined);
-    assert.equal(tree.props.style.left, 818); assert.equal(tree.props.style.top, 666);
+    assert.equal(tree.props.style.left, 822); assert.equal(tree.props.style.top, 639, 'flips above when there is no room below');
     assert.equal(tree.props['data-island-extension'], undefined);
     assert.match(css(), /\.instant-tooltip\s*\{[^}]*position: fixed;[^}]*pointer-events: none/);
     assert.doesNotMatch(src('ui/island/components/InstantTooltip.tsx'), /\.focus\(|setTimeout\(/); d.dispose();
@@ -157,4 +158,19 @@ test('icon action hints: native titles never return on SVG/icon-only buttons', (
     }
     visit(source);
   }
+});
+
+test('tooltip placement: hugs its button, side buttons point outward, picker swatches stay on the picker', () => {
+  const d = driver(), { placeTooltip } = d.load('ui/island/components/InstantTooltip.tsx');
+  const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
+  const win = box(0, 0, 1400, 900), tip = { width: 80, height: 24 };
+  // Left side button at x 300..336: tip sits just left of it, vertically centred.
+  assert.deepEqual(placeTooltip(box(300, 100, 36, 36), tip, win, 'left'), { left: 214, top: 106, maxWidth: 1384 });
+  assert.deepEqual(placeTooltip(box(1000, 100, 36, 36), tip, win, 'right'), { left: 1042, top: 106, maxWidth: 1384 });
+  // No room outward: falls back to below the button, not into some far surface.
+  assert.equal(placeTooltip(box(10, 100, 36, 36), tip, win, 'left').top, 142);
+  // Swatch inside a docked picker: bounded by the picker, directly under the swatch.
+  const picker = box(940, 10, 300, 400), swatch = box(1000, 200, 20, 20);
+  assert.deepEqual(placeTooltip(swatch, tip, picker, 'below'), { left: 970, top: 226, maxWidth: 284 });
+  d.dispose();
 });

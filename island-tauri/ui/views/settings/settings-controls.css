@@ -18,7 +18,7 @@
 .shortcut-recorder { flex: 0 1 220px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; padding: var(--space-1) 0; }
 .shortcut-line { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .island .shortcut-keys { flex: 1; min-width: 0; height: 30px; box-sizing: border-box; display: flex; align-items: center; padding: 0 10px;
-  border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); background: rgb(0 0 0 / .25); color: var(--ui-text);
+  border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--ui-background) 55%, transparent); color: var(--ui-text);
   font: var(--fs-body)/1 var(--ui-mono); text-align: left; cursor: pointer; overflow: hidden; white-space: nowrap; }
 .island .shortcut-keys:hover { background: var(--v-fill-hi); }
 .island .shortcut-keys:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
@@ -36,7 +36,7 @@
 /* ── Font picker ───────────────────────────────────────────────────── */
 .font-search { display: flex; align-items: center; gap: var(--space-2); }
 .font-search input[type='search'] { flex: 1; min-width: 0; height: 30px; box-sizing: border-box; padding: 4px 10px; border: .5px solid var(--v-stroke-hi);
-  border-radius: var(--radius-lg); background: rgb(0 0 0 / .25); color: var(--ui-text); font: var(--fs-body)/1.4 var(--ui-font); }
+  border-radius: var(--radius-lg); background: color-mix(in srgb, var(--ui-background) 55%, transparent); color: var(--ui-text); font: var(--fs-body)/1.4 var(--ui-font); }
 .font-search input[type='search']:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 .font-mono-toggle { flex: none; display: flex; align-items: center; gap: var(--space-1); color: var(--ui-text-secondary); font-size: var(--fs-sm); cursor: pointer; }
 .font-mono-toggle input { margin: 0; accent-color: var(--ui-accent); }
@@ -51,7 +51,7 @@
 .app-rule-add { display: flex; align-items: center; gap: var(--space-2); }
 .app-rule-combo { position: relative; flex: 1; min-width: 0; }
 .app-rule-combo input[type='text'] { width: 100%; height: 30px; box-sizing: border-box; padding: 4px 10px; border: .5px solid var(--v-stroke-hi); border-radius: var(--radius-lg);
-  background: rgb(0 0 0 / .25); color: var(--ui-text); font: var(--fs-body)/1.4 var(--ui-font); }
+  background: color-mix(in srgb, var(--ui-background) 55%, transparent); color: var(--ui-text); font: var(--fs-body)/1.4 var(--ui-font); }
 .app-rule-combo input[type='text'][aria-invalid='true'] { border-color: var(--ui-error); }
 .app-rule-combo input[type='text']:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 .app-rule-suggestions { max-height: 210px; }

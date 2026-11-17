@@ -3,7 +3,7 @@
 .ai-dashboard *, .ai-dashboard *::before, .ai-dashboard *::after { box-sizing: border-box; }
 .ai-dashboard .ai-claude { --ai-tint: var(--ai-claude); }
 .ai-dashboard .ai-codex { --ai-tint: var(--ai-codex); }
-.ai-dashboard .ai-other { --ai-tint: #c6c6ca; }
+.ai-dashboard .ai-other { --ai-tint: color-mix(in srgb, var(--ui-text) 78%, transparent); }
 .ai-two-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .ai-dashboard .ai-card { border: 0; border-radius: var(--radius-3xl); background: rgba(255,255,255,.065); padding: var(--space-3) var(--space-3); min-width: 0; overflow: hidden; }
 .ai-card-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; height: 16px; margin-bottom: 6px; }
@@ -75,8 +75,8 @@
 .ai-stat dt { margin: 0; color: var(--ui-text-hint); display: flex; align-items: center; gap: var(--space-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-stat dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ai-insights .ai-card { min-height: 96px; }
-.ai-insights { --ai-cache-read: #6fcf97; --ai-cache-write: var(--ai-amber); --ai-cache-fresh: rgba(255,255,255,.55); }
-.ai-cache-bar { display: flex; gap: 2px; height: 6px; margin: 4px 0 2px; background: rgba(255,255,255,.08); border-radius: var(--radius-sm); overflow: hidden; }
+.ai-insights { --ai-cache-read: var(--ui-green); --ai-cache-write: var(--ai-amber); --ai-cache-fresh: color-mix(in srgb, var(--ui-ink) 55%, transparent); }
+.ai-cache-bar { display: flex; gap: 2px; height: 6px; margin: 4px 0 2px; background: color-mix(in srgb, var(--ui-ink) 8%, transparent); border-radius: var(--radius-sm); overflow: hidden; }
 .ai-cache-bar i { min-width: 3px; border-radius: var(--radius-sm); }
 .ai-cache-read { background: var(--ai-cache-read); }
 .ai-cache-write { background: var(--ai-cache-write); }

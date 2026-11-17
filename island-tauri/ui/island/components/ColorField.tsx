@@ -55,6 +55,40 @@ export function ColorSwatch({ id, label, value, onPick, onReset, resetLabel, cla
     }}><span /></button>;
 }
 
+// The source palette intentionally repeats colours. Indices identify cells, not hexes.
+export const APPLE_GRID_COLORS = [ '#FFFFFF', '#EBEBEB', '#D6D6D6', '#C2C2C2', '#ADADAD', '#999999', '#858585', '#707070', '#5C5C5C', '#474747', '#333333', '#000000', '#003366', '#336699', '#3366CC', '#003399', '#000099', '#0000CC', '#000066', '#333366', '#663399', '#660099', '#330066', '#330033', '#006699', '#0099CC', '#0066CC', '#0033CC', '#0000FF', '#3333FF', '#333399', '#6633CC', '#9933CC', '#9900CC', '#6600CC', '#660066', '#0099CC', '#00CCFF', '#0099FF', '#0066FF', '#3366FF', '#6666FF', '#6666CC', '#9966CC', '#CC66FF', '#CC33FF', '#9900FF', '#990099', '#33CCCC', '#66FFFF', '#33CCFF', '#3399FF', '#6699FF', '#9999FF', '#9999CC', '#CC99FF', '#FF99FF', '#FF66FF', '#CC00FF', '#CC00CC', '#66CCCC', '#99FFFF', '#66CCFF', '#6699FF', '#99CCFF', '#CCCCFF', '#CC99CC', '#FFCCFF', '#FF99FF', '#FF66FF', '#FF33FF', '#FF00FF', '#99CCCC', '#CCFFFF', '#99CCFF', '#9999FF', '#CCCCFF', '#FFFFFF', '#FFCCFF', '#FF99FF', '#FF66FF', '#FF00FF', '#CC00CC', '#990099', '#CCFFCC', '#FFFFCC', '#FFFF99', '#FFFF66', '#FFFF33', '#FFFF00', '#FFCC00', '#FF9900', '#FF6600', '#FF3300', '#FF0000', '#CC0000', '#99FF99', '#CCFF99', '#CCCC66', '#CCCC33', '#CCCC00', '#CC9900', '#CC6600', '#CC3300', '#CC0000', '#990000', '#660000', '#330000', '#66FF66', '#99FF66', '#99CC66', '#99CC33', '#999900', '#996600', '#993300', '#990000', '#660000', '#330000', '#000000', '#000000', '#33FF33', '#66FF33', '#66CC33', '#669933', '#666600', '#663300', '#660000', '#330000', '#000000', '#000000', '#000000', '#000000', '#00FF00', '#33FF00', '#33CC00', '#339900', '#336600', '#333300', '#330000', '#000000', '#000000', '#000000', '#000000', '#000000' ];
+export function gridSelection(hex: string) {
+  return APPLE_GRID_COLORS.findIndex(color => color.toLowerCase() === hex.toLowerCase());
+}
+export function gridNavigation(index: number, key: string, count = APPLE_GRID_COLORS.length): number {
+  if (!count) return -1;
+  const last = count - 1, current = Math.max(0, Math.min(last, index));
+  switch (key) {
+    case 'ArrowLeft': return Math.max(0, current - 1);
+    case 'ArrowRight': return Math.min(last, current + 1);
+    case 'ArrowUp': return Math.max(0, current - 12);
+    case 'ArrowDown': return Math.min(last, current + 12);
+    case 'Home': return Math.floor(current / 12) * 12;
+    case 'End': return Math.min(last, Math.floor(current / 12) * 12 + 11);
+    default: return -1;
+  }
+}
+export function ColorGrid({ hex, onPick }: { hex: string; onPick(hex: string): void }) {
+  const selected = gridSelection(hex);
+  const [focus, setFocus] = useState(Math.max(0, selected));
+  return <div className="color-pop-grid" role="radiogroup" aria-label="Colour grid">
+    {APPLE_GRID_COLORS.map((color, index) => <button key={index} type="button" role="radio" aria-label={`${color.toLowerCase()}, row ${Math.floor(index / 12) + 1}, column ${index % 12 + 1}`}
+      aria-checked={index === selected} tabIndex={index === focus ? 0 : -1} style={{ background: color }}
+      onFocus={() => setFocus(index)} onClick={() => { setFocus(index); onPick(color.toLowerCase()); }}
+      onKeyDown={event => {
+        const next = gridNavigation(index, event.key);
+        if (next < 0) return;
+        event.preventDefault(); setFocus(next);
+        (event.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+      }} />)}
+  </div>;
+}
+
 const TABS = ['Grid', 'Spectrum', 'Sliders'] as const;
 type Tab = typeof TABS[number];
 const TAB_KEY = 'monolith.colorPicker.tab';
@@ -132,6 +166,7 @@ export function ColorPickerPanel() {
   }, [id]);
   const hex = hsvToHex(hsv);
   const commit = (value = hsvToHex(hsvRef.current)) => { colorPicker.get()?.onPick(value); setText(value); };
+  const pick = (value: string) => { setHsv(hexToHsv(value)); commit(value.toLowerCase()); };
   const sv = useDrag((fx, fy) => setHsv(c => { const n = { ...c, s: fx, v: 1 - fy }; setText(hsvToHex(n)); return n; }), () => commit());
   const hue = useDrag(fx => setHsv(c => { const n = { ...c, h: Math.min(359.9, fx * 360) }; setText(hsvToHex(n)); return n; }), () => commit());
   const root = typeof document !== 'undefined' ? getComputedStyle(document.documentElement) : null;
@@ -161,6 +196,7 @@ export function ColorPickerPanel() {
         }}>{name}</button>)}
     </div>
     <div className="color-pop-body" role="tabpanel" id={`color-body-${tab}`} aria-labelledby={`color-tab-${tab}`}>
+      {tab === 'Grid' && <ColorGrid hex={hex} onPick={pick} />}
       {tab === 'Spectrum' && <>
     <div className="color-pop-sv" style={{ background: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider"
       aria-valuetext={hex}><i style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }} /></div>

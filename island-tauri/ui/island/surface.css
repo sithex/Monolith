@@ -194,7 +194,8 @@ html[data-glass='true'] .live-side-button { background: color-mix(in srgb, var(-
 .fader-col.master { min-width: 72px; flex: 0 0 72px; }
 .fader-name { min-height: 32px; flex: 1; display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; max-width: 100%; color: var(--ui-text-secondary); }
 .fader-name span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
-.fader-name svg { width: 15px; height: 15px; flex: none; }
+.fader-name svg, .fader-name .mixer-app-icon { width: 15px; height: 15px; flex: none; }
+.fader-name .mixer-app-icon { object-fit: contain; }
 .mixer select { flex: 1; }
 
 /* ---- Settings ------------------------------------------------------------ */

@@ -10,7 +10,7 @@ use crate::{
         control_process::{self as process, argv, Lines, Runner},
     },
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 pub type MixerService = ControlActor<MixerChanged, MixerOp>;
 /// Quiet gap that ends an event burst, and the longest a burst may delay one refresh.
@@ -68,6 +68,7 @@ struct Model {
     sinks: Vec<Sink>,
     streams: Vec<Stream>,
     default: Option<String>,
+    icons: HashMap<String, String>,
 }
 impl Model {
     fn mixer(&self) -> MixerModel {
@@ -106,6 +107,11 @@ impl Model {
                     pid: s.pid,
                     media_name: s.media_name.clone(),
                     icon_name: s.icon_name.clone(),
+                    icon_png: s
+                        .icon_name
+                        .as_ref()
+                        .and_then(|n| self.icons.get(n))
+                        .cloned(),
                     muted: s.muted,
                     corked: s.corked,
                     volume_percent: s.volume_percent,
@@ -133,6 +139,7 @@ impl Model {
             sinks: self.sinks.clone(),
             streams: self.streams.clone(),
             default: self.default.clone(),
+            icons: self.icons.clone(),
         };
         if matches!(scope, RefreshScope::Sinks | RefreshScope::Both) {
             let text = runner
@@ -157,6 +164,13 @@ impl Model {
             if skipped != 0 || streams.len() > 2048 {
                 return Err(bad());
             }
+            let names = streams
+                .iter()
+                .filter_map(|s| s.icon_name.clone())
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect();
+            next.icons = super::icon_resolver::resolve(names).await;
             next.streams = streams;
         }
         *self = next;

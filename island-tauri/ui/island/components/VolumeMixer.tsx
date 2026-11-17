@@ -6,14 +6,15 @@ import { Icon } from './Icon';
 import { RollingText } from './RollingText';
 import { useReducedMotionAll } from './motion-preference';
 
-function Column({ channel, master, intents }: { channel: MixerChannel; master?: boolean; intents: Pick<AppViewIntents, 'mixer'> }) {
+function Column({ channel, master, iconPng, intents }: { channel: MixerChannel; master?: boolean; iconPng?: string | null; intents: Pick<AppViewIntents, 'mixer'> }) {
   const volume = channel.volumePercent, muted = channel.muted;
   const commit = (percent: number) => intents.mixer(channel.name !== null ? { type: 'sinkVolume', name: channel.name, percent } : { type: 'streamVolume', index: channel.index, percent });
   const [shown, setShown] = useState(volume ?? 0);
+  const [failedIcon, setFailedIcon] = useState<string | null>(null);
   const reduced = useReducedMotionAll();
   useEffect(() => { if (volume !== null) setShown(volume); }, [volume]);
   return <div className={`fader-col ${master ? 'master' : ''}`}>
-    <div className="fader-name"><Icon name={master ? 'volume' : 'music'} /><span title={channel.label}>{channel.label}</span></div>
+    <div className="fader-name">{!master && iconPng && failedIcon !== iconPng ? <img className="mixer-app-icon" src={iconPng} alt="" width={15} height={15} onError={() => setFailedIcon(iconPng)} /> : <Icon name={master ? 'volume' : 'music'} />}<span title={channel.label}>{channel.label}</span></div>
     {volume === null ? <p className="muted" style={{ flex: 1 }}>Unknown</p> : <Fader value={Math.min(100, volume)} label={channel.label} muted={muted} onCommit={v => { setShown(v); commit(v); }} />}
     <span className="fader-pct">{volume === null ? '—' : <><span className="sr-only">{Math.round(shown)}%</span>
       <span aria-hidden="true"><RollingText text={String(Math.round(shown))} reduced={reduced} fast />%</span></>}</span>
@@ -30,7 +31,7 @@ export function VolumeMixer({ model, intents }: { model: Service<MixerModel>; in
       <div className="mixer-strip" data-fit-width="">
         {master ? <Column master channel={{ ...master, label: 'Output' }} intents={intents} /> : <p className="unavailable">Master volume unavailable</p>}
         <div className="mixer-divider" />
-        {value.streams.length ? value.streams.map(stream => <Column key={stream.index} channel={{ ...stream, label: stream.appName, name: null }} intents={intents} />) : <Empty icon="volume">No apps playing</Empty>}
+        {value.streams.length ? value.streams.map(stream => <Column key={stream.index} iconPng={stream.iconPng} channel={{ ...stream, label: stream.appName, name: null }} intents={intents} />) : <Empty icon="volume">No apps playing</Empty>}
       </div>
     </div>;
   }}</ServiceCard>;

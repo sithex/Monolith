@@ -82,12 +82,22 @@ pub enum Event {
     Disappeared { id: String },
 }
 
+/// Internal delivery envelope: freezes display metadata with the transition for retries.
+/// The original Event wire shape remains unchanged for existing tracker consumers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NamedEvent {
+    pub event: Event,
+    pub body: Option<String>,
+}
+
 /// The result of one [`Tracker::update`](crate::integrations::agents::core::Tracker::update).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Update {
     pub chips: Vec<Chip>,
     pub events: Vec<Event>,
+    #[serde(skip)]
+    pub notification_events: Vec<NamedEvent>,
     /// Number of running chips beyond `maxChips` (not shown).
     pub overflow: u32,
 }

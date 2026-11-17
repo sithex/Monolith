@@ -85,6 +85,9 @@ pub struct MixerStream {
     pub pid: Option<u32>,
     pub media_name: Option<String>,
     pub icon_name: Option<String>,
+    /// Host-resolved PNG data URL; absent when no safe theme icon is available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_png: Option<String>,
     pub muted: bool,
     pub corked: bool,
     pub volume_percent: Option<u32>,

@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::integrations::agents::core::classify::classify;
 use crate::integrations::agents::core::model::{
-    Chip, Event, RunState, SessionRow, TrackerConfig, Update, WarningKind,
+    Chip, Event, NamedEvent, RunState, SessionRow, TrackerConfig, Update, WarningKind,
 };
 
 /// Sources that are always shown as top-level chips (non-delegated).
@@ -311,9 +311,25 @@ impl Tracker {
             .map(|(_, chip)| chip)
             .collect();
 
+        let notification_events = events
+            .iter()
+            .map(|event| {
+                let body = match event {
+                    Event::Started { id } | Event::Finished { id, .. } => {
+                        present.get(id).and_then(|(row, _)| notification_body(row))
+                    }
+                    _ => None,
+                };
+                NamedEvent {
+                    event: event.clone(),
+                    body,
+                }
+            })
+            .collect();
         Update {
             chips,
             events,
+            notification_events,
             overflow,
         }
     }
@@ -381,6 +397,26 @@ pub fn label_for(row: &SessionRow) -> String {
         }
     }
     short_id(&row.id)
+}
+
+/// Only metadata already displayed by the agent chips, never messages or prompts.
+/// The full session id (also exposed by AI Live's copy-id tooltip) distinguishes equal
+/// names and equal 60-character prefixes on the grouped notification page.
+fn notification_body(row: &SessionRow) -> Option<String> {
+    let name = row
+        .title
+        .as_deref()
+        .into_iter()
+        .chain(row.model.as_deref())
+        .map(str::trim)
+        .find(|s| !s.is_empty())?;
+    let mut chars = name.chars();
+    let mut label: String = chars.by_ref().take(60).collect();
+    if chars.next().is_some() {
+        label.pop();
+        label.push('…');
+    }
+    Some(format!("{label} · {}", short_id(&row.id)))
 }
 
 /// Short id: strip a leading `local-` prefix, then take the first 8 chars

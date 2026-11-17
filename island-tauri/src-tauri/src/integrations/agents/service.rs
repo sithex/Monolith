@@ -55,11 +55,14 @@ impl AgentConfig {
 }
 pub trait AgentEvents: Send + Sync {
     fn deliver(&self, event: &Event) -> Result<(), IslandError>;
+    fn deliver_named(&self, event: &core::NamedEvent) -> Result<(), IslandError> {
+        self.deliver(&event.event)
+    }
     fn clear(&self) -> Result<(), IslandError>;
 }
 struct State {
     tracker: Tracker,
-    outbox: VecDeque<Event>,
+    outbox: VecDeque<core::NamedEvent>,
     current: AgentsChanged,
 }
 pub struct AgentService {
@@ -189,7 +192,7 @@ impl AgentService {
         }
         candidate.retain_history(&ids);
         state.tracker = candidate;
-        state.outbox.extend(update.events);
+        state.outbox.extend(update.notification_events);
         // The core's diagnostics are counters/inspection, not an unbounded lifetime log.
         drop(state.tracker.take_warnings());
         let chips = update
@@ -232,7 +235,7 @@ impl AgentService {
             let Some(event) = event else {
                 return Ok(());
             };
-            if let Err(error) = self.sink.deliver(&event) {
+            if let Err(error) = self.sink.deliver_named(&event) {
                 let mut state = self
                     .state
                     .lock()

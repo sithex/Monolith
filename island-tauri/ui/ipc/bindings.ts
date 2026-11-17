@@ -1141,6 +1141,8 @@ export type MixerStream = {
 	pid: number | null,
 	mediaName: string | null,
 	iconName: string | null,
+	/**  Host-resolved PNG data URL; absent when no safe theme icon is available. */
+	iconPng?: string | null,
 	muted: boolean,
 	corked: boolean,
 	volumePercent: number | null,

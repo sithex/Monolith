@@ -105,6 +105,12 @@ export function adaptShelf(raw: unknown): ShelfModel {
   }, 50), f => f.id);
   return { enabled: bool(r.enabled), maxItems: num(r.maxItems, 1, 50), items };
 }
+// Mixer icons use the notification PNG data-URL encoding, never a path or theme name.
+function mixerIcon(x: unknown): string | null {
+  if (x === undefined || x === null) return null;
+  const s = str(x, 43714);
+  return /^data:image\/png;base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(s) && s.length > 22 ? s : bad();
+}
 export function adaptMixer(raw: unknown): Service<MixerModel> {
   const { r, available, detail } = topic(raw);
   const sinks: MixerChanged['sinks'] = unique(list(r.sinks, x => {
@@ -112,7 +118,7 @@ export function adaptMixer(raw: unknown): Service<MixerModel> {
   }, 256), s => s.index);
   unique(sinks, s => s.name);
   const streams: MixerChanged['streams'] = unique(list(r.streams, x => {
-    const s = record(x); return { index: uint(s.index), sinkIndex: uint(s.sinkIndex), appName: text(s.appName), binary: optionalText(s.binary), pid: nullable(s.pid, uint), mediaName: optionalText(s.mediaName), iconName: optionalText(s.iconName), muted: bool(s.muted), corked: bool(s.corked), volumePercent: nullable(s.volumePercent, uint) };
+    const s = record(x); return { index: uint(s.index), sinkIndex: uint(s.sinkIndex), appName: text(s.appName), binary: optionalText(s.binary), pid: nullable(s.pid, uint), mediaName: optionalText(s.mediaName), iconName: optionalText(s.iconName), iconPng: mixerIcon(s.iconPng), muted: bool(s.muted), corked: bool(s.corked), volumePercent: nullable(s.volumePercent, uint) };
   }), s => s.index);
   return service(available, detail, { sinks, streams, defaultSink: nullable(r.defaultSink, deviceName) });
 }

@@ -60,10 +60,28 @@ pub fn palette_path_changed(profile: &Path, event: &notify::Event) -> bool {
         })
 }
 
+/// Renderer-owned scheme roles are unknown until its first command. An explicit `None`
+/// from the renderer follows the skin (also used by Album when no artwork is available).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum NotchScheme {
+    #[default]
+    Pending,
+    Skin,
+    Palette(Box<Palette>),
+}
+
+impl From<Option<Palette>> for NotchScheme {
+    fn from(palette: Option<Palette>) -> Self {
+        palette.map_or(Self::Skin, |palette| Self::Palette(Box::new(palette)))
+    }
+}
+
 pub struct PaletteService {
     root: PathBuf,
     home: PathBuf,
     cache: Mutex<Option<Palette>>,
+    /// Single flight for cold readers; refreshes cannot overlap the helper either.
+    computation: Mutex<()>,
     /// Serializes Hermes skin writes (`sync_hermes_theme`).
     theme: Mutex<()>,
     /// Is Hermes theme sync on? Only then is an active `ripple-island` skin the island's own
@@ -81,13 +99,17 @@ impl PaletteService {
             root,
             home,
             cache: Mutex::new(None),
+            computation: Mutex::new(()),
             theme: Mutex::new(()),
             theme_sync: Box::new(|| false),
         }
     }
 
     /// Live source of the `hermesThemeSync` setting (see `theme_sync`).
-    pub fn with_theme_sync(mut self, theme_sync: impl Fn() -> bool + Send + Sync + 'static) -> Self {
+    pub fn with_theme_sync(
+        mut self,
+        theme_sync: impl Fn() -> bool + Send + Sync + 'static,
+    ) -> Self {
         self.theme_sync = Box::new(theme_sync);
         self
     }
@@ -163,6 +185,14 @@ impl PaletteService {
         if let Some(hit) = self.cached() {
             return Ok(hit);
         }
+        let _flight = self
+            .computation
+            .lock()
+            .map_err(|_| IslandError::internal("Palette computation poisoned"))?;
+        // A concurrent reader (including watcher startup) may have populated it.
+        if let Some(hit) = self.cached() {
+            return Ok(hit);
+        }
         let palette = self.compute()?;
         self.store(&palette);
         Ok(palette)
@@ -184,6 +214,7 @@ impl PaletteService {
 
     /// Recompute; `Some(palette)` only when it changed.
     pub fn refresh(&self) -> Option<Palette> {
+        let _flight = self.computation.lock().ok()?;
         match self.compute() {
             Ok(palette) => self.store(&palette).then_some(palette),
             Err(error) => {
@@ -274,7 +305,12 @@ impl PaletteWatcher {
                     on_change(palette);
                 }
             };
-            publish(&service);
+            // Startup joins cold readers and publishes even if one of them filled the cache.
+            // Using refresh here would launch a second helper after a reader won the flight.
+            match service.get() {
+                Ok(palette) => on_change(palette),
+                Err(error) => tracing::debug!(%error, "Initial palette unavailable"),
+            }
             let mut refreshed = Instant::now();
             let mut pending: Option<Instant> = None;
             loop {
@@ -359,6 +395,9 @@ impl Drop for PaletteWatcher {
         self.stop();
     }
 }
+
+#[cfg(test)]
+pub(crate) mod startup_tests;
 
 #[cfg(test)]
 mod tests {

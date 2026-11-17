@@ -35,6 +35,11 @@ impl VisualService {
             }),
         })
     }
+    /// Native startup must not wait behind a visual snapshot computing the skin palette.
+    pub fn appearance(&self) -> Option<Appearance> {
+        self.state.try_lock().ok().map(|state| state.appearance)
+    }
+
     pub fn snapshot(
         &self,
         services: &Services,
@@ -85,4 +90,36 @@ pub fn publish(app: &tauri::AppHandle) {
             Err(error) => tracing::warn!(%error, "Visual snapshot unavailable"),
         }
     });
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::*;
+    use std::{sync::Arc, time::Duration};
+
+    #[test]
+    fn native_appearance_selection_does_not_wait_for_a_visual_snapshot() {
+        let dir = crate::services::scratch("native-appearance-selection");
+        fs::write(dir.join("appearance.json"), br#""ocean""#).unwrap();
+        let visual = Arc::new(VisualService::new(dir.clone()).unwrap());
+        assert_eq!(visual.appearance(), Some(Appearance::Ocean));
+        let held = visual.state.lock().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let worker = {
+            let visual = visual.clone();
+            std::thread::spawn(move || {
+                tx.send(visual.appearance()).unwrap();
+            })
+        };
+        let selection = rx.recv_timeout(Duration::from_millis(250));
+        drop(held);
+        worker.join().unwrap();
+        assert_eq!(
+            selection.unwrap(),
+            None,
+            "busy visual state means not ready, not wait"
+        );
+        assert_eq!(visual.appearance(), Some(Appearance::Ocean));
+        fs::remove_dir_all(dir).unwrap();
+    }
 }

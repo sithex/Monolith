@@ -10,12 +10,13 @@ PlasmoidItem {
     id: root
     property bool online: false
     property date now: new Date()
-    property var appearance: ({})
+    property alias appearance: appearanceState.value
+    NotchAppearance { id: appearanceState }
     // Backend pushes only public panel styling through this declared KConfig key.
     property string pushedAppearance: Plasmoid.configuration.notchAppearance || ""
     onPushedAppearanceChanged: {
         if (pushedAppearance) {
-            try { appearance = JSON.parse(pushedAppearance); } catch (error) { console.warn("Invalid notch appearance update"); }
+            try { appearanceState.accept(JSON.parse(pushedAppearance)); } catch (error) { console.warn("Invalid notch appearance update"); }
         }
     }
     property var requests: Requests.create(function(operation) {backend.connectSource(root.command + " " + operation);})
@@ -41,7 +42,7 @@ PlasmoidItem {
             try {
                 var reply = JSON.parse(data.stdout);
                 if (reply.online !== undefined) root.online = reply.online;
-                if (reply.online) root.appearance = reply;
+                if (reply.online) appearanceState.accept(reply);
             } catch (error) { root.online = false; }
             disconnectSource(source);
             root.requests.complete();
@@ -122,10 +123,10 @@ PlasmoidItem {
         playing: mediaPlayers.currentPlayer !== null && mediaPlayers.currentPlayer.playbackStatus === Mpris.PlaybackStatus.Playing
         showDate: root.appearance.showDate !== false
         stealth: root.appearance.stealth === true
-        accent: root.appearance.accent || "#f2cc60"
-        background: root.appearance.background || "#171717"
-        textColor: root.appearance.text || "#f1ede4"
-        dimColor: root.appearance.dim || "#aaa69d"
+        accent: appearanceState.accent
+        background: appearanceState.background
+        textColor: appearanceState.text
+        dimColor: appearanceState.dim
         borderEnabled: (root.appearance.notchBorder || {}).enabled !== false
         borderColor: (root.appearance.notchBorder || {}).color || accent
         borderOpacity: (root.appearance.notchBorder || {}).opacity ?? 0.1

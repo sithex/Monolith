@@ -135,8 +135,8 @@ pub struct Services {
     palette_watcher: Mutex<Option<palette::PaletteWatcher>>,
     pub overlay: bool,
     /// Nov 2: the island's active colour-scheme roles (UI-owned palettes), so the native
-    /// notch (hover tint, clock text) follows the scheme. `None` = follow the Hermes skin.
-    pub scheme_palette: Mutex<Option<Palette>>,
+    /// notch (hover tint, clock text) follows the scheme. Pending is NOT follow-skin.
+    pub scheme_palette: Mutex<palette::NotchScheme>,
 }
 
 impl Services {
@@ -220,7 +220,7 @@ impl Services {
             test_hooks: Mutex::new(None),
             palette_watcher: Mutex::new(None),
             overlay: cfg.overlay,
-            scheme_palette: Mutex::new(None),
+            scheme_palette: Mutex::new(palette::NotchScheme::Pending),
         }
     }
 

@@ -207,8 +207,9 @@ pub async fn notch_scheme_set(
         .scheme_palette
         .lock()
         .map_err(|_| IslandError::internal("Scheme palette poisoned"))?;
-    if *slot != palette {
-        *slot = palette;
+    let next = crate::services::palette::NotchScheme::from(palette);
+    if *slot != next {
+        *slot = next;
         drop(slot);
         crate::integrations::plasma::runtime::nudge_status(&app);
     }

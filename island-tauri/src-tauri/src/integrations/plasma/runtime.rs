@@ -130,6 +130,57 @@ fn live_state(app: &tauri::AppHandle) -> super::notch_live::NotchLive {
     live
 }
 
+/// Cache-only colour sampling, shared by the first native snapshot and every later one.
+/// A cached skin is not evidence of the chosen preset's roles.
+fn panel_colors(
+    settings: &crate::contract::settings::Settings,
+    skin: &crate::services::palette::PaletteService,
+    scheme: &crate::services::palette::NotchScheme,
+    selected: Option<crate::contract::frontend::Appearance>,
+) -> Value {
+    use crate::{contract::frontend::Appearance, services::palette::NotchScheme};
+    let palette = match scheme {
+        NotchScheme::Palette(palette) => Some(palette.as_ref().clone()),
+        NotchScheme::Skin => skin.cached(),
+        NotchScheme::Pending if selected == Some(Appearance::Skin) => skin.cached(),
+        NotchScheme::Pending => None,
+    }
+    .filter(|p| {
+        [
+            &p.background,
+            &p.accent,
+            &p.text,
+            &p.primary,
+            &p.dim,
+            &p.border,
+            &p.surface,
+            &p.error,
+        ]
+        .iter()
+        .all(|role| crate::contract::settings::is_hex_color(role))
+    });
+    let color = |value: &str, fallback: &str| {
+        if value.is_empty() {
+            fallback.to_owned()
+        } else {
+            value.to_owned()
+        }
+    };
+    match palette {
+        Some(p) => json!({
+            "appearanceReady": true,
+            "background": color(&settings.panel_clock_color, &color(&settings.background, &p.surface)),
+            "accent": color(&settings.accent, &p.accent), "text": p.text, "dim": p.dim,
+            "notchBorder": {"enabled":settings.notch_border_enabled,
+                "color":color(&settings.notch_border_color, &color(&settings.accent, &p.accent)),
+                "opacity":settings.notch_border_opacity,"width":settings.notch_border_width}
+        }),
+        None => json!({"appearanceReady":false, "background":null, "accent":null,
+            "text":null,"dim":null,"notchBorder":{"enabled":settings.notch_border_enabled,
+                "color":null,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width}}),
+    }
+}
+
 fn snapshot(
     app: &tauri::AppHandle,
     anchor: &Option<Anchor>,
@@ -151,40 +202,23 @@ fn snapshot(
     drop(controller);
     let state = app.state::<IslandActor>().handle.state();
     let settings = services.settings.get()?;
-    let skin = match services.palette.get() {
-        Ok(palette) => Some(palette),
-        Err(error) => {
-            tracing::debug!(%error,"Panel palette unavailable");
-            None
-        }
-    };
-    // The island's colour scheme (when one is chosen) recolours the notch too.
-    let scheme = services.scheme_palette.lock().ok().and_then(|s| s.clone());
-    let palette = scheme.or(skin);
-    let color = |value: &str, fallback: &str| {
-        if value.is_empty() {
-            fallback.to_owned()
-        } else {
-            value.to_owned()
-        }
-    };
-    let background = palette.as_ref().map(|palette| {
-        color(
-            &settings.panel_clock_color,
-            &color(&settings.background, &palette.surface),
-        )
-    });
-    let accent = palette.as_ref().map(|p| color(&settings.accent, &p.accent));
-    let border_color = color(
-        &settings.notch_border_color,
-        accent.as_deref().unwrap_or("#f2cc60"),
-    );
+    let selected = app
+        .try_state::<crate::services::frontend::VisualService>()
+        .and_then(|visual| visual.appearance());
+    let scheme = services
+        .scheme_palette
+        .lock()
+        .ok()
+        .map(|s| s.clone())
+        .unwrap_or_default();
+    let colors = panel_colors(&settings, &services.palette, &scheme, selected);
     Ok(
         // `view` and `stateRev` are additive fields (legacy readers ignore unknown keys).
         json!({"online":true,"pid":std::process::id(),"updated":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs_f64(),
         "mode":legacy_mode_name(state.mode),"view":serde_json::to_value(state.view)?,"stateRev":state.rev,
         "anchor":anchor,"bounds":bounds,"windowId":xid,"rectangles":rectangles,"pty":services.terminal.pid().unwrap_or(0),
-        "showDate":settings.show_date,"stealth":settings.stealth,"accent":accent,"notchWidth":settings.notch_width,
+        "showDate":settings.show_date,"stealth":settings.stealth,"accent":colors["accent"],"notchWidth":settings.notch_width,
+        "appearanceReady":colors["appearanceReady"],
         "gameMode":state.game_mode,
         "dataMigrationError":app.state::<crate::paths::Paths>().migration_error,
         // Notch holds completely still: game mode on and "freeze the companion" kept enabled
@@ -196,8 +230,8 @@ fn snapshot(
         "copyProgress":settings.notch_copy_progress,
         "shelf":settings.shelf_enabled,
         "waitingPulse":settings.notch_waiting_pulse,"hoverPeek":settings.notch_hover_peek,"hoverDelay":settings.hover_delay,
-        "notchBorder":{"enabled":settings.notch_border_enabled,"color":border_color,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width},
-        "background":background,"text":palette.as_ref().map(|p|&p.text),"dim":palette.as_ref().map(|p|&p.dim),
+        "notchBorder":colors["notchBorder"],
+        "background":colors["background"],"text":colors["text"],"dim":colors["dim"],
         "live":live.to_json()}),
     )
 }
@@ -239,7 +273,11 @@ fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
     let runtime = app.state::<IslandRuntime>();
     // The Wayland surface starts TOP_BLEED px above `target` (window/wayland.rs).
     #[cfg(target_os = "linux")]
-    let bleed = if runtime.wayland { f64::from(crate::window::wayland::TOP_BLEED) } else { 0. };
+    let bleed = if runtime.wayland {
+        f64::from(crate::window::wayland::TOP_BLEED)
+    } else {
+        0.
+    };
     #[cfg(not(target_os = "linux"))]
     let bleed = 0.;
     let pill = crate::contract::island::RoundedRect {
@@ -317,6 +355,7 @@ fn monitor_script(enabled: bool, style: &Value, origins: Option<&[[f64; 2]]>) ->
 
 fn panel_style_payload(raw: &Value) -> Value {
     let keys = [
+        "appearanceReady",
         "background",
         "accent",
         "text",
@@ -352,6 +391,142 @@ fn panel_style_script(targets: &[(u32, u32)], style: &Value) -> String {
 #[cfg(test)]
 mod notch_tests {
     use super::*;
+    use crate::{
+        contract::frontend::Appearance,
+        services::palette::{startup_tests, NotchScheme},
+    };
+
+    #[test]
+    fn first_native_palette_snapshot_never_waits_for_the_slow_helper() {
+        let (dir, skin) = startup_tests::fixture(1.0);
+        let settings = crate::contract::settings::Settings::default();
+        let start = Instant::now();
+        let cold = panel_colors(
+            &settings,
+            &skin,
+            &NotchScheme::Pending,
+            Some(Appearance::Skin),
+        );
+        let cold_time = start.elapsed();
+        assert!(
+            cold_time < Duration::from_millis(250),
+            "cold snapshot: {cold_time:?}"
+        );
+        assert_eq!(
+            startup_tests::calls(&dir),
+            0,
+            "snapshot must not start the helper"
+        );
+        assert_eq!(cold["appearanceReady"], false);
+        let worker = {
+            let skin = skin.clone();
+            std::thread::spawn(move || skin.get().unwrap())
+        };
+        startup_tests::wait_started(&dir);
+        let start = Instant::now();
+        let pending = panel_colors(
+            &settings,
+            &skin,
+            &NotchScheme::Pending,
+            Some(Appearance::Skin),
+        );
+        let pending_time = start.elapsed();
+        assert!(
+            pending_time < Duration::from_millis(250),
+            "in-flight snapshot: {pending_time:?}"
+        );
+        assert_eq!(pending["appearanceReady"], false);
+        let palette = worker.join().unwrap();
+        let ready = panel_colors(
+            &settings,
+            &skin,
+            &NotchScheme::Pending,
+            Some(Appearance::Skin),
+        );
+        assert_eq!(ready["appearanceReady"], true);
+        assert_eq!(ready["accent"], palette.accent);
+        assert_eq!(ready["background"], palette.surface);
+        assert_eq!(startup_tests::calls(&dir), 1);
+        eprintln!("first palette snapshot {cold_time:?}; in-flight {pending_time:?}; helper delay 1s; calls 1");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn preset_waits_for_renderer_roles_not_a_cached_skin_and_incomplete_is_not_ready() {
+        let (dir, skin) = startup_tests::fixture(0.0);
+        let settings = crate::contract::settings::Settings::default();
+        let palette = skin.get().unwrap();
+        for selected in [
+            None,
+            Some(Appearance::Ocean),
+            Some(Appearance::Custom),
+            Some(Appearance::Album),
+        ] {
+            let pending = panel_colors(&settings, &skin, &NotchScheme::Pending, selected);
+            assert_eq!(pending["appearanceReady"], false);
+            assert!(pending["accent"].is_null());
+            assert_eq!(panel_style_payload(&pending)["appearanceReady"], false);
+        }
+        // Renderer None explicitly confirms follow-skin (including Album's no-art fallback).
+        assert_eq!(
+            panel_colors(
+                &settings,
+                &skin,
+                &NotchScheme::from(None),
+                Some(Appearance::Album)
+            )["appearanceReady"],
+            true
+        );
+        for role in [
+            "background",
+            "accent",
+            "text",
+            "primary",
+            "dim",
+            "border",
+            "surface",
+            "error",
+        ] {
+            let mut invalid = serde_json::to_value(&palette).unwrap();
+            invalid[role] = json!("");
+            let invalid = serde_json::from_value(invalid).unwrap();
+            let reply = panel_colors(
+                &settings,
+                &skin,
+                &NotchScheme::from(Some(invalid)),
+                Some(Appearance::Ocean),
+            );
+            assert_eq!(reply["appearanceReady"], false, "missing {role}");
+            for color in ["accent", "background", "text", "dim"] {
+                assert!(reply[color].is_null());
+            }
+        }
+        // Preset roles do not need a computed skin at all; explicit overrides still win.
+        let (cold_dir, cold_skin) = startup_tests::fixture(0.0);
+        let mut preset = palette;
+        preset.accent = "#123456".into();
+        let settings = crate::contract::settings::Settings {
+            panel_clock_color: "#102030".into(),
+            accent: "#aabbcc".into(),
+            notch_border_color: "#010203".into(),
+            notch_border_opacity: 0.0,
+            ..settings
+        };
+        let ready = panel_colors(
+            &settings,
+            &cold_skin,
+            &NotchScheme::from(Some(preset)),
+            Some(Appearance::Ocean),
+        );
+        assert_eq!(ready["appearanceReady"], true);
+        assert_eq!(ready["background"], "#102030");
+        assert_eq!(ready["accent"], "#aabbcc");
+        assert_eq!(ready["notchBorder"]["color"], "#010203");
+        assert_eq!(ready["notchBorder"]["opacity"], 0.0);
+        std::fs::remove_dir_all(cold_dir).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn notch_panel_payload_is_public_only_and_honors_zero_opacity() {
         let raw = json!({"background":"#123456","accent":"#abcdef","showDate":true,
@@ -387,8 +562,15 @@ mod notch_tests {
     fn shelf_switch_rides_the_payload_and_nothing_about_its_items_does() {
         let raw = json!({"shelf":false,"shelfItems":[{"path":"/x"}],"live":{}});
         let style = panel_style_payload(&raw);
-        assert_eq!(style["shelf"], json!(false), "the notch needs the off switch");
-        assert!(style.get("shelfItems").is_none(), "paths never reach Plasma's config");
+        assert_eq!(
+            style["shelf"],
+            json!(false),
+            "the notch needs the off switch"
+        );
+        assert!(
+            style.get("shelfItems").is_none(),
+            "paths never reach Plasma's config"
+        );
     }
     #[test]
     fn companion_freezes_only_in_game_mode_with_the_setting_on() {
@@ -565,269 +747,376 @@ impl NativeHost {
         }
         let relay = companion.is_some();
         let worker = crate::services::shutdown::BoundedThread::spawn("ripple-status", move || {
-                let mut last_write = Instant::now();
-                let mut last_panel_style = Value::Null;
-                let mut anchor = anchor;
-                // Reconciled when "every monitor" or its monitor list changes (or notch width).
-                let mut last_monitors: Option<(bool, Vec<String>)> = None;
-                let mut last_companion: Option<bool> = None;
-                let mut anchors = Vec::<Anchor>::new();
-                let mut anchors_read: Option<Instant> = None;
-                let mut primary: Option<Anchor> = None;
-                let mut monitor_report = Value::Null;
-                let mut monitor_error: Option<String> = None;
-                let mut unavailable = Vec::<String>::new();
-                let mut pending = std::collections::VecDeque::new();
-                // Last written status without its `updated` stamp, and when it was written.
-                let mut last_body = Value::Null;
-                let mut last_status_write: Option<Instant> = None;
-                let mut last_error: Option<String> = None;
-                'worker: loop {
-                    let message = pending.pop_front().map(Ok).unwrap_or_else(|| receive.recv_timeout(HEARTBEAT));
-                    let mut moved = matches!(message, Ok(StatusMsg::Moved));
-                    let clicked = match message {
-                        Ok(StatusMsg::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
-                        Ok(StatusMsg::PinAt(widget)) => Some(widget),
-                        Ok(StatusMsg::Refresh | StatusMsg::Moved) | Err(mpsc::RecvTimeoutError::Timeout) => None,
-                    };
-                    while let Ok(message) = receive.try_recv() {
-                        match message {
-                            StatusMsg::Stop => break 'worker,
-                            StatusMsg::PinAt(_) => pending.push_back(message),
-                            StatusMsg::Moved => moved = true,
-                            StatusMsg::Refresh => {},
+            let mut last_write = Instant::now();
+            let mut last_panel_style = Value::Null;
+            let mut anchor = anchor;
+            // Reconciled when "every monitor" or its monitor list changes (or notch width).
+            let mut last_monitors: Option<(bool, Vec<String>)> = None;
+            let mut last_companion: Option<bool> = None;
+            let mut anchors = Vec::<Anchor>::new();
+            let mut anchors_read: Option<Instant> = None;
+            let mut primary: Option<Anchor> = None;
+            let mut monitor_report = Value::Null;
+            let mut monitor_error: Option<String> = None;
+            let mut unavailable = Vec::<String>::new();
+            let mut pending = std::collections::VecDeque::new();
+            // Last written status without its `updated` stamp, and when it was written.
+            let mut last_body = Value::Null;
+            let mut last_status_write: Option<Instant> = None;
+            let mut last_error: Option<String> = None;
+            'worker: loop {
+                let message = pending
+                    .pop_front()
+                    .map(Ok)
+                    .unwrap_or_else(|| receive.recv_timeout(HEARTBEAT));
+                let mut moved = matches!(message, Ok(StatusMsg::Moved));
+                let clicked = match message {
+                    Ok(StatusMsg::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    Ok(StatusMsg::PinAt(widget)) => Some(widget),
+                    Ok(StatusMsg::Refresh | StatusMsg::Moved)
+                    | Err(mpsc::RecvTimeoutError::Timeout) => None,
+                };
+                while let Ok(message) = receive.try_recv() {
+                    match message {
+                        StatusMsg::Stop => break 'worker,
+                        StatusMsg::PinAt(_) => pending.push_back(message),
+                        StatusMsg::Moved => moved = true,
+                        StatusMsg::Refresh => {}
+                    }
+                }
+                // Never coalesce away a click (including a rapid second-monitor click).
+                std::thread::sleep(MIN_WRITE_INTERVAL.saturating_sub(last_write.elapsed()));
+                let update = (|| -> Result<()> {
+                    let settings = handle.state::<Services>().settings.get()?;
+                    let enabled = settings.show_notch_on_every_monitor;
+                    // The KWin pointer script runs only while the companion is on: loaded at
+                    // startup and when the setting flips, never retried in a loop.
+                    if relay && last_companion != Some(settings.companion_enabled) {
+                        last_companion = Some(settings.companion_enabled);
+                        let result = if settings.companion_enabled {
+                            super::companion::load_script()
+                        } else {
+                            super::companion::unload_script()
+                        };
+                        if let Err(error) = result {
+                            tracing::warn!(%error, "Notch companion pointer script unavailable");
                         }
                     }
-                    // Never coalesce away a click (including a rapid second-monitor click).
-                    std::thread::sleep(MIN_WRITE_INTERVAL.saturating_sub(last_write.elapsed()));
-                    let update = (|| -> Result<()> {
-                        let settings = handle.state::<Services>().settings.get()?;
-                        let enabled = settings.show_notch_on_every_monitor;
-                        // The KWin pointer script runs only while the companion is on: loaded at
-                        // startup and when the setting flips, never retried in a loop.
-                        if relay && last_companion != Some(settings.companion_enabled) {
-                            last_companion = Some(settings.companion_enabled);
-                            let result = if settings.companion_enabled {
-                                super::companion::load_script()
+                    let live = live_state(&handle).stabilised(Some(&last_live));
+                    // Plasma is reconciled only at startup and when the setting, its monitor
+                    // list (or notch width) changes: never periodically, never on a click,
+                    // never retried.
+                    let monitors = (enabled, settings.notch_monitors.clone());
+                    if allow_panel_push && last_monitors.as_ref() != Some(&monitors) {
+                        last_monitors = Some(monitors);
+                        let result = (|| -> Result<()> {
+                            let style =
+                                panel_style_payload(&snapshot(&handle, &anchor, &bounds, &live)?);
+                            // Only a chosen subset needs the output names (one kscreen read).
+                            let origins = if enabled && !settings.notch_monitors.is_empty() {
+                                let [outputs, _] = super::anchor::discovery_commands();
+                                let out = crate::services::process::run_bounded(
+                                    outputs,
+                                    Duration::from_secs(3),
+                                    1024 * 1024,
+                                    false,
+                                )?;
+                                let outputs: Value =
+                                    serde_json::from_slice(&out).context("Invalid outputs")?;
+                                notch_screen_origins(&outputs, &settings.notch_monitors)
                             } else {
-                                super::companion::unload_script()
+                                None
                             };
-                            if let Err(error) = result {
-                                tracing::warn!(%error, "Notch companion pointer script unavailable");
+                            let script = monitor_script(enabled, &style, origins.as_deref());
+                            let reconcile = || -> Result<Value> {
+                                let mut command =
+                                    std::process::Command::new(super::qdbus::program());
+                                command.args([
+                                    "org.kde.plasmashell",
+                                    "/PlasmaShell",
+                                    "org.kde.PlasmaShell.evaluateScript",
+                                    &script,
+                                ]);
+                                let out = crate::services::process::run_bounded(
+                                    command,
+                                    Duration::from_secs(3),
+                                    65536,
+                                    false,
+                                )?;
+                                Ok(serde_json::from_slice(&out).unwrap_or(Value::Null))
+                            };
+                            monitor_report = reconcile()?;
+                            // One fixed second pass (not a retry): it adds nothing when the first
+                            // pass succeeded and only re-asserts the centre slot of new notches.
+                            if monitor_report["added"]
+                                .as_array()
+                                .is_some_and(|a| !a.is_empty())
+                            {
+                                let second = reconcile()?;
+                                monitor_report["ordered"] = second["ordered"].clone();
+                                monitor_report["notches"] = second["notches"].clone();
                             }
-                        }
-                        let live = live_state(&handle).stabilised(Some(&last_live));
-                        // Plasma is reconciled only at startup and when the setting, its monitor
-                        // list (or notch width) changes: never periodically, never on a click,
-                        // never retried.
-                        let monitors = (enabled, settings.notch_monitors.clone());
-                        if allow_panel_push && last_monitors.as_ref() != Some(&monitors) {
-                            last_monitors = Some(monitors);
-                            let result = (|| -> Result<()> {
-                                let style = panel_style_payload(&snapshot(&handle, &anchor, &bounds, &live)?);
-                                // Only a chosen subset needs the output names (one kscreen read).
-                                let origins = if enabled && !settings.notch_monitors.is_empty() {
-                                    let [outputs, _] = super::anchor::discovery_commands();
-                                    let out = crate::services::process::run_bounded(outputs, Duration::from_secs(3), 1024 * 1024, false)?;
-                                    let outputs: Value = serde_json::from_slice(&out).context("Invalid outputs")?;
-                                    notch_screen_origins(&outputs, &settings.notch_monitors)
-                                } else {
-                                    None
-                                };
-                                let script = monitor_script(enabled, &style, origins.as_deref());
-                                let reconcile = || -> Result<Value> {
-                                    let mut command = std::process::Command::new(super::qdbus::program());
-                                    command.args(["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", &script]);
-                                    let out = crate::services::process::run_bounded(command, Duration::from_secs(3), 65536, false)?;
-                                    Ok(serde_json::from_slice(&out).unwrap_or(Value::Null))
-                                };
-                                monitor_report = reconcile()?;
-                                // One fixed second pass (not a retry): it adds nothing when the first
-                                // pass succeeded and only re-asserts the centre slot of new notches.
-                                if monitor_report["added"].as_array().is_some_and(|a| !a.is_empty()) {
-                                    let second = reconcile()?;
-                                    monitor_report["ordered"] = second["ordered"].clone();
-                                    monitor_report["notches"] = second["notches"].clone();
+                            tracing::info!(report = %monitor_report, "Monitor notches reconciled");
+                            primary =
+                                tauri::async_runtime::block_on(super::anchor::discover()).ok();
+                            if enabled {
+                                let (found, missing) = super::anchor::discover_all()?;
+                                anchors = found;
+                                unavailable = missing;
+                                anchors_read = Some(Instant::now());
+                            } else {
+                                anchors.clear();
+                                anchors_read = None;
+                                unavailable.clear();
+                                // Turning the option off brings the island home to the primary notch.
+                                if let Some(home) = primary.clone().filter(|p| {
+                                    anchor.as_ref().is_some_and(|a| a.output != p.output)
+                                }) {
+                                    bounds = relocate(&handle, &home)?;
+                                    anchor = Some(home);
                                 }
-                                tracing::info!(report = %monitor_report, "Monitor notches reconciled");
-                                primary = tauri::async_runtime::block_on(super::anchor::discover()).ok();
-                                if enabled {
-                                    let (found, missing) = super::anchor::discover_all()?;
+                            }
+                            Ok(())
+                        })();
+                        monitor_error = result.err().map(|e| e.to_string());
+                        if let Some(error) = &monitor_error {
+                            tracing::warn!(%error, "Monitor notch routing unavailable");
+                        }
+                    }
+                    // Clicks use the cached anchors (no Plasma or kscreen calls before the
+                    // click is served). Only a widget the cache doesn't know (Plasma restarted,
+                    // a monitor was plugged in) costs one re-read first.
+                    let mut click_handled = false;
+                    if clicked.is_some() && enabled {
+                        let known = clicked.is_some_and(|w| anchors.iter().any(|a| a.widget == w));
+                        if !known {
+                            match super::anchor::discover_all() {
+                                Ok((found, missing)) => {
                                     anchors = found;
                                     unavailable = missing;
                                     anchors_read = Some(Instant::now());
+                                }
+                                Err(error) => {
+                                    tracing::debug!(%error, "Notch position refresh unavailable")
+                                }
+                            }
+                        }
+                        match select_monitor_anchor(
+                            &anchors,
+                            primary.as_ref(),
+                            anchor.as_ref(),
+                            clicked,
+                            enabled,
+                        ) {
+                            Ok(Some(target)) => {
+                                let changed_output =
+                                    anchor.as_ref().is_none_or(|a| a.output != target.output);
+                                if anchor.as_ref() != Some(&target) {
+                                    bounds = relocate(&handle, &target)?;
+                                    anchor = Some(target);
+                                }
+                                // Same output toggles; another output opens/transfers, never collapses.
+                                let intent = if changed_output {
+                                    Intent::Pin
                                 } else {
-                                    anchors.clear();
-                                    anchors_read = None;
-                                    unavailable.clear();
-                                    // Turning the option off brings the island home to the primary notch.
-                                    if let Some(home) = primary.clone().filter(|p| anchor.as_ref().is_some_and(|a| a.output != p.output)) {
-                                        bounds = relocate(&handle, &home)?;
-                                        anchor = Some(home);
-                                    }
-                                }
-                                Ok(())
-                            })();
-                            monitor_error = result.err().map(|e| e.to_string());
-                            if let Some(error) = &monitor_error { tracing::warn!(%error, "Monitor notch routing unavailable"); }
-                        }
-                        // Clicks use the cached anchors (no Plasma or kscreen calls before the
-                        // click is served). Only a widget the cache doesn't know (Plasma restarted,
-                        // a monitor was plugged in) costs one re-read first.
-                        let mut click_handled = false;
-                        if clicked.is_some() && enabled {
-                            let known = clicked.is_some_and(|w| anchors.iter().any(|a| a.widget == w));
-                            if !known {
-                                match super::anchor::discover_all() {
-                                    Ok((found, missing)) => {
-                                        anchors = found;
-                                        unavailable = missing;
-                                        anchors_read = Some(Instant::now());
-                                    }
-                                    Err(error) => tracing::debug!(%error, "Notch position refresh unavailable"),
-                                }
-                            }
-                            match select_monitor_anchor(&anchors, primary.as_ref(), anchor.as_ref(), clicked, enabled) {
-                                Ok(Some(target)) => {
-                                    let changed_output = anchor.as_ref().is_none_or(|a| a.output != target.output);
-                                    if anchor.as_ref() != Some(&target) {
-                                        bounds = relocate(&handle, &target)?;
-                                        anchor = Some(target);
-                                    }
-                                    // Same output toggles; another output opens/transfers, never collapses.
-                                    let intent = if changed_output { Intent::Pin } else { Intent::PanelPin };
-                                    tauri::async_runtime::block_on(handle.state::<IslandActor>().handle.dispatch(intent))?;
-                                    click_handled = true;
-                                    // After the click is served, re-read positions when the cache is
-                                    // old: Plasma may have moved the notches without telling us. Rapid
-                                    // clicks reuse the fresh read instead of queueing behind new ones.
-                                    let refresh = if anchors_stale(anchors_read) { Some(super::anchor::discover_all()) } else { None };
-                                    match refresh {
-                                        None => {}
-                                        Some(Ok((found, missing))) => {
-                                            anchors = found;
-                                            unavailable = missing;
-                                            anchors_read = Some(Instant::now());
-                                            let output = anchor.as_ref().map(|a| a.output.clone());
-                                            if let Some(fresh) = anchors.iter().find(|a| Some(&a.output) == output.as_ref()).cloned() {
-                                                if anchor.as_ref() != Some(&fresh) {
-                                                    bounds = relocate(&handle, &fresh)?;
-                                                    anchor = Some(fresh);
-                                                }
-                                            }
-                                        }
-                                        Some(Err(error)) => tracing::debug!(%error, "Notch position refresh unavailable"),
-                                    }
-                                }
-                                Ok(None) => {}
-                                Err(error) => tracing::debug!(%error, "Notch click falls back to the primary toggle"),
-                            }
-                        }
-                        // The widget reported its panel docked/floated (Plasma shifts a floating panel's
-                        // contents when a window is maximized): re-read once and follow the notch.
-                        if moved && !click_handled {
-                            // No anchor yet (startup raced a Plasma restart): fall back to the
-                            // primary notch, exactly like a fresh start would.
-                            let fresh = if enabled && anchor.is_some() {
-                                match super::anchor::discover_all() {
-                                    Ok((found, missing)) => {
+                                    Intent::PanelPin
+                                };
+                                tauri::async_runtime::block_on(
+                                    handle.state::<IslandActor>().handle.dispatch(intent),
+                                )?;
+                                click_handled = true;
+                                // After the click is served, re-read positions when the cache is
+                                // old: Plasma may have moved the notches without telling us. Rapid
+                                // clicks reuse the fresh read instead of queueing behind new ones.
+                                let refresh = if anchors_stale(anchors_read) {
+                                    Some(super::anchor::discover_all())
+                                } else {
+                                    None
+                                };
+                                match refresh {
+                                    None => {}
+                                    Some(Ok((found, missing))) => {
                                         anchors = found;
                                         unavailable = missing;
                                         anchors_read = Some(Instant::now());
                                         let output = anchor.as_ref().map(|a| a.output.clone());
-                                        anchors.iter().find(|a| Some(&a.output) == output.as_ref()).cloned()
+                                        if let Some(fresh) = anchors
+                                            .iter()
+                                            .find(|a| Some(&a.output) == output.as_ref())
+                                            .cloned()
+                                        {
+                                            if anchor.as_ref() != Some(&fresh) {
+                                                bounds = relocate(&handle, &fresh)?;
+                                                anchor = Some(fresh);
+                                            }
+                                        }
                                     }
-                                    Err(error) => { tracing::debug!(%error, "Notch move refresh unavailable"); None }
-                                }
-                            } else {
-                                match tauri::async_runtime::block_on(super::anchor::discover()) {
-                                    Ok(found) => { primary = Some(found.clone()); Some(found) }
-                                    Err(error) => { tracing::debug!(%error, "Notch move refresh unavailable"); None }
-                                }
-                            };
-                            if let Some(fresh) = fresh.filter(|f| anchor.as_ref().is_none_or(|a| a.output == f.output)) {
-                                if anchor.as_ref() != Some(&fresh) {
-                                    bounds = relocate(&handle, &fresh)?;
-                                    anchor = Some(fresh);
-                                }
-                            }
-                        }
-                        // A click is never lost: anything unroutable falls back to the primary toggle.
-                        if clicked.is_some() && !click_handled {
-                            if let Err(error) = tauri::async_runtime::block_on(handle.state::<IslandActor>().handle.dispatch(Intent::PanelPin)) {
-                                tracing::warn!(%error, "Fallback notch click failed");
-                            }
-                        }
-                        home_widget.store(
-                            match anchor.as_ref() {
-                                Some(a) if enabled && a.native => a.widget,
-                                Some(_) if enabled => 0,
-                                _ => ROUTE_OFF,
-                            },
-                            Ordering::Release,
-                        );
-                        let mut next = snapshot(&handle, &anchor, &bounds, &live)?;
-                        last_live = live;
-                        next["monitorNotches"] = monitor_report.clone();
-                        next["monitorNotchError"] = json!(monitor_error);
-                        next["notchUnavailableOutputs"] = json!(unavailable);
-                        let mut body = next.clone();
-                        if let Some(fields) = body.as_object_mut() {
-                            fields.remove("updated");
-                        }
-                        // Write when something changed, otherwise only as a liveness heartbeat.
-                        if body != last_body || last_status_write.is_none_or(|t| t.elapsed() >= STATUS_REFRESH) {
-                            guard
-                                .lock()
-                                .map_err(|_| anyhow::anyhow!("Instance lock poisoned"))?
-                                .update_status(&next)?;
-                            last_body = body;
-                            last_status_write = Some(Instant::now());
-                        }
-                        let style = panel_style_payload(&next);
-                        *cached.lock().map_err(|_| anyhow::anyhow!("Panel cache poisoned"))? = next;
-                        if allow_panel_push && style != last_panel_style {
-                            // One script call restyles every notch (primary plus other monitors).
-                            let mut targets: Vec<(u32, u32)> = anchor.iter().chain(anchors.iter()).filter(|a| a.native).map(|a| (a.panel, a.widget)).collect();
-                            targets.sort_unstable();
-                            targets.dedup();
-                            if !targets.is_empty() {
-                                let mut command = std::process::Command::new(super::qdbus::program());
-                                command.args(["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", &panel_style_script(&targets, &style)]);
-                                match crate::services::process::run_bounded(command, Duration::from_secs(1), 4096, false) {
-                                    Ok(_) => {
-                                        let width_changed = !last_panel_style.is_null()
-                                            && last_panel_style.get("notchWidth") != style.get("notchWidth");
-                                        last_panel_style = style;
-                                        // A new width moves the notches: re-discover once (a setting change, not a loop).
-                                        if width_changed { last_monitors = None; }
+                                    Some(Err(error)) => {
+                                        tracing::debug!(%error, "Notch position refresh unavailable")
                                     }
-                                    Err(error) => tracing::debug!(%error, "Native notch appearance push unavailable"),
                                 }
                             }
-                        }
-                        Ok(())
-                    })();
-                    last_write = Instant::now();
-                    match update {
-                        Ok(()) => last_error = None,
-                        // Someone else owns status.json now: stop writing for good.
-                        Err(error) if error.downcast_ref::<super::status_file::OwnershipLost>().is_some() => {
-                            tracing::error!(%error, "Native status ownership lost; refusing further ownership writes");
-                            break;
-                        }
-                        // Anything else (a slow main thread, a busy Plasma) is transient: keep the
-                        // notch and status alive and try again on the next message or heartbeat.
-                        Err(error) => {
-                            let text = error.to_string();
-                            if last_error.as_deref() != Some(text.as_str()) {
-                                tracing::warn!(error = %text, "Native status update failed; retrying");
+                            Ok(None) => {}
+                            Err(error) => {
+                                tracing::debug!(%error, "Notch click falls back to the primary toggle")
                             }
-                            last_error = Some(text);
                         }
                     }
+                    // The widget reported its panel docked/floated (Plasma shifts a floating panel's
+                    // contents when a window is maximized): re-read once and follow the notch.
+                    if moved && !click_handled {
+                        // No anchor yet (startup raced a Plasma restart): fall back to the
+                        // primary notch, exactly like a fresh start would.
+                        let fresh = if enabled && anchor.is_some() {
+                            match super::anchor::discover_all() {
+                                Ok((found, missing)) => {
+                                    anchors = found;
+                                    unavailable = missing;
+                                    anchors_read = Some(Instant::now());
+                                    let output = anchor.as_ref().map(|a| a.output.clone());
+                                    anchors
+                                        .iter()
+                                        .find(|a| Some(&a.output) == output.as_ref())
+                                        .cloned()
+                                }
+                                Err(error) => {
+                                    tracing::debug!(%error, "Notch move refresh unavailable");
+                                    None
+                                }
+                            }
+                        } else {
+                            match tauri::async_runtime::block_on(super::anchor::discover()) {
+                                Ok(found) => {
+                                    primary = Some(found.clone());
+                                    Some(found)
+                                }
+                                Err(error) => {
+                                    tracing::debug!(%error, "Notch move refresh unavailable");
+                                    None
+                                }
+                            }
+                        };
+                        if let Some(fresh) =
+                            fresh.filter(|f| anchor.as_ref().is_none_or(|a| a.output == f.output))
+                        {
+                            if anchor.as_ref() != Some(&fresh) {
+                                bounds = relocate(&handle, &fresh)?;
+                                anchor = Some(fresh);
+                            }
+                        }
+                    }
+                    // A click is never lost: anything unroutable falls back to the primary toggle.
+                    if clicked.is_some() && !click_handled {
+                        if let Err(error) = tauri::async_runtime::block_on(
+                            handle
+                                .state::<IslandActor>()
+                                .handle
+                                .dispatch(Intent::PanelPin),
+                        ) {
+                            tracing::warn!(%error, "Fallback notch click failed");
+                        }
+                    }
+                    home_widget.store(
+                        match anchor.as_ref() {
+                            Some(a) if enabled && a.native => a.widget,
+                            Some(_) if enabled => 0,
+                            _ => ROUTE_OFF,
+                        },
+                        Ordering::Release,
+                    );
+                    let mut next = snapshot(&handle, &anchor, &bounds, &live)?;
+                    last_live = live;
+                    next["monitorNotches"] = monitor_report.clone();
+                    next["monitorNotchError"] = json!(monitor_error);
+                    next["notchUnavailableOutputs"] = json!(unavailable);
+                    let mut body = next.clone();
+                    if let Some(fields) = body.as_object_mut() {
+                        fields.remove("updated");
+                    }
+                    // Write when something changed, otherwise only as a liveness heartbeat.
+                    if body != last_body
+                        || last_status_write.is_none_or(|t| t.elapsed() >= STATUS_REFRESH)
+                    {
+                        guard
+                            .lock()
+                            .map_err(|_| anyhow::anyhow!("Instance lock poisoned"))?
+                            .update_status(&next)?;
+                        last_body = body;
+                        last_status_write = Some(Instant::now());
+                    }
+                    let style = panel_style_payload(&next);
+                    *cached
+                        .lock()
+                        .map_err(|_| anyhow::anyhow!("Panel cache poisoned"))? = next;
+                    if allow_panel_push
+                        && style["appearanceReady"] == true
+                        && style != last_panel_style
+                    {
+                        // One script call restyles every notch (primary plus other monitors).
+                        let mut targets: Vec<(u32, u32)> = anchor
+                            .iter()
+                            .chain(anchors.iter())
+                            .filter(|a| a.native)
+                            .map(|a| (a.panel, a.widget))
+                            .collect();
+                        targets.sort_unstable();
+                        targets.dedup();
+                        if !targets.is_empty() {
+                            let mut command = std::process::Command::new(super::qdbus::program());
+                            command.args([
+                                "org.kde.plasmashell",
+                                "/PlasmaShell",
+                                "org.kde.PlasmaShell.evaluateScript",
+                                &panel_style_script(&targets, &style),
+                            ]);
+                            match crate::services::process::run_bounded(
+                                command,
+                                Duration::from_secs(1),
+                                4096,
+                                false,
+                            ) {
+                                Ok(_) => {
+                                    let width_changed = !last_panel_style.is_null()
+                                        && last_panel_style.get("notchWidth")
+                                            != style.get("notchWidth");
+                                    last_panel_style = style;
+                                    // A new width moves the notches: re-discover once (a setting change, not a loop).
+                                    if width_changed {
+                                        last_monitors = None;
+                                    }
+                                }
+                                Err(error) => {
+                                    tracing::debug!(%error, "Native notch appearance push unavailable")
+                                }
+                            }
+                        }
+                    }
+                    Ok(())
+                })();
+                last_write = Instant::now();
+                match update {
+                    Ok(()) => last_error = None,
+                    // Someone else owns status.json now: stop writing for good.
+                    Err(error)
+                        if error
+                            .downcast_ref::<super::status_file::OwnershipLost>()
+                            .is_some() =>
+                    {
+                        tracing::error!(%error, "Native status ownership lost; refusing further ownership writes");
+                        break;
+                    }
+                    // Anything else (a slow main thread, a busy Plasma) is transient: keep the
+                    // notch and status alive and try again on the next message or heartbeat.
+                    Err(error) => {
+                        let text = error.to_string();
+                        if last_error.as_deref() != Some(text.as_str()) {
+                            tracing::warn!(error = %text, "Native status update failed; retrying");
+                        }
+                        last_error = Some(text);
+                    }
                 }
-            })?;
+            }
+        })?;
         // Every actor publication refreshes the status file (event-driven, coalesced above).
         let mut changes = actor.watch();
         let nudge = stop.clone();

@@ -1,3 +1,4 @@
+import { Switch } from './Switch';
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { AutoclickerChanged, AutoclickerConfig, AutoclickerOp, ClickButton, ClickKind, ClickTarget, TriggerMode } from '../../ipc/client';
@@ -116,7 +117,7 @@ export function AutoclickerApp({ model, intents }: { model: AutoclickerChanged; 
 
     <section className="card ac-card">
       <Row title="Hotkey active" hint={hotkeyNote(model)}>
-        <input className="switch" type="checkbox" aria-label="Hotkey active" checked={model.armed} onChange={e => send({ type: 'arm', armed: e.target.checked })} />
+        <Switch aria-label="Hotkey active" checked={model.armed} onChange={e => send({ type: 'arm', armed: e.target.checked })} />
       </Row>
       {warn(model.hotkeyState) && model.armed && <p className="warning app-caption">{model.hotkeyDetail}</p>}
       <Row title="Hotkey" hint={model.armed ? 'Turn the hotkey off to record a new one' : undefined}>

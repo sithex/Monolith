@@ -1,3 +1,4 @@
+import { Switch } from './components/Switch';
 import type { ReactNode } from 'react';
 import type { Settings, SettingsPatch } from '../ipc/client';
 import { DraftRange, Dropdown } from './components/AppPrimitives';
@@ -25,7 +26,7 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
     <button className="link" type="button" aria-label={`${rowSpec(id).label}: follow skin`} onClick={() => patch({ [key]: '' })}>{settings[key] || 'Follow skin'}</button>
   </div>);
   const flag = (id: string, key: 'notchWaitingPulse' | 'notchHoverPeek' | 'notchCopyProgress' | 'shelfEnabled' | 'shelfRemoveAfterDrag' | 'companionReactive' | 'showNotchOnEveryMonitor' | 'companionEnabled' | 'notchBorderEnabled') => row(id,
-    <input type="checkbox" className="switch" aria-label={id === 'companion' ? 'Notch companion' : rowSpec(id).label} checked={key === 'showNotchOnEveryMonitor' ? settings[key] === true : settings[key] !== false} onChange={e => patch({ [key]: e.target.checked })} />);
+    <Switch aria-label={id === 'companion' ? 'Notch companion' : rowSpec(id).label} checked={key === 'showNotchOnEveryMonitor' ? settings[key] === true : settings[key] !== false} onChange={e => patch({ [key]: e.target.checked })} />);
   // Group row: the parent switch with its dependent rows indented under it (dimmed while off).
   const group = (id: string, parents: ReactNode[], children: ReactNode[]) => {
     const spec = groupSpec(id);
@@ -37,8 +38,8 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
     {note && <p className="muted">Taskbar notch only. The open island keeps its own appearance.</p>}
     {flag('everyMonitor', 'showNotchOnEveryMonitor')}
     {row('notchMonitors', <div className="settings-checklist" role="group" aria-label="Notch monitors">
-      {choices.length ? choices.map(c => <label key={c.name} data-connected={c.connected} title={c.connected ? undefined : 'Not connected now'}>
-        <input type="checkbox" aria-label={`Notch on ${c.name}`} checked={c.checked} onChange={e => patch({ notchMonitors: toggleMonitor(saved, known, c.name, e.target.checked) })} />{c.name}</label>)
+      {choices.length ? choices.map(c => <span key={c.name} data-connected={c.connected} title={c.connected ? undefined : 'Not connected now'}>
+        <Switch size="sm" aria-label={`Notch on ${c.name}`} checked={c.checked} onChange={e => patch({ notchMonitors: toggleMonitor(saved, known, c.name, e.target.checked) })} />{c.name}</span>)
         : <span className="muted">{outputs === null ? 'Detecting monitors…' : 'No monitors reported'}</span>}
     </div>, `${saved.length ? `${saved.length} selected` : 'All monitors'}${outputs === null ? ' · detecting…' : ''}`)}
     {flag('waitingPulse', 'notchWaitingPulse')}

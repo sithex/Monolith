@@ -1,3 +1,4 @@
+import { Switch } from '../island/components/Switch';
 // Phase 5 sibling portal. Legacy DOM/CSS remain untouched; all controls stay inside its shape.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -91,8 +92,8 @@ export function ClipboardSurface() {
     <p data-testid="clipboard-status">{!settings?.clipboardHistory ? "Monitoring off" : status?.paused ? "Paused" : status?.available ? "Capturing clipboard changes" : status?.detail ?? "Connecting…"}</p>
     <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       {settings && <>
-        <label className="setting-row"><span>Enable clipboard history (private, opt-in)</span><input aria-label="Enable clipboard history" type="checkbox" checked={settings.clipboardHistory} onChange={(e) => { void save({ clipboardHistory: e.target.checked }); }} /></label>
-        <label className="setting-row"><span>Persist pinned entries only</span><input aria-label="Persist pinned clipboard entries" type="checkbox" checked={settings.clipboardPersist} onChange={(e) => { void save({ clipboardPersist: e.target.checked }); }} /></label>
+        <div className="setting-row"><span>Enable clipboard history (private, opt-in)</span><Switch aria-label="Enable clipboard history" checked={settings.clipboardHistory} onChange={(e) => { void save({ clipboardHistory: e.target.checked }); }} /></div>
+        <div className="setting-row"><span>Persist pinned entries only</span><Switch aria-label="Persist pinned clipboard entries" checked={settings.clipboardPersist} onChange={(e) => { void save({ clipboardPersist: e.target.checked }); }} /></div>
         <label className="setting-row"><span>History size (10–500)</span><input aria-label="Clipboard history size" type="number" min={10} max={500} value={settings.clipboardHistorySize} onChange={(e) => { if (e.target.value !== "") void save({ clipboardHistorySize: Number(e.target.value) }); }} /></label>
         <button disabled={!settings.clipboardHistory} onClick={() => { void run(() => clipboardSetPaused(!status?.paused)); }}>{status?.paused ? "Resume clipboard" : "Pause clipboard"}</button>
         {state.view === "settings" && <button onClick={() => { void run(() => dispatch({ type: "selectView", view: "clipboard" })); }}>Open clipboard history</button>}

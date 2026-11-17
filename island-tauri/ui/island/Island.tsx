@@ -36,6 +36,7 @@ import { NotchNotifications, NotificationCards, useNotificationHover } from './n
 import { ApprovalNotice, useApprovalHover } from './ApprovalNotice';
 import { createClickSound } from './click-sound';
 import './island.css';
+import './components/switch.css';
 import './polish.css';
 import './motion-media.css';
 import './motion-system.css';

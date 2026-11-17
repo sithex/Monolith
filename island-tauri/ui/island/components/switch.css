@@ -1,0 +1,49 @@
+/* A neutral white knob in either tone, derived from the theme colour space once.
+   The inset shade stays neutral too; no scheme-specific paint is embedded here. */
+.switch-track {
+  --switch-knob: oklch(from var(--ui-accent) 1 0 0);
+  --switch-shade: oklch(from var(--ui-accent) 0 0 0 / .25);
+  position: relative; display: inline-flex; align-items: center; flex: none;
+  width: 44px; height: 24px; box-sizing: border-box; padding: 1px;
+  border: 1px solid var(--v-stroke-hi); border-radius: var(--radius-full);
+  background: var(--v-track); box-shadow: inset 0 0 12px var(--switch-shade);
+  cursor: pointer; isolation: isolate;
+}
+.switch-track::before {
+  content: ''; position: absolute; inset: -1px; z-index: -1;
+  border-radius: inherit; background: var(--ui-accent); opacity: 0;
+  box-shadow: inset 0 0 12px var(--switch-shade);
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.switch-track[data-checked='true']::before { opacity: 1; }
+.switch-track .switch {
+  position: absolute; width: 1px; height: 1px; margin: 0; padding: 0;
+  opacity: 0; clip-path: inset(50%); overflow: hidden;
+}
+.switch-knob { display: block; width: 20px; height: 20px; pointer-events: none; }
+.switch-knob::before {
+  content: ''; display: block; width: 100%; height: 100%; border-radius: var(--radius-full);
+  background: var(--switch-knob); box-shadow: 0 1px 3px var(--switch-shade);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.switch-track:active:not([data-disabled='true']):not(:has(.switch:disabled)) .switch-knob::before { transform: scaleX(1.1); }
+.switch-track:has(.switch:focus-visible) { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.switch-track[data-disabled='true'], .switch-track:has(.switch:disabled) { opacity: .4; cursor: default; }
+.switch-track[data-size='sm'] { width: 34px; height: 20px; }
+.switch-track[data-size='sm'] .switch-knob { width: 16px; height: 16px; }
+.settings-row > .switch-track, .setting-row > .switch-track { margin-left: auto; }
+html:is([data-nav-via='key'], [data-reduce-motion='true']) .switch-track::before,
+html:is([data-nav-via='key'], [data-reduce-motion='true']) .switch-knob::before { transition: none; transform: none; }
+/* Also stop an already-running Motion transform if the modality/preference changes. */
+html:is([data-nav-via='key'], [data-reduce-motion='true']) .switch-knob { transform: translateX(0) !important; }
+html:is([data-nav-via='key'], [data-reduce-motion='true']) .switch-track[data-checked='true'] .switch-knob { transform: translateX(20px) !important; }
+html:is([data-nav-via='key'], [data-reduce-motion='true']) .switch-track[data-size='sm'][data-checked='true'] .switch-knob { transform: translateX(14px) !important; }
+@media (prefers-reduced-motion: reduce) {
+  .switch-track::before, .switch-knob::before { transition: none; transform: none; }
+  .switch-knob { transform: translateX(0) !important; }
+  .switch-track[data-checked='true'] .switch-knob { transform: translateX(20px) !important; }
+  .switch-track[data-size='sm'][data-checked='true'] .switch-knob { transform: translateX(14px) !important; }
+}
+/* Inline monitor labels used to be the checkbox's outer label. */
+.settings-checklist > span[data-connected] { display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--ui-mono); }
+.settings-checklist > span[data-connected='false'] { color: var(--ui-text-secondary); }

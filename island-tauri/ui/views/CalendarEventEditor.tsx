@@ -1,3 +1,4 @@
+import { Switch } from '../island/components/Switch';
 import { useState } from 'react';
 import type { AgendaRow, CalendarOp } from '../ipc/client';
 import { draftEvent, localDate, saveEvent, deleteEvent, type EventDraft } from './calendar-editor';
@@ -12,7 +13,7 @@ export function CalendarEventEditor({ row, date, command, close }: { row: Agenda
       <fieldset disabled={busy} className="app-stack" style={{ border: 0, padding: 0, minWidth: 0 }}>
         <label>Title<input aria-label="Event title" required maxLength={8192} value={draft.summary} onChange={e => setDraft({ ...draft, summary: e.target.value })}/></label>
         <label>Location<input aria-label="Event location" maxLength={8192} value={draft.location} onChange={e => setDraft({ ...draft, location: e.target.value })}/></label>
-        <label><input aria-label="All-day event" type="checkbox" checked={draft.allDay} onChange={e => setDraft({ ...draft, allDay: e.target.checked, start: e.target.checked ? draft.start.slice(0,10) : `${draft.start}T09:00:00`, end: e.target.checked ? draft.end.slice(0,10) : `${draft.end}T10:00:00` })}/>All day</label>
+        <div><Switch size="sm" aria-label="All-day event" checked={draft.allDay} onChange={e => setDraft({ ...draft, allDay: e.target.checked, start: e.target.checked ? draft.start.slice(0,10) : `${draft.start}T09:00:00`, end: e.target.checked ? draft.end.slice(0,10) : `${draft.end}T10:00:00` })}/>All day</div>
         <label>Start<input aria-label="Event start" type={draft.allDay ? 'date' : 'datetime-local'} step={draft.allDay ? undefined : 1} required value={draft.start} onChange={e => setDraft({ ...draft, start: e.target.value })}/></label>
         <label>End{draft.allDay ? ' (exclusive)' : ''}<input aria-label="Event end" type={draft.allDay ? 'date' : 'datetime-local'} step={draft.allDay ? undefined : 1} required value={draft.end} onChange={e => setDraft({ ...draft, end: e.target.value })}/></label>
         {row && <p className="muted">This replaces the entire local event with this single occurrence. Any recurrence or unsupported fields are removed. Delete removes the entire event.</p>}

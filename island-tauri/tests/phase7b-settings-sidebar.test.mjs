@@ -342,7 +342,7 @@ test('sidebar runtime: new feature switches save one boolean key and do not star
       ['apps', 'weatherEnabled', 'Weather'], ['apps', 'batteryAlerts', 'Battery alerts'],
       ['apps', 'lyricsEnabled', 'Synced lyrics'], ['apps', 'equalizerEnabled', 'Live equalizer'],
     ]) {
-      h.select(section); const control = nodes(h.tree).find(node => node.type === 'input' && node.props['aria-label'] === label); assert.equal(control.props.checked, false, key);
+      h.select(section); const control = nodes(h.tree).find(node => node.type?.name === 'Switch' && node.props['aria-label'] === label); assert.equal(control.props.checked, false, key);
       control.props.onChange({ target: { checked: true } }); assert.deepEqual(h.saved.at(-1), { [key]: true });
       control.props.onChange({ target: { checked: false } }); assert.deepEqual(h.saved.at(-1), { [key]: false });
     }

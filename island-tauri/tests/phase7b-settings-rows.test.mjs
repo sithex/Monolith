@@ -37,7 +37,7 @@ export async function settingsFixture(run, { settings = {}, defaults = {}, appea
     for (const [key, descriptor] of Object.entries(before)) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
   }
 }
-const toggle = (tree, label) => nodes(tree).find(node => node.type === 'input' && node.props['aria-label'] === label);
+const toggle = (tree, label) => nodes(tree).find(node => node.type?.name === 'Switch' && node.props['aria-label'] === label);
 const fieldset = group => nodes(group).find(node => node.type === 'fieldset');
 // Row elements are unexpanded components (props.id) in SettingsView, plain divs in NotchControls.
 const rowIds = tree => nodes(tree).map(node => node.props?.['data-setting-id'] ?? (node.type?.name === 'Row' ? node.props.id : null)).filter(Boolean);

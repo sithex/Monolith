@@ -1,3 +1,4 @@
+import { Switch } from '../island/components/Switch';
 // A sibling-root portal adds Phase 4 controls without changing the pinned legacy renderer.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -65,11 +66,11 @@ export function NotificationPrivacySettings() {
           ["systemNotificationMirror", "Mirror desktop notifications", "Opt in to passive desktop mirroring; no notification history is saved"],
           ["redactBodies", "Hide notification bodies", "Irreversibly scrub stored bodies; turning off does not restore them"],
           ["dnd", "Do Not Disturb", "Store arrivals without showing a toast"],
-        ] as const).map(([key, label, hint]) => <label className="setting-row" key={key}>
+        ] as const).map(([key, label, hint]) => <div className="setting-row" key={key}>
           <span className="setting-text"><span className="setting-label">{label}</span><span className="setting-hint">{hint}</span></span>
-          <input type="checkbox" aria-label={label} checked={settings[key]}
+          <Switch aria-label={label} checked={settings[key]}
             onChange={(event) => { void save({ [key]: event.target.checked }); }} />
-        </label>)}
+        </div>)}
         <form onSubmit={(event) => {
           event.preventDefault(); event.stopPropagation();
           // Preserve exact identifiers. Rust rejects blank lines, padding, controls, duplicates

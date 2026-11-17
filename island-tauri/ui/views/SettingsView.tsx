@@ -1,3 +1,4 @@
+import { Switch } from '../island/components/Switch';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -187,7 +188,7 @@ export function SettingsView({ active = true }: { active?: boolean } = {}) {
   const renderRow = (row: RowSpec) => {
     const { id, label } = row; let control: ReactNode; let hint = row.hint;
     const flag = FLAGS[id], key = row.keys[0], bounds = key && RANGES[key];
-    if (flag) control = <input className="switch" type="checkbox" aria-label={label} checked={settings[flag] === true} onChange={e => patch({ [flag]: e.target.checked })} />;
+    if (flag) control = <Switch aria-label={label} checked={settings[flag] === true} onChange={e => patch({ [flag]: e.target.checked })} />;
     else if (bounds && key) {
       const [min, max, step, unit] = bounds, offset = key === 'offsetX' || key === 'offsetY';
       const number = Number(settings[key] ?? min);

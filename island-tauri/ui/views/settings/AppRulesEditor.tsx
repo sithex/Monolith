@@ -1,3 +1,4 @@
+import { Switch } from '../../island/components/Switch';
 // Per-app notification rules: one line per app (popup / sound switches, urgency), an app-name
 // combobox suggesting apps seen in notifications, add and remove. Saves the whole list as one
 // `notificationAppRules` patch; Rust's `check_app_rules` has the final word.
@@ -28,10 +29,10 @@ export function AppRulesEditor({ rules, seenApps, onSave, globalSound = '' }: {
     {rules.length > 0 && <ul className="app-rule-list">
       {rules.map(rule => <li key={rule.app} className="app-rule">
         <span className="app-rule-name" title={rule.app}>{rule.app}</span>
-        <label className="app-rule-toggle"><input className="switch" type="checkbox" aria-label={`${rule.app} popups`} checked={rule.popup}
-          onChange={e => save(updateRule(rules, rule.app, { popup: e.target.checked }))} />Popup</label>
-        <label className="app-rule-toggle"><input className="switch" type="checkbox" aria-label={`${rule.app} sound`} checked={rule.sound}
-          onChange={e => save(updateRule(rules, rule.app, { sound: e.target.checked }))} />Sound</label>
+        <span className="app-rule-toggle"><Switch size="sm" aria-label={`${rule.app} popups`} checked={rule.popup}
+          onChange={e => save(updateRule(rules, rule.app, { popup: e.target.checked }))} />Popup</span>
+        <span className="app-rule-toggle"><Switch size="sm" aria-label={`${rule.app} sound`} checked={rule.sound}
+          onChange={e => save(updateRule(rules, rule.app, { sound: e.target.checked }))} />Sound</span>
         <SoundPicker label={`${rule.app} sound choice`} value={rule.soundId ?? ''} emptyLabel="Same as global" previewEmpty={globalSound} disabled={!rule.sound}
           onChange={id => save(updateRule(rules, rule.app, { soundId: id }))} />
         <Dropdown label={`${rule.app} urgency`} value={rule.urgency} options={URGENCY_OPTIONS}

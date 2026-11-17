@@ -1,3 +1,4 @@
+import { Switch } from '../../island/components/Switch';
 // Searchable dropdown of installed font families (Rust `font_families`, fontconfig). Each
 // entry is drawn in its own font, but only the visible window is rendered (font-list.ts
 // caps it at FONT_MAX_RENDERED rows), so hundreds of fonts never load at once.
@@ -64,7 +65,7 @@ export function FontPicker({ label, value, fonts, monoDefault = true, onChange, 
         <input ref={search} type="search" aria-label={`Search ${label}`} placeholder={fonts ? `Search ${fonts.length} fonts` : 'Loading fonts…'} value={query}
           role="combobox" aria-expanded="true" aria-controls={id} aria-activedescendant={entries[focus] ? `${id}-${focus}` : undefined}
           spellCheck={false} autoComplete="off" onChange={e => setQuery(e.target.value)} />
-        <label className="font-mono-toggle"><input type="checkbox" checked={monoOnly} onChange={e => setMonoOnly(e.target.checked)} />Monospace</label>
+        <span className="font-mono-toggle"><Switch size="sm" aria-label="Monospace" checked={monoOnly} onChange={e => setMonoOnly(e.target.checked)} />Monospace</span>
       </div>
       <div className="font-list" ref={list} role="listbox" id={id} aria-label={label} style={{ maxHeight: LIST_PX }}
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}>

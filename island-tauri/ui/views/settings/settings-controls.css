@@ -58,7 +58,6 @@
 .app-rule { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 2px 4px 2px 10px; border-radius: var(--radius-lg); background: var(--v-fill); }
 .app-rule-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); }
 .app-rule-toggle { flex: none; display: flex; align-items: center; gap: 6px; color: var(--ui-text-secondary); font-size: var(--fs-sm); cursor: pointer; }
-.island .app-rule-toggle input.switch { transform: scale(.82); transform-origin: right center; }
 .app-rule .dropdown { flex: 0 0 132px; }
 .island .app-rule .dropdown-trigger { min-height: 28px; height: 28px; padding: 0 8px 0 10px; font-size: var(--fs-sm); }
 .app-rule .dropdown-menu { left: auto; min-width: 160px; }

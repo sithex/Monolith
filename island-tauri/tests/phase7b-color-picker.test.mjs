@@ -263,7 +263,8 @@ test('new CSS permits literal colours only in SV/hue gradients and the white-rin
   for (const token of ['--ui-raised', '--ui-surface', '--ui-text', '--ui-text-secondary', '--ui-border', '--ui-focus', '--ui-danger', '--v-fill', '--v-stroke', '--ui-shadow']) assert.ok(css.includes(`var(${token})`), token);
   assert.match(css, /\.color-pop-body \{ height: 200px; flex: none;/); assert.match(css, /inset 0 0 0 2px var\(--ui-text\), inset 0 0 0 3px var\(--ui-background\)/);
   assert.match(css, /html\[data-nav-via='key'\]/); assert.match(css, /html\[data-reduce-motion='true'\]/); assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(css, /@media \(prefers-reduced-motion: no-preference\) \{\s*html:not\(\[data-nav-via='key'\]\):not\(\[data-reduce-motion='true'\]\).*:active/);
   assert.doesNotMatch(css, /(?:backdrop-filter|filter:|transition: all)/);
-  for (const old of ['ui/island/polish.css', 'ui/island/tokens/light-tone.css']) assert.doesNotMatch(src(old), /\.color-(?:pop|swatch)/, `${old} no longer owns picker rules`);
+  for (const old of ['ui/island/polish.css', 'ui/island/tokens/light-tone.css', 'ui/island/components/controls.css']) assert.doesNotMatch(src(old), /\.color-(?:pop|swatch)/, `${old} no longer owns picker rules`);
   assert.match(src('ui/island/Island.tsx'), /import '\.\/components\/color-picker.css';/, 'CSS loads outside the component test loader');
 });

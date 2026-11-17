@@ -7,6 +7,10 @@
 .color-pop { z-index: 60; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-4xl); overflow: auto; overscroll-behavior: contain;
   background: var(--ui-raised); color: var(--ui-text); border: 1px solid var(--ui-border); box-shadow: var(--ui-shadow);
   font-family: var(--ui-font); font-size: var(--fs-body); user-select: none; -webkit-user-select: none; }
+:where(.color-pop) button { font: var(--fw-regular) var(--fs-body)/1.2 var(--ui-font); border: 1px solid transparent; border-radius: var(--radius-sm); padding: var(--space-1) var(--space-3); background: var(--v-fill-hi); color: var(--ui-text); cursor: pointer; transition: background-color var(--dur-fast) ease, transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) ease; }
+.color-pop button:disabled { opacity: .4; cursor: default; }
+.color-pop .color-pop-done { background: var(--ui-accent); color: var(--ui-on-accent); font-weight: var(--fw-strong); }
+.color-pop :is(.color-pop-x, .color-pop-link) { background: transparent; color: var(--ui-text-secondary); }
 .color-pop-head { display: flex; align-items: center; gap: var(--space-2); height: 24px; flex: none; }
 .color-pop-head strong { flex: 1; min-width: 0; font-weight: var(--fw-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .color-pop-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--v-stroke-hi); flex: none; }
@@ -63,9 +67,13 @@
 .color-pop-link { min-width: 0; height: 28px; padding: 0 var(--space-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .color-pop-done { height: 28px; padding: 0 var(--space-2); }
 @media (hover: hover) and (pointer: fine) {
+  .color-pop .color-pop-done:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-accent) 88%, var(--ui-ink)); }
+  .color-pop :is(.color-pop-x, .color-pop-link):hover:not(:disabled) { background: var(--v-hover); color: var(--ui-text); }
   .color-pop :is(.color-pop-pipette, .color-pop-add):hover:not(:disabled) { background: var(--v-hover); color: var(--ui-text); }
 }
-.color-pop :is(.color-pop-x, .color-pop-pipette, .color-pop-link, .color-pop-done, .color-pop-add):active:not(:disabled) { transform: scale(.97); transition: transform var(--dur-press) var(--ease-out); }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-nav-via='key']):not([data-reduce-motion='true']) .color-pop :is(.color-pop-x, .color-pop-pipette, .color-pop-link, .color-pop-done, .color-pop-add):active:not(:disabled) { transform: scale(.97); transition: transform var(--dur-press) var(--ease-out); }
+}
 html[data-nav-via='key'] .color-pop button, html[data-reduce-motion='true'] .color-pop button { transform: none; transition: none; }
 html[data-nav-via='key'] .color-pop-pill, html[data-reduce-motion='true'] .color-pop-pill, .color-pop-tabs[data-instant='true'] .color-pop-pill { transition: none; }
 @media (prefers-reduced-motion: reduce) { .color-pop button { transform: none; transition: none; } .color-pop-pill { transition: none; } }

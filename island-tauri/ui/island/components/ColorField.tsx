@@ -25,18 +25,29 @@ export const colorPicker = {
 const HEX = /^#[0-9a-f]{6}$/i;
 export const isHex = (v: string) => HEX.test(v);
 type Hsv = { h: number; s: number; v: number };
-export function hexToHsv(hex: string): Hsv {
+type Rgb = { r: number; g: number; b: number };
+const channel = (value: number) => Math.round(Math.max(0, Math.min(255, Number.isFinite(value) ? value : 0)));
+export function hexToRgb(hex: string): Rgb {
   const n = isHex(hex) ? parseInt(hex.slice(1), 16) : 0;
-  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  return { r: n >> 16 & 255, g: n >> 8 & 255, b: n & 255 };
+}
+export function rgbToHex({ r, g, b }: Rgb): string {
+  return '#' + [r, g, b].map(x => channel(x).toString(16).padStart(2, '0')).join('');
+}
+export function rgbToHsv(rgb: Rgb): Hsv {
+  const r = channel(rgb.r) / 255, g = channel(rgb.g) / 255, b = channel(rgb.b) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
   let h = 0;
   if (d) h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
   return { h: h * 60, s: max ? d / max : 0, v: max };
 }
-export function hsvToHex({ h, s, v }: Hsv): string {
-  const f = (n: number) => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
-  return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+export const hexToHsv = (hex: string): Hsv => rgbToHsv(hexToRgb(hex));
+export function hsvToRgb({ h, s, v }: Hsv): Rgb {
+  h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(1, s)); v = Math.max(0, Math.min(1, v));
+  const f = (n: number) => { const k = (n + h / 60) % 6; return channel((v - v * s * Math.max(0, Math.min(k, 4 - k, 1))) * 255); };
+  return { r: f(5), g: f(3), b: f(1) };
 }
+export const hsvToHex = (hsv: Hsv): string => rgbToHex(hsvToRgb(hsv));
 
 /** A swatch button that opens the docked picker. Same footprint as the old native input. */
 export function ColorSwatch({ id, label, value, onPick, onReset, resetLabel, className = '' }: {
@@ -180,13 +191,18 @@ export function ColorPickerPanel() {
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   }, [id]);
-  const hex = hsvToHex(hsv);
+  const hex = hsvToHex(hsv), rgb = hexToRgb(hex);
+  const rgbDragging = useRef(false);
   const commit = (value = hsvToHex(hsvRef.current)) => { colorPicker.get()?.onPick(value); setText(value); };
   const preview = (next: Hsv) => { hsvRef.current = next; setHsv(next); setText(hsvToHex(next)); };
   const pick = (value: string) => { preview(hexToHsv(value)); commit(value.toLowerCase()); };
   const dragScope = `${id}:${tab}`;
   const sv = useDrag((fx, fy) => preview({ ...hsvRef.current, s: fx, v: 1 - fy }), () => commit(), dragScope);
   const hue = useDrag(fx => preview({ ...hsvRef.current, h: Math.min(359.9, fx * 360) }), () => commit(), dragScope);
+  const changeChannel = (key: keyof Rgb, value: number, final = false) => {
+    const valueHex = rgbToHex({ ...hexToRgb(hsvToHex(hsvRef.current)), [key]: channel(value) });
+    preview(hexToHsv(valueHex)); if (final) commit(valueHex);
+  };
   const root = typeof document !== 'undefined' ? getComputedStyle(document.documentElement) : null;
   const presets = ['accent', 'text', 'background', 'surface', 'dim'].map(r => root?.getPropertyValue(`--skin-${r}`).trim() ?? '').filter(isHex)
     .concat(['#ffffff', '#000000', '#ffd60a', '#80ff36', '#30d5c8', '#5e9eff', '#bf5af2', '#ff453a']).map(c => c.toLowerCase()).filter((c, i, a) => a.indexOf(c) === i).slice(0, 12);
@@ -210,11 +226,31 @@ export function ColorPickerPanel() {
         onKeyDown={e => {
           const next = e.key === 'ArrowRight' ? (i + 1) % 3 : e.key === 'ArrowLeft' ? (i + 2) % 3 : e.key === 'Home' ? 0 : e.key === 'End' ? 2 : -1;
           if (next < 0) return;
-          e.preventDefault(); selectTab(TABS[next]); document.getElementById(`color-tab-${TABS[next]}`)?.focus();
+          e.preventDefault(); selectTab(TABS[next]!); document.getElementById(`color-tab-${TABS[next]}`)?.focus();
         }}>{name}</button>)}
     </div>
     <div className="color-pop-body" role="tabpanel" id={`color-body-${tab}`} aria-labelledby={`color-tab-${tab}`}>
       {tab === 'Grid' && <ColorGrid hex={hex} onPick={pick} />}
+      {tab === 'Sliders' && <div className="color-pop-sliders">
+        {(['r', 'g', 'b'] as const).map((key, i) => {
+          const label = ['Red', 'Green', 'Blue'][i];
+          const low = { ...rgb, [key]: 0 }, high = { ...rgb, [key]: 255 };
+          return <div className="color-pop-channel" key={key}>
+            <label htmlFor={`color-channel-${key}`}>{key.toUpperCase()}</label>
+            <input id={`color-channel-${key}`} type="range" aria-label={label} min={0} max={255} step={1} value={rgb[key]}
+              style={{ background: `linear-gradient(to right, ${rgbToHex(low)}, ${rgbToHex(high)})` }}
+              onPointerDown={e => { rgbDragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); }}
+              onChange={e => changeChannel(key, Number(e.target.value), !rgbDragging.current)}
+              onPointerUp={() => { rgbDragging.current = false; commit(); }} onPointerCancel={() => { rgbDragging.current = false; commit(); }}
+              onBlur={() => { if (rgbDragging.current) { rgbDragging.current = false; commit(); } }} />
+            <input type="number" aria-label={`${label} value`} min={0} max={255} step={1} value={rgb[key]}
+              onChange={e => changeChannel(key, Number(e.target.value), true)} />
+          </div>;
+        })}
+        <label className="color-pop-slider-hex">Hex <input aria-label="Sliders hex colour" spellCheck={false} maxLength={7} value={text}
+          onChange={e => { const value = e.target.value; setText(value); const full = value.startsWith('#') ? value : `#${value}`; if (isHex(full)) { const next = hexToHsv(full); hsvRef.current = next; setHsv(next); } }}
+          onBlur={() => { const full = text.startsWith('#') ? text : `#${text}`; if (isHex(full)) pick(full); }} /></label>
+      </div>}
       {tab === 'Spectrum' && <div className="color-pop-spectrum">
     <div className="color-pop-sv" style={{ background: `hsl(${hsv.h} 100% 50%)` }} onPointerDown={sv} aria-label="Saturation and brightness" role="slider" tabIndex={0}
       aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hsv.s * 100)}

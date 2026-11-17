@@ -19,8 +19,8 @@ mod tracker;
 pub use classify::{classify, valid_time, CLOCK_SKEW_SECS};
 pub use error::ConfigError;
 pub use model::{
-    Chip, Event, RunState, SessionRow, TrackerConfig, Update, WarningKind, DEFAULT_LOOKBACK_SECS,
-    DEFAULT_MAX_CHIPS, DEFAULT_STALE_AFTER_SECS, MAX_MAX_CHIPS, MAX_STALE_AFTER_SECS,
-    MIN_MAX_CHIPS, MIN_STALE_AFTER_SECS,
+    Chip, Event, NamedEvent, RunState, SessionRow, TrackerConfig, Update, WarningKind,
+    DEFAULT_LOOKBACK_SECS, DEFAULT_MAX_CHIPS, DEFAULT_STALE_AFTER_SECS, MAX_MAX_CHIPS,
+    MAX_STALE_AFTER_SECS, MIN_MAX_CHIPS, MIN_STALE_AFTER_SECS,
 };
 pub use tracker::{label_for, short_id, Tracker};

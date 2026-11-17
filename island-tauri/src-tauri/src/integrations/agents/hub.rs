@@ -52,12 +52,12 @@ impl AgentHubSink {
             .insert(id);
         Ok(())
     }
-    fn notify(&self, title: &str) -> Result<(), IslandError> {
+    fn notify(&self, title: &str, body: Option<&str>) -> Result<(), IslandError> {
         self.hub.insert(NotificationInput {
             source: NotificationSource::Alert,
             app_name: "Agents".into(),
             title: title.into(),
-            body: None,
+            body: body.map(str::to_owned),
             icon_png: None,
             urgency: Urgency::Normal,
             actions: vec![],
@@ -73,15 +73,22 @@ impl AgentHubSink {
 }
 impl AgentEvents for AgentHubSink {
     fn deliver(&self, event: &Event) -> Result<(), IslandError> {
+        self.deliver_named(&super::core::NamedEvent {
+            event: event.clone(),
+            body: None,
+        })
+    }
+    fn deliver_named(&self, named: &super::core::NamedEvent) -> Result<(), IslandError> {
+        let event = &named.event;
         match event {
             Event::Started { id } => {
                 self.activity(format!("agent:{id}"), 50)?;
-                self.notify("Agent run started")
+                self.notify("Agent run started", named.body.as_deref())
             }
             Event::Finished { id, .. } => {
                 self.remove(&format!("agent:{id}"))?;
                 self.activity(format!("agent-finished:{id}"), 60)?;
-                self.notify("Agent run finished")
+                self.notify("Agent run finished", named.body.as_deref())
             }
             Event::Stalled { id } | Event::Disappeared { id } => {
                 self.remove(&format!("agent:{id}"))

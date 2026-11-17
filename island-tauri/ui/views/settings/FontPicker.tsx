@@ -4,6 +4,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { FontFamily } from '../../ipc/bindings';
 import { DEFAULT_FONT_LABEL, FONT_ROW_PX, fontEntries, fontWindow, previewFamily, scrollToRow } from './font-list';
+import { DropdownCheck, DropdownChevron, useMenuPresence } from '../../island/components/Dropdown';
 
 const LIST_PX = 256;
 
@@ -11,7 +12,8 @@ export function FontPicker({ label, value, fonts, monoDefault = true, onChange, 
   label: string; value: string; fonts: readonly FontFamily[] | null; monoDefault?: boolean;
   onChange(value: string): void; error?: string | null;
 }) {
-  const [open, setOpen] = useState(false), [query, setQuery] = useState(''), [monoOnly, setMonoOnly] = useState(monoDefault);
+  const menu = useMenuPresence(), { open } = menu;
+  const [query, setQuery] = useState(''), [monoOnly, setMonoOnly] = useState(monoDefault);
   const [focus, setFocus] = useState(0), [scrollTop, setScrollTop] = useState(0), [up, setUp] = useState(false);
   const root = useRef<HTMLDivElement>(null), list = useRef<HTMLDivElement>(null), search = useRef<HTMLInputElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const id = useId();
@@ -19,7 +21,7 @@ export function FontPicker({ label, value, fonts, monoDefault = true, onChange, 
   const { start, end } = fontWindow(scrollTop, LIST_PX, entries.length);
   useEffect(() => {
     if (!open) return;
-    const away = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
+    const away = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) menu.hide(); };
     document.addEventListener('pointerdown', away, true);
     return () => document.removeEventListener('pointerdown', away, true);
   }, [open]);
@@ -34,10 +36,10 @@ export function FontPicker({ label, value, fonts, monoDefault = true, onChange, 
     const at = Math.max(0, fontEntries(fonts ?? [], '', monoOnly, value).findIndex(e => e.value === value));
     setFocus(at);
     const top = Math.max(0, at * FONT_ROW_PX - LIST_PX / 2);
-    setScrollTop(top); setOpen(true);
+    setScrollTop(top); menu.show();
     requestAnimationFrame(() => { if (list.current) list.current.scrollTop = top; });
   };
-  const pick = (v: string) => { setOpen(false); trigger.current?.focus(); if (v !== value) onChange(v); };
+  const pick = (v: string, instant = false) => { menu.hide(instant); trigger.current?.focus(); if (v !== value) onChange(v); };
   const move = (to: number) => {
     const index = Math.max(0, Math.min(entries.length - 1, to));
     setFocus(index);
@@ -50,16 +52,16 @@ export function FontPicker({ label, value, fonts, monoDefault = true, onChange, 
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); move(focus + (e.key === 'ArrowDown' ? 1 : -1)); }
     else if (e.key === 'PageDown' || e.key === 'PageUp') { e.preventDefault(); move(focus + (e.key === 'PageDown' ? 8 : -8)); }
     else if ((e.key === 'Home' || e.key === 'End') && e.target !== search.current) { e.preventDefault(); move(e.key === 'Home' ? 0 : entries.length - 1); }
-    else if (e.key === 'Enter') { e.preventDefault(); const entry = entries[focus]; if (entry) pick(entry.value); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); trigger.current?.focus(); }
-    else if (e.key === 'Tab') setOpen(false);
+    else if (e.key === 'Enter') { e.preventDefault(); const entry = entries[focus]; if (entry) pick(entry.value, true); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); menu.hide(true); trigger.current?.focus(); }
+    else if (e.key === 'Tab') menu.hide(true);
   }}>
     <button ref={trigger} type="button" className="dropdown-trigger" aria-label={label} aria-haspopup="listbox" aria-expanded={open} aria-controls={id}
-      aria-invalid={error ? true : undefined} onClick={() => open ? setOpen(false) : show()}>
+      aria-invalid={error ? true : undefined} onClick={() => open ? menu.hide() : show()}>
       <span className="dropdown-value" style={{ fontFamily: value ? `${value}, monospace` : undefined }}>{current}</span>
-      <svg className="dropdown-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      <DropdownChevron />
     </button>
-    {open && <div className="dropdown-menu font-menu">
+    {menu.mounted && <div className="dropdown-menu font-menu" data-state={menu.state} inert={!open || undefined} onAnimationEnd={menu.settled}>
       <div className="font-search">
         <input ref={search} type="search" aria-label={`Search ${label}`} placeholder={fonts ? `Search ${fonts.length} fonts` : 'Loading fonts…'} value={query}
           role="combobox" aria-expanded="true" aria-controls={id} aria-activedescendant={entries[focus] ? `${id}-${focus}` : undefined}
@@ -75,7 +77,7 @@ export function FontPicker({ label, value, fonts, monoDefault = true, onChange, 
               className="font-option" style={{ top: index * FONT_ROW_PX, height: FONT_ROW_PX, fontFamily: previewFamily(entry) }}
               onPointerEnter={() => setFocus(index)} onClick={() => pick(entry.value)}>
               <span>{entry.label}</span>
-              {entry.value === value && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>}
+              {entry.value === value && <DropdownCheck />}
             </div>;
           })}
         </div>

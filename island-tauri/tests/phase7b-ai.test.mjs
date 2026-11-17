@@ -27,7 +27,8 @@ const render = (usage, period='today') => renderToStaticMarkup(createElement(AiD
 function walk(node, result=[]) {
   if (!node || typeof node !== 'object') return result;
   if (Array.isArray(node)) { node.forEach(n=>walk(n,result)); return result; }
-  if (typeof node.type === 'function') return walk(node.type(node.props),result);
+  // Dropdown holds hook state: keep it as a leaf (its own markup is pinned in phase7b-dropdown.test.mjs).
+  if (typeof node.type === 'function' && node.type.name !== 'Dropdown') return walk(node.type(node.props),result);
   result.push(node); walk(node.props?.children,result); return result;
 }
 
@@ -53,7 +54,11 @@ test('AI period selection changes spend models projects and daily trend, not pro
 test('AI provider cards retain real sign-in intent and spending selector handlers',()=>{
   const selected=[],signed=[];
   const nodes=walk(AiDashboard({dashboard:dashboardFromUsage({account:{},local:{}},'today',now),period:'today',onPeriodChange:p=>selected.push(p),onConnect:p=>signed.push(p),now}));
-  nodes.find(n=>n.type==='select').props.onChange({target:{value:'week'}});
+  const period=nodes.find(n=>n.type?.name==='Dropdown');
+  assert.equal(period.props.label,'Spending period'); assert.equal(period.props.value,'today');
+  assert.deepEqual(period.props.options.map(o=>o.value),['today','week','month']);
+  assert.equal(nodes.some(n=>n.type==='select'),false,'no native <select> (WebKitGTK draws a GTK popup)');
+  period.props.onChange('week');
   nodes.filter(n=>n.type==='button').forEach(n=>n.props.onClick());
   assert.deepEqual(selected,['week']); assert.deepEqual(signed,['anthropic','openai-codex']);
 });

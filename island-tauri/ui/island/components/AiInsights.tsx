@@ -1,6 +1,8 @@
 import type { Service } from '../models';
-import { ServiceNotice } from './AppPrimitives';
+import { Dropdown, ServiceNotice } from './AppPrimitives';
 import type { AiInsightsData, AiPeriod } from '../../views/adapters';
+
+const PERIOD_OPTIONS = [{ value: 'today', label: 'Today' }, { value: 'week', label: '7 days' }, { value: 'month', label: '30 days' }];
 
 // "Sessions" tab of AI Stats: per-session cost, cache efficiency, workload and the priciest
 // sessions. Reads `local.insights` only; every number is a session-start cohort like the overview.
@@ -33,7 +35,7 @@ export function AiInsights({ insights, period, onPeriodChange }: { insights: Ser
   return <div className="ai-dashboard ai-insights">
     <div className="ai-two-columns">
       <section className="ai-card ai-per-session">
-        <div className="ai-card-header"><h3>Per session</h3><select aria-label="Insights period" value={period} onChange={e => onPeriodChange?.(e.target.value as AiPeriod)}><option value="today">Today</option><option value="week">7 days</option><option value="month">30 days</option></select></div>
+        <div className="ai-card-header"><h3>Per session</h3><Dropdown label="Insights period" value={period} options={PERIOD_OPTIONS} align="end" onChange={v => onPeriodChange?.(v as AiPeriod)} /></div>
         <div className="ai-spend-value">{money(d.avgCost)}<small>average</small></div>
         <dl className="ai-stats-list">
           <Stat label="Median" value={money(d.medianCost)} hint="Half of priced sessions cost less than this"/>

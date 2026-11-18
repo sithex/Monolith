@@ -102,10 +102,11 @@ test('island clock offset mirrors each plasmoid companion slot (open/close clock
  const { companionNotchSlot, COMPANION_CHARACTERS }=pickerHarness({value:'blob',onPick(){}}).mod;
  const qml=`${root}/../../island/plasma-anchor/contents/ui`;
  const files=Object.fromEntries([...readFileSync(`${qml}/Companion.qml`,'utf8').matchAll(/(\w+): "characters\/(\w+)\.qml"/g)].map(m=>[m[1],m[2]]));
+ const defaultSlot=Number(readFileSync(`${qml}/characters/HabitCharacter.qml`,'utf8').match(/^\s*property int slotSize: (\d+)\s*$/m)[1]);
  for (const { id } of COMPANION_CHARACTERS) {
   const src=readFileSync(`${qml}/characters/${files[id]}.qml`,'utf8');
   const fixed=src.match(/preferredSize: (\d+)\s*$/m), slot=src.match(/slotSize: (\d+)/);
-  const expected=fixed?+fixed[1]:Math.max(16,Math.min(26,slot?+slot[1]:20));
+  const expected=fixed?+fixed[1]:Math.max(16,Math.min(26,slot?+slot[1]:defaultSlot));
   assert.equal(companionNotchSlot(id),expected,id);
  }
  assert.equal(companionNotchSlot(''),16);

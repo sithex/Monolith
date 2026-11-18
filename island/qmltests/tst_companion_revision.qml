@@ -114,6 +114,41 @@ TestCase {
         compare(after, normal, data.id + " settles back");
     }
 
+    function test_nurgling_giggle_and_doze() {
+        const f = createTemporaryObject(factory, suite, { character: "nurgling" }), a = f.art;
+        compare(f.preferredSize, 26);
+        point(f, 0, -900);
+        const up = picture(f);
+        point(f, 0, 900);
+        verify(picture(f) !== up, "Nurgling up and down gaze differ");
+
+        const pupil = findChild(a, "companionEye0");
+        const body = findChild(a, "nurglingBody");
+        const fly = findChild(a, "nurglingFly");
+        verify(pupil.visible);
+        verify(!fly.visible);
+        f.blink = 0.08;
+        verify(!pupil.visible, "blink closes the eye");
+        f.blink = 1;
+
+        a.habitFrame = 1;
+        compare(body.x, -1);
+        verify(fly.visible);
+        verify(!pupil.visible, "laughter squints");
+        const flyX = fly.x;
+        a.habitFrame = 2;
+        compare(body.x, 1);
+        verify(fly.x !== flyX, "the fly circles the horn");
+        a.resetHabit();
+        compare(body.x, 0);
+        verify(!fly.visible);
+
+        f.sleepy = true;
+        verify(!pupil.visible, "doze closes the eye");
+        verify(fly.visible, "the fly lands while dozing");
+        compare(fly.y, 0);
+    }
+
     function test_directional_habits() {
         // Mushroom's reference bob is vertical, not the old pointer-directed spore puff.
         for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron", "sonichu", "salamander"]) {

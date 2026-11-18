@@ -1,98 +1,108 @@
 import QtQuick
 
-// A Nurgling (Warhammer), as crisp 1× pixel art from the official miniature references:
-// one crooked yellowed horn, small beady eyes, a broad toothy grin, a bloated paunch with
-// a ripe pustule and a navel, stubby limbs. The beady eyes follow the pointer.
-//
-// Hover: sticks its tongue out with a gleeful squint. Idle habit: a fit of giggles while
-// one of Grandfather Nurgle's flies buzzes round its horn. Dozing: eyes shut, and the fly
-// settles on the horn.
+// A 26 px Nurgling: a crooked horn, crooked grin and a luminous, lumpy paunch.
+// Hover sticks out its tongue; idle giggles shake it as a fly circles the horn.
 HabitCharacter {
     id: art
-    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 8
+    habitInterval: 110
 
     readonly property int eyeX: gazePx(gazeX, 0.5, -1, 1)
     readonly property int eyeY: gazePx(gazeY, 0.6, -1, 1)
     readonly property bool giggling: habitFrame > 0
-    // Shakes with laughter: a pixel side to side on alternate frames.
-    readonly property int bodyX: giggling && habitFrame < 8 ? (habitFrame % 2 ? -1 : 1) : 0
+    readonly property var laughSteps: [0, -1, 1, -1, 1, -1, 1, -1, 0]
+    readonly property real open: face ? face.blink * face.lid : 1
     readonly property bool squint: happy || giggling
+    readonly property bool shut: asleep || open < 0.5
 
     readonly property var colors: ({
-        "O": "#27301a", "G": "#8fa548", "g": "#6f8436", "B": "#b9c46c", "H": "#e6dcb0", "h": "#a8996a",
-        "K": "#3a1e1a", "T": "#f0e8c8", "S": "#a8475a", "s": "#d07a7a", "F": "#5f7230",
-        "E": "#1a1a10", "Y": "#e8e070", "P": "#e0708a", "U": "#e8d070", "u": "#c8a850"
+        "K": "#242b1a", "d": "#48582d", "g": "#768943", "G": "#a8b65b", "L": "#ced378", "H": "#e9e59d",
+        "J": "#675839", "B": "#ad9260", "b": "#d8bc82", "I": "#f3dda4", "T": "#fff0ce", "t": "#cfb584",
+        "X": "#201a17", "M": "#43212a", "r": "#8c4352", "p": "#cb6977", "P": "#ef9c98", "Y": "#f7dd75",
+        "E": "#191b12", "W": "#ffffff", "F": "#85926c", "w": "#c9dee1"
     })
-    readonly property var flyColors: ({ "f": "#7d8a4a", "w": "#c8d6e0" })
 
     Item {
         objectName: "nurglingBody"
-        x: art.bodyX
-        width: 20
-        height: 20
+        x: art.laughSteps[art.habitFrame]
+        width: art.slotSize
+        height: art.slotSize
         PixelSprite {
-            x: 1
             colors: art.colors
             rows: [
-                "..........OHO.....",
-                "..........OHhO....",
-                ".........OHhO.....",
-                "........OHhO......",
-                "....OOOOHhOOO.....",
-                "...OGGGGHGGGGO....",
-                "..OGGGGGGGGGGGO...",
-                "..OGGGGGGGGGGGO...",
-                "..OGGGGGGGGGGGO...",
-                ".OGKGGGGGGGGGKGO..",
-                ".OGKKTKTKTKTKKGO..",
-                ".OGgKKKKKKKKKgGO..",
-                "OGO.OgKTKTKgGO.OGO",
-                "OgGOGGgKKKgGGGOGgO",
-                ".OOGBBBBBBBBBBGOO.",
-                "..OGBBBBBBBBUuBGO.",
-                "..OGBBBBgBBBuBBGO.",
-                "..OGgBBBBBBBBBgGO.",
-                "...OOgGOOOOOGgOO..",
-                "...OFFFO...OFFFO.."
+                "..........................",
+                "..................J.......",
+                "................JIJ.......",
+                "...............JIbK.......",
+                ".........KKKKKIbbK........",
+                ".......KKLLGJbbJKKK.......",
+                "......KLLHLLGBJGGggK......",
+                ".....KLLLGGGGLGddGGggK....",
+                "....KLGGddGGGGddGGggdK....",
+                "....KLGGGGGGLGGGGGGgpgK...",
+                "...KGGGGGGGLLGGGGGGggddK..",
+                "...KGGrGGGGGddGGGGGGMdgK..",
+                "...KGLMGGGGGGgGGGGMXXdgK..",
+                "...KGLMXMGGGGGGMMTtXMdK...",
+                "..KgGLrXTMTTXTTXtXXrdgK...",
+                "..KLGGGrXtXXXXXXTXMgdgK...",
+                ".KgLGdGGrXrtTrpMMgGgdGgKK.",
+                ".KLgGKGLGGrMMMrrgGGLgKGLK.",
+                "..KtKKGLHLLLLLGGGGGgdKtKK.",
+                "....KGLHLLYpLLLLGGGGgdKK..",
+                "....KGLHLLPprLLLGdGppgdK..",
+                "....KgGLLLLrrLLGgXgYrGdK..",
+                "....KgGGLLLLLLGGGdggGddK..",
+                ".....KdgGGGGGGGGGGggddK...",
+                "....KtGtKddggggdddKgGtgK..",
+                "....KKKKK.KKKKKKK.KKKKKK.."
             ]
         }
-        // Beady eyes: two pixels, a yellow glint, sliding toward the pointer.
+        // Fixed, staggered sockets; only the two-pixel pupils move with the gaze.
         Repeater {
-            model: [{ x: 5, rows: ["EY", "EE"] }, { x: 11, rows: ["YE", "EE"] }]
+            model: [6, 15]
             PixelSprite {
-                required property var modelData
+                required property int modelData
                 required property int index
-                objectName: "companionEye" + index
-                readonly property real open: art.face ? art.face.blink * art.face.lid : 1
-                x: modelData.x + (art.squint || open < 0.5 ? 0 : art.eyeX)
-                y: 7 + (art.squint || open < 0.5 ? 1 : art.eyeY)
+                x: modelData
+                y: 8 - index
                 colors: art.colors
-                rows: art.squint ? (index === 0 ? ["E.", ".E"] : [".E", "E."])
-                    : open < 0.5 ? ["EE"] : modelData.rows
+                rows: art.shut ? ["....", ".dd.", "dEEd"]
+                    : art.squint ? ["....", ".EE.", "E..E"]
+                    : [".dd.", "dLLd", "dYYd", ".gg."]
+
+                PixelSprite {
+                    objectName: "companionEye" + parent.index
+                    visible: !art.squint && !art.shut
+                    x: 1 + art.eyeX
+                    y: 1 + art.eyeY
+                    colors: art.colors
+                    rows: ["EW", "EE"]
+                }
             }
         }
         // Tongue, poked out on hover.
         PixelSprite {
             objectName: "hoverMark"
-            visible: art.happy
-            x: 9
-            y: 12
+            visible: art.happy && !art.asleep
+            x: 12
+            y: 15
             colors: art.colors
-            rows: ["PP", "PP", ".P"]
+            rows: [".Mr.", "MrpM", "MrPM", ".rpM", "..M."]
         }
     }
 
     // One of Nurgle's flies: circles the horn while giggling, sits on it while dozing.
-    readonly property var flyPath: [[0, 0], [15, 0], [17, 2], [16, 5], [14, 3], [15, 0], [17, 1], [16, 3], [17, 0]]
+    readonly property var flyPath: [[0, 0], [13, 1], [16, 0], [20, 1], [21, 3], [20, 5], [16, 4], [13, 3], [15, 1]]
     PixelSprite {
         objectName: "nurglingFly"
-        readonly property var at: art.asleep ? [13, 0] : art.flyPath[Math.min(8, art.habitFrame)]
+        readonly property var at: art.asleep ? [18, 0] : art.flyPath[art.habitFrame]
         visible: art.asleep || (art.giggling && !art.happy)
         x: at[0]
         y: at[1]
-        colors: art.flyColors
-        rows: art.asleep ? ["wf"] : (art.habitFrame % 2 ? ["w.", ".f"] : [".w", "f."])
+        colors: art.colors
+        rows: art.asleep ? [".w.", "wEF"]
+            : art.habitFrame % 2 ? ["w.w", ".EF"] : [".w.", "FEw"]
     }
 }

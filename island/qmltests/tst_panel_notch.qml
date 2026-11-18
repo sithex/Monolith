@@ -97,7 +97,7 @@ TestCase {
         face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
         const clock = findChild(notch, "panelClock");
         compare(face.shownCharacter, "blob");
-        compare(face.width, 16);
+        compare(face.width, 26);
         notch.companionCharacter = "isaac";
         compare(face.shownCharacter, "isaac");
         compare(face.width, 26);
@@ -193,7 +193,7 @@ TestCase {
         // An unknown character (older or newer settings) falls back to the blob.
         notch.companionCharacter = "ghost";
         compare(face.shownCharacter, "blob");
-        compare(face.width, 16);
+        compare(face.width, 26);
         verify(findChild(face, "companionBody"));
     }
     function test_main_component_compiles() {

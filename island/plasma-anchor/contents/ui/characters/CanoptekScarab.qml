@@ -1,94 +1,301 @@
 import QtQuick
 
-// A Canoptek Scarab (Warhammer 40,000), as crisp 1× pixel art: a split silver carapace
-// with glowing green runes, six jointed legs, a sensor slit that glows green and a pair
-// of mandibles. The glow in the sensor slit slides toward the pointer.
+// A Canoptek Scarab (Warhammer 40,000), as crisp 1× pixel art at 26 px:
+// a split silver carapace with glowing green Necron glyphs, six articulated
+// jointed mechanical legs, a sensor visor with glowing emerald optic tracking the
+// pointer, and razor-sharp feeder mandibles.
 //
-// Hover: the sensor slit lights from end to end and the mandibles open. Idle habit: a
-// skitter, side to side on alternating legs with a chomp of the mandibles. Dozing: the
-// sensor and runes dim and the legs tuck in.
+// Tracking: the glowing optic slides left/right/up/down within the dark visor aperture.
+// Hover (hoverMark): the visor flares white-green from end to end, carapace glyphs
+// blaze with white energy, and mandibles spread wide in an aggressive threat display.
+// Idle habit: an authentic robotic skitter on alternating tripod legs with sharp
+// chittering chomps of the mandibles, settling smoothly to rest.
+// Blink: the optic narrows to a sinister slit.
+// Doze / Stasis: legs tuck close under the shell, runes dim to dormant embers.
 HabitCharacter {
     id: art
-    slotSize: 20 // pre-26 art; drop this line when redrawn
+    slotSize: 26
     gazeScale: 1
     habitFrames: 6
+    habitInterval: 125
+    habitCooldown: 12000
 
-    readonly property int eyeX: gazePx(gazeX, 0.6, -1, 1)
-    readonly property int eyeY: gazePx(gazeY, 0.7, 0, 1)
+    readonly property int eyeX: gazePx(gazeX, 0.7, -2, 2)
+    readonly property int eyeY: gazePx(gazeY, 0.8, -1, 1)
     readonly property real open: face ? face.blink * face.lid : 1
-    readonly property bool skittering: !happy && habitFrame > 0 && habitFrame < 6
-    readonly property int bodyX: skittering ? (habitFrame % 2 ? -1 : 1) : 0
-    readonly property bool chomp: happy || (skittering && habitFrame % 2 === 0)
+    readonly property bool shut: open < 0.45
+    readonly property bool sleeping: asleep || (face ? face.sleepy : false)
+    readonly property bool skittering: !happy && habitFrame > 0 && habitFrame <= habitFrames
+    readonly property bool chomp: happy || (skittering && (habitFrame === 2 || habitFrame === 4))
 
     readonly property var colors: ({
-        "O": "#121417", "S": "#c9cdd2", "s": "#8d939a", "d": "#5a6068", "H": "#eef1f4",
-        "x": "#0b0d0f", "R": "#6a7078", "L": "#9aa0a7",
-        "g": art.asleep ? "#174d26" : "#3fe063", "G": "#5cff7a", "e": "#174d26"
+        "K": "#0e1117", // Crisp dark outline & chassis seam
+        "D": "#242832", // Deep gunmetal metallic shadow
+        "d": "#4a5260", // Dark living metal
+        "s": "#7e8896", // Midtone silver plate
+        "S": "#bac4d2", // Bright polished silver
+        "H": "#f2f6fc", // Specular highlight rim
+        "e": "#123a1e", // Stasis dormant green ember
+        "g": "#28d052", // Vibrant Necron glyph green
+        "G": "#58ff7a", // Intense green eye optic core
+        "W": "#c6ffd4", // Hot white-green energy flare
+        "w": "#ffffff", // Pure white glint
+        "X": "#080a0e", // Dark sensor visor cavity
+        "x": "#181c24", // Internal chassis joint
+        "L": "#96a0b0"  // Leg metallic highlight
     })
 
-    // Mirrors a left half onto the right, shading the right side darker.
-    function mirror(halves) {
-        const shade = { "H": "s", "S": "S", "s": "d", "R": "d" };
-        return halves.map(h => h + h.split("").reverse().map(c => shade[c] || c).join(""));
-    }
-    readonly property var shell: mirror([
-        "......OOOO",
-        "....OOHSSO",
-        "...OHSSgSO",
-        "...OSSSSSO",
-        "...OSSgSSO",
-        "...OsSSSSO",
-        "...OssSssO",
-        "...OOOOOOO",
-        "....OdRxxx",
-        "....OdRxxx",
-        ".....OOOOO"
-    ])
-    // Legs: three a side, jointed out from the carapace; two poses for the skitter, and
-    // tucked in while dozing.
-    readonly property var legs: mirror(asleep ? [
-        "..........", "..........", "..LL......", "..........", "..LL......",
-        "..........", "..........", "....L.....", "....L.....", ".........."
-    ] : skittering && habitFrame % 2 ? [
-        "..........", ".L........", "..LL......", "..........", ".LLL......",
-        "..........", "..........", "....L.....", "....L.....", "...L......"
-    ] : [
-        "..........", "..........", ".LLL......", "..........", "..........",
-        ".LLL......", "..........", "....L.....", "...L......", "..L......."
-    ])
+    readonly property var normalBodyRows: [
+        "..........................",
+        "..........................",
+        ".........KKKKKKKK.........",
+        ".......KKHSSSSSSSKK.......",
+        "......KHSSSSKKSSSSdKK.....",
+        ".....KHSSgSKKSSgSSddKK....",
+        "....KHSSssgKKgssdddKK.....",
+        "....KHSSgssgKKgssgssddK...",
+        "....KHSSssssKKsssssddK....",
+        "....KDddssssKKssssdddK....",
+        "....KHDsssssKKsssssddK....",
+        "....KKDddsssKKssdddKKK....",
+        "......KKDDDDDDDDDDKK......",
+        "......KDdssdxxxdsddDK.....",
+        ".....KKSSSSSSSSSSSSKK.....",
+        "....KDXXXXXXXXXXXXXXDK....",
+        "...KDXXXXXXXXXXXXXXXXDK...",
+        "...KDXXXXXXXXXXXXXXXXDK...",
+        "....KKDDDDDDDDDDDDDDKK....",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        ".........................."
+    ]
 
-    Item {
+    readonly property var sleepBodyRows: normalBodyRows.map(function(r) {
+        return r.replace(/g/g, "e").replace(/G/g, "e");
+    })
+
+    readonly property var restLegRows: [
+        "..........................",
+        "..KK..................KK..",
+        ".KLdK................KdSL.",
+        ".KLdK................KdSL.",
+        "KLdK..................KdSL",
+        "KLdK..................KdSL",
+        "KdK....................KdK",
+        "..........................",
+        "KLK....................KLK",
+        "KLSK..................KSLK",
+        ".KdSK................KdSK.",
+        "..KdK................KdK..",
+        "...K..................K...",
+        "..........................",
+        ".KLK..................KLK.",
+        "KLSK..................KSLK",
+        "KdSK..................KdSK",
+        ".KdK..................KdK.",
+        "..KK..................KK..",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        ".........................."
+    ]
+
+    readonly property var skitterLegsA: [
+        "..........................",
+        "..KK......................",
+        ".KLdK.................KK..",
+        ".KLdK................KdSL.",
+        "KdK..................KdSL.",
+        "......................KdK.",
+        "......................KK..",
+        ".....................KdSL.",
+        "......................KK..",
+        "KLK.......................",
+        "KdSK......................",
+        ".KdK......................",
+        ".....................KLK..",
+        "....................KdSK..",
+        ".....................KdK..",
+        ".KLK..................K...",
+        "KdSK......................",
+        ".KdK......................",
+        "..KK......................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        ".........................."
+    ]
+
+    readonly property var skitterLegsB: [
+        "..........................",
+        "......................KK..",
+        "..KK.................KdSL.",
+        ".KLdK................KdSL.",
+        ".KLdK.................KdK.",
+        "..KdK.....................",
+        "..KK......................",
+        ".KLdK.....................",
+        "..KK......................",
+        "......................KLK.",
+        ".....................KdSK.",
+        "......................KdK.",
+        "..KLK.....................",
+        ".KdSK.....................",
+        "..KdK.....................",
+        "...K..................KLK.",
+        ".....................KdSK.",
+        "......................KdK.",
+        "......................KK..",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        ".........................."
+    ]
+
+    readonly property var sleepLegRows: [
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "....K................K....",
+        "...KLK..............KdSK..",
+        "...KdK..............KdK...",
+        "..........................",
+        "..........................",
+        "....K................K....",
+        "...KdK..............KdK...",
+        "....K................K....",
+        "..........................",
+        "..........................",
+        "..........................",
+        "....K................K....",
+        "...KdK..............KdK...",
+        "....K................K....",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        ".........................."
+    ]
+
+    readonly property var mandiblesOpen: [
+        ".......KsSSK..KsSSK.......",
+        ".......KdssK..KdssK.......",
+        "........KdssKKssddK.......",
+        ".........KdSK.KdSK........",
+        "..........KK...KK........."
+    ]
+
+    readonly property var mandiblesChomp: [
+        ".......KsSK....KsSK.......",
+        "........KsSK..KsSK........",
+        ".........KdssssdK.........",
+        "..........KdSSdK..........",
+        "...........KKKK..........."
+    ]
+
+    readonly property var mandiblesHover: [
+        "......KsSK......KsSK......",
+        ".....KsSK........KsSK.....",
+        "......KdSK......KdSK......",
+        ".......KK........KK.......",
+        ".........................."
+    ]
+
+    readonly property var hoverMarkRows: [
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        ".......W......W...........",
+        "........W....W............",
+        "......W..W..W..W..........",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        "..........................",
+        ".........................."
+    ]
+
+    // 1. Jointed legs under carapace
+    PixelSprite {
+        objectName: "scarabLegs"
+        colors: art.colors
+        rows: art.sleeping ? art.sleepLegRows : (art.skittering && (art.habitFrame % 2 === 1) ? art.skitterLegsA : (art.skittering && (art.habitFrame % 2 === 0) ? art.skitterLegsB : art.restLegRows))
+    }
+
+    // 2. Main body: carapace, neck, and head visor housing
+    PixelSprite {
         objectName: "scarabBody"
-        x: art.bodyX
-        y: 4
-        width: 20
-        height: 16
-        PixelSprite { colors: art.colors; rows: art.shell }
-        // Over the shell's dark outline, so each leg joins the silver.
-        PixelSprite { colors: art.colors; rows: art.legs; y: 1 }
-        // Mandibles.
-        PixelSprite {
-            y: 11
-            colors: art.colors
-            rows: art.mirror(art.chomp ? ["....LL....", "....L....."] : [".....LL...", "......LL.."])
-        }
-        // Sensor glow inside the 6×2 slit (columns 7–12).
-        PixelSprite {
-            objectName: "companionEye0"
-            readonly property bool dim: art.asleep || art.open < 0.5
-            x: art.happy ? 7 : dim ? 9 : 9 + art.eyeX
-            y: art.happy ? 8 : dim ? 9 : 8 + art.eyeY
-            colors: art.colors
-            rows: art.happy ? ["gGGGGg", "gGGGGg"] : art.asleep ? ["ee"] : dim ? ["gg"] : ["GG"]
-        }
-        // Hover: the carapace runes flare.
-        PixelSprite {
-            objectName: "hoverMark"
-            visible: art.happy
-            x: 6
-            y: 2
-            colors: art.colors
-            rows: [".G....G.", "........", "G......G"]
-        }
+        colors: art.colors
+        rows: art.sleeping ? art.sleepBodyRows : art.normalBodyRows
+    }
+
+    // 3. Sensor optic eye inside visor aperture
+    PixelSprite {
+        objectName: "companionEye0"
+        x: art.happy ? 6 : (art.sleeping ? 11 : (art.shut ? 11 : 11 + art.eyeX))
+        y: art.happy ? 15 : (art.sleeping ? 17 : (art.shut ? 16 : 16 + (art.eyeY > 0 ? 1 : art.eyeY < 0 ? -1 : 0)))
+        colors: art.colors
+        rows: art.happy ? [
+            "gGGGGGGGGGGGGg",
+            "gGWWWWWWWWWWGg",
+            "gGGGGGGGGGGGGg"
+        ] : art.sleeping ? [
+            "ee"
+        ] : art.shut ? [
+            "gGGg"
+        ] : art.eyeY > 0 ? [
+            "gGwg"
+        ] : [
+            "gGwg",
+            "gGGg"
+        ]
+    }
+
+    // 4. Feeder shears / mandibles
+    PixelSprite {
+        objectName: "scarabMandibles"
+        y: 19
+        colors: art.colors
+        rows: art.happy ? art.mandiblesHover : (art.chomp ? art.mandiblesChomp : art.mandiblesOpen)
+    }
+
+    // 5. Hover: carapace runes flare with intense white energy
+    PixelSprite {
+        objectName: "hoverMark"
+        visible: art.happy
+        colors: art.colors
+        rows: art.hoverMarkRows
     }
 }

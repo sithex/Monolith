@@ -18,6 +18,7 @@ import { useNotifications } from '../ipc/notifications';
 import { ShortcutRecorder } from './settings/ShortcutRecorder';
 import { FontPicker } from './settings/FontPicker';
 import { AppRulesEditor } from './settings/AppRulesEditor';
+import { MutedApps } from './settings/MutedApps';
 import { SoundPicker } from './settings/SoundPicker';
 import { rulesSummary } from './settings/app-rules';
 import { ClipboardPatterns, DisplayChoice, WeatherLocation } from './settings/WidgetControls';
@@ -214,6 +215,8 @@ export function SettingsView({ active = true }: { active?: boolean } = {}) {
         onChange={value => { setFontError(null); saveSettings({ terminalFontFamily: value }).catch(e => setFontError(message(e))); }} />; break;
       case 'notificationSoundId': control = <SoundPicker label={label} value={settings.notificationSoundId ?? ''} emptyLabel="Each app's own (default)" onChange={id => patch({ notificationSoundId: id })} />; break;
       case 'deniedApps': return <DeniedApps key={id} value={(settings.notificationDeniedApps ?? []).join('\n')} onSave={apps => patch({ notificationDeniedApps: apps })} />;
+      case 'mutedApps': return <div key={id}><Row id={id} label={label} hint={hint}><MutedApps rules={appRules}
+        onSave={update => { setError(''); void saveSettings(current => update(current.notificationAppRules)).catch(e => setError(message(e))); }} /></Row></div>;
       case 'appRules': return <div key={id}><Row id={id} label={label} hint={rulesSummary(appRules)}><button className="link" type="button" aria-expanded={rulesOpen} onClick={() => setRulesOpen(!rulesOpen)}>{rulesOpen ? 'Close' : 'Edit'}</button></Row>
         {rulesOpen && <AppRulesEditor rules={appRules} seenApps={seenApps} globalSound={settings.notificationSoundId ?? ''} onSave={rules => saveSettings({ notificationAppRules: rules })} />}</div>;
       case 'scheme': return <div key={id} data-setting-id={id} tabIndex={-1}><SchemePicker value={appearance} settings={settings} patch={patch} onPick={id => { void saveAppearance(id).catch(e => setError(message(e))); }} /></div>;

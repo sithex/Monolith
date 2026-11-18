@@ -14,7 +14,9 @@ export function useShownPopups(): Popup[] {
     return () => { delete (window as unknown as Record<string, unknown>).__islandNotificationsTest; };
   }, []);
   useEffect(() => { const l = () => setFixture(fixtureRows); fixtureListeners.add(l); l(); return () => { fixtureListeners.delete(l); }; }, []);
-  return settings.notificationsEnabled && !state.dnd && !state.gameMode ? (fixture ?? snapshot.items) : [];
+  if (!settings.notificationsEnabled || state.dnd || state.gameMode) return [];
+  const suppressed = new Set(settings.notificationAppRules.filter(rule => !rule.popup).map(rule => rule.app));
+  return (fixture ?? snapshot.items).filter(p => !suppressed.has(p.notification.appName));
 }
 let fixtureRows: Popup[] | null = null;
 const fixtureListeners = new Set<() => void>();
@@ -27,12 +29,12 @@ export const MAX_STACK = 3;
 let measured = 0;
 const sizeListeners = new Set<() => void>();
 export const setMeasured = (h: number) => { if (Math.abs(measured - h) >= 1) { measured = h; sizeListeners.forEach(l => l()); } };
-export function useNotificationHover(): { active: boolean; width: number; height: number } {
+export function useNotificationHover(confirming = false): { active: boolean; width: number; height: number } {
   const state = useIslandState(), shown = useShownPopups();
   const [, force] = useState(0);
   useEffect(() => { const l = () => force(n => n + 1); sizeListeners.add(l); return () => { sizeListeners.delete(l); }; }, []);
-  const active = state.mode === 'hover' && state.hoverCause?.type !== 'alert' && shown.length > 0;
-  const fallback = 150 * Math.min(MAX_STACK, shown.length);
+  const active = state.mode === 'hover' && state.hoverCause?.type !== 'alert' && (confirming || shown.length > 0);
+  const fallback = 150 * Math.min(MAX_STACK, shown.length) + (confirming ? 36 : 0);
   return { active, width: NOTCH_CARD_WIDTH, height: TOPLINE + (measured || fallback) + BOTTOM_PAD };
 }
 

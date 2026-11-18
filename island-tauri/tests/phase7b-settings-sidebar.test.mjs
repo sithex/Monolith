@@ -53,7 +53,7 @@ test('sidebar: all pre-sidebar row IDs remain valid jump targets', () => {
   const legacyIds = ['swipeNavigation', 'stealth', 'clickSounds', 'openShortcut', 'paletteShortcut',
     'gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers',
     'terminalCommand', 'notificationsEnabled', 'dnd', 'systemNotificationMirror', 'silenceKdePopups',
-    'notificationSound', 'notificationSoundId', 'approvalsInNotch', 'redactBodies', 'deniedApps', 'appRules',
+    'notificationSound', 'notificationSoundId', 'approvalsInNotch', 'redactBodies', 'deniedApps', 'appRules', 'mutedApps',
     'showDate', 'displayBackend', 'hardwareMonitor', 'arrangeApps', 'exportSettings', 'importSettings',
     'scheme', 'hermesThemeSync', 'overrides', 'translucent', 'glassStrength', 'borderEnabled', 'reduceMotion',
     'animationSpeed', 'everyMonitor', 'notchMonitors', 'waitingPulse', 'hoverPeek', 'companion',

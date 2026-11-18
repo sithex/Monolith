@@ -58,6 +58,62 @@ pub struct Hub {
     #[cfg(target_os = "linux")]
     sound: effects::Sound,
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        contract::settings::{NotificationAppRule, RuleUrgency, Settings, SettingsPatch},
+        services::{autostart::Autostart, scratch},
+        state::actor::{self, Sink, Snapshot},
+        state::machine::Effect,
+    };
+
+    struct NoEffects;
+    impl Sink for NoEffects {
+        fn apply(&mut self, _: &[Effect], _: &Snapshot) -> Result<(), IslandError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn muted_app_keeps_history_without_a_popup() {
+        let root = scratch("muted-notifications");
+        let settings = Arc::new(SettingsService::new(
+            root.clone(),
+            Autostart::with_default_launcher(root.clone(), root.join("app"), true),
+        ));
+        settings
+            .patch(&SettingsPatch {
+                notification_app_rules: Some(vec![NotificationAppRule {
+                    app: "Updater".into(),
+                    popup: false,
+                    sound: false,
+                    urgency: RuleUrgency::App,
+                    sound_id: String::new(),
+                }]),
+                ..Default::default()
+            })
+            .unwrap();
+        let (handle, task) = actor::spawn(
+            Settings::default(),
+            Arc::new(actor::MonotonicClock::default()),
+            NoEffects,
+        );
+        let hub = Hub::new(handle.clone(), settings);
+        let mut input = NotificationInput::hermes("Updates available");
+        input.app_name = "Updater".into();
+        hub.insert(input).unwrap();
+        assert!(hub.popup_snapshot().unwrap().items.is_empty());
+        let history = hub.list().unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].app_name, "Updater");
+        assert_eq!(history[0].title, "Updates available");
+        handle.shutdown();
+        task.await.unwrap().unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
 impl Hub {
     pub fn new(actor: Handle, settings: Arc<SettingsService>) -> Arc<Self> {
         Arc::new(Self {

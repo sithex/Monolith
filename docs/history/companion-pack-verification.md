@@ -22,7 +22,7 @@ Hidden art/face, unattended monitor, reduced motion, hover, sleeping and thinkin
 
 ## Commands and results
 
-Run from `/home/nick/Hermes/Monolith` unless another directory is specified. Logs are under `/home/nick/Hermes/Monolith/evidence/companion-pack/`.
+Run from `~/Hermes/Monolith` unless another directory is specified. Logs are under `~/Hermes/Monolith/evidence/companion-pack/`.
 
 ```sh
 QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
@@ -84,7 +84,7 @@ git diff --check
 
 ## Evidence paths
 
-Single evidence parent: **`/home/nick/Hermes/Monolith/evidence/companion-pack/`**.
+Single evidence parent: **`~/Hermes/Monolith/evidence/companion-pack/`**.
 
 - `strips-1x.png`, `strips-4x.png`: normal / hover / sleep / habit / settled.
 - `timelines-1x.png`, `timelines-4x.png`: real before / six timed frames / after.
@@ -125,7 +125,7 @@ Re-ran the complete offscreen QML suite (24 passed), TypeScript checking (clean)
 
 ## Deployment follow-up
 
-User authorized deployment. Release rebuilt successfully with `build.sh` under CPUWeight/IOWeight 20, nice 15, idle I/O scheduling and MemoryMax 8G; log: `evidence/companion-pack/deploy-build.log`. Verified rollback backup: `/home/nick/Hermes/Backups/Monolith/companion-pack-20261104T065508Z/` (previous binary, plasmoid, settings, panel configuration, source archive).
+User authorized deployment. Release rebuilt successfully with `build.sh` under CPUWeight/IOWeight 20, nice 15, idle I/O scheduling and MemoryMax 8G; log: `evidence/companion-pack/deploy-build.log`. Verified rollback backup: `~/Hermes/Backups/Monolith/companion-pack-20261104T065508Z/` (previous binary, plasmoid, settings, panel configuration, source archive).
 
 Copied plasmoid to `~/.local/share/plasma/plasmoids/local.hermes.island.notch3` and compared all seven changed/new QML files byte-for-byte. Restarted `plasma-plasmashell.service`, gracefully stopped old Monolith and started new release using `run.sh --overlay --ui island` in user unit `monolith-companion-pack-1793775503`. Readback: PID 1281276, online, valid DP-1 native anchor, three monitor notches reconciled, no monitor-notch error, Isaac selection preserved. Live pin/open produces 200 input rectangles; collapse returns idle with zero input rectangles. Real desktop screenshots saved as `evidence/companion-pack/deployed-open.png` and `deployed-closed.png`; inspected open capture and startup log. No character-specific QML loading errors observed. Whole-desktop journal retains unrelated widget/theme warnings. Live CPU A/B and switching each new character in the production UI have not been measured/tested; prior offscreen switching coverage remains applicable.
 

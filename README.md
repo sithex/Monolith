@@ -37,11 +37,11 @@ WebKitGTK), and the notch is a native Plasma widget.
   mic mute, power profile, keep-awake, screenshot, colour picker, open a desktop app, or jump straight to an
   app. A layout editor sets where they go.
 - **Notch companions.** A small animated character sits in the notch and watches your pointer. There are
-  eleven to choose from: Blob, Isaac, Null, Companion Cube, Nurgling, Hollow Knight, Frog, Necron Warrior,
-  Necron Overlord, Canoptek Scarab and the Eye of Sauron.
+  fourteen to choose from: Blob, Isaac, Null, Companion Cube, Nurgling, Hollow Knight, Frog, Necron Warrior,
+  Necron Overlord, Canoptek Scarab, the Eye of Sauron, Mushroom, Sonichu and Salamander.
   [docs/notch-companion-characters.md](docs/notch-companion-characters.md) explains how to add your own.
-- **Settings.** Seven sections in an icon rail on the left: General, Notifications, Look, Notch & companion,
-  Terminal, Apps & widgets, and Island & backup. A search box at the top finds any setting and jumps to it.
+- **Settings.** Eight sections in a labelled rail on the left: General, Appearance, Notch, Companion,
+  Notifications, Apps, Terminal and Advanced. A search box at the top finds any setting and jumps to it.
   Every setting has a control, and you can export and import your settings as a backup.
 - **Customisation.** Colour schemes, including a custom one and one that follows your Hermes skin, plus size
   presets, glass/blur strength and notch colours. You can rearrange the launcher iPhone-style: hold a tile and

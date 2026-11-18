@@ -22,7 +22,7 @@ PALETTE = dict(zip(
 
 class HermesThemeTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix="ripple-theme-", dir=os.environ.get("TMPDIR"))
+        self.tmp = tempfile.TemporaryDirectory(prefix="monolith-theme-", dir=os.environ.get("TMPDIR"))
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.home = self.root / "home"
@@ -62,7 +62,8 @@ class HermesThemeTests(unittest.TestCase):
         # Remove inherited Python import paths; script inserts only our fixture agent.
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("PYTHON") and k != "HERMES_HOME"}
         self.env.update(HOME=str(self.root), HERMES_HOME=str(self.home), PYTHONDONTWRITEBYTECODE="1")
-        self.skin = self.home / "skins" / "ripple-island.yaml"
+        self.skin = self.home / "skins" / "monolith.yaml"
+        self.legacy_skin = self.home / "skins" / "ripple-island.yaml"
 
     def set_active(self, name):
         self.config.write_text(json.dumps({"display": {"skin": name}}))
@@ -86,10 +87,10 @@ class HermesThemeTests(unittest.TestCase):
 
     def test_apply_copies_branding_replaces_colors_and_is_idempotent(self):
         original = self.base_path.read_bytes()
-        self.assertEqual(self.success(self.run_helper()), {"skin": "ripple-island", "changed": True})
+        self.assertEqual(self.success(self.run_helper()), {"skin": "monolith", "changed": True})
         skin = json.loads(self.skin.read_text())
-        self.assertEqual(self.active(), "ripple-island")
-        self.assertEqual(skin["ripple_island_base"], "fixture-base")
+        self.assertEqual(self.active(), "monolith")
+        self.assertEqual(skin["monolith_base"], "fixture-base")
         for key in ("branding", "spinner", "art"):
             self.assertEqual(skin[key], self.base[key])
         self.assertNotIn("light_colors", skin)
@@ -99,18 +100,19 @@ class HermesThemeTests(unittest.TestCase):
             self.assertEqual(skin["colors"][role], expected)
         self.assertEqual(stat.S_IMODE(self.skin.stat().st_mode), 0o600)
         before = (self.skin.read_bytes(), self.skin.stat().st_mtime_ns)
-        self.assertEqual(self.success(self.run_helper()), {"skin": "ripple-island", "changed": False})
+        self.assertEqual(self.success(self.run_helper()), {"skin": "monolith", "changed": False})
         self.assertEqual((self.skin.read_bytes(), self.skin.stat().st_mtime_ns), before)
-        self.assertEqual(self.calls(), [["skin", "use", "ripple-island"]])
+        self.assertEqual(self.calls(), [["skin", "use", "monolith"]])
         self.assertEqual(self.base_path.read_bytes(), original)
+        self.assertFalse(self.legacy_skin.exists())
         self.assertEqual(list(self.skin.parent.glob("*.tmp")), [])
 
     def test_light_community_palette_becomes_a_complete_skin(self):
         # Catppuccin Latte (ui/island/tokens/schemes.ts): a light background must pass the
         # same validation and map every skin role, with no dark_colors/light_colors override.
-        latte = {"name": "ripple-island", "background": "#eff1f5", "surface": "#ccd0da", "border": "#bcc0cc",
+        latte = {"name": "monolith", "background": "#eff1f5", "surface": "#ccd0da", "border": "#bcc0cc",
                  "dim": "#6c6f85", "text": "#4c4f69", "primary": "#1e66f5", "accent": "#8839ef", "error": "#d20f39"}
-        self.assertEqual(self.success(self.run_helper(palette=latte)), {"skin": "ripple-island", "changed": True})
+        self.assertEqual(self.success(self.run_helper(palette=latte)), {"skin": "monolith", "changed": True})
         colors = json.loads(self.skin.read_text())["colors"]
         for role, expected in {"background": "#eff1f5", "ui_accent": "#8839ef", "ui_text": "#4c4f69", "ui_primary": "#1e66f5",
                                "ui_error": "#d20f39", "status_bar_bg": "#ccd0da", "ui_border": "#bcc0cc", "banner_dim": "#6c6f85"}.items():
@@ -120,7 +122,7 @@ class HermesThemeTests(unittest.TestCase):
     def test_reapply_remembers_original_and_restore_reactivates_it(self):
         self.success(self.run_helper())
         self.success(self.run_helper(palette={**PALETTE, "accent": "#123ABC"}))
-        self.assertEqual(json.loads(self.skin.read_text())["ripple_island_base"], "fixture-base")
+        self.assertEqual(json.loads(self.skin.read_text())["monolith_base"], "fixture-base")
         self.assertEqual(self.success(self.run_helper("restore")), {"skin": "fixture-base", "changed": True})
         self.assertEqual(self.active(), "fixture-base")
         count = len(self.calls())
@@ -136,8 +138,14 @@ class HermesThemeTests(unittest.TestCase):
         self.assertEqual(len(self.calls()), count)
 
     def test_missing_remembered_base_restores_default(self):
-        self.set_active("ripple-island")
-        self.skin.write_text(json.dumps({"ripple_island_base": "ripple-island"}))
+        self.set_active("monolith")
+        self.skin.write_text(json.dumps({"monolith_base": "monolith"}))
+        self.assertEqual(self.success(self.run_helper("restore")), {"skin": "default", "changed": True})
+        self.assertEqual(self.active(), "default")
+
+    def test_remembered_base_never_resolves_to_the_legacy_generated_name(self):
+        self.set_active("monolith")
+        self.skin.write_text(json.dumps({"monolith_base": "ripple-island"}))
         self.assertEqual(self.success(self.run_helper("restore")), {"skin": "default", "changed": True})
         self.assertEqual(self.active(), "default")
 
@@ -148,6 +156,7 @@ class HermesThemeTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("invalid palette", result.stderr)
                 self.assertFalse(self.skin.exists())
+                self.assertFalse(self.legacy_skin.exists())
                 self.assertEqual(self.active(), "fixture-base")
                 self.assertEqual(self.calls(), [])
         incomplete = dict(PALETTE)
@@ -157,8 +166,8 @@ class HermesThemeTests(unittest.TestCase):
 
     def test_cli_fallback_is_used_and_activation_is_read_back(self):
         self.success(self.run_helper(FAIL_SKIN="1"))
-        self.assertEqual(self.calls(), [["skin", "use", "ripple-island"], ["config", "set", "display.skin", "ripple-island"]])
-        self.assertEqual(self.active(), "ripple-island")
+        self.assertEqual(self.calls(), [["skin", "use", "monolith"], ["config", "set", "display.skin", "monolith"]])
+        self.assertEqual(self.active(), "monolith")
 
     def test_success_exit_without_actual_activation_is_rejected(self):
         result = self.run_helper(LIE_ABOUT_SUCCESS="1")
@@ -166,6 +175,48 @@ class HermesThemeTests(unittest.TestCase):
         self.assertIn("could not activate", result.stderr)
         self.assertEqual(self.active(), "fixture-base")
         self.assertEqual(len(self.calls()), 2)
+
+    # ---- Migration from the old generated skin name (ripple-island -> monolith) ----
+
+    def test_apply_from_active_legacy_skin_migrates_carries_base_and_deletes_old(self):
+        self.legacy_skin.write_text(json.dumps({"ripple_island_base": "fixture-base"}))
+        self.set_active("ripple-island")
+        result = self.success(self.run_helper())
+        self.assertEqual(result, {"skin": "monolith", "changed": True})
+        # New generated skin exists, remembers the old file's base, and is active.
+        self.assertTrue(self.skin.exists())
+        skin = json.loads(self.skin.read_text())
+        self.assertEqual(skin["monolith_base"], "fixture-base")
+        self.assertNotIn("ripple_island_base", skin)
+        self.assertEqual(self.active(), "monolith")
+        # The old generated file is gone and the switch went through the CLI.
+        self.assertFalse(self.legacy_skin.exists())
+        self.assertEqual(self.calls(), [["skin", "use", "monolith"]])
+        # The migrated skin still carries the base's branding and the new colours.
+        for key in ("branding", "spinner", "art"):
+            self.assertEqual(skin[key], self.base[key])
+        self.assertEqual(skin["colors"]["ui_accent"], "#00ff80")
+
+    def test_apply_migrates_even_when_the_new_skin_already_exists(self):
+        # A previous run wrote monolith.yaml but the old file survived (or the machine was
+        # mid-migration): applying again must still drop the old file and keep the base.
+        self.legacy_skin.write_text(json.dumps({"ripple_island_base": "fixture-base"}))
+        self.set_active("monolith")
+        self.success(self.run_helper())
+        self.assertFalse(self.legacy_skin.exists())
+        self.assertEqual(json.loads(self.skin.read_text())["monolith_base"], "fixture-base")
+
+    def test_restore_while_active_on_legacy_skin_restores_remembered_base(self):
+        self.legacy_skin.write_text(json.dumps({"ripple_island_base": "fixture-base"}))
+        self.set_active("ripple-island")
+        self.assertEqual(self.success(self.run_helper("restore")), {"skin": "fixture-base", "changed": True})
+        self.assertEqual(self.active(), "fixture-base")
+
+    def test_restore_while_active_on_legacy_skin_with_no_base_restores_default(self):
+        self.legacy_skin.write_text(json.dumps({"ripple_island_base": "ripple-island"}))
+        self.set_active("ripple-island")
+        self.assertEqual(self.success(self.run_helper("restore")), {"skin": "default", "changed": True})
+        self.assertEqual(self.active(), "default")
 
 
 if __name__ == "__main__":

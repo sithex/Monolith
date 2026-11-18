@@ -84,9 +84,10 @@ pub struct PaletteService {
     computation: Mutex<()>,
     /// Serializes Hermes skin writes (`sync_hermes_theme`).
     theme: Mutex<()>,
-    /// Is Hermes theme sync on? Only then is an active `ripple-island` skin the island's own
-    /// generated copy (follow the skin remembered under it); with sync off a `ripple-island`
-    /// skin was chosen by the user (e.g. copied from another machine) and is followed as-is.
+    /// Is Hermes theme sync on? Only then is an active `monolith` skin the island's own
+    /// generated copy (follow the skin remembered under it); with sync off a `monolith` (or the
+    /// older `ripple-island`) skin was chosen by the user (e.g. copied from another machine)
+    /// and is followed as-is. The legacy name is still recognised during migration.
     theme_sync: Box<dyn Fn() -> bool + Send + Sync>,
 }
 
@@ -114,7 +115,7 @@ impl PaletteService {
         self
     }
 
-    /// Nov 2 Hermes theme sync: `Some` writes the island scheme as the `ripple-island` skin and
+    /// Nov 2 Hermes theme sync: `Some` writes the island scheme as the `monolith` skin and
     /// activates it (remembering the previous skin); `None` restores that previous skin. Only
     /// public Hermes surfaces are touched (a skin file + `hermes skin use`). Returns the active
     /// skin name. The palette watcher then publishes the new skin palette as usual.
@@ -411,7 +412,7 @@ mod tests {
         let dir = scratch("theme-sync");
         let service = PaletteService::new(dir.join("root"), dir.join("home"));
         let mut palette = Palette {
-            name: "ripple-island".into(),
+            name: "monolith".into(),
             background: "#080d0a".into(),
             accent: "#80ff36".into(),
             text: "#d8e2d7".into(),

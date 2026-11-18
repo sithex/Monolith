@@ -5,7 +5,7 @@ import type { SchemeRoles } from './tokens/schemes';
 const ROLES = ['background', 'surface', 'border', 'dim', 'text', 'primary', 'accent', 'error'] as const;
 /** The 8 roles as a skin palette, or null when any role is not a plain #rrggbb colour. */
 export function themePayload(roles: SchemeRoles): Palette | null {
-  const out = { name: 'ripple-island' } as Palette;
+  const out = { name: 'monolith' } as Palette;
   for (const role of ROLES) {
     const value = roles[role];
     if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) return null;
@@ -16,7 +16,8 @@ export function themePayload(roles: SchemeRoles): Palette | null {
 
 /**
  * Optional Hermes theme sync (Nov 2). While enabled, the island scheme (`roles`) is written
- * as the `ripple-island` Hermes skin, debounced so a dragged colour picker writes once;
+ * as the `monolith` Hermes skin (the old `ripple-island` skin is migrated on the next sync),
+ * debounced so a dragged colour picker writes once;
  * `roles === null` (the "Hermes skin" scheme) and turning sync off restore the skin that was
  * active before. Nothing runs at startup while sync is off, and identical requests are skipped.
  */

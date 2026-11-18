@@ -12,26 +12,44 @@ from hermes_cli.config import load_config_readonly
 from hermes_cli.skin_engine import init_skin_from_config, get_active_skin
 
 config = load_config_readonly() or {}
-# Ripple's optional theme sync activates its own generated `ripple-island` skin. The island's
-# "Hermes skin" scheme must keep following the skin the user had BEFORE that, which the
-# generated file remembers as `ripple_island_base`; otherwise picking any island theme would
-# make "Hermes skin" mirror the island's own colours and lose the user's real skin.
+# Monolith's optional theme sync activates its own generated `monolith` skin (migrated from
+# the older `ripple-island` name). The island's "Hermes skin" scheme must keep following the
+# skin the user had BEFORE that, which the generated file remembers as `monolith_base` (older
+# files used `ripple_island_base`); otherwise picking any island theme would make "Hermes
+# skin" mirror the island's own colours and lose the user's real skin.
 # Only while theme sync is ON (the island passes --theme-sync): with sync off, an active
-# `ripple-island` skin is one the user picked (e.g. carried over from another machine), and
-# swapping it for its remembered base showed a different skin's colours (always necron green).
+# `monolith` (or the older `ripple-island`) skin is one the user picked (e.g. carried over
+# from another machine), and swapping it for its remembered base showed a different skin's
+# colours (always necron green).
+OUR_GENERATED = frozenset(("monolith", "ripple-island"))
+BASE_KEYS = ("monolith_base", "ripple_island_base")
+
+
+def _remembered_base(home: Path) -> str:
+    """The base skin remembered by our generated skin under either name/key."""
+    for skin in ("monolith", "ripple-island"):
+        try:
+            data = json.loads((home / "skins" / f"{skin}.yaml").read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError, AttributeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        for key in BASE_KEYS:
+            value = data.get(key)
+            if isinstance(value, str) and value.strip() and value not in OUR_GENERATED:
+                return value.strip()
+    return ""
+
+
 display = config.get("display") if isinstance(config, dict) else None
-if "--theme-sync" in sys.argv[2:] and isinstance(display, dict) and display.get("skin") == "ripple-island":
+if "--theme-sync" in sys.argv[2:] and isinstance(display, dict) and display.get("skin") in OUR_GENERATED:
     try:
         from hermes_constants import get_hermes_home
         home = Path(get_hermes_home())
     except Exception:
         import os
         home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
-    try:
-        base = json.loads((home / "skins" / "ripple-island.yaml").read_text(encoding="utf-8-sig")).get("ripple_island_base")
-    except (OSError, ValueError, AttributeError):
-        base = None
-    base = base if isinstance(base, str) and base.strip() and base != "ripple-island" else "default"
+    base = _remembered_base(home) or "default"
     config = {**config, "display": {**display, "skin": base}}
 init_skin_from_config(config)
 skin = get_active_skin()

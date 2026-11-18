@@ -1,13 +1,15 @@
-"""Mirror the Ripple island colour scheme into a Hermes skin, or restore the previous one.
+"""Mirror the Monolith island colour scheme into a Hermes skin, or restore the previous one.
 
 Usage: hermes-theme.py <hermes-agent-dir> <hermes-launcher> apply '<palette json>'
        hermes-theme.py <hermes-agent-dir> <hermes-launcher> restore
 
 Only public, documented Hermes surfaces are written: a skin file
-``$HERMES_HOME/skins/ripple-island.yaml`` (JSON is valid YAML) and ``display.skin`` through
+``$HERMES_HOME/skins/monolith.yaml`` (JSON is valid YAML) and ``display.skin`` through
 the ``hermes skin use`` CLI (falling back to ``hermes config set display.skin``). The skin
 copies the previous skin's branding/spinner/art so only colours change, and remembers that
-skin under ``ripple_island_base`` so turning sync off restores it. Prints one JSON line.
+skin under ``monolith_base`` so turning sync off restores it. The skin was previously named
+``ripple-island`` (key ``ripple_island_base``); when that old generated file exists it is
+migrated (base carried over, active skin switched, old file removed). Prints one JSON line.
 """
 import copy
 import json
@@ -18,7 +20,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-SKIN = "ripple-island"
+SKIN = "monolith"
+LEGACY_SKIN = "ripple-island"
+BASE_KEY = "monolith_base"
+LEGACY_BASE_KEY = "ripple_island_base"
+# The skin identity is ours under either name during migration; neither is a real base.
+OURS = frozenset((SKIN, LEGACY_SKIN))
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 ROLES = ("background", "surface", "border", "dim", "text", "primary", "accent", "error")
 
@@ -99,6 +106,23 @@ def skin_colors(p: dict) -> dict:
     }
 
 
+def remembered_base(existing: dict, legacy: dict) -> str:
+    """The base skin a generated skin remembers, preferring the current key.
+
+    During migration the old generated file (or an old key in the new file) is carried over;
+    a remembered base that is one of our own generated names is never treated as a base.
+    """
+    for source in (existing, legacy):
+        value = source.get(BASE_KEY)
+        if isinstance(value, str) and value.strip() and value not in OURS:
+            return value.strip()
+    for source in (existing, legacy):
+        value = source.get(LEGACY_BASE_KEY)
+        if isinstance(value, str) and value.strip() and value not in OURS:
+            return value.strip()
+    return ""
+
+
 def use_skin(launcher: str, name: str) -> None:
     env = dict(os.environ, NO_COLOR="1")
     for args in (["skin", "use", name], ["config", "set", "display.skin", name]):
@@ -128,14 +152,19 @@ def write_atomic(path: Path, text: str) -> None:
 
 def main() -> None:
     launcher, verb = sys.argv[2], sys.argv[3]
-    path = hermes_home() / "skins" / f"{SKIN}.yaml"
+    home = hermes_home()
+    path = home / "skins" / f"{SKIN}.yaml"
+    legacy_path = home / "skins" / f"{LEGACY_SKIN}.yaml"
     current = active_skin()
     existing = load_yaml(path) or {}
-    remembered = existing.get("ripple_island_base")
-    base = (remembered if isinstance(remembered, str) and remembered and remembered != SKIN else "default") \
-        if current == SKIN else current
+    legacy = load_yaml(legacy_path) or {}
+    remembered = remembered_base(existing, legacy)
+    # Ours is never a base to restore; with no remembered base, fall back to the skin default.
+    base = remembered if remembered else "default"
+    if current not in OURS:
+        base = current
     if verb == "restore":
-        if current == SKIN:
+        if current in OURS:
             use_skin(launcher, base)
             print(json.dumps({"skin": base, "changed": True}))
         else:
@@ -152,14 +181,20 @@ def main() -> None:
     colors: dict = dict(raw_colors) if isinstance(raw_colors, dict) else {}
     data.update({
         "name": SKIN,
-        "description": f"Ripple island colours over {base} (managed by Ripple; turn off Hermes theme sync to restore {base})",
+        "description": f"Monolith island colours over {base} (managed by Monolith; turn off Hermes theme sync to restore {base})",
         "colors": {**colors, **skin_colors(palette)},
-        "ripple_island_base": base,
+        BASE_KEY: base,
     })
     text = json.dumps(data, indent=2, ensure_ascii=True) + "\n"
     changed = not path.is_file() or path.read_text(encoding="utf-8", errors="replace") != text
     if changed:
         write_atomic(path, text)
+    # Migration: once the new generated skin is written, drop the old one.
+    if legacy_path.exists():
+        legacy_path.unlink()
+        changed = True
+    # Activate the generated skin whenever it is not already active (this also covers
+    # migrating from the old generated name).
     if current != SKIN:
         use_skin(launcher, SKIN)
         changed = True

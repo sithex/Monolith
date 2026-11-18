@@ -29,7 +29,7 @@ export const LAUNCHER_WIDTH = 560;
 export const COMPACT_VIEWS: ReadonlySet<IslandView> = new Set<IslandView>(['launcher', 'agents', 'mixer', 'brightness', 'timer', 'quickInfo', 'downloads', 'clipboard', 'notifications', 'scratchpad', 'controls', 'shelf', 'autoclicker']);
 /** Lowest open height for content-fitted pages: top bar + one line of content. */
 export const MIN_FIT_HEIGHT = 80;
-export function IslandSurface({ children, fail, paletteOpen = false, scheme }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean;
+export function IslandSurface({ children, fail, paletteOpen = false, confirmingMute = false, scheme }: { children: ReactNode; fail(error: unknown): void; paletteOpen?: boolean; confirmingMute?: boolean;
   /** The colour scheme the page and the native notch use; the raw skin palette can be a different skin (theme sync keeps the base). */
   scheme?: { surface?: string; accent?: string } }) {
   const state = useIslandState(), settings = useSettings();
@@ -101,7 +101,7 @@ export function IslandSurface({ children, fail, paletteOpen = false, scheme }: {
   useLayoutEffect(() => { owner.current?.schedule(!animating.current);  }, [state.rev, state.mode, state.view, settings, layout.rev, launcher.rev, contentH, contentW]);
   const preset = layout.layout.preset;
   const { width: customWidth, maxHeight: customHeight } = presetSize(preset);
-  const approvalHover = useApprovalHover(), notificationHover = useNotificationHover();
+  const approvalHover = useApprovalHover(), notificationHover = useNotificationHover(confirmingMute);
   // An approval prompt outranks popup cards; otherwise the notch grows into the cards.
   const hover = approvalHover.active || !notificationHover.active ? approvalHover : notificationHover;
   // Apps page (Nick's reference, Nov 9): the island hugs the 5-column grid of 100px tiles

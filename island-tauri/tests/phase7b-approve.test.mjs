@@ -72,7 +72,7 @@ test('component never answers from the keyboard and wires Esc to the existing di
 test('Island renders the notice in the hover slot and the surface takes its size from it', () => {
   const island = src('ui/island/Island.tsx'), surface = src('ui/island/IslandSurface.tsx');
   // Approval outranks in-notch notification cards, which outrank the plain preview.
-  assert.match(island, /approvalHover\.active \? <ApprovalNotice fail=\{fail\} \/> : notificationHover\.active \? <NotchNotifications fail=\{fail\} placement="hover" \/> : <PreviewNotice fail=\{fail\} \/>/);
+  assert.match(island, /approvalHover\.active \? <ApprovalNotice fail=\{fail\} \/> : notificationHover\.active \? <NotchNotifications fail=\{fail\} placement="hover" \{\.\.\.notificationMute\} \/> : <PreviewNotice fail=\{fail\} \/>/);
   assert.match(surface, /approvalHover\.active \|\| !notificationHover\.active \? approvalHover : notificationHover/);
   assert.match(surface, /state\.mode === 'hover' \? hover\.width/);
   assert.match(surface, /state\.mode === 'hover' \? hover\.height/);

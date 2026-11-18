@@ -25,6 +25,12 @@
 .notification-card[data-in-notch=true] { padding: 10px 12px 12px 12px; border: 0; border-radius: var(--radius-3xl); background: color-mix(in srgb, var(--skin-text, #fff) 5%, transparent); box-shadow: none; }
 .notification-card[data-in-notch=true][data-critical=true] { box-shadow: inset 0 0 0 1px var(--skin-error, #ef7777); }
 .notch-notifications .notification-overflow { align-self: center; }
+.notification-mute { font-size: var(--fs-sm); color: var(--ui-text-hint); flex: none; }
+@media (hover: hover) {
+  .notification-card:not(:hover):not(:focus-within) .notification-mute { opacity: 0; }
+}
+.notification-muted { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); font-size: var(--fs-body); }
+.notification-muted span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Open island: one banner card pinned under the topline, inside the surface. */
 .notch-notifications[data-placement=open] { position: absolute; z-index: 30; top: 48px; left: 50%; width: min(420px, calc(100% - 24px)); transform: translateX(-50%); pointer-events: none; }
 .notch-notifications[data-placement=open] > * { pointer-events: auto; }

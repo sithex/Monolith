@@ -23,7 +23,14 @@ const rgbOf = (hex: string) => { const v = parseInt(hex.slice(1), 16); return `r
 
 /** A picked colour: the swatch, its hex and rgb, and Copy. Stays until clicked; a click
  *  anywhere on it (or Copy) dismisses it — it never opens another page. */
-function ColourCard({ hex, popup, perform, inNotch }: { hex: string; popup: Popup; perform(op: PopupOp): void; inNotch: boolean }) {
+type Mute = (app: string, id: string) => void;
+
+function MuteButton({ notification: n, mute }: { notification: Popup['notification']; mute?: Mute }) {
+  return mute && <button type="button" className="notification-mute" aria-label={`Mute ${n.appName}`} title={`Mute ${n.appName}`}
+    onClick={e => { e.stopPropagation(); mute(n.appName, n.id); }}>Mute</button>;
+}
+
+function ColourCard({ hex, popup, perform, inNotch, mute }: { hex: string; popup: Popup; perform(op: PopupOp): void; inNotch: boolean; mute?: Mute }) {
   const n = popup.notification;
   const [copied, setCopied] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
@@ -40,6 +47,7 @@ function ColourCard({ hex, popup, perform, inNotch }: { hex: string; popup: Popu
     <div className="notification-card-head">
       <span className="notification-icon colour-card-dot" aria-hidden="true" style={{ background: hex }} />
       <span className="notification-app">{n.appName}</span><span className="notification-priority">Click to close</span>
+      <MuteButton notification={n} mute={mute} />
       <button className="notification-close" aria-label="Dismiss picked colour" onClick={e => { e.stopPropagation(); dismiss(); }}>
         <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
       </button>
@@ -61,16 +69,16 @@ function ColourCard({ hex, popup, perform, inNotch }: { hex: string; popup: Popu
     {copied === 'failed' && <p className="colour-card-error" role="alert">Couldn't copy. The colour was copied when it was picked.</p>}
   </motion.article>;
 }
-export function NotificationCard({ popup, redact = false, perform, changed = surfacesChanged, inNotch = false }: {
-  popup: Popup; redact?: boolean; perform(op: PopupOp): void; changed?(): void;
+export function NotificationCard({ popup, redact = false, perform, changed = surfacesChanged, inNotch = false, mute }: {
+  popup: Popup; redact?: boolean; perform(op: PopupOp): void; changed?(): void; mute?: Mute;
   /** Drawn inside the island surface: no separate input region, no floating card chrome. */
   inNotch?: boolean;
 }) {
   const hex = pickedColour(popup.notification);
-  if (hex) return <ColourCard hex={hex} popup={popup} perform={perform} inNotch={inNotch} />;
-  return <PlainCard popup={popup} redact={redact} perform={perform} changed={changed} inNotch={inNotch} />;
+  if (hex) return <ColourCard hex={hex} popup={popup} perform={perform} inNotch={inNotch} mute={mute} />;
+  return <PlainCard popup={popup} redact={redact} perform={perform} changed={changed} inNotch={inNotch} mute={mute} />;
 }
-function PlainCard({ popup, redact, perform, changed, inNotch }: { popup: Popup; redact: boolean; perform(op: PopupOp): void; changed(): void; inNotch: boolean }) {
+function PlainCard({ popup, redact, perform, changed, inNotch, mute }: { popup: Popup; redact: boolean; perform(op: PopupOp): void; changed(): void; inNotch: boolean; mute?: Mute }) {
   const n = popup.notification;
   const [hovered, setHovered] = useState(false), [focused, setFocused] = useState(false);
   const held = useRef(false), focusedNow = useRef(false);
@@ -96,6 +104,7 @@ function PlainCard({ popup, redact, perform, changed, inNotch }: { popup: Popup;
       {n.iconPng?.startsWith('data:image/png;base64,') ? <img className="notification-icon" src={n.iconPng} alt="" onError={e => { e.currentTarget.hidden = true; }} />
         : <span className="notification-icon notification-monogram" aria-hidden="true">{n.appName.slice(0, 1).toLocaleUpperCase()}</span>}
       <span className="notification-app">{n.appName}</span><span className="notification-priority">{critical ? 'Critical' : 'Now'}</span>
+      <MuteButton notification={n} mute={mute} />
       <button className="notification-close" aria-label={`Dismiss ${n.title}`} onClick={() => perform({ type: 'dismiss', id: n.id })}>
         <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
       </button>
@@ -114,7 +123,9 @@ function PlainCard({ popup, redact, perform, changed, inNotch }: { popup: Popup;
 /** Popup cards as part of the notch. Hover: the notch grows into the stack (rendered in the
  *  hover preview slot). Open island: a banner pinned under the topline, inside the surface.
  *  Never a separate floating window. Mounted once; listens for popup snapshots. */
-export function NotchNotifications({ fail, placement }: { fail(error: unknown): void; placement: 'hover' | 'open' }) {
+export function NotchNotifications({ fail, placement, mute, confirmation, undo }: {
+  fail(error: unknown): void; placement: 'hover' | 'open'; mute: Mute; confirmation?: string; undo(): void;
+}) {
   const settings = useSettings(), snapshot = usePopups(), shown = useShownPopups();
   // This module is also loaded standalone by the node card tests.
   const reduced = useReducedMotion() === true || settings.reduceMotion || (typeof document !== 'undefined' && document.documentElement.dataset.reduceMotion === 'true')
@@ -141,13 +152,15 @@ export function NotchNotifications({ fail, placement }: { fail(error: unknown): 
     const ro = new ResizeObserver(measure); ro.observe(el); measure();
     return () => ro.disconnect();
   }, [placement]);
+  if (!shown.length && !confirmation) return null;
   const more = shown.length - visibleCount;
   return <section ref={stack} className="notch-notifications" data-placement={placement} aria-label="Notifications">
+    {confirmation && <div className="notification-muted" role="status"><span>Muted {confirmation}</span><button type="button" onClick={undo}>Undo</button></div>}
     <AnimatePresence initial={false} onExitComplete={surfacesChanged}>
       {shown.slice(0, visibleCount).map(p => <motion.div key={p.notification.id} layout={!reduced}
         initial={{ opacity: 0, y: reduced ? 0 : -8, scale: reduced ? 1 : .97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: reduced ? 0 : -8, scale: reduced ? 1 : .97 }} transition={transition}>
-        <NotificationCard popup={p} redact={settings.redactBodies} perform={perform} inNotch />
+        <NotificationCard popup={p} redact={settings.redactBodies} perform={perform} inNotch mute={mute} />
       </motion.div>)}
     </AnimatePresence>
     {more > 0 && <button className="notification-overflow" onClick={() => { void dispatch({ type: 'selectView', view: 'notifications' }).catch(fail); }}>+{more} more · Open history</button>}

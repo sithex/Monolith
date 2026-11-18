@@ -46,7 +46,7 @@ test('the popup stack is no longer a separate floating window', () => {
   const src = readFileSync(file, 'utf8'), css = readFileSync(new URL('../ui/island/notifications/notification-cards.css', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /notification-stack/); assert.doesNotMatch(css, /\.notification-stack/);
   assert.match(src, /export function NotificationCards[\s\S]*return null;/);
-  assert.match(src, /<NotificationCard popup=\{p\} redact=\{settings\.redactBodies\} perform=\{perform\} inNotch \/>/);
+  assert.match(src, /<NotificationCard popup=\{p\} redact=\{settings\.redactBodies\} perform=\{perform\} inNotch mute=\{mute\} \/>/);
 });
 test('critical cards have no timer; redaction never exposes the body; expired actions disappear', () => {
   const html = card({ ...note, urgency: 'critical', canInvokeActions: false }, { redact: true });

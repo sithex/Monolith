@@ -73,6 +73,7 @@ const ROW_CATALOG: readonly { id: string; title: string; tab: string; rows: read
     { id: 'redactBodies', label: 'Hide message text', hint: 'Only titles are kept', keys: ['redactBodies'] },
     { id: 'deniedApps', label: 'Blocked apps', hint: 'Apps that never notify', keys: ['notificationDeniedApps'] },
     { id: 'appRules', label: 'Per-app rules', hint: 'Popup, sound and urgency for each app', keys: ['notificationAppRules'] },
+    { id: 'mutedApps', label: 'Muted apps', hint: 'History only, no popups or sound · Unmute', keys: [] },
   ] },
   { id: 'clock', title: 'Clock', tab: 'general', rows: [
     { id: 'showDate', label: 'Show date under time', keys: ['showDate'] },
@@ -183,7 +184,7 @@ export const SETTINGS_CARDS: readonly CardSpec[] = [
   { id: 'layoutEditor', title: 'Island layout', tab: 'appearance', reset: false, rows: rows('sideButtons', 'islandSize') },
   { id: 'notch', title: 'Notch', tab: 'notch', rows: rows('everyMonitor', 'notchMonitors', 'waitingPulse', 'hoverPeek', 'copyProgress', 'shelfEnabled', 'shelfMaxItems', 'shelfRemoveAfterDrag', 'notchColor', 'notchWidth', 'notchBorder', 'notchBorderColor', 'notchBorderOpacity', 'notchBorderWidth') },
   { id: 'companion', title: 'Companion', tab: 'companion', rows: rows('companion', 'companionCharacter', 'companionReactive', 'companionMonitor') },
-  { id: 'notifications', title: 'Notifications', tab: 'notifications', rows: rows('notificationsEnabled', 'systemNotificationMirror', 'silenceKdePopups', 'approvalsInNotch', 'redactBodies', 'deniedApps', 'appRules') },
+  { id: 'notifications', title: 'Notifications', tab: 'notifications', rows: rows('notificationsEnabled', 'systemNotificationMirror', 'silenceKdePopups', 'approvalsInNotch', 'redactBodies', 'deniedApps', 'appRules', 'mutedApps') },
   { id: 'gameMode', title: 'Focus', tab: 'notifications', rows: rows('dnd', 'gameModeAuto', 'gameMode', 'gameModeDnd', 'gameModeFreezeCompanion', 'gameModePausePollers') },
   { id: 'sounds', title: 'Sounds', tab: 'notifications', rows: rows('notificationSound', 'notificationSoundId', 'clickSounds') },
   { id: 'popups', title: 'Popups', tab: 'notifications', rows: [

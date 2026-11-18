@@ -47,9 +47,11 @@ export function seedStores({ boot, visual, workspace }: Awaited<ReturnType<typeo
 }
 // No optimistic appearance/settings state: successful command + authoritative revision.
 let settingsTail: Promise<unknown> = Promise.resolve();
-export function saveSettings(patch: SettingsPatch): Promise<void> {
+export function saveSettings(patch: SettingsPatch | ((current: Settings) => SettingsPatch)): Promise<void> {
   const result = settingsTail.catch(() => undefined).then(async () => {
-    await settingsPatch(patch);
+    const next = typeof patch === 'function' ? patch(settingsStore.getSnapshot()) : patch;
+    if (Object.keys(next).length === 0) return;
+    await settingsPatch(next);
     acceptVisual(await visualGet());
   });
   settingsTail = result;

@@ -30,7 +30,15 @@ impl SettingsService {
         let file = data_dir.join("settings.json");
         let raw = fs::read(&file)
             .ok()
-            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .map(|bytes| match serde_json::from_slice::<Value>(&bytes) {
+                Ok(value) if value.is_object() => value,
+                // Unreadable (e.g. a hand-edit typo): move it aside so the first save cannot
+                // silently replace the user's settings with defaults.
+                result => {
+                    set_aside_unreadable(&file, result.err());
+                    Value::Null
+                }
+            })
             .unwrap_or(Value::Null);
         let settings = Settings::from_file_value(&raw);
         let known = settings.to_file_map();
@@ -102,6 +110,27 @@ impl SettingsService {
     }
 }
 
+/// Renames an unparseable `settings.json` to `settings.json.bad-<unix secs>` and logs it.
+fn set_aside_unreadable(file: &std::path::Path, error: Option<serde_json::Error>) {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let aside = file.with_file_name(format!("settings.json.bad-{secs}"));
+    let reason = error.map_or_else(|| "not a JSON object".to_owned(), |e| e.to_string());
+    match fs::rename(file, &aside) {
+        Ok(()) => tracing::warn!(
+            %reason,
+            kept = %aside.display(),
+            "settings.json unreadable; using defaults and keeping the original"
+        ),
+        Err(rename) => tracing::warn!(
+            %reason,
+            %rename,
+            "settings.json unreadable and could not be moved aside; using defaults"
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,6 +149,36 @@ mod tests {
             dir.join(data),
             Autostart::with_default_launcher(dir.to_path_buf(), dir.join("app"), refuse),
         )
+    }
+
+    #[test]
+    fn unreadable_settings_file_is_kept_aside_not_overwritten() {
+        let dir = scratch("unreadable-settings");
+        fs::create_dir_all(dir.join("data")).unwrap();
+        let file = dir.join("data/settings.json");
+        // A customised file with one hand-edit typo (trailing comma); then a non-object root.
+        for original in [
+            "{\n  \"stealth\": true,\n  \"clipboardDenyPatterns\": [\"^secret\"],\n}\n",
+            "[]",
+        ] {
+            fs::write(&file, original).unwrap();
+            let svc = service(&dir, "data", true);
+            assert!(!svc.get().unwrap().stealth, "falls back to defaults");
+            svc.patch(&patch(json!({"swipeNavigation": false})))
+                .unwrap();
+            let kept: Vec<_> = fs::read_dir(dir.join("data"))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|path| path.to_string_lossy().contains("settings.json.bad-"))
+                .collect();
+            assert_eq!(kept.len(), 1, "exactly one copy kept: {kept:?}");
+            assert_eq!(fs::read_to_string(&kept[0]).unwrap(), original);
+            fs::remove_file(&kept[0]).unwrap();
+        }
+        // A missing file is normal first run: nothing is set aside.
+        fs::remove_file(&file).unwrap();
+        service(&dir, "data", true);
+        assert_eq!(fs::read_dir(dir.join("data")).unwrap().count(), 0);
     }
 
     #[test]

@@ -13,8 +13,8 @@ HabitCharacter {
 
     readonly property int headX: gazePx(gazeX, 0.35, -1, 1)
     readonly property int headY: gazePx(gazeY, 0.45, -1, 1)
-    readonly property int pupilX: gazePx(gazeX, 0.7, -2, 2)
-    readonly property int pupilY: gazePx(gazeY, 0.7, -2, 2)
+    readonly property int pupilX: gazePx(gazeX, 1.1, -3, 3)
+    readonly property int pupilY: gazePx(gazeY, 1.0, -2, 2)
     readonly property real open: face ? face.blink * face.lid : 1
     readonly property bool eyesShut: open < 0.35
     readonly property bool dozing: asleep || (face ? face.lid < 0.6 : false)
@@ -39,7 +39,7 @@ HabitCharacter {
         "W": art.isDark ? Qt.lighter(art.baseColor, 2.5) : "#ffffff",
         "E": art.eyeBaseColor,
         "H": "#ffffff",
-        "P": "#ff8ca3"
+        "P": art.isDark ? "#d46b80" : "#ff9aa8"
     })
 
     readonly property var settledRows: [
@@ -155,20 +155,21 @@ HabitCharacter {
                 y: 11 + (art.habitFrame > 0 ? (art.habitFrame === 1 || art.habitFrame === 5 ? 1 : -1) : art.pupilY)
                     + (art.eyesShut ? 2 : art.dozing ? 1 : 0)
                 colors: art.colors
-                rows: art.eyesShut ? ["EE"] : art.dozing ? ["EE", "EE"] : ["HE", "EE", "EE", "EE"]
+                rows: art.eyesShut ? ["EE"] : art.dozing ? ["EE", "EE"] : ["EH", "EE", "EE"]
             }
         }
 
         PixelSprite {
             objectName: "hoverMark"
             visible: art.happy
-            x: 6 + art.pupilX
-            y: 12 + art.pupilY
+            x: 7 + art.pupilX
+            y: 11 + art.pupilY
             colors: art.colors
             rows: [
-                "..EE........EE..",
-                ".E..E......E..E.",
-                "PP............PP"
+                ".EE.....EE.",
+                "E..E...E..E",
+                "...........",
+                ".PP.....PP."
             ]
         }
     }

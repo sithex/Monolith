@@ -129,6 +129,38 @@ TestCase {
         }
     }
 
+    function test_hollowknight_mask_and_nail() {
+        const f = createTemporaryObject(factory, suite, { character: "hollowknight" }), a = f.art;
+        compare(f.preferredSize, 26);
+        const eye = findChild(a, "companionEye0"), head = findChild(a, "knightHead");
+        const poses = new Set();
+        for (const p of [[0, 0], [0, -900], [0, 900], [-900, 0], [900, 0]]) {
+            point(f, p[0], p[1]);
+            poses.add(picture(f));
+        }
+        compare(poses.size, 5, "each gaze direction has its own picture");
+        verify(eye.rows.join("").includes("H"));
+        f.blink = 0.08;
+        compare(eye.rows.length, 1, "blink closes the socket to a slit");
+        f.blink = 1;
+        const raisedY = head.y;
+        f.sleepy = true;
+        compare(head.y, raisedY + 1, "the Knight bows while dozing");
+        verify(!eye.rows.join("").includes("H"));
+        f.sleepy = false;
+
+        const slash = findChild(a, "knightSlash");
+        a.habitDirection = 1;
+        a.habitFrame = 2;
+        const right = slash.rows;
+        const rightX = slash.x;
+        a.habitDirection = -1;
+        compare(slash.x, f.preferredSize - rightX - slash.width);
+        compare(JSON.stringify(slash.rows), JSON.stringify(right.map(
+            row => row.padEnd(slash.width, ".").split("").reverse().join(""))));
+        a.resetHabit();
+    }
+
     function test_mushroom_reference_bob() {
         const f = createTemporaryObject(factory, suite, { character: "mushroom" }), a = f.art;
         point(f, 0, 0);

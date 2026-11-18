@@ -44,9 +44,9 @@ at 16–20 px) are drawn as **crisp pixel sprites** instead:
 - Base the character on `characters/HabitCharacter.qml` and draw with
   `characters/PixelSprite.qml`: text rows plus a colour map, one unantialiased
   `Rectangle` per horizontal run. Every pixel lands on a screen pixel at 1×.
-- Slot size: 20×20 by default. A character whose reference needs more detail sets
-  `slotSize` (max 26, `HabitCharacter.maxSlotSize`): the notch is the 32 px panel with a
-  28 px interior, so 26 leaves one pixel above and below. The brain sizes the face from
+- Slot size: 26×26 by default (`HabitCharacter.slotSize`, max `maxSlotSize` 26): the notch
+  is the 32 px panel with a 28 px interior, so 26 leaves one pixel above and below. New
+  characters use the full 26 px; 20 px is too small for detail. The brain sizes the face from
   `preferredSize`, the text after it moves right, and tests/renders check bounds against
   the character's own slot.
 - Design the sprite first as text rows in Python (Pillow, nearest-neighbour preview at

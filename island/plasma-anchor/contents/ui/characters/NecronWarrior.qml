@@ -10,6 +10,7 @@ import QtQuick
 // dims to a low ember at the bottom of each socket.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 5
 

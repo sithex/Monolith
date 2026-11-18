@@ -8,6 +8,7 @@ import QtQuick
 // slash toward the pointer's side, with a white arc. Dozing: eyes half shut, head bowed.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 6
 

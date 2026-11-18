@@ -9,6 +9,7 @@ import QtQuick
 // settles on the horn.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 8
 

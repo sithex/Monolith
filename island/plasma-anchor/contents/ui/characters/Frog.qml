@@ -8,6 +8,7 @@ import QtQuick
 // and a sleepy bubble swells and pops.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 9
 

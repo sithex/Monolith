@@ -4,6 +4,7 @@ import QtQuick.Shapes
 // Original miniature rendition; see docs/history/companion-pack-spec.md.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
 
     Item {
         width: 20

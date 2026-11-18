@@ -9,6 +9,7 @@ import QtQuick
 // sensor and runes dim and the legs tuck in.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 6
 

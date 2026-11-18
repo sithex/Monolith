@@ -65,13 +65,17 @@ export const COMPANION_CHARACTERS: readonly CompanionChoice[] = [
 ];
 
 /** Each character's notch slot, i.e. its `preferredSize` in the plasmoid (Blob.qml, Isaac.qml,
- *  `slotSize` in HabitCharacter-based ones; default 20). The native notch shifts its clock right
+ *  `slotSize` in HabitCharacter-based ones; default 26). The native notch shifts its clock right
  *  by `max(0, slot - 20)`; the island's own clock mirrors that so open/close hand-offs line up.
  *  An unknown ID loads no art in Companion.qml, which falls back to 16. */
-const NOTCH_SLOT: Partial<Record<string, number>> = { blob: 16, isaac: 18, eyeofsauron: 26, mushroom: 26, salamander: 26 };
+// Characters not yet redrawn at 26 px; each redraw removes its entry.
+const NOTCH_SLOT: Partial<Record<string, number>> = {
+  blob: 16, isaac: 18, canoptekscarab: 20, companioncube: 20, frog: 20, hollowknight: 20,
+  necronoverlord: 20, necronwarrior: 20, notchmimic: 20, nurgling: 20, sonichu: 20,
+};
 export function companionNotchSlot(id: string | null | undefined): number {
   const key = id || 'blob';
-  return NOTCH_SLOT[key] ?? (COMPANION_CHARACTERS.some(c => c.id === key) ? 20 : 16);
+  return NOTCH_SLOT[key] ?? (COMPANION_CHARACTERS.some(c => c.id === key) ? 26 : 16);
 }
 
 type Filter = 'All' | CompanionGroup;

@@ -11,6 +11,7 @@ import QtQuick
 // waits for you the heart turns amber.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 7
 

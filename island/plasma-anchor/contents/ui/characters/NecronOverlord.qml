@@ -10,6 +10,7 @@ import QtQuick
 // low line and the staff goes dark.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 5
 

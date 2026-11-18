@@ -11,6 +11,7 @@ import QtQuick
 // the cheek toward the pointer side. Dozing: half-lids over drowsy eyes.
 HabitCharacter {
     id: art
+    slotSize: 20 // pre-26 art; drop this line when redrawn
     gazeScale: 1
     habitFrames: 3
     habitInterval: 125

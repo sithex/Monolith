@@ -836,6 +836,20 @@ export type DownloadsChanged = {
 };
 
 /**
+ *  Effective colours the native notch actually draws after every override fallback (one
+ *  source of truth for both the plasmoid status and the renderer's Follow-skin swatches).
+ *  Precedence mirrors `runtime::panel_colors`: the panel clock colour wins, then the island
+ *  background override, then the scheme/skin surface; the border colour wins similarly over
+ *  the accent. `background` is the notch/clock-pill fill, `accent` the hover tint, and
+ *  `border_color` the notch border when enabled.
+ */
+export type EffectiveNotchColors = {
+	background: string,
+	accent: string,
+	borderColor: string,
+};
+
+/**
  *  Latest-value topic (`EqualizerChanged`), emitted at most 30 times per second and only while
  *  the equalizer is capturing. `active: false` = capture stopped (bands empty).
  */
@@ -1957,6 +1971,12 @@ export type VisualChanged = {
 	settings: Settings,
 	palette: Palette,
 	appearance: Appearance,
+	/**
+	 *  The colours the native notch actually draws (override fallbacks resolved); `None`
+	 *  while no scheme/skin palette is usable yet. Single source of truth for the
+	 *  Follow-skin swatches in Settings.
+	 */
+	notch: EffectiveNotchColors | null,
 };
 
 export type VoiceOp = "status" | "toggle";

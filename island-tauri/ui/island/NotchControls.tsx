@@ -9,8 +9,8 @@ import { groupSpec, monitorChoices, rowSpec, toggleMonitor } from '../views/sett
 import { settingsGroup } from '../views/settings/SettingsGroup';
 
 /** Hook-free shared notch/companion controls; every preference has a stable jump target. */
-export function NotchControls({ settings, background, accent, patch, outputs = null, show = () => true, header, note = true, label = 'Notch appearance' }: {
-  settings: Settings; background: string; accent: string; patch(value: SettingsPatch): void;
+export function NotchControls({ settings, panelFallback, borderFallback, patch, outputs = null, show = () => true, header, note = true, label = 'Notch appearance' }: {
+  settings: Settings; panelFallback: string; borderFallback: string; patch(value: SettingsPatch): void;
   outputs?: string[] | null; show?(rowId: string): boolean; header?: ReactNode;
   /** The "taskbar notch only" note; shown once, on the Notch card. */
   note?: boolean; label?: string;
@@ -21,7 +21,7 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
       <span className="label">{spec.label}{(hint ?? spec.hint) && <small>{hint ?? spec.hint}</small>}</span>{control}</div>;
   };
   const color = (id: string, key: 'panelClockColor' | 'notchBorderColor', fallback: string) => row(id, <div className="notch-color-control">
-    <ColorSwatch id={key} label={rowSpec(id).label} value={settings[key] || fallback} onPick={hex => patch({ [key]: hex })}
+    <ColorSwatch id={key} label={rowSpec(id).label} value={settings[key] || fallback} following={!settings[key]} onPick={hex => patch({ [key]: hex })}
       onReset={() => patch({ [key]: '' })} resetLabel="Follow skin" />
     <button className="link" type="button" aria-label={`${rowSpec(id).label}: follow skin`} onClick={() => patch({ [key]: '' })}>{settings[key] || 'Follow skin'}</button>
   </div>);
@@ -48,10 +48,10 @@ export function NotchControls({ settings, background, accent, patch, outputs = n
     {group('shelf', [flag('shelfEnabled', 'shelfEnabled')], [
       row('shelfMaxItems', <NumberStepper aria-label="Shelf size" min={1} max={50} step={1} value={settings.shelfMaxItems ?? 12} onCommit={(value, final) => { if (final) patch({ shelfMaxItems: value }); }} />),
       flag('shelfRemoveAfterDrag', 'shelfRemoveAfterDrag')])}
-    {color('notchColor', 'panelClockColor', background)}
+    {color('notchColor', 'panelClockColor', panelFallback)}
     {row('notchWidth', <><DraftRange aria-label="Notch width" min={110} max={320} step={2} value={settings.notchWidth ?? 144} onCommit={(value, final) => { if (final) patch({ notchWidth: value }); }} /><output>{settings.notchWidth ?? 144}px</output></>)}
     {group('notchBorder', [flag('notchBorder', 'notchBorderEnabled')], [
-      color('notchBorderColor', 'notchBorderColor', accent),
+      color('notchBorderColor', 'notchBorderColor', borderFallback),
       row('notchBorderOpacity', <><DraftRange aria-label="Notch border opacity" min={0} max={100} step={1} value={Math.round((settings.notchBorderOpacity ?? .1) * 100)} onCommit={value => patch({ notchBorderOpacity: value / 100 })} /><output>{Math.round((settings.notchBorderOpacity ?? .1) * 100)}%</output></>),
       row('notchBorderWidth', <><DraftRange aria-label="Notch border thickness" min={0} max={4} step={.1} value={settings.notchBorderWidth ?? .8} onCommit={value => patch({ notchBorderWidth: value })} /><output>{settings.notchBorderWidth ?? .8}px</output></>)])}
     {flag('companion', 'companionEnabled')}

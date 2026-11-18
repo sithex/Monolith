@@ -44,7 +44,7 @@ function shortSurface({ buttons, pill }) {
     'framer-motion': { motion: { section: 'section' }, useReducedMotion: () => true, useAnimationControls: () => animation },
     'ui/ipc/island-state.ts': { useIslandState: () => state },
     'ui/ipc/client.ts': {},
-    'ui/stores/index.ts': { useSettings: () => ({ offsetX: 0, offsetY: 0 }), usePalette: () => ({}) },
+    'ui/stores/index.ts': { useSettings: () => ({ offsetX: 0, offsetY: 0 }), usePalette: () => ({}), useNotchColors: () => null },
     'ui/stores/apps.ts': { useLayout: () => ({ rev: 1, unchangedSizing: false, layout: { ...sideLayout, buttons } }),
       useLauncher: () => ({ rev: 1, items: [] }) },
     'ui/island/geometry.ts': { ...load('ui/island/geometry.ts'), nativePill: () => pill },

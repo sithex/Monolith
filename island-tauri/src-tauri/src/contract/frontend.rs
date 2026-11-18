@@ -99,4 +99,8 @@ pub struct VisualChanged {
     pub settings: super::settings::Settings,
     pub palette: super::palette::Palette,
     pub appearance: Appearance,
+    /// The colours the native notch actually draws (override fallbacks resolved); `None`
+    /// while no scheme/skin palette is usable yet. Single source of truth for the
+    /// Follow-skin swatches in Settings.
+    pub notch: Option<super::palette::EffectiveNotchColors>,
 }

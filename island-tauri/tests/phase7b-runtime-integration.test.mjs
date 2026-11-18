@@ -181,7 +181,7 @@ test('Settings exposes working display backend controls only for desktop Linux a
   for(const ua of ['Mozilla/5.0 (X11; Linux x86_64)','Mozilla/5.0 (Windows NT 10.0)','Mozilla/5.0 (Macintosh; Intel Mac OS X)','Mozilla/5.0 (Linux; Android 14)']) {
     for(const running of ['wayland','x11']) {
       const calls=[],settings={displayBackend:running==='wayland'?'x11':'wayland'};
-      const d=driver({'ui/stores/index.ts':{useSettings:()=>settings,useAppearance:()=> 'green',usePalette:()=>({}),saveSettings:async p=>calls.push(p)},'ui/ipc/client.ts':{displayOutputs:async()=>[]}});
+      const d=driver({'ui/stores/index.ts':{useSettings:()=>settings,useAppearance:()=> 'green',usePalette:()=>({}),useNotchColors:()=>null,saveSettings:async p=>calls.push(p)},'ui/ipc/client.ts':{displayOutputs:async()=>[]}});
       try {globals({navigator:{userAgent:ua},document:{documentElement:{dataset:{displayBackend:running}}}},()=>{
         const View=d.load('ui/views/SettingsView.tsx').SettingsView;
         let tree=d.render(View);labeled(tree,'Advanced').props.onClick();tree=d.render(View);const group=labeled(tree,'Display server');
@@ -199,7 +199,7 @@ test('palette setting jumps focus the matching row after the filtered DOM commit
   const events=new EventTarget(),log=[];
   const control={focus(){log.push('row-focus');}};
   const row={dataset:{settingId:'terminalFontFamily'},querySelector(){return control;},scrollIntoView(){log.push('row-scroll');},setAttribute(){},removeAttribute(){}};
-  const d=driver({'ui/stores/index.ts':{useSettings:()=>({}),useAppearance:()=> 'green',usePalette:()=>({}),saveSettings:async()=>{}},'ui/ipc/bindings.ts':{commands:{fontFamilies:async()=>({status:'ok',data:[]})}}});
+  const d=driver({'ui/stores/index.ts':{useSettings:()=>({}),useAppearance:()=> 'green',usePalette:()=>({}),useNotchColors:()=>null,saveSettings:async()=>{}},'ui/ipc/bindings.ts':{commands:{fontFamilies:async()=>({status:'ok',data:[]})}}});
   try { globals({window:events,document:{documentElement:{dataset:{displayBackend:'x11'}},querySelector:selector=>{assert.equal(selector,'.settings-panel [data-setting-id="terminalFontFamily"]');return row;}}},()=>{
     const C=d.load('ui/views/SettingsView.tsx').SettingsView;
     d.render(C);
@@ -216,7 +216,7 @@ test('palette setting jumps focus the matching row after the filtered DOM commit
 test('Notch width handler preserves the 110–320 range and writes only final commits with no island size changes',()=>{
   const {NotchControls}=load('ui/island/NotchControls.tsx');
   for(const width of [undefined,110,144,320]) {
-    const calls=[],tree=NotchControls({settings:{notchWidth:width},background:'#000000',accent:'#ffffff',patch:p=>calls.push(p)}),slider=labeled(tree,'Notch width');
+    const calls=[],tree=NotchControls({settings:{notchWidth:width},panelFallback:'#000000',borderFallback:'#ffffff',patch:p=>calls.push(p)}),slider=labeled(tree,'Notch width');
     assert.deepEqual([slider.props.min,slider.props.max,slider.props.step,slider.props.value],[110,320,2,width??144]);
     for(const value of [110,144,320]) {slider.props.onCommit(value,false);assert.equal(calls.length,0);}
     slider.props.onCommit(110,true);slider.props.onCommit(320,true);assert.deepEqual(calls,[{notchWidth:110},{notchWidth:320}]);
@@ -228,7 +228,7 @@ function surfaceHarness({unchangedSizing=false,maxHeight=1190}={}) {
     'framer-motion':{motion:{section:'section'},useReducedMotion:()=>true,useAnimationControls:()=>animation},
     'ui/ipc/island-state.ts':{useIslandState:()=>state},
     'ui/ipc/client.ts':{},
-    'ui/stores/index.ts':{useSettings:()=>({offsetX:0,offsetY:0}),usePalette:()=>({})},
+    'ui/stores/index.ts':{useSettings:()=>({offsetX:0,offsetY:0}),usePalette:()=>({}),useNotchColors:()=>null},
     'ui/stores/apps.ts':{useLayout:()=>({rev:1,unchangedSizing,layout:{...layoutFixture,preset:{type:'custom',width:820,maxHeight},buttons:[]}}),useLauncher:()=>({rev:1,items:[]})},
     'ui/island/geometry.ts':{...load('ui/island/geometry.ts'),nativePill:()=>null},
     'ui/island/components/IslandShell.tsx':{UI_SPRING:{}},
@@ -296,7 +296,7 @@ test('renderer fit bounds retain large custom preferences and fit the full side-
 
 test('Settings wires the terminal launch preference without restarting or submitting a chat',async()=>{
   const saved=[];
-  const d=driver({'ui/stores/index.ts':{useSettings:()=>({terminalCommand:'hermes --cli'}),useAppearance:()=> 'skin',usePalette:()=>({}),saveSettings:async patch=>saved.push(patch)},'ui/ipc/bindings.ts':{commands:{fontFamilies:async()=>({status:'ok',data:[]})}}});
+  const d=driver({'ui/stores/index.ts':{useSettings:()=>({terminalCommand:'hermes --cli'}),useAppearance:()=> 'skin',usePalette:()=>({}),useNotchColors:()=>null,saveSettings:async patch=>saved.push(patch)},'ui/ipc/bindings.ts':{commands:{fontFamilies:async()=>({status:'ok',data:[]})}}});
   try {globals({navigator:{userAgent:'Linux'},document:{documentElement:{dataset:{displayBackend:'wayland'}}}},()=>{
     const View=d.load('ui/views/SettingsView.tsx').SettingsView;
     let tree=d.render(View);labeled(tree,'Terminal').props.onClick();tree=d.render(View);const editor=component(tree,'TerminalCommandSettings');
@@ -312,7 +312,7 @@ test('Settings search shows matching results from every section, empty state, Es
   const settings={translucent:true,companionEnabled:true,reduceMotion:false,animationSpeed:150,terminalCursorStyle:'bar'};
   const defaults={reduceMotion:false,animationSpeed:100,swipeNavigation:true,stealth:false,clickSounds:true,gameModeAuto:true,gameMode:false,openShortcut:'Meta+`',
     customAccent:'',customBackground:'',customText:'',hermesThemeSync:false,accent:'',background:'',borderColor:''};
-  const d=driver({'ui/stores/index.ts':{useSettings:()=>settings,useAppearance:()=> 'album',usePalette:()=>({}),saveSettings:async p=>saved.push(p),saveAppearance:async a=>appearances.push(a)},
+  const d=driver({'ui/stores/index.ts':{useSettings:()=>settings,useAppearance:()=> 'album',usePalette:()=>({}),useNotchColors:()=>null,saveSettings:async p=>saved.push(p),saveAppearance:async a=>appearances.push(a)},
     'ui/ipc/client.ts':{settingsDefaults:async()=>defaults,displayOutputs:async()=>['DP-1'],terminalCopy:async()=>{}}});
   // globals() restores synchronously; this async body keeps its own fixture for the awaits.
   const before={navigator:Object.getOwnPropertyDescriptor(globalThis,'navigator'),document:Object.getOwnPropertyDescriptor(globalThis,'document')};

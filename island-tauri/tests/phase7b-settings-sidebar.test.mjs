@@ -177,7 +177,7 @@ async function fixture(run, { stored = null, settings = {}, dispatch } = {}) {
   const saved = [], intents = [], lookups = [], focused = [], storage = new Map(stored ? [[model.SECTION_STORAGE_KEY, stored]] : []);
   const events = new EventTarget(); let tree;
   const d = driver({
-    'ui/stores/index.ts': { useSettings: () => settings, useAppearance: () => 'skin', usePalette: () => ({}), saveSettings: async patch => saved.push(patch) },
+    'ui/stores/index.ts': { useSettings: () => settings, useAppearance: () => 'skin', usePalette: () => ({}), useNotchColors: () => null, saveSettings: async patch => saved.push(patch) },
     'ui/ipc/client.ts': { displayOutputs: async () => [], settingsDefaults: async () => ({}) },
     'ui/ipc/bindings.ts': { commands: { fontFamilies: async () => ({ status: 'ok', data: [] }) } },
     'ui/ipc/notifications.ts': { useNotifications: () => [] },

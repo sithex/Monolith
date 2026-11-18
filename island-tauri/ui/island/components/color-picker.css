@@ -2,6 +2,8 @@
 .island .color-swatch { width: 36px; height: 26px; padding: var(--space-1); border-radius: var(--radius-lg); border: 1px solid var(--ui-border); background: transparent; cursor: pointer; flex: none; }
 .island .color-swatch > span { display: block; width: 100%; height: 100%; border-radius: var(--radius-sm); background: var(--swatch); box-shadow: inset 0 0 0 .5px var(--v-stroke-hi); }
 .island .color-swatch[data-open='true'] { border-color: var(--ui-accent); box-shadow: 0 0 0 1px var(--ui-accent); }
+.island .color-swatch[data-following='true'] { border-style: dashed; border-color: var(--ui-accent); }
+.island .color-swatch[data-following='true'] > span { opacity: .85; }
 .scheme-seed .color-swatch { width: 30px; height: 24px; }
 /* 24 + 32 + 200 + 35 + 35 + 28 + five 8px gaps + 24px padding + 2px border = 420px. */
 .color-pop { z-index: 60; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-4xl); overflow: auto; overscroll-behavior: contain;

@@ -54,14 +54,15 @@ export function hsvToRgb({ h, s, v }: Hsv): Rgb {
 export const hsvToHex = (hsv: Hsv): string => rgbToHex(hsvToRgb(hsv));
 
 /** A swatch button that opens the docked picker. Same footprint as the old native input. */
-export function ColorSwatch({ id, label, value, onPick, onReset, resetLabel, className = '' }: {
-  id: string; label: string; value: string; onPick(hex: string): void; onReset?(): void; resetLabel?: string; className?: string;
+export function ColorSwatch({ id, label, value, onPick, onReset, resetLabel, following = false, className = '' }: {
+  id: string; label: string; value: string; onPick(hex: string): void; onReset?(): void; resetLabel?: string; following?: boolean; className?: string;
 }) {
   const open = useSyncExternalStore(colorPicker.subscribe, () => colorPicker.get()?.id === id);
   const ref = useRef<HTMLButtonElement>(null);
   // Keep the open panel's callbacks current (settings round-trips re-render the caller).
   useEffect(() => { const a = colorPicker.get(); if (open && a) { a.onPick = onPick; a.onReset = onReset; a.value = value; a.label = label; a.resetLabel = resetLabel; } }, [open, onPick, onReset, value, label, resetLabel]);
-  return <button ref={ref} type="button" id={id} className={`color-swatch ${className}`} aria-label={label} aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? 'color-picker-panel' : undefined} data-open={open}
+  return <button ref={ref} type="button" id={id} className={`color-swatch ${className}`} aria-label={label} aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? 'color-picker-panel' : undefined} data-open={open} data-following={following || undefined}
+    title={following ? "Follow skin — showing the skin's colour" : undefined}
     style={{ ['--swatch' as string]: value }}
     onClick={() => {
       if (open) { colorPicker.close(); return; }

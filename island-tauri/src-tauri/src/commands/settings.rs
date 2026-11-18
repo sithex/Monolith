@@ -212,6 +212,9 @@ pub async fn notch_scheme_set(
         *slot = next;
         drop(slot);
         crate::integrations::plasma::runtime::nudge_status(&app);
+        // The renderer's effective notch colours changed with the scheme: publish a fresh
+        // visual snapshot so the Follow-skin swatches stay in sync.
+        crate::services::frontend::publish(&app);
     }
     Ok(())
 }

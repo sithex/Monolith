@@ -8,7 +8,11 @@
 
 use super::{hermes_launcher, hermes_python, process::run_bounded};
 use crate::{
-    contract::{palette::Palette, settings::is_hex_color},
+    contract::{
+        frontend::Appearance,
+        palette::{EffectiveNotchColors, Palette},
+        settings::{is_hex_color, Settings},
+    },
     error::IslandError,
 };
 use serde_json::Value;
@@ -73,6 +77,74 @@ pub enum NotchScheme {
 impl From<Option<Palette>> for NotchScheme {
     fn from(palette: Option<Palette>) -> Self {
         palette.map_or(Self::Skin, |palette| Self::Palette(Box::new(palette)))
+    }
+}
+
+/// The palette roles the native notch follows for a scheme choice: the renderer-owned scheme
+/// when present, otherwise the Hermes skin (also when Pending but the skin scheme is
+/// selected). Returns `None` — mirroring `appearanceReady:false` — when roles are missing or
+/// invalid, in which case the notch draws its QML defaults rather than a scheme colour.
+pub fn scheme_palette<'a>(
+    scheme: &'a NotchScheme,
+    selected: Option<Appearance>,
+    skin: Option<&'a Palette>,
+) -> Option<&'a Palette> {
+    let palette = match scheme {
+        NotchScheme::Palette(p) => Some(p.as_ref()),
+        NotchScheme::Skin => skin,
+        NotchScheme::Pending if selected == Some(Appearance::Skin) => skin,
+        NotchScheme::Pending => None,
+    };
+    palette.filter(|p| {
+        [
+            &p.background,
+            &p.accent,
+            &p.text,
+            &p.primary,
+            &p.dim,
+            &p.border,
+            &p.surface,
+            &p.error,
+        ]
+        .iter()
+        .all(|role| is_hex_color(role))
+    })
+}
+
+impl EffectiveNotchColors {
+    /// Effective colours from a known palette, with the island-wide and notch-specific
+    /// overrides already applied. `first` mirrors `runtime::panel_colors`' `color()` nesting:
+    /// the notch override wins, then the island override, then the scheme/skin role.
+    fn first(a: &str, b: &str, c: &str) -> String {
+        if !a.is_empty() {
+            a.to_owned()
+        } else if !b.is_empty() {
+            b.to_owned()
+        } else {
+            c.to_owned()
+        }
+    }
+
+    pub fn from_palette(settings: &Settings, p: &Palette) -> Self {
+        Self {
+            background: Self::first(
+                &settings.panel_clock_color,
+                &settings.background,
+                &p.surface,
+            ),
+            accent: Self::first(&settings.accent, "", &p.accent),
+            border_color: Self::first(&settings.notch_border_color, &settings.accent, &p.accent),
+        }
+    }
+
+    /// Effective colours for the current scheme/skin choice; `None` when no palette is usable.
+    pub fn compute(
+        settings: &Settings,
+        scheme: &NotchScheme,
+        selected: Option<Appearance>,
+        skin: Option<&Palette>,
+    ) -> Option<Self> {
+        scheme_palette(scheme, selected, skin).map(|p| Self::from_palette(settings, p))
     }
 }
 
@@ -668,5 +740,118 @@ mod tests {
         watcher.stop();
         assert!(profile.exists());
         fs::remove_dir_all(home).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod effective_notch_colors_tests {
+    use super::*;
+    use crate::contract::settings::Settings;
+
+    fn palette() -> Palette {
+        Palette {
+            name: "test".into(),
+            background: "#080d0a".into(),
+            accent: "#80ff36".into(),
+            text: "#d8e2d7".into(),
+            primary: "#e7eee4".into(),
+            dim: "#8a9c8d".into(),
+            border: "#3d6243".into(),
+            surface: "#121c15".into(),
+            error: "#ff7272".into(),
+        }
+    }
+
+    #[test]
+    fn empty_settings_follow_the_scheme_surface_and_accent() {
+        let settings = Settings::default();
+        let p = palette();
+        let e = EffectiveNotchColors::from_palette(&settings, &p);
+        assert_eq!(e.background, "#121c15");
+        assert_eq!(e.border_color, "#80ff36");
+        assert_eq!(e.accent, "#80ff36");
+    }
+
+    #[test]
+    fn island_override_wins_over_scheme_then_notch_override_wins_over_both() {
+        let settings = Settings {
+            background: "#102030".into(),
+            accent: "#102030".into(),
+            ..Default::default()
+        };
+        let e = EffectiveNotchColors::from_palette(&settings, &palette());
+        assert_eq!(e.background, "#102030");
+        assert_eq!(e.border_color, "#102030");
+
+        let override_clock = Settings {
+            panel_clock_color: "#112233".into(),
+            notch_border_color: "#445566".into(),
+            ..Default::default()
+        };
+        let e = EffectiveNotchColors::from_palette(&override_clock, &palette());
+        assert_eq!(e.background, "#112233");
+        assert_eq!(e.border_color, "#445566");
+    }
+
+    #[test]
+    fn renderer_scheme_beats_the_skin_when_both_are_known() {
+        let settings = Settings::default();
+        let green = palette();
+        let dark = Palette {
+            name: "skin".into(),
+            background: "#000000".into(),
+            accent: "#ffffff".into(),
+            text: "#ffffff".into(),
+            primary: "#ffffff".into(),
+            dim: "#888888".into(),
+            border: "#222222".into(),
+            surface: "#111111".into(),
+            error: "#ff0000".into(),
+        };
+        let scheme = NotchScheme::Palette(Box::new(green.clone()));
+        let e = EffectiveNotchColors::compute(&settings, &scheme, None, Some(&dark)).unwrap();
+        assert_eq!(e.background, "#121c15");
+        assert_eq!(e.border_color, "#80ff36");
+        // Skin scheme uses the Hermes skin palette.
+        let skin = EffectiveNotchColors::compute(
+            &settings,
+            &NotchScheme::Skin,
+            Some(Appearance::Skin),
+            Some(&dark),
+        )
+        .unwrap();
+        assert_eq!(skin.background, "#111111");
+        assert_eq!(skin.border_color, "#ffffff");
+    }
+
+    #[test]
+    fn pending_scheme_resolves_to_skin_only_when_skin_is_selected() {
+        let settings = Settings::default();
+        let dark = palette();
+        assert!(EffectiveNotchColors::compute(
+            &settings,
+            &NotchScheme::Pending,
+            Some(Appearance::Skin),
+            Some(&dark)
+        )
+        .is_some());
+        assert!(EffectiveNotchColors::compute(
+            &settings,
+            &NotchScheme::Pending,
+            Some(Appearance::Green),
+            Some(&dark)
+        )
+        .is_none());
+        assert!(
+            EffectiveNotchColors::compute(&settings, &NotchScheme::Pending, None, Some(&dark))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn invalid_role_roles_are_not_a_usable_palette() {
+        let mut bad = palette();
+        bad.accent = "not-a-color".into();
+        assert!(scheme_palette(&NotchScheme::Palette(Box::new(bad)), None, None).is_none());
     }
 }

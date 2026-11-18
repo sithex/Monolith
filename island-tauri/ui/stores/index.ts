@@ -3,7 +3,7 @@ import { useGatedStore } from './gated';
 import { createTopic } from './topic';
 import { bootstrap, visualGet, onVisualChanged, settingsPatch, appearanceSet,
   type Settings, type SettingsPatch, type Palette, type Appearance, type VisualChanged,
-  type BootstrapSnapshot, type SystemStats, type AiUsage } from '../ipc/client';
+  type BootstrapSnapshot, type SystemStats, type AiUsage, type EffectiveNotchColors } from '../ipc/client';
 import { listenIslandState, seedIslandState } from '../ipc/island-state';
 import { listenNotifications, seedNotifications } from '../ipc/notifications';
 import { listenExtended, loadWorkspace, seedExtended } from './apps';
@@ -13,6 +13,7 @@ import { listenExtended, loadWorkspace, seedExtended } from './apps';
 export const settingsStore = createTopic<Settings>();
 export const paletteStore = createTopic<Palette>();
 export const appearanceStore = createTopic<Appearance>();
+export const notchStore = createTopic<EffectiveNotchColors | null>();
 export const monitorStore = createTopic<SystemStats | null>();
 export const aiStore = createTopic<AiUsage | null>();
 export const runtimeStore = createTopic<BootstrapSnapshot['runtime']>();
@@ -20,10 +21,12 @@ export const acceptVisual = (snapshot: VisualChanged) => {
   settingsStore.apply(snapshot.settings, snapshot.rev);
   paletteStore.apply(snapshot.palette, snapshot.rev);
   appearanceStore.apply(snapshot.appearance, snapshot.rev);
+  notchStore.apply(snapshot.notch ?? null, snapshot.rev);
 };
 export const useSettings = (active = true) => useGatedStore(settingsStore.subscribe, settingsStore.getSnapshot, active);
 export const usePalette = (active = true) => useGatedStore(paletteStore.subscribe, paletteStore.getSnapshot, active);
 export const useAppearance = (active = true) => useGatedStore(appearanceStore.subscribe, appearanceStore.getSnapshot, active);
+export const useNotchColors = (active = true) => useGatedStore(notchStore.subscribe, notchStore.getSnapshot, active);
 export const useMonitor = () => useSyncExternalStore(monitorStore.subscribe, monitorStore.getSnapshot);
 export const useAi = () => useSyncExternalStore(aiStore.subscribe, aiStore.getSnapshot);
 export async function loadStores() {
@@ -41,6 +44,7 @@ export function seedStores({ boot, visual, workspace }: Awaited<ReturnType<typeo
   settingsStore.seed(visual.settings, visual.rev);
   paletteStore.seed(visual.palette, visual.rev);
   appearanceStore.seed(visual.appearance, visual.rev);
+  notchStore.seed(visual.notch ?? null, visual.rev);
   runtimeStore.seed(boot.runtime, 0);
   monitorStore.seed(null, 0);
   aiStore.seed(null, 0);

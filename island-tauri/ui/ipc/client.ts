@@ -35,6 +35,7 @@ import {
   type VoiceStatus,
   type VoicePanel,
   type VoicePanelOp,
+  type EffectiveNotchColors,
 } from "./bindings";
 
 export type {
@@ -64,6 +65,7 @@ export type {
   VoiceStatus,
   VoicePanel,
   VoicePanelOp,
+  EffectiveNotchColors,
 };
 
 type Result<T> = { status: "ok"; data: T } | { status: "error"; error: IslandError };

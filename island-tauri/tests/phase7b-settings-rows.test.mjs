@@ -14,7 +14,7 @@ const rule = (css, selector) => css.split('\n').find(line => line.startsWith(`${
 export async function settingsFixture(run, { settings = {}, defaults = {}, appearance = 'skin' } = {}) {
   const saved = [], appearances = []; let tree;
   const d = driver({
-    'ui/stores/index.ts': { useSettings: () => settings, useAppearance: () => appearance, usePalette: () => ({}),
+    'ui/stores/index.ts': { useSettings: () => settings, useAppearance: () => appearance, usePalette: () => ({}), useNotchColors: () => null,
       saveSettings: async patch => { saved.push(patch); }, saveAppearance: async id => { appearances.push(id); } },
     'ui/ipc/client.ts': { displayOutputs: async () => [], settingsDefaults: async () => defaults },
     'ui/ipc/bindings.ts': { commands: { fontFamilies: async () => ({ status: 'ok', data: [] }) } },
@@ -129,7 +129,7 @@ test('group rows runtime: switching a parent off and on writes only the parent k
 test('group rows: the notch card groups drop shelf and notch border; values stay; the companion card gets no empty group', () => {
   const { NotchControls } = load('ui/island/NotchControls.tsx');
   const calls = [], base = { shelfMaxItems: 7, shelfRemoveAfterDrag: true, notchBorderColor: '#abcdef', notchBorderOpacity: .6, notchBorderWidth: 2.5 };
-  const render = (settings, show) => NotchControls({ settings: { ...base, ...settings }, background: '#000000', accent: '#00ff00', patch: p => calls.push(p), ...(show ? { show } : {}) });
+  const render = (settings, show) => NotchControls({ settings: { ...base, ...settings }, panelFallback: '#000000', borderFallback: '#00ff00', patch: p => calls.push(p), ...(show ? { show } : {}) });
   const group = (tree, id) => nodes(tree).find(node => node.props?.['data-group'] === id);
   for (const [shelfEnabled, notchBorderEnabled] of [[true, true], [false, true], [true, false], [false, false]]) {
     const tree = render({ shelfEnabled, notchBorderEnabled });

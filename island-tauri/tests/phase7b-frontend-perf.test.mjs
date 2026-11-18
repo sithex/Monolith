@@ -33,7 +33,7 @@ function settingsPane(run) {
   const calls = { settings: [], appearance: [], palette: [], notifications: [] };
   let settings = { uiFont: 'system' };
   const d = driver({
-    'ui/stores/index.ts': { useSettings: a => (calls.settings.push(a), settings), useAppearance: a => (calls.appearance.push(a), 'skin'), usePalette: a => (calls.palette.push(a), {}),
+    'ui/stores/index.ts': { useSettings: a => (calls.settings.push(a), settings), useAppearance: a => (calls.appearance.push(a), 'skin'), usePalette: a => (calls.palette.push(a), {}), useNotchColors: () => null,
       saveSettings: async () => {}, saveAppearance: async () => {} },
     'ui/ipc/client.ts': { displayOutputs: async () => [], settingsDefaults: async () => ({}) },
     'ui/ipc/bindings.ts': { commands: { fontFamilies: async () => ({ status: 'ok', data: [] }) } },

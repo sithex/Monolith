@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { displayOutputs, settingsDefaults, terminalCopy, type Appearance, type Settings, type SettingsPatch } from '../ipc/client';
-import { saveSettings, saveAppearance, useSettings, useAppearance, usePalette } from '../stores';
+import { saveSettings, saveAppearance, useSettings, useAppearance, usePalette, useNotchColors } from '../stores';
 import { NotchControls } from '../island/NotchControls';
 import { LayoutEditor } from '../island/LayoutEditor';
 import { SchemePicker } from '../island/SchemePicker';
@@ -117,7 +117,7 @@ const RANGES: Partial<Record<keyof Settings, [number, number, number, string]>> 
   equalizerBands: [8, 32, 1, ' bands'], offsetX: [-400, 400, 1, 'px'], offsetY: [-200, 200, 1, 'px'],
 };
 export function SettingsView({ active = true }: { active?: boolean } = {}) {
-  const settings = useSettings(active), appearance = useAppearance(active), palette = usePalette(active);
+  const settings = useSettings(active), appearance = useAppearance(active), palette = usePalette(active), notch = useNotchColors(active);
   const [error, setError] = useState(''), [tab, setTab] = useState<Tab>(() => { try { return savedSection(localStorage.getItem(SECTION_STORAGE_KEY)); } catch { return 'general'; } }), [query, setQuery] = useState('');
   const [offsetPreview, setOffsetPreview] = useState<{ x: number; y: number } | null>(null);
   const [outputs, setOutputs] = useState<string[] | null>(null), [jumpTarget, setJumpTarget] = useState<string | null>(null), [highlight, setHighlight] = useState<string | null>(null);
@@ -250,7 +250,9 @@ export function SettingsView({ active = true }: { active?: boolean } = {}) {
             {sectionKeys(tab).length > 0 && <SectionReset key={tab} name={sectionName} onReset={resetSection} />}
           </header>
           {SETTINGS_CARDS.filter(card => card.tab === tab).map(card => {
-            if (card.id === 'notch' || card.id === 'companion') return <NotchControls key={card.id} settings={settings} background={settings.background || palette.surface} accent={settings.accent || palette.accent} patch={patch}
+            if (card.id === 'notch' || card.id === 'companion') return <NotchControls key={card.id} settings={settings}
+              panelFallback={notch?.background ?? settings.background ?? palette.surface} borderFallback={notch?.borderColor ?? settings.accent ?? palette.accent}
+              patch={patch}
               outputs={outputs} show={id => card.rows.some(row => row.id === id)} note={card.id === 'notch'} label={card.title} header={header(card.id)} />;
             if (card.id === 'layoutEditor') return <LayoutEditor key={card.id} />;
             return <section key={card.id} className="settings-card" aria-label={card.title}>{header(card.id)}{card.id === 'backup' ? <Backup settings={settings} appearance={appearance} /> : cardSegments(card).map(segment => 'row' in segment ? renderRow(segment.row)

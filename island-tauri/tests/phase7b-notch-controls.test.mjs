@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from './phase7b-loader.mjs';
 const root=process.env.ISLAND_UI_ROOT ?? new URL('../ui',import.meta.url).pathname;
+const src = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const { NotchControls }=load(`${root}/island/NotchControls.tsx`);
 const { DraftRange }=load(`${root}/island/components/AppPrimitives.tsx`);
 const children=e=>[e,...[e?.props?.children].flat(Infinity).filter(Boolean).flatMap(c=>typeof c==='object'?children(c):[])];
@@ -9,7 +10,7 @@ test('every notch and companion row has its stable ID target even when disabled'
  const { SETTINGS_CARDS } = load(`${root}/views/settings-model.ts`);
  const expected = SETTINGS_CARDS.filter(card => ['notch', 'companion'].includes(card.id)).flatMap(card => card.rows.map(row => row.id));
  for (const settings of [{}, { showNotchOnEveryMonitor: false, companionEnabled: false, notchBorderEnabled: false }]) {
-  const tree = NotchControls({ settings, background: '#000000', accent: '#00ff00', patch() {} });
+  const tree = NotchControls({ settings, panelFallback: '#000000', borderFallback: '#00ff00', patch() {} });
   const targets = children(tree).filter(node => node.props?.['data-setting-id']);
   assert.deepEqual(targets.map(node => node.props['data-setting-id']), expected);
   assert.ok(targets.every(node => node.props['data-setting-label'] && node.props.tabIndex === -1));
@@ -17,7 +18,7 @@ test('every notch and companion row has its stable ID target even when disabled'
 });
 test('notch appearance controls emit independent color and border settings',()=>{
  const calls=[];
- const controls=children(NotchControls({settings:{panelClockColor:'#123456',notchBorderEnabled:true,notchBorderColor:'#abcdef',notchBorderOpacity:.6,notchBorderWidth:2.5},background:'#000000',accent:'#00ff00',patch:p=>calls.push(p)}));
+ const controls=children(NotchControls({settings:{panelClockColor:'#123456',notchBorderEnabled:true,notchBorderColor:'#abcdef',notchBorderOpacity:.6,notchBorderWidth:2.5},panelFallback:'#000000',borderFallback:'#00ff00',patch:p=>calls.push(p)}));
  const input=label=>controls.find(e=>e.props?.['aria-label']===label||e.props?.label===label);
  // Colours use the in-island picker swatch (the native GTK chooser opens behind the island on Wayland).
  assert.equal(input('Notch colour').props.value,'#123456');
@@ -34,7 +35,7 @@ test('notch appearance controls emit independent color and border settings',()=>
 
 test('notch companion switch is on by default and patches companionEnabled',()=>{
  const calls=[];
- const find=s=>children(NotchControls({settings:s,background:'#000000',accent:'#00ff00',patch:p=>calls.push(p)})).find(e=>e.props?.['aria-label']==='Notch companion');
+ const find=s=>children(NotchControls({settings:s,panelFallback:'#000000',borderFallback:'#00ff00',patch:p=>calls.push(p)})).find(e=>e.props?.['aria-label']==='Notch companion');
  assert.equal(find({}).props.checked,true);
  assert.equal(find({companionEnabled:false}).props.checked,false);
  find({}).props.onChange({target:{checked:false}});
@@ -43,7 +44,7 @@ test('notch companion switch is on by default and patches companionEnabled',()=>
 
 test('companion character picker lists every character and patches the choice',()=>{
  const calls=[];
- const all=s=>children(NotchControls({settings:s,background:'#000000',accent:'#00ff00',patch:p=>calls.push(p)}));
+ const all=s=>children(NotchControls({settings:s,panelFallback:'#000000',borderFallback:'#00ff00',patch:p=>calls.push(p)}));
  const picker=s=>all(s).find(e=>e.props?.value!==undefined&&typeof e.props?.onPick==='function'&&e.props?.value!==e.props?.label&&!('resetLabel' in e.props));
  // Saved character stays editable while the companion is off; it must not enable it.
  picker({companionEnabled:false}).props.onPick('frog');
@@ -197,9 +198,38 @@ test('companion picker tab stop falls back to the first visible tile while the s
  h.chip('All'); assert.equal(h.tiles().find(t=>t.props.tabIndex===0).props['aria-label'],'Frog');
 });
 test('disabled companion picker disables every control and ignores picks',()=>{
- const h=pickerHarness({value:'blob',disabled:true,onPick(){throw Error('picked');}});
- assert.ok(h.tiles().every(t=>t.props.disabled===true));
- assert.ok(h.chips().every(t=>t.props.disabled===true));
- assert.equal(h.find(e=>e.props?.['aria-label']==='Search companions').props.disabled,true);
- assert.equal(h.find(e=>e.props?.role==='radiogroup').props['aria-label'],'Companion character');
+const h=pickerHarness({value:'blob',disabled:true,onPick(){throw Error('picked');}});
+assert.ok(h.tiles().every(t=>t.props.disabled===true));
+assert.ok(h.chips().every(t=>t.props.disabled===true));
+assert.equal(h.find(e=>e.props?.['aria-label']==='Search companions').props.disabled,true);
+assert.equal(h.find(e=>e.props?.role==='radiogroup').props['aria-label'],'Companion character');
+});
+test('follow-skin swatches show the effective notch colour when the override is empty',()=>{
+// Empty settings + a known effective palette (the Rust-computed EffectiveNotchColors):
+// the swatch must show what the notch actually draws, and mark itself as following.
+const controls=children(NotchControls({settings:{},panelFallback:'#80ff36',borderFallback:'#121c15',patch(){}}));
+const component=label=>controls.find(e=>e.props?.label===label);
+assert.equal(component('Notch colour').props.value,'#80ff36');
+assert.equal(component('Notch border colour').props.value,'#121c15');
+assert.equal(component('Notch colour').props.following,true);
+assert.equal(component('Notch border colour').props.following,true);
+// The swatch itself renders the "following" marker: a data attribute and a title.
+const cf = src('ui/island/components/ColorField.tsx');
+assert.match(cf, /data-following=\{following \|\| undefined\}/);
+assert.match(cf, /title=\{following \? "Follow skin/);
+});
+test('follow-skin swatches show the override when one is set',()=>{
+const controls=children(NotchControls({settings:{panelClockColor:'#112233',notchBorderColor:'#445566'},panelFallback:'#80ff36',borderFallback:'#121c15',patch(){}}));
+const component=label=>controls.find(e=>e.props?.label===label);
+const clock=component('Notch colour'), border=component('Notch border colour');
+assert.equal(clock.props.value,'#112233');
+assert.equal(clock.props.following,false);
+assert.equal(border.props.value,'#445566');
+assert.equal(border.props.following,false);
+});
+test('the island-wide override wins over the skin surface in a following swatch',()=>{
+// panelFallback already carries the island-level override; an empty notch setting must
+// resolve to it (same precedence as runtime::panel_colors).
+const controls=children(NotchControls({settings:{background:'#334455'},panelFallback:'#334455',borderFallback:'#121c15',patch(){}}));
+assert.equal(controls.find(e=>e.props?.label==='Notch colour').props.value,'#334455');
 });

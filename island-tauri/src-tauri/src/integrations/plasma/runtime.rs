@@ -138,47 +138,23 @@ fn panel_colors(
     scheme: &crate::services::palette::NotchScheme,
     selected: Option<crate::contract::frontend::Appearance>,
 ) -> Value {
-    use crate::{contract::frontend::Appearance, services::palette::NotchScheme};
-    let palette = match scheme {
-        NotchScheme::Palette(palette) => Some(palette.as_ref().clone()),
-        NotchScheme::Skin => skin.cached(),
-        NotchScheme::Pending if selected == Some(Appearance::Skin) => skin.cached(),
-        NotchScheme::Pending => None,
-    }
-    .filter(|p| {
-        [
-            &p.background,
-            &p.accent,
-            &p.text,
-            &p.primary,
-            &p.dim,
-            &p.border,
-            &p.surface,
-            &p.error,
-        ]
-        .iter()
-        .all(|role| crate::contract::settings::is_hex_color(role))
-    });
-    let color = |value: &str, fallback: &str| {
-        if value.is_empty() {
-            fallback.to_owned()
-        } else {
-            value.to_owned()
-        }
+    use crate::contract::palette::EffectiveNotchColors;
+    use crate::services::palette::scheme_palette;
+    let cached = skin.cached();
+    let Some(p) = scheme_palette(scheme, selected, cached.as_ref()) else {
+        return json!({"appearanceReady": false, "background": null, "accent": null,
+            "text": null, "dim": null, "notchBorder": {"enabled": settings.notch_border_enabled,
+                "color": null, "opacity": settings.notch_border_opacity, "width": settings.notch_border_width}});
     };
-    match palette {
-        Some(p) => json!({
-            "appearanceReady": true,
-            "background": color(&settings.panel_clock_color, &color(&settings.background, &p.surface)),
-            "accent": color(&settings.accent, &p.accent), "text": p.text, "dim": p.dim,
-            "notchBorder": {"enabled":settings.notch_border_enabled,
-                "color":color(&settings.notch_border_color, &color(&settings.accent, &p.accent)),
-                "opacity":settings.notch_border_opacity,"width":settings.notch_border_width}
-        }),
-        None => json!({"appearanceReady":false, "background":null, "accent":null,
-            "text":null,"dim":null,"notchBorder":{"enabled":settings.notch_border_enabled,
-                "color":null,"opacity":settings.notch_border_opacity,"width":settings.notch_border_width}}),
-    }
+    let effective = EffectiveNotchColors::from_palette(settings, p);
+    json!({
+        "appearanceReady": true,
+        "background": effective.background,
+        "accent": effective.accent, "text": p.text, "dim": p.dim,
+        "notchBorder": {"enabled": settings.notch_border_enabled,
+            "color": effective.border_color,
+            "opacity": settings.notch_border_opacity, "width": settings.notch_border_width}
+    })
 }
 
 fn snapshot(

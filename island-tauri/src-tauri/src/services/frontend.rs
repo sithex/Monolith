@@ -45,6 +45,14 @@ impl VisualService {
         services: &Services,
         choice: Option<Appearance>,
     ) -> Result<VisualChanged, IslandError> {
+        // Read the renderer-owned scheme choice before taking the state lock (no lock
+        // ordering with `scheme_palette` elsewhere).
+        let scheme = services
+            .scheme_palette
+            .lock()
+            .ok()
+            .map(|guard| guard.clone())
+            .unwrap_or_default();
         let mut state = self
             .state
             .lock()
@@ -57,11 +65,18 @@ impl VisualService {
             atomic_write(&self.file, &bytes, "Cannot persist appearance")?;
             state.appearance = choice;
         }
+        let notch = crate::contract::palette::EffectiveNotchColors::compute(
+            &settings,
+            &scheme,
+            Some(state.appearance),
+            services.palette.cached().as_ref(),
+        );
         let mut next = VisualChanged {
             rev: state.current.as_ref().map_or(0, |v| v.rev),
             settings,
             palette,
             appearance: state.appearance,
+            notch,
         };
         if state.current.as_ref() != Some(&next) {
             next.rev = next.rev.wrapping_add(1);

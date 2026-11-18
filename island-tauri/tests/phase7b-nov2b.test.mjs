@@ -41,7 +41,7 @@ test('Custom scheme derives every role from three seeds and falls back to green'
 
 test('theme sync sends exactly the 8 skin roles, lowercased, or nothing', () => {
   const roles = { ...GREEN, accent: '#80FF36' };
-  assert.deepEqual(themePayload(roles), { name: 'ripple-island', ...GREEN });
+  assert.deepEqual(themePayload(roles), { name: 'monolith', ...GREEN });
   assert.equal(themePayload({ ...GREEN, dim: 'var(--x)' }), null);
   assert.equal(themePayload({ ...GREEN, error: undefined }), null);
   const hook = src('ui/island/hermes-theme.ts');
@@ -101,8 +101,12 @@ test('the native notch follows the scheme (hover tint = scheme accent) and the r
   {
     // F3: an explicit scheme palette wins; Skin uses the artwork palette; Pending never invents colours.
     const rt = src('src-tauri/src/integrations/plasma/runtime.rs');
-    assert.match(rt, /NotchScheme::Palette\(palette\) => Some\(palette\.as_ref\(\)\.clone\(\)\)/);
-    assert.match(rt, /NotchScheme::Skin => skin\.cached\(\)/);
+    assert.match(rt, /scheme_palette\(scheme, selected, cached\.as_ref\(\)\)/);
+    assert.match(rt, /EffectiveNotchColors::from_palette\(settings, p\)/);
+    const pl = src('src-tauri/src/services/palette.rs');
+    assert.match(pl, /NotchScheme::Palette\(p\) => Some\(p\.as_ref\(\)\)/);
+    assert.match(pl, /NotchScheme::Skin => skin/);
+    assert.match(pl, /NotchScheme::Pending if selected == Some\(Appearance::Skin\) => skin/);
   }
 });
 

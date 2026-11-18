@@ -67,7 +67,7 @@ test('every toggle checkbox is centralized in Switch, and the old switch pseudo-
   assert.doesNotMatch(src('ui/views/settings/settings-controls.css'), /input\.switch/);
   const { Switch } = load('ui/island/components/Switch.tsx');
   const { NotchControls } = load('ui/island/NotchControls.tsx');
-  const tree = NotchControls({ settings: {}, background: '', accent: '', outputs: ['DP-1'], patch() {} });
+  const tree = NotchControls({ settings: {}, panelFallback: '', borderFallback: '', outputs: ['DP-1'], patch() {} });
   assert.equal(labeled(tree, 'Notch companion').type, Switch);
   assert.equal(labeled(tree, 'Notch on DP-1').type, Switch);
   assert.equal(labeled(tree, 'Notch on DP-1').props.size, 'sm');

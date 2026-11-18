@@ -646,7 +646,7 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                     &s,
                     "7a AI Live page without plugin",
                     15,
-                    "document.querySelector('.app-pane:not([hidden])').innerText.includes('Live metrics plugin not installed')",
+                    "document.querySelector('.app-pane:not([hidden])').innerText.includes('habby-metrics plugin, which is not installed')",
                 );
                 eval(
                     &s,

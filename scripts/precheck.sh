@@ -66,8 +66,10 @@ step() { # key, description, command...
 run() { "${scope[@]}" "${prefix[@]}" "$@"; }
 in_dir() { local d="$1"; shift; (cd -- "$d" && "$@"); }
 
+# TMPDIR=/tmp: test scratch dirs hold Unix sockets, and a long caller TMPDIR pushes their
+# paths past the 108-byte sun_path limit (notification-pump tests then fail to bind).
 step rust-test "cargo test --lib --test units --test services" \
-  in_dir "$APP/src-tauri" run cargo test --locked --no-fail-fast --lib --test units --test services
+  in_dir "$APP/src-tauri" run env TMPDIR=/tmp cargo test --locked --no-fail-fast --lib --test units --test services
 # Clippy is warning-free on main, so any warning is new and fails the gate.
 step clippy "cargo clippy --lib --tests -D warnings" \
   in_dir "$APP/src-tauri" run cargo clippy --locked --lib --tests -- -D warnings

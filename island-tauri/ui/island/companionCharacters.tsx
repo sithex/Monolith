@@ -14,11 +14,7 @@ export type CompanionChoice = {
   id: CompanionCharacter; name: string; group: CompanionGroup; source?: string; preview(): ReactElement;
 };
 
-const blob = () => <svg viewBox="0 0 16 16" width="28" height="28" aria-hidden="true">
-  <circle cx="8" cy="8.5" r="7" fill="currentColor" />
-  <rect x="5.1" y="6.5" width="1.9" height="3.8" rx=".95" fill="#171717" />
-  <rect x="9" y="6.5" width="1.9" height="3.8" rx=".95" fill="#171717" />
-</svg>;
+const blob = () => <svg viewBox="0 0 26 26" width="28" height="28" shapeRendering="crispEdges" aria-hidden="true"><path d="M9 4h8v1h-8zM7 5h2v1h-2zM17 5h2v1h-2zM5 6h2v1h-2zM19 6h2v1h-2zM4 7h1v1h-1zM21 7h1v1h-1zM3 8h1v1h-1zM22 8h1v1h-1zM3 9h1v1h-1zM22 9h1v1h-1zM2 10h1v1h-1zM23 10h1v1h-1zM2 11h1v1h-1zM24 11h1v1h-1zM2 12h1v1h-1zM24 12h1v1h-1zM2 13h1v1h-1zM24 13h1v1h-1zM2 14h1v1h-1zM24 14h1v1h-1zM2 15h1v1h-1zM24 15h1v1h-1zM3 16h1v1h-1zM23 16h1v1h-1zM3 17h1v1h-1zM23 17h1v1h-1zM4 18h1v1h-1zM22 18h1v1h-1zM5 19h2v1h-2zM21 19h2v1h-2zM7 20h2v1h-2zM19 20h2v1h-2zM9 21h10v1h-10z" fill="#393836"/><path d="M9 5h2v1h-2zM15 5h2v1h-2zM7 6h2v1h-2zM15 6h2v1h-2zM5 7h2v1h-2zM13 7h2v1h-2zM4 8h2v1h-2zM10 8h4v1h-4zM4 9h3v1h-3zM9 9h4v1h-4zM3 10h6v1h-6zM3 11h2v1h-2zM3 12h1v1h-1z" fill="#fdf9ef"/><path d="M11 5h4v1h-4zM9 6h6v1h-6zM7 7h6v1h-6zM6 8h4v1h-4zM7 9h2v1h-2zM8 11h1v1h-1zM16 11h1v1h-1z" fill="#ffffff"/><path d="M17 6h2v1h-2zM15 7h6v1h-6zM14 8h8v1h-8zM13 9h9v1h-9zM9 10h14v1h-14zM5 11h3v1h-3zM10 11h6v1h-6zM18 11h5v1h-5zM4 12h4v1h-4zM10 12h6v1h-6zM18 12h5v1h-5zM3 13h5v1h-5zM10 13h6v1h-6zM18 13h5v1h-5zM3 14h5v1h-5zM10 14h6v1h-6zM18 14h5v1h-5zM3 15h17v1h-17zM4 16h14v1h-14zM4 17h12v1h-12zM5 18h7v1h-7zM7 19h2v1h-2z" fill="#f1ede4"/><path d="M9 11h1v1h-1zM17 11h1v1h-1zM8 12h2v1h-2zM16 12h2v1h-2zM8 13h2v1h-2zM16 13h2v1h-2zM8 14h2v1h-2zM16 14h2v1h-2z" fill="#171717"/><path d="M23 11h1v1h-1zM23 12h1v1h-1zM23 13h1v1h-1zM23 14h1v1h-1zM23 15h1v1h-1zM21 16h2v1h-2zM20 17h3v1h-3zM18 18h4v1h-4zM15 19h6v1h-6zM11 20h8v1h-8z" fill="#b9b6af"/><path d="M20 15h3v1h-3zM18 16h3v1h-3zM16 17h4v1h-4zM12 18h6v1h-6zM9 19h6v1h-6zM9 20h2v1h-2z" fill="#d3d0c8"/></svg>;
 
 const isaac = () => <svg viewBox="0 0 18 18" width="28" height="28" aria-hidden="true">
   <ellipse cx="9" cy="8.8" rx="8.3" ry="7.6" fill="#cf9c9b" stroke="#140606" strokeWidth="1.4" />
@@ -70,7 +66,7 @@ export const COMPANION_CHARACTERS: readonly CompanionChoice[] = [
  *  An unknown ID loads no art in Companion.qml, which falls back to 16. */
 // Characters not yet redrawn at 26 px; each redraw removes its entry.
 const NOTCH_SLOT: Partial<Record<string, number>> = {
-  blob: 16, isaac: 18, canoptekscarab: 20, companioncube: 20, frog: 20, hollowknight: 20,
+  isaac: 18, canoptekscarab: 20, companioncube: 20, frog: 20, hollowknight: 20,
   necronoverlord: 20, necronwarrior: 20, notchmimic: 20, nurgling: 20, sonichu: 20,
 };
 export function companionNotchSlot(id: string | null | undefined): number {

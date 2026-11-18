@@ -108,7 +108,7 @@ test('island clock offset mirrors each plasmoid companion slot (open/close clock
   const expected=fixed?+fixed[1]:Math.max(16,Math.min(26,slot?+slot[1]:20));
   assert.equal(companionNotchSlot(id),expected,id);
  }
- assert.equal(companionNotchSlot(''),16);
+ assert.equal(companionNotchSlot(''),26);
  assert.equal(companionNotchSlot('nope'),16);
 });
 const ALL_IDS=['blob','isaac','notchmimic','companioncube','nurgling','hollowknight','frog','necronwarrior','necronoverlord','canoptekscarab','eyeofsauron','mushroom','sonichu','salamander'];

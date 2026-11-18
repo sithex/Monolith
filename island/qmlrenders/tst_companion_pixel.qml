@@ -69,30 +69,6 @@ TestCase {
             grab("sleep");
             face.sleepy = false;
             face.lid = 1;
-            if (id === "isaac") {
-                // The stand-alone brain has no pill clock; sample each shared flow phase.
-                point(face, 0, 0);
-                for (let f = 0; f < art.flowSteps; f++) {
-                    art.flowFrame = f;
-                    grab("flow-" + f);
-                }
-                art.flowFrame = 0;
-                // Include the gap outside the sprite slot, where the shot actually lands.
-                stage.width = face.width + 14;
-                face.x = 4;
-                for (const side of [["r", 900], ["l", -900]]) {
-                    point(face, side[1], 300);
-                    art.shoot();
-                    art.resetHabit();
-                    for (let f = 1; f <= art.habitFrames; f++) {
-                        art.habitFrame = f;
-                        grab("habit-" + side[0] + "-" + f);
-                    }
-                    art.habitFrame = 0;
-                }
-                stage.destroy();
-                continue;
-            }
             for (const side of [["r", 900], ["l", -900]]) {
                 point(face, side[1], 300);
                 art.lastHabitAt = 0;

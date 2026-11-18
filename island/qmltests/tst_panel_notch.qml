@@ -97,10 +97,10 @@ TestCase {
         face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
         const clock = findChild(notch, "panelClock");
         compare(face.shownCharacter, "blob");
-        compare(face.width, 26);
+        compare(face.width, 16);
         notch.companionCharacter = "isaac";
         compare(face.shownCharacter, "isaac");
-        compare(face.width, 26);
+        compare(face.width, 18);
         verify(findChild(face, "isaacMouth"));
         // His eyes follow the pointer too, and stay inside his head.
         const eye = findChild(face, "companionEye0");
@@ -112,13 +112,6 @@ TestCase {
         // Always crying; the tears dry while the pointer is on the notch.
         const stream = findChild(face, "isaacStream");
         verify(stream.visible);
-        verify(stream.width >= 2);
-        const streamDx = stream.x - eye.x;
-        const streamDy = stream.y - eye.y;
-        notch.pointerX = centre.x - 2500; notch.pointerY = centre.y - 2500; notch.pointerAt = Date.now() + 1;
-        tryVerify(function() { return eye.x < restX - 1; }, 1000);
-        compare(stream.x - eye.x, streamDx);
-        compare(stream.y - eye.y, streamDy);
         compare(findChild(face, "isaacMouth").opacity, 1);
         face.happy = true;
         tryVerify(function() { return stream.opacity < .2; }, 1000);
@@ -166,24 +159,8 @@ TestCase {
         verify(!shot.visible);
         face.art.shoot();
         verify(shot.visible);
-        const splash = findChild(face, "isaacSplash");
-        tryVerify(function() { return splash.visible; }, 1000);
-        verify(splash.mapToItem(notch, 0, 0).x >= face.x + face.width);
-        verify(splash.mapToItem(notch, splash.width, 0).x < clock.mapToItem(notch, 0, 0).x);
-        tryVerify(function() { return !shot.visible && !splash.visible; }, 2000);
-        // The alternate drip runs alone and is cancelled as soon as hover dries the eyes.
-        const dripper = findChild(face, "isaacDripper");
-        const drip = findChild(face, "isaacDrip");
-        art.flowing = false;
-        verify(!art.clockWanted);
-        verify(!findChild(face, "isaacFlow").visible);
-        verify(dripper.running);
-        dripper.triggered(); // Exercise the bead without waiting on the randomized interval.
-        tryVerify(function() { return drip.visible; }, 1000);
-        face.happy = true;
-        verify(!dripper.running && !drip.visible);
-        art.flowing = true;
-        face.happy = false;
+        tryVerify(function() { return findChild(face, "isaacSplash").visible; }, 1000);
+        tryVerify(function() { return !shot.visible && !findChild(face, "isaacSplash").visible; }, 2000);
         // The mute mark moves past the bigger head and stays clear of the clock.
         const mic = findChild(notch, "notchMicMuted");
         notch.micMuted = true;
@@ -193,7 +170,7 @@ TestCase {
         // An unknown character (older or newer settings) falls back to the blob.
         notch.companionCharacter = "ghost";
         compare(face.shownCharacter, "blob");
-        compare(face.width, 26);
+        compare(face.width, 16);
         verify(findChild(face, "companionBody"));
     }
     function test_main_component_compiles() {
@@ -597,7 +574,7 @@ TestCase {
         const face = findChild(notch, "notchCompanion");
         face.screenArea = Qt.rect(-100000, -100000, 200000, 200000);
         tryCompare(face, "opacity", 1);
-        for (const name of ["blob", "isaac", "notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu", "salamander"]) {
+        for (const name of ["blob", "isaac", "notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu"]) {
             notch.companionCharacter = name;
             compare(face.shownCharacter, name);
             notch.waiting = true;

@@ -38,7 +38,7 @@ WebKitGTK), and the notch is a native Plasma widget.
   app. A layout editor sets where they go.
 - **Notch companions.** A small animated character sits in the notch and watches your pointer. There are
   fourteen to choose from: Blob, Isaac, Null, Companion Cube, Nurgling, Hollow Knight, Frog, Necron Warrior,
-  Necron Overlord, Canoptek Scarab, the Eye of Sauron, Mushroom, Sonichu and Salamander.
+  Necron Overlord, Canoptek Scarab, the Eye of Sauron, Mushroom and Sonichu.
   [docs/notch-companion-characters.md](docs/notch-companion-characters.md) explains how to add your own.
 - **Settings.** Eight sections in a labelled rail on the left: General, Appearance, Notch, Companion,
   Notifications, Apps, Terminal and Advanced. A search box at the top finds any setting and jumps to it.

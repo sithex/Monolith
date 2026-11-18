@@ -296,6 +296,9 @@ mod tests {
         assert_eq!(restored.accent, "#abcdef");
         let direct: CompanionCharacter = serde_json::from_value(json!("obelisk")).unwrap();
         assert_eq!(serde_json::to_value(direct).unwrap(), "blob");
+        // Salamander was removed too; a saved choice loads as the default face.
+        let removed: CompanionCharacter = serde_json::from_value(json!("salamander")).unwrap();
+        assert_eq!(removed, CompanionCharacter::Blob);
         svc.patch(&patch(json!({"notchWidth":201}))).unwrap();
         let saved: serde_json::Value =
             serde_json::from_slice(&fs::read(dir.join("settings.json")).unwrap()).unwrap();
@@ -351,7 +354,6 @@ mod tests {
             "eyeofsauron",
             "mushroom",
             "sonichu",
-            "salamander",
         ] {
             svc.patch(&patch(json!({"companionCharacter": id})))
                 .unwrap();

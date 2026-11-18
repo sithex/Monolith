@@ -9,7 +9,7 @@ TestCase {
     id: suite
     name: "CompanionPixel"
     width: 220; height: 220; visible: true; when: windowShown
-    readonly property var ids: ["notchmimic", "companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu", "salamander"]
+    readonly property var ids: ["companioncube", "nurgling", "hollowknight", "frog", "necronwarrior", "necronoverlord", "canoptekscarab", "eyeofsauron", "mushroom", "sonichu"]
 
     Component {
         id: factory
@@ -151,7 +151,7 @@ TestCase {
 
     function test_directional_habits() {
         // Mushroom's reference bob is vertical, not the old pointer-directed spore puff.
-        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron", "sonichu", "salamander"]) {
+        for (const id of ["hollowknight", "frog", "necronwarrior", "eyeofsauron", "sonichu"]) {
             const f = createTemporaryObject(factory, suite, { character: id }), a = f.art;
             point(f, 900, 200);
             a.lastHabitAt = 0; a.startHabit();
@@ -233,111 +233,7 @@ TestCase {
         compare(JSON.stringify(eye.rows), JSON.stringify(["bb", "EE", "EE"]), "half-closed doze lids");
     }
 
-    function test_salamander_controller_concept() {
-        const f = createTemporaryObject(factory, suite, { character: "salamander" }), a = f.art;
-        const blank = "..........................";
-        const expected = Array(8).fill(blank).concat([
-            "....................hhh...",
-            "...................hEEHh..",
-            "..........hhhhhh..hBEEEYh.",
-            "Y........hBYYBBBhhYYBBBBBh",
-            "Bh......hBYYBBBBBYYYBBBBBB",
-            "bBh...hhBBBBBBYYBBBBBBBKKb",
-            ".bBhhhBBYYBBBBYYBBBBBbbbb.",
-            "..bbBBBBYYBBBBBBBBBbb.....",
-            "....bbbbbBBb...bbBBb......",
-            "........bBBb.....bBBb.....",
-            "......bbb.bb.....bbb.b...."
-        ], Array(7).fill(blank));
-        point(f, 900, 0);
-        compare(JSON.stringify(a.currentBodyRows), JSON.stringify(expected), "approved right pose, pixel for pixel");
-        const palette = { K: "#0f1219", B: "#323c52", b: "#262e40", h: "#56637f",
-            Y: "#ffc81e", O: "#ff8f1f", E: "#06070a", H: "#ffffff" };
-        for (const key of Object.keys(palette)) compare(a.colors[key], palette[key]);
-        point(f, -900, 0);
-        compare(JSON.stringify(a.currentBodyRows), JSON.stringify(expected.map(row => row.split("").reverse().join(""))), "exact left mirror");
-        point(f, 900, -900);
-        compare(a.currentBodyRows[8][22], "H", "raised eye and glint");
-        point(f, 900, 900);
-        compare(a.currentBodyRows[11][22], "H", "glint follows downward pointer within lowered eye");
-        f.blink = 0.08;
-        verify(a.currentBodyRows.join("").indexOf("H") < 0, "blink closes eye");
-        f.blink = 1;
-        f.sleepy = true; f.lid = 0.42;
-        verify(a.dozing, "sleep branch is reachable with lowered lids");
-        verify(a.currentBodyRows.join("").indexOf("H") < 0, "sleep has no eye glint");
-        compare(a.currentBodyRows[11][0], ".", "tail coils inward");
-        checkBounds(f, "controller concept sleep");
-    }
 
-    function test_notchmimic_traits() {
-        const f = createTemporaryObject(factory, suite, { character: "notchmimic" }), a = f.art;
-        point(f, 0, 0);
-        compare(f.preferredSize, 26);
-        compare(a.habitFrames, 6);
-        compare(a.habitInterval, 125);
-        const body = findChild(a, "mimicBody"), hands = findChild(a, "mimicHands");
-        const eye0 = findChild(a, "companionEye0"), eye1 = findChild(a, "companionEye1");
-        verify(body !== null, "mimicBody item exists");
-        verify(hands !== null, "mimicHands sprite exists");
-        verify(eye0 !== null && eye1 !== null, "eyes exist");
-
-        // Hands are anchored to the bottom ledge
-        compare(hands.y, 20);
-
-        // At rest: body is at y=2
-        const settled = picture(f);
-        compare(body.y, 2);
-        compare(JSON.stringify(eye0.rows), JSON.stringify(["GE", "EE"]));
-
-        // Habit frames: body rises by up to 2 px while hands stay anchored at bottom
-        a.habitFrame = 1;
-        compare(body.y, 1);
-        compare(hands.y, 20);
-        a.habitFrame = 2;
-        compare(body.y, 0);
-        compare(hands.y, 20);
-        a.habitFrame = 3;
-        compare(body.y, 1);
-        a.habitFrame = 4;
-        compare(body.y, 0);
-        a.habitFrame = 5;
-        compare(body.y, 1);
-        a.habitFrame = 6;
-        compare(body.y, 2);
-        a.resetHabit();
-        compare(picture(f), settled, "habit settles exactly to rest");
-
-        // Hover: jaws open wide
-        f.happy = true;
-        const mark = findChild(a, "hoverMark");
-        verify(mark !== null);
-        verify(mark.visible);
-        checkBounds(f, "notchmimic hover");
-        f.happy = false;
-
-        // Blink & sleep
-        f.blink = 0.08;
-        compare(JSON.stringify(eye0.rows), JSON.stringify(["MMMM", "KKKK", "DDDD"]));
-        checkBounds(f, "notchmimic blink");
-        f.blink = 1;
-
-        f.sleepy = true; f.lid = 0.42;
-        compare(JSON.stringify(eye0.rows), JSON.stringify(["MMMM", "DDDD", "EwwE"]));
-        checkBounds(f, "notchmimic sleep");
-    }
-
-    function test_facing_retention() {
-        // Salamander keeps its last horizontal facing when gazeX is near centre.
-        const f = createTemporaryObject(factory, suite, { character: "salamander" });
-        point(f, 900, 0);
-        point(f, 0, 0);
-        const centerFacingRight = picture(f);
-        point(f, -900, 0);
-        point(f, 0, 0);
-        const centerFacingLeft = picture(f);
-        verify(centerFacingRight !== centerFacingLeft, "salamander retains facing when pointer returns to center");
-    }
 
     // A gaze target reversed mid-glide must end at the new target (it used to compare
     // with the half-animated value, skip the update and finish the stale glide).

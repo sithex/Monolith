@@ -55,11 +55,11 @@ test('companion character picker lists every character and patches the choice',(
  const order=pickerHarness(p.props).mod.COMPANION_CHARACTERS.map(c=>c.name);
  const pickedTiles=props=>pickerHarness(props).tiles().sort((a,b)=>order.indexOf(a.props['aria-label'])-order.indexOf(b.props['aria-label']));
  const tiles=pickedTiles(p.props);
- assert.deepEqual(tiles.map(e=>e.props['aria-label']),['Blob','Isaac','Null','Companion Cube · Portal','Nurgling','Hollow Knight','Frog','Necron Warrior','Necron Overlord','Canoptek Scarab','Eye of Sauron','Mushroom','Sonichu','Salamander']);
- assert.deepEqual(tiles.map(e=>e.props['aria-checked']),[true,false,false,false,false,false,false,false,false,false,false,false,false,false]);
+ assert.deepEqual(tiles.map(e=>e.props['aria-label']),['Blob','Isaac','Null','Companion Cube · Portal','Nurgling','Hollow Knight','Frog','Necron Warrior','Necron Overlord','Canoptek Scarab','Eye of Sauron','Mushroom','Sonichu']);
+ assert.deepEqual(tiles.map(e=>e.props['aria-checked']),[true,false,false,false,false,false,false,false,false,false,false,false,false]);
  tiles[1].props.onClick();
  assert.deepEqual(calls,[{companionCharacter:'isaac'}]);
- const ids=['blob','isaac','notchmimic','companioncube','nurgling','hollowknight','frog','necronwarrior','necronoverlord','canoptekscarab','eyeofsauron','mushroom','sonichu','salamander'];
+ const ids=['blob','isaac','notchmimic','companioncube','nurgling','hollowknight','frog','necronwarrior','necronoverlord','canoptekscarab','eyeofsauron','mushroom','sonichu'];
  calls.length=0;
  tiles.forEach(t=>t.props.onClick());
  assert.deepEqual(calls,ids.map(companionCharacter=>({companionCharacter})));
@@ -111,11 +111,11 @@ test('island clock offset mirrors each plasmoid companion slot (open/close clock
   const expected=fixed?+fixed[1]:Math.max(16,Math.min(26,slot?+slot[1]:defaultSlot));
   assert.equal(companionNotchSlot(id),expected,id);
  }
- assert.equal(companionNotchSlot(''),26);
+ assert.equal(companionNotchSlot(''),16);
  assert.equal(companionNotchSlot('nope'),16);
 });
-const ALL_IDS=['blob','isaac','notchmimic','companioncube','nurgling','hollowknight','frog','necronwarrior','necronoverlord','canoptekscarab','eyeofsauron','mushroom','sonichu','salamander'];
-const NAMES=['Blob','Null','Frog','Salamander','Isaac','Companion Cube · Portal','Hollow Knight','Mushroom','Sonichu','Nurgling','Necron Warrior','Necron Overlord','Canoptek Scarab','Eye of Sauron'];
+const ALL_IDS=['blob','isaac','notchmimic','companioncube','nurgling','hollowknight','frog','necronwarrior','necronoverlord','canoptekscarab','eyeofsauron','mushroom','sonichu'];
+const NAMES=['Blob','Null','Frog','Isaac','Companion Cube · Portal','Hollow Knight','Mushroom','Sonichu','Nurgling','Necron Warrior','Necron Overlord','Canoptek Scarab','Eye of Sauron'];
 test('every companion appears once, in a known group, with grouped headings',()=>{
  const { COMPANION_CHARACTERS, COMPANION_GROUPS }=pickerHarness({value:'blob',onPick(){}}).mod;
  assert.deepEqual(COMPANION_CHARACTERS.map(c=>c.id),ALL_IDS);
@@ -125,10 +125,10 @@ test('every companion appears once, in a known group, with grouped headings',()=
  const h=pickerHarness({value:'blob',onPick(){}});
  assert.deepEqual(h.ids(),NAMES);
  assert.deepEqual(h.nodes().filter(e=>e.props?.className==='companion-group-title').map(e=>e.props.children),['Originals','Games','Warhammer 40K','Fantasy']);
- assert.deepEqual(h.chips().map(e=>e.props.children[0]+' '+e.props.children[1].props.children),['All 14','Originals 4','Games 5','Warhammer 40K 4','Fantasy 1']);
+ assert.deepEqual(h.chips().map(e=>e.props.children[0]+' '+e.props.children[1].props.children),['All 13','Originals 3','Games 5','Warhammer 40K 4','Fantasy 1']);
 });
 test('companion previews scale to a crisp integer multiple of any viewBox',()=>{
- const h=pickerHarness({value:'salamander',onPick(){}});
+ const h=pickerHarness({value:'mushroom',onPick(){}});
  for(const c of h.mod.COMPANION_CHARACTERS){
   const side=Number(c.preview().props.viewBox.split(' ')[2]);
   const svg=h.find(e=>e.props?.['aria-label']===c.name).props.children[0].props.children;
@@ -136,7 +136,7 @@ test('companion previews scale to a crisp integer multiple of any viewBox',()=>{
   if(c.preview().props.shapeRendering) assert.equal(svg.props.shapeRendering,'crispEdges');
  }
  const big=h.find(e=>e.props?.className==='companion-preview companion-preview-large').props.children;
- const selSide=Number(h.mod.COMPANION_CHARACTERS.find(c=>c.id==='salamander').preview().props.viewBox.split(' ')[2]);
+ const selSide=Number(h.mod.COMPANION_CHARACTERS.find(c=>c.id==='mushroom').preview().props.viewBox.split(' ')[2]);
  assert.ok(big.props.width%selSide===0&&big.props.width>=2*selSide,'large preview is an integer multiple of the selected viewBox');
 });
 test('companion search matches name, group and franchise case-insensitively',()=>{
@@ -148,7 +148,7 @@ test('companion search matches name, group and franchise case-insensitively',()=
  assert.equal(h.find(e=>e.props?.className==='companion-group-title'),undefined,'no headings while searching');
  h.type('zzz'); assert.deepEqual(h.ids(),[]);
  assert.equal(h.find(e=>e.props?.role==='status').props.children,'No companions match');
- h.type(''); assert.equal(h.ids().length,14);
+ h.type(''); assert.equal(h.ids().length,13);
  assert.equal(h.find(e=>e.props?.role==='status'),undefined);
 });
 test('companion group chips filter, combine with search and keep the selection',()=>{
@@ -163,7 +163,7 @@ test('companion group chips filter, combine with search and keep the selection',
  h.type('sonic'); assert.deepEqual(h.ids(),['Sonichu']);
  h.chip('Fantasy'); assert.deepEqual(h.ids(),[]);
  h.type(''); assert.deepEqual(h.ids(),['Eye of Sauron']);
- h.chip('All'); assert.equal(h.ids().length,14);
+ h.chip('All'); assert.equal(h.ids().length,13);
  assert.equal(h.tiles().find(t=>t.props['aria-label']==='Frog').props['aria-checked'],true);
  assert.deepEqual(picks,[]);
 });
@@ -177,12 +177,12 @@ test('companion picker keyboard: roving tabindex, arrows, Home/End and picking',
  h.find(e=>e.props?.role==='radiogroup').props.ref.current={querySelectorAll:()=>radios()};
  const key=(from,k)=>{let prevented=false;h.find(e=>e.props?.['aria-label']===from).props.onKeyDown({key:k,preventDefault(){prevented=true;}});h.render();return prevented;};
  assert.ok(key('Isaac','ArrowRight')); assert.equal(focused.pop(),'Companion Cube · Portal');
- assert.equal(tab().indexOf(0),5);
+ assert.equal(tab().indexOf(0),4);
  key('Companion Cube · Portal','ArrowDown'); assert.equal(focused.pop(),'Nurgling');
  key('Nurgling','ArrowUp'); assert.equal(focused.pop(),'Companion Cube · Portal');
  key('Companion Cube · Portal','ArrowLeft'); assert.equal(focused.pop(),'Isaac');
  key('Isaac','Home'); assert.equal(focused.pop(),'Blob'); assert.equal(tab().indexOf(0),0);
- key('Blob','End'); assert.equal(focused.pop(),'Eye of Sauron'); assert.equal(tab().indexOf(0),13);
+ key('Blob','End'); assert.equal(focused.pop(),'Eye of Sauron'); assert.equal(tab().indexOf(0),12);
  key('Eye of Sauron','ArrowRight'); assert.equal(focused.pop(),'Eye of Sauron');
  assert.equal(key('Blob','Tab'),false); assert.deepEqual(focused,[]);
  h.tiles()[0].props.onClick(); assert.deepEqual(picks,['blob']);

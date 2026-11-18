@@ -63,17 +63,16 @@ pub enum CompanionCharacter {
     /// A cute kawaii toadstool with spore puffs.
     Mushroom,
     Sonichu,
-    Salamander,
 }
 
-// Deserialize the removed ID at the boundary only. A serde alias on Blob makes
-// specta include "obelisk" in the public TS union, incorrectly advertising it as
-// a supported selectable value. Serialization and generated types stay canonical.
+// Deserialize removed IDs ("obelisk", "salamander") at the boundary only, as Blob. A serde
+// alias on Blob makes specta include them in the public TS union, incorrectly advertising
+// them as supported selectable values. Serialization and generated types stay canonical.
 impl<'de> Deserialize<'de> for CompanionCharacter {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let id = String::deserialize(deserializer)?;
         match id.as_str() {
-            "blob" | "obelisk" => Ok(Self::Blob),
+            "blob" | "obelisk" | "salamander" => Ok(Self::Blob),
             "isaac" => Ok(Self::Isaac),
             "notchmimic" => Ok(Self::Notchmimic),
             "companioncube" => Ok(Self::Companioncube),
@@ -86,7 +85,6 @@ impl<'de> Deserialize<'de> for CompanionCharacter {
             "eyeofsauron" => Ok(Self::Eyeofsauron),
             "mushroom" => Ok(Self::Mushroom),
             "sonichu" => Ok(Self::Sonichu),
-            "salamander" => Ok(Self::Salamander),
             _ => Err(serde::de::Error::unknown_variant(
                 &id,
                 &[
@@ -103,7 +101,6 @@ impl<'de> Deserialize<'de> for CompanionCharacter {
                     "eyeofsauron",
                     "mushroom",
                     "sonichu",
-                    "salamander",
                 ],
             )),
         }

@@ -1,176 +1,88 @@
 import QtQuick
+import QtQuick.Shapes
 
-// Monolith default companion (Blob), redrawn as crisp 26 px pixel art.
-// A round ivory ball following notch text colours with two upright expressive eyes.
-// Tracks pointer with whole-pixel head lean and eye gaze, blinks, dozes, smiles on hover,
-// and squish-bounces in whole pixels as an idle habit.
-HabitCharacter {
+// The round companion: an ivory ball in the notch's text colour
+// with two upright eyes. Draws itself from `face`, the brain in ../Companion.qml.
+Item {
     id: art
-    slotSize: 26
-    gazeScale: 1
-    habitFrames: 6
-    habitInterval: 125
-
-    readonly property int headX: gazePx(gazeX, 0.35, -1, 1)
-    readonly property int headY: gazePx(gazeY, 0.45, -1, 1)
-    readonly property int pupilX: gazePx(gazeX, 1.1, -3, 3)
-    readonly property int pupilY: gazePx(gazeY, 1.0, -2, 2)
-    readonly property real open: face ? face.blink * face.lid : 1
-    readonly property bool eyesShut: open < 0.35
-    readonly property bool dozing: asleep || (face ? face.lid < 0.6 : false)
-
-    // Directional habit: hops toward pointer side
-    property int habitDirection: 1
-    onHabitStarted: habitDirection = gazeX < 0 ? -1 : 1
-    readonly property int habitY: habitFrame === 3 ? -2 : (habitFrame === 2 || habitFrame === 4 ? -1 : 0)
-    readonly property int habitShiftX: habitFrame > 0 && habitFrame < 6 ? habitDirection : 0
-
-    // Notch color adaptation
-    readonly property color baseColor: face ? face.bodyColor : "#f1ede4"
-    readonly property color eyeBaseColor: face ? face.eyeColor : "#171717"
-    readonly property bool isDark: baseColor.hslLightness < 0.5
-
-    readonly property var colors: ({
-        "K": art.isDark ? Qt.darker(art.baseColor, 2.0) : Qt.darker(art.baseColor, 4.2),
-        "D": art.isDark ? Qt.darker(art.baseColor, 1.35) : Qt.darker(art.baseColor, 1.30),
-        "S": art.isDark ? Qt.darker(art.baseColor, 1.18) : Qt.darker(art.baseColor, 1.14),
-        "B": art.baseColor,
-        "L": art.isDark ? Qt.lighter(art.baseColor, 1.8) : Qt.lighter(art.baseColor, 1.05),
-        "W": art.isDark ? Qt.lighter(art.baseColor, 2.5) : "#ffffff",
-        "E": art.eyeBaseColor,
-        "H": "#ffffff",
-        "P": art.isDark ? "#d46b80" : "#ff9aa8"
-    })
-
-    readonly property var settledRows: [
-        "..........................",
-        "..........................",
-        "..........................",
-        "..........................",
-        ".........KKKKKKKK.........",
-        ".......KKLLWWWWLLKK.......",
-        ".....KKLLWWWWWWLLBBKK.....",
-        "....KLLWWWWWWLLBBBBBBK....",
-        "...KLLWWWWLLLLBBBBBBBBK...",
-        "...KLLLWWLLLLBBBBBBBBBK...",
-        "..KLLLLLLBBBBBBBBBBBBBBK..",
-        "..KLLBBBBBBBBBBBBBBBBBBDK.",
-        "..KLBBBBBBBBBBBBBBBBBBBDK.",
-        "..KBBBBBBBBBBBBBBBBBBBBDK.",
-        "..KBBBBBBBBBBBBBBBBBBBBDK.",
-        "..KBBBBBBBBBBBBBBBBBSSSDK.",
-        "...KBBBBBBBBBBBBBBSSSDDK..",
-        "...KBBBBBBBBBBBBSSSSDDDK..",
-        "....KBBBBBBBSSSSSSDDDDK...",
-        ".....KKBBSSSSSSDDDDDDKK...",
-        ".......KKSSDDDDDDDDKK.....",
-        ".........KKKKKKKKKK.......",
-        "..........................",
-        "..........................",
-        "..........................",
-        ".........................."
-    ]
-
-    readonly property var squishRows: [
-        "..........................",
-        "..........................",
-        "..........................",
-        "..........................",
-        "..........................",
-        "........KKKKKKKKKK........",
-        "......KKLLWWWWWWLLKK......",
-        "....KKLLWWWWWWWWLLBBKK....",
-        "...KLLWWWWWWWWLLBBBBBBK...",
-        "..KLLWWWWLLLLBBBBBBBBBBK..",
-        ".KLLLLLLBBBBBBBBBBBBBBBBK.",
-        ".KLBBBBBBBBBBBBBBBBBBBBBDK",
-        ".KLBBBBBBBBBBBBBBBBBBBBBDK",
-        ".KBBBBBBBBBBBBBBBBBBBBBBDK",
-        ".KBBBBBBBBBBBBBBBBBBBBBBDK",
-        ".KBBBBBBBBBBBBBBBBBSSSSDDK",
-        "..KBBBBBBBBBBBBBBSSSSDDDK.",
-        "...KBBBBBBBBBBBSSSSSSDDDK.",
-        "....KBBBBBBBSSSSSSSDDDDK..",
-        ".....KKBBSSSSSSDDDDDDDKK..",
-        ".......KKSSDDDDDDDDDKK....",
-        ".........KKKKKKKKKK.......",
-        "..........................",
-        "..........................",
-        "..........................",
-        ".........................."
-    ]
-
-    readonly property var stretchRows: [
-        "..........................",
-        "..........................",
-        "..........................",
-        "..........KKKKKK..........",
-        "........KKLLWWLLKK........",
-        "......KKLLWWWWLLBBKK......",
-        ".....KLLWWWWWWLLBBBBK.....",
-        "....KLLWWWWLLLLBBBBBBK....",
-        "...KLLLLLLBBBBBBBBBBBBK...",
-        "...KLBBBBBBBBBBBBBBBBBK...",
-        "...KLBBBBBBBBBBBBBBBBBDK..",
-        "...KLBBBBBBBBBBBBBBBBBDK..",
-        "...KBBBBBBBBBBBBBBBBBBDK..",
-        "...KBBBBBBBBBBBBBBBBBBDK..",
-        "...KBBBBBBBBBBBBBBBBBBDK..",
-        "...KBBBBBBBBBBBBBBSSSDDK..",
-        "....KBBBBBBBBBBSSSSDDDK...",
-        ".....KBBBBBBSSSSSSDDDDK...",
-        "......KKBBSSSSSDDDDDDKK...",
-        "........KKSSDDDDDDDDKK....",
-        "..........KKKKKKKKKK......",
-        "..........................",
-        "..........................",
-        "..........................",
-        "..........................",
-        ".........................."
-    ]
+    property Item face
+    readonly property real preferredSize: 16
+    readonly property real gazeScale: 1
+    readonly property real size: face ? face.size : 0
 
     Item {
-        id: body
-        objectName: "companionBody"
-        width: 26
-        height: 26
-        x: art.headX
-        y: art.headY + art.habitY
+        id: head
+        width: art.size
+        height: art.size
+        anchors.centerIn: parent
+        // The whole head leans a little toward the pointer, the eyes a lot more.
+        transform: Translate { x: art.face.quarter(art.face.shownX * .25); y: art.face.quarter(art.face.shownY * .2) }
 
-        PixelSprite {
-            objectName: "blobSkin"
-            colors: art.colors
-            rows: art.habitFrame === 1 || art.habitFrame === 5 ? art.squishRows
-                : (art.habitFrame === 2 || art.habitFrame === 4 ? art.stretchRows : art.settledRows)
+        Rectangle {
+            id: body
+            objectName: "companionBody"
+            x: art.size * .06
+            y: art.size * .06
+            width: art.size * .88
+            height: art.size * .88
+            radius: width / 2
+            color: art.face.bodyColor
+            antialiasing: true
         }
 
         Repeater {
-            model: [8, 16]
-            PixelSprite {
-                required property int modelData
+            model: [.36, .64]
+            Rectangle {
+                required property real modelData
                 required property int index
                 objectName: "companionEye" + index
-                visible: !art.happy
-                x: modelData + (art.habitFrame > 0 ? art.habitShiftX : art.pupilX)
-                y: 11 + (art.habitFrame > 0 ? (art.habitFrame === 1 || art.habitFrame === 5 ? 1 : -1) : art.pupilY)
-                    + (art.eyesShut ? 2 : art.dozing ? 1 : 0)
-                colors: art.colors
-                rows: art.eyesShut ? ["EE"] : art.dozing ? ["EE", "EE"] : ["EH", "EE", "EE"]
+                readonly property real eyeH: art.size * .24 * art.face.lid * art.face.blink
+                width: art.size * .12
+                height: Math.max(1, eyeH)
+                radius: width / 2
+                x: art.size * modelData - width / 2 + art.face.shownX
+                y: art.size * .52 - height / 2 + art.face.shownY + (1 - art.face.lid) * art.size * .1
+                color: art.face.eyeColor
+                antialiasing: true
+                opacity: art.face.happy ? 0 : 1
+                Behavior on opacity { NumberAnimation { duration: 140 } }
             }
         }
 
-        PixelSprite {
-            objectName: "hoverMark"
-            visible: art.happy
-            x: 7 + art.pupilX
-            y: 11 + art.pupilY
-            colors: art.colors
-            rows: [
-                ".EE.....EE.",
-                "E..E...E..E",
-                "...........",
-                ".PP.....PP."
-            ]
+        // Pleased: the eyes turn into little arches while the pointer is on the notch.
+        Shape {
+            anchors.fill: parent
+            opacity: art.face.happy ? 1 : 0
+            visible: opacity > 0
+            preferredRendererType: Shape.CurveRenderer
+            Behavior on opacity { NumberAnimation { duration: 140 } }
+            ShapePath {
+                id: leftArch
+                strokeColor: art.face.eyeColor
+                strokeWidth: Math.max(1.2, art.size * .1)
+                fillColor: "transparent"
+                capStyle: ShapePath.RoundCap
+                // Follows the gaze only while shown, so hidden arches never re-tessellate.
+                readonly property real cx: art.size * .36 + (art.face.happy ? art.face.quarter(art.face.shownX * .5) : 0)
+                readonly property real cy: art.size * .55
+                readonly property real span: art.size * .085
+                startX: cx - span
+                startY: cy
+                PathQuad { x: leftArch.cx + leftArch.span; y: leftArch.cy; controlX: leftArch.cx; controlY: leftArch.cy - art.size * .2 }
+            }
+            ShapePath {
+                id: rightArch
+                strokeColor: art.face.eyeColor
+                strokeWidth: Math.max(1.2, art.size * .1)
+                fillColor: "transparent"
+                capStyle: ShapePath.RoundCap
+                readonly property real cx: art.size * .64 + (art.face.happy ? art.face.quarter(art.face.shownX * .5) : 0)
+                readonly property real cy: art.size * .55
+                readonly property real span: art.size * .085
+                startX: cx - span
+                startY: cy
+                PathQuad { x: rightArch.cx + rightArch.span; y: rightArch.cy; controlX: rightArch.cx; controlY: rightArch.cy - art.size * .2 }
+            }
         }
     }
 }

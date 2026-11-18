@@ -554,10 +554,13 @@ mod tests {
             "eyeofsauron",
             "mushroom",
             "sonichu",
-            "salamander",
         ] {
             assert!(companion.contains(&format!("\"{id}\"")));
         }
+        assert!(
+            !companion.contains("salamander"),
+            "removed companion must not be advertised"
+        );
         assert!(
             !companion.contains("obelisk"),
             "legacy input must not leak into supported public choices"

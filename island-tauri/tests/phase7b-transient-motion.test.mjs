@@ -26,11 +26,12 @@ function walk(node) {
 }
 
 test('notification exit retracts upward in 150ms ease-out; each reduced-motion source keeps only opacity', () => {
-  for (const source of ['none', 'setting', 'html', 'media', 'hook']) {
+  for (const source of ['none', 'setting', 'html', 'media']) {
     const popup = { notification: { id: 'test' } };
     const mocks = {
       react: { useRef: () => ({ current: null }), useEffect() {}, useLayoutEffect() {} },
-      'framer-motion': { useReducedMotion: () => source === 'hook', AnimatePresence: 'presence', motion: { div: 'motion-div' } },
+      'framer-motion': { AnimatePresence: 'presence', motion: { div: 'motion-div' } },
+      '../components/motion-preference': { useReducedMotionAll: () => source === 'html' || source === 'media' },
       '../../stores': { useSettings: () => ({ reduceMotion: source === 'setting', animationSpeed: 100 }) },
       '../../ipc/island-state': { useIslandState: () => ({ mode: 'hover' }) },
       '../../ipc/notifications': { usePopups: () => ({ items: [popup] }) },

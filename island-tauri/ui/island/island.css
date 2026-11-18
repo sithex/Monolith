@@ -41,7 +41,7 @@ html[data-panel-anchor='true'] .island[data-state='still'][data-arrived='true'] 
 .preview { padding: 20px 24px; flex: 1; }
 .preview h2 { font-size: var(--fs-xl); font-weight: 600; }
 .preview button { margin-top: 20px; width: 100%; }
-.terminal-wrap { display: flex; flex: 1; min-height: 0; padding: 0 10px 10px; }
+.terminal-wrap { display: flex; flex: 1; min-height: 0; flex-direction: column; padding: 0 10px 10px; }
 
 .island[data-morphing='true'] > .terminal-wrap { will-change: transform, opacity, filter; }
 .island[data-state='large'][data-morphing='true'] > .terminal-wrap { position: absolute; top: 42px; left: 50%; margin-left: calc(var(--open-content-width) / -2); width: var(--open-content-width); height: var(--open-content-height); flex: none; }

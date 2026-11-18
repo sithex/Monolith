@@ -14,6 +14,7 @@ const module = { exports: {} };
 const mocks = {
   'framer-motion': { motion: { article: ({ onUpdate, ...props }) => React.createElement('article', props),
     span: ({ initial, animate, transition, ...props }) => React.createElement('span', props) } },
+  '../components/motion-preference': {},
   '../../stores': {}, '../../ipc/island-state': {}, '../../ipc/notifications': {}, '../../ipc/client': { terminalCopy: async () => {} }, '../geometry': {}, './notification-cards.css': {}, './notification-hover': {},
 };
 vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename: file.pathname })(name => mocks[name] ?? nativeRequire(name), module, module.exports);

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useReducedMotionAll } from '../components/motion-preference';
 import { useSettings } from '../../stores';
 import { useIslandState, dispatch } from '../../ipc/island-state';
 import { changePopup, listenPopups, usePopups } from '../../ipc/notifications';
@@ -78,7 +79,9 @@ export function NotificationCard({ popup, redact = false, perform, changed = sur
   if (hex) return <ColourCard hex={hex} popup={popup} perform={perform} inNotch={inNotch} mute={mute} />;
   return <PlainCard popup={popup} redact={redact} perform={perform} changed={changed} inNotch={inNotch} mute={mute} />;
 }
-function PlainCard({ popup, redact, perform, changed, inNotch, mute }: { popup: Popup; redact: boolean; perform(op: PopupOp): void; changed(): void; inNotch: boolean; mute?: Mute }) {
+function PlainCard({ popup, redact, perform, changed, inNotch, mute, queued }: {
+  popup: Popup; redact: boolean; perform(op: PopupOp): void; changed?(): void; inNotch: boolean; mute?: Mute; queued?: number;
+}) {
   const n = popup.notification;
   const [hovered, setHovered] = useState(false), [focused, setFocused] = useState(false);
   const held = useRef(false), focusedNow = useRef(false);
@@ -91,23 +94,36 @@ function PlainCard({ popup, redact, perform, changed, inNotch, mute }: { popup: 
     addEventListener('island-pointer-left', left);
     return () => { removeEventListener('island-pointer-left', left); if (held.current) perform({ type: 'pause', id: n.id, paused: false }); };
   }, [n.id]);
-  const open = () => perform({ type: 'invoke', id: n.id, key: 'default' });
-  const actions = n.actions.filter(a => a.key !== 'default' && a.key !== 'inline-reply');
+  const dismiss = () => perform({ type: 'dismiss', id: n.id });
+  const open = () => pickedColour(n) ? dismiss() : perform({ type: 'invoke', id: n.id, key: 'default' });
   const critical = n.urgency === 'critical';
-  return <motion.article className="notification-card" data-island-extension={inNotch ? undefined : 'notification'} data-in-notch={inNotch} data-critical={critical}
-    data-testid="notification-toast" role={critical ? 'alert' : 'status'} onUpdate={changed}
-    onPointerEnter={() => { setHovered(true); pause(true); }} onPointerLeave={() => { setHovered(false); pause(focused); }}
-    onFocusCapture={() => { setFocused(true); pause(true); }} onBlurCapture={e => {
+  const interaction = {
+    onPointerEnter: () => { setHovered(true); pause(true); },
+    onPointerLeave: () => { setHovered(false); pause(focused); },
+    onFocusCapture: () => { setFocused(true); pause(true); },
+    onBlurCapture: (e: React.FocusEvent<HTMLElement>) => {
       if (!e.currentTarget.contains(e.relatedTarget)) { setFocused(false); pause(hovered); }
-    }}>
+    },
+  };
+  const icon = n.iconPng?.startsWith('data:image/png;base64,') ? <img className="notification-icon" src={n.iconPng} alt="" onError={e => { e.currentTarget.hidden = true; }} />
+    : <span className="notification-icon notification-monogram" aria-hidden="true">{n.appName.slice(0, 1).toLocaleUpperCase()}</span>;
+  const close = <button type="button" className="notification-close" aria-label={`Dismiss ${n.title}`} onClick={dismiss}>
+    <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+  </button>;
+  if (queued !== undefined) return <article className="notification-banner" data-testid="notification-banner" role={critical ? 'alert' : 'status'} data-critical={critical} {...interaction}>
+    <button type="button" className="notification-banner-content" onClick={open}>
+      {icon}<span className="notification-banner-app">{n.appName}</span><strong>{n.title}</strong>
+      {!redact && n.body && <span className="notification-banner-body">{n.body}</span>}
+    </button>
+    {queued > 0 && <span className="notification-banner-count" aria-label={`${queued} more notifications`}>+{queued}</span>}
+    <MuteButton notification={n} mute={mute} />{close}
+  </article>;
+  const actions = n.actions.filter(a => a.key !== 'default' && a.key !== 'inline-reply');
+  return <motion.article className="notification-card" data-island-extension={inNotch ? undefined : 'notification'} data-in-notch={inNotch} data-critical={critical}
+    data-testid="notification-toast" role={critical ? 'alert' : 'status'} onUpdate={changed} {...interaction}>
     <div className="notification-card-head">
-      {n.iconPng?.startsWith('data:image/png;base64,') ? <img className="notification-icon" src={n.iconPng} alt="" onError={e => { e.currentTarget.hidden = true; }} />
-        : <span className="notification-icon notification-monogram" aria-hidden="true">{n.appName.slice(0, 1).toLocaleUpperCase()}</span>}
-      <span className="notification-app">{n.appName}</span><span className="notification-priority">{critical ? 'Critical' : 'Now'}</span>
-      <MuteButton notification={n} mute={mute} />
-      <button className="notification-close" aria-label={`Dismiss ${n.title}`} onClick={() => perform({ type: 'dismiss', id: n.id })}>
-        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-      </button>
+      {icon}<span className="notification-app">{n.appName}</span><span className="notification-priority">{critical ? 'Critical' : 'Now'}</span>
+      <MuteButton notification={n} mute={mute} />{close}
     </div>
     <button className="notification-content" onClick={open} aria-label={`Open ${n.appName}: ${n.title}`}>
       <strong>{n.title}</strong>{!redact && n.body && <span>{n.body}</span>}
@@ -120,16 +136,12 @@ function PlainCard({ popup, redact, perform, changed, inNotch, mute }: { popup: 
       style={{ '--remaining': popup.remainingMs / popup.ttlMs, animationDuration: `${popup.remainingMs}ms`, animationPlayState: hovered || focused || popup.paused ? 'paused' : 'running' } as CSSProperties} /></div>}
   </motion.article>;
 }
-/** Popup cards as part of the notch. Hover: the notch grows into the stack (rendered in the
- *  hover preview slot). Open island: a banner pinned under the topline, inside the surface.
- *  Never a separate floating window. Mounted once; listens for popup snapshots. */
+/** Both presentations consume the same Rust queue; only the layout changes when opened. */
 export function NotchNotifications({ fail, placement, mute, confirmation, undo }: {
   fail(error: unknown): void; placement: 'hover' | 'open'; mute: Mute; confirmation?: string; undo(): void;
 }) {
   const settings = useSettings(), snapshot = usePopups(), shown = useShownPopups();
-  // This module is also loaded standalone by the node card tests.
-  const reduced = useReducedMotion() === true || settings.reduceMotion || (typeof document !== 'undefined' && document.documentElement.dataset.reduceMotion === 'true')
-    || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const reduced = useReducedMotionAll() || settings.reduceMotion === true;
   const duration = .15 / Math.min(2, Math.max(.5, (settings.animationSpeed ?? 100) / 100));
   const transition = { duration, ease: [.23, 1, .32, 1] as const };
   const perform = (op: PopupOp) => {
@@ -138,8 +150,9 @@ export function NotchNotifications({ fail, placement, mute, confirmation, undo }
       void dispatch({ type: 'selectView', view: popup?.notification.appName === 'Agents' ? 'agents' : 'notifications' }).then(() => changePopup({ type: 'dismiss', id: op.id })).catch(fail);
     } else void changePopup(op).catch(fail);
   };
-  const visibleCount = placement === 'open' ? 1 : MAX_STACK;
-  const hiddenIds = JSON.stringify(snapshot.items.slice(visibleCount).map(p => p.notification.id));
+  const popup = shown[0];
+  // The open banner does not add a second timer or suspend the queued cards. Rust owns expiry.
+  const hiddenIds = JSON.stringify(placement === 'hover' ? shown.slice(MAX_STACK).map(p => p.notification.id) : []);
   useEffect(() => {
     const ids = JSON.parse(hiddenIds) as string[];
     for (const id of ids) void changePopup({ type: 'pause', id, paused: true }).catch(fail);
@@ -153,17 +166,22 @@ export function NotchNotifications({ fail, placement, mute, confirmation, undo }
     return () => ro.disconnect();
   }, [placement]);
   if (!shown.length && !confirmation) return null;
-  const more = shown.length - visibleCount;
+  const more = shown.length - MAX_STACK;
   return <section ref={stack} className="notch-notifications" data-placement={placement} aria-label="Notifications">
     {confirmation && <div className="notification-muted" role="status"><span>Muted {confirmation}</span><button type="button" onClick={undo}>Undo</button></div>}
+    {placement === 'open' ? popup && <motion.div key={popup.notification.id}
+      initial={reduced ? false : { opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={transition}>
+      <PlainCard popup={popup} redact={settings.redactBodies} perform={perform} inNotch mute={mute} queued={shown.length - 1} />
+    </motion.div> : <>
     <AnimatePresence initial={false} onExitComplete={surfacesChanged}>
-      {shown.slice(0, visibleCount).map(p => <motion.div key={p.notification.id} layout={!reduced}
+      {shown.slice(0, MAX_STACK).map(p => <motion.div key={p.notification.id} layout={!reduced}
         initial={{ opacity: 0, y: reduced ? 0 : -8, scale: reduced ? 1 : .97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: reduced ? 0 : -8, scale: reduced ? 1 : .97 }} transition={transition}>
         <NotificationCard popup={p} redact={settings.redactBodies} perform={perform} inNotch mute={mute} />
       </motion.div>)}
     </AnimatePresence>
     {more > 0 && <button className="notification-overflow" onClick={() => { void dispatch({ type: 'selectView', view: 'notifications' }).catch(fail); }}>+{more} more · Open history</button>}
+    </>}
   </section>;
 }
 

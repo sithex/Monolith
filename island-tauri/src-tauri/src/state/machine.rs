@@ -788,9 +788,16 @@ mod tests {
         step(&mut m, Intent::Pin, &s, 1404);
         step(&mut m, Intent::PopupShown("e".into()), &s, 1405);
         assert_eq!(m.state.mode, IslandMode::Large);
+        assert_eq!(
+            m.state.hover_cause, None,
+            "the open island owns presentation"
+        );
         // An empty queue never closes an island the user opened.
         step(&mut m, Intent::PopupsEmpty, &s, 1406);
         assert_eq!(m.state.mode, IslandMode::Large);
+        step(&mut m, Intent::Collapse, &s, 1407);
+        assert_eq!(m.state.mode, IslandMode::Still);
+        assert!(m.popup.is_none(), "handled banners do not return on close");
     }
 
     #[test]

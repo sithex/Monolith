@@ -183,10 +183,11 @@ export function Island() {
   }}><NotificationCards fail={fail} /><IslandSurface fail={fail} paletteOpen={paletteOpen} confirmingMute={!!notificationMute.confirmation} scheme={scheme ?? undefined}>
     <Topline fail={fail} />
     <CommandPalette fail={fail} onOpenChange={setPaletteOpen} />
-    <AnimatePresence>{state.mode === 'hover' && <motion.div key="preview" className="preview island-content" {...reveal}
+    {!active && <AnimatePresence>{state.mode === 'hover' && <motion.div key="preview" className="preview island-content" {...reveal}
       exit={reduced ? { opacity: 0, transition: fadeOnly } : { opacity: 0, scale: 0.96, y: -6, transition: tween(DUR.fast) }}
-      style={{ position: 'absolute', top: 42, left: 0, right: 0 }}>{approvalHover.active ? <ApprovalNotice fail={fail} /> : notificationHover.active ? <NotchNotifications fail={fail} placement="hover" {...notificationMute} /> : <PreviewNotice fail={fail} />}</motion.div>}</AnimatePresence>
+      style={{ position: 'absolute', top: 42, left: 0, right: 0 }}>{approvalHover.active ? <ApprovalNotice fail={fail} /> : notificationHover.active ? <NotchNotifications fail={fail} placement="hover" {...notificationMute} /> : <PreviewNotice fail={fail} />}</motion.div>}</AnimatePresence>}
     <motion.div ref={wrap} className="terminal-wrap island-content" hidden={!active && !lingering} aria-hidden={!active} inert={!active} style={closing ?? undefined} {...openMotion}>
+      {active && <NotchNotifications fail={fail} placement="open" {...notificationMute} />}
       <ViewPager fail={fail} views={views}>
         <IslandShell title={viewLabels[view]} home={view === 'terminal'} intents={{ navigate: () => navigate('terminal') }} back={{ label: viewLabels[previous], go: goBack }}
           actions={<>{view === 'launcher' && <LauncherEditButton fail={fail} />}<VoiceControls shown={view === 'terminal'} active={active && view === 'terminal'} fail={fail} /></>}>
@@ -205,7 +206,6 @@ export function Island() {
         </IslandShell>
       </ViewPager>
     </motion.div>
-    {active && <NotchNotifications fail={fail} placement="open" {...notificationMute} />}
     {/* Errors are a short message inside the open island (under its blur, clickable to
         dismiss), not loose text on the desktop below it. */}
     <AnimatePresence>{error && active && <motion.div key="error" className="island-error" role="alert" title="Dismiss" onClick={() => setError('')}

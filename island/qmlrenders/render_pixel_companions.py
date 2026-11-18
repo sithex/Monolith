@@ -31,21 +31,27 @@ for scale in (1, 8):
     rows = []
     for id_ in ids:
         hab = sorted([p.stem[len(id_) + 1:] for p in frames.glob(id_ + "-habit-*.png")], key=lambda s: (s.split("-")[1], int(s.split("-")[2])))
-        rows.append((id_, looks))
-        rows.append((id_, hab))
-    cols = max(len(r[1]) for r in rows)
-    side = max(Image.open(p).width for p in frames.glob("*.png"))
-    cell = side * scale + (4 if scale == 1 else 8)
+        rows.append((id_, looks, 26))
+        if id_ == "isaac":
+            rows.append((id_, [f"flow-{f}" for f in range(8)], 26))
+        rows.append((id_, hab, 40 if id_ == "isaac" else 26))
+    gap = 4 if scale == 1 else 8
+    sheet_width = max(len(names) * (width * scale + gap) for _, names, width in rows)
     top = 0 if scale == 1 else 14
-    sheet = Image.new("RGB", (cols * cell + 4, len(rows) * (cell + top) + 4), "#000000")
+    row_height = 26 * scale + gap + top
+    sheet = Image.new("RGB", (sheet_width + 4, len(rows) * row_height + 4), "#0b0b0c")
     d = ImageDraw.Draw(sheet)
-    for ri, (id_, names) in enumerate(rows):
+    for ri, (id_, names, width) in enumerate(rows):
+        cell = width * scale + gap
         for ci, n in enumerate(names):
             f = frames / f"{id_}-{n}.png"
             if not f.exists(): continue
             im = Image.open(f).convert("RGB")
-            assert im.width == im.height and 20 <= im.width <= 26, (f, im.size)
-            x, y = 4 + ci * cell, 4 + ri * (cell + top)
+            if id_ == "isaac" and n.startswith("habit-"):
+                assert im.size == (40, 26), (f, im.size)
+            else:
+                assert im.width == im.height and 20 <= im.width <= 26, (f, im.size)
+            x, y = 4 + ci * cell, 4 + ri * row_height
             if scale > 1: d.text((x, y), n.replace("look-", "")[:12], fill="#bbbbbb")
             sheet.paste(im.resize((im.width * scale, im.height * scale), Image.NEAREST), (x, y + top))
     sheet.save(out / f"sheet-{scale}x.png")

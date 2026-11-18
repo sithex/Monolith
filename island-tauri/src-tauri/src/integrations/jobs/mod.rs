@@ -142,7 +142,8 @@ impl TransfersService {
     }
 
     pub fn configure(&self, enabled: bool) {
-        self.enabled.send_if_modified(|v| std::mem::replace(v, enabled) != enabled);
+        self.enabled
+            .send_if_modified(|v| std::mem::replace(v, enabled) != enabled);
     }
 
     pub fn current(&self) -> TransfersChanged {
@@ -205,8 +206,9 @@ impl TransfersService {
             .find(|(job, _)| job == id)
             .map(|(_, url)| url.clone())
             .ok_or_else(|| IslandError::unavailable("Transfer no longer running"))?;
-        let path = core::local_path(&url)
-            .ok_or_else(|| IslandError::unsupported("Transfer destination is not a local folder"))?;
+        let path = core::local_path(&url).ok_or_else(|| {
+            IslandError::unsupported("Transfer destination is not a local folder")
+        })?;
         let meta = std::fs::symlink_metadata(&path);
         let argv = match meta {
             Ok(m) if m.is_dir() => vec![OsString::from("xdg-open"), path.into_os_string()],

@@ -48,7 +48,9 @@ pub enum LayoutSide {
     deny_unknown_fields
 )]
 pub enum LayoutAction {
-    OpenApp { view: IslandView },
+    OpenApp {
+        view: IslandView,
+    },
     AppGrid {},
     Settings {},
     Volume {},
@@ -70,7 +72,9 @@ pub enum LayoutAction {
     CommandPalette {},
     /// Starts the autoclicker (with its start delay) or stops it.
     ToggleAutoclicker {},
-    LaunchDesktop { desktop_id: String },
+    LaunchDesktop {
+        desktop_id: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, specta::Type)]

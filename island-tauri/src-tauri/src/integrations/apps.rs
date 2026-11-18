@@ -5,17 +5,17 @@ use crate::{
     error::IslandError,
     integrations::{
         agents::{AgentConfig, AgentHubSink, AgentService},
+        autoclicker::Autoclicker,
         brightness::BrightnessService,
         calendar::{CalendarConfig, CalendarService, TzConfig},
         control_process::{fixture_from_env, Runner},
         downloads::{DesktopOpener, DownloadsService, Opener},
         jobs::TransfersService,
-        shelf::ShelfStore,
-        autoclicker::Autoclicker,
         mixer::MixerService,
         notifications::{hub::Hub, NotificationInput, NotificationSource, Urgency},
         power::PowerService,
         scratchpad::ScratchpadService,
+        shelf::ShelfStore,
         tiles::TilesService,
         timer::{
             alarm::{AlarmPlayer, Chime},
@@ -38,8 +38,8 @@ use std::{
     time::Duration,
 };
 use tauri::Manager;
-use tokio::sync::watch;
 use tauri_specta::Event as _;
+use tokio::sync::watch;
 
 #[derive(Default)]
 struct Slots {
@@ -138,7 +138,12 @@ pub fn colour_swatch(hex: &str) -> Option<String> {
     let channel = |i: usize| u8::from_str_radix(digits.get(i..i + 2)?, 16).ok();
     let rgb = [channel(0)?, channel(2)?, channel(4)?];
     const SIDE: u32 = 48;
-    let pixels: Vec<u8> = rgb.iter().copied().cycle().take((SIDE * SIDE * 3) as usize).collect();
+    let pixels: Vec<u8> = rgb
+        .iter()
+        .copied()
+        .cycle()
+        .take((SIDE * SIDE * 3) as usize)
+        .collect();
     let mut png = Vec::new();
     PngEncoder::new(&mut png)
         .write_image(&pixels, SIDE, SIDE, ExtendedColorType::Rgb8)
@@ -174,11 +179,9 @@ async fn announce_colours(
                     "The colour is on your clipboard.".to_owned(),
                     colour_swatch(&colour),
                 )),
-                (Some(error), _) if !cancelled => Some((
-                    "Couldn't pick a colour".to_owned(),
-                    error.clone(),
-                    None,
-                )),
+                (Some(error), _) if !cancelled => {
+                    Some(("Couldn't pick a colour".to_owned(), error.clone(), None))
+                }
                 _ => None,
             };
             if let Some((title, body, icon_png)) = note {
@@ -523,7 +526,9 @@ impl AppServices {
                         ));
                         slots.tiles = Some(service);
                     }
-                    None => tracing::warn!("System tiles need the clipboard service, which failed to start"),
+                    None => tracing::warn!(
+                        "System tiles need the clipboard service, which failed to start"
+                    ),
                 }
             }
         } else if let Some(service) = slots.tiles.take() {
@@ -800,7 +805,10 @@ mod controls_tests {
         // Defaults: Controls (quick-toggles) on, system-tiles off; its cards still need it.
         assert!(!super::active(&with_controls(true), "system-tiles"));
         assert!(super::controls_needs(&with_controls(true), "system-tiles"));
-        assert!(!super::controls_needs(&with_controls(false), "system-tiles"));
+        assert!(!super::controls_needs(
+            &with_controls(false),
+            "system-tiles"
+        ));
         assert!(!super::controls_needs(&with_controls(true), "clipboard"));
     }
 }

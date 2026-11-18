@@ -404,18 +404,23 @@ fn shutdown_steps(handle: &tauri::AppHandle) {
     use std::{sync::Arc, time::Duration};
     use tauri::Manager;
     let secs = Duration::from_secs;
-    let step = |name: &'static str, cap: Duration, work: fn(&tauri::AppHandle) -> Result<(), String>| {
-        let handle = handle.clone();
-        Step::new(name, cap, move || work(&handle))
-    };
+    let step =
+        |name: &'static str, cap: Duration, work: fn(&tauri::AppHandle) -> Result<(), String>| {
+            let handle = handle.clone();
+            Step::new(name, cap, move || work(&handle))
+        };
     run(
         vec![
-            step("clipboard", secs(2), |h| match h.try_state::<Arc<integrations::clipboard::Clipboard>>() {
-                Some(clipboard) => clipboard.shutdown().map_err(|e| e.to_string()),
-                None => Ok(()),
+            step("clipboard", secs(2), |h| {
+                match h.try_state::<Arc<integrations::clipboard::Clipboard>>() {
+                    Some(clipboard) => clipboard.shutdown().map_err(|e| e.to_string()),
+                    None => Ok(()),
+                }
             }),
             step("system-services", secs(3), |h| {
-                if let Some(system) = h.try_state::<Arc<integrations::system_services::SystemServices>>() {
+                if let Some(system) =
+                    h.try_state::<Arc<integrations::system_services::SystemServices>>()
+                {
                     system.shutdown();
                 }
                 Ok(())
@@ -424,25 +429,27 @@ fn shutdown_steps(handle: &tauri::AppHandle) {
                 Some(tray) => tray.shutdown().map_err(|e| e.to_string()),
                 None => Ok(()),
             }),
-            step("notifications", secs(5), |h| {
-                match h.try_state::<integrations::notifications::hub::Notifications>() {
-                    Some(notifications) => notifications.shutdown().map_err(|e| e.to_string()),
-                    None => Ok(()),
-                }
+            step("notifications", secs(5), |h| match h
+                .try_state::<integrations::notifications::hub::Notifications>(
+            ) {
+                Some(notifications) => notifications.shutdown().map_err(|e| e.to_string()),
+                None => Ok(()),
             }),
             step("game-mode", secs(2), |h| {
                 integrations::plasma::gamemode::shutdown_for_app(h);
                 Ok(())
             }),
-            step("state-actor", secs(3), |h| match h.try_state::<state::host::IslandActor>() {
-                Some(actor) => actor.shutdown().map_err(|e| e.to_string()),
-                None => Ok(()),
-            }),
-            step("native-host", secs(4), |h| {
-                match h.try_state::<integrations::plasma::runtime::NativeHost>() {
-                    Some(host) => host.shutdown().map_err(|e| format!("{e:#}")),
+            step("state-actor", secs(3), |h| {
+                match h.try_state::<state::host::IslandActor>() {
+                    Some(actor) => actor.shutdown().map_err(|e| e.to_string()),
                     None => Ok(()),
                 }
+            }),
+            step("native-host", secs(4), |h| match h
+                .try_state::<integrations::plasma::runtime::NativeHost>()
+            {
+                Some(host) => host.shutdown().map_err(|e| format!("{e:#}")),
+                None => Ok(()),
             }),
             step("services", secs(3), |h| {
                 if let Some(services) = h.try_state::<services::Services>() {

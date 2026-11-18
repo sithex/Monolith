@@ -54,7 +54,12 @@ fn fake_copy(s: &Stack) -> (zbus::Connection, zbus::Connection) {
     )
     .unwrap();
     // Plasma owns the server long before any copy starts: let the island's monitor arm on it.
-    until(s, "7a job monitor armed", 10, "window.__TAURI_INTERNALS__.invoke('transfers_get').then(t=>t.detail==='monitoring')");
+    until(
+        s,
+        "7a job monitor armed",
+        10,
+        "window.__TAURI_INTERNALS__.invoke('transfers_get').then(t=>t.detail==='monitoring')",
+    );
     let client = block(zbus::connection::Builder::address(address.as_str()).build()).unwrap();
     fs::create_dir_all(s.root.join("Videos")).unwrap();
     let dest = format!("file://{}/Videos/holiday%20film.mkv", s.root.display());
@@ -224,39 +229,104 @@ fn fallback_round_trip(
     trigger: &str,
 ) {
     eval(s, trigger);
-    until(s, &format!("7a {name} fallback card"), 20, "!!document.querySelector('[data-island-fallback]') && !document.querySelector('.island')");
+    until(
+        s,
+        &format!("7a {name} fallback card"),
+        20,
+        "!!document.querySelector('[data-island-fallback]') && !document.querySelector('.island')",
+    );
     let layout = eval(s, "(()=>{const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};const card=document.querySelector('[data-island-fallback]');const style=getComputedStyle(card);return {card:box(card),text:box(card.querySelector('.island-fallback-text')),button:box(card.querySelector('button')),label:card.querySelector('button').textContent,line:card.textContent,background:style.backgroundColor,radius:parseFloat(style.borderRadius)||0,vw:innerWidth,vh:innerHeight}})()");
-    let n = |path: &[&str]| -> f64 {
-        path.iter().fold(&layout, |v, k| &v[*k]).as_f64().unwrap()
-    };
+    let n = |path: &[&str]| -> f64 { path.iter().fold(&layout, |v, k| &v[*k]).as_f64().unwrap() };
     // Rendered layout: on screen, not transparent, button inside the card and clear of the text.
-    assert!(n(&["card", "width"]) >= 200. && n(&["card", "height"]) >= 36., "{name}: card size {layout}");
-    assert!(n(&["card", "x"]) >= 0. && n(&["card", "y"]) >= 0. && n(&["card", "right"]) <= n(&["vw"]) && n(&["card", "bottom"]) <= n(&["vh"]), "{name}: card on screen {layout}");
-    assert!(!layout["background"].as_str().unwrap().contains("rgba(0, 0, 0, 0)") && layout["background"] != "transparent", "{name}: solid card {layout}");
-    assert!(n(&["button", "x"]) >= n(&["card", "x"]) && n(&["button", "right"]) <= n(&["card", "right"]) && n(&["button", "y"]) >= n(&["card", "y"]) && n(&["button", "bottom"]) <= n(&["card", "bottom"]), "{name}: Reload inside the card {layout}");
-    assert!(n(&["text", "right"]) <= n(&["button", "x"]), "{name}: text clear of Reload {layout}");
-    assert!(n(&["button", "width"]) >= 44. && n(&["button", "height"]) >= 24., "{name}: Reload is a real target {layout}");
+    assert!(
+        n(&["card", "width"]) >= 200. && n(&["card", "height"]) >= 36.,
+        "{name}: card size {layout}"
+    );
+    assert!(
+        n(&["card", "x"]) >= 0.
+            && n(&["card", "y"]) >= 0.
+            && n(&["card", "right"]) <= n(&["vw"])
+            && n(&["card", "bottom"]) <= n(&["vh"]),
+        "{name}: card on screen {layout}"
+    );
+    assert!(
+        !layout["background"]
+            .as_str()
+            .unwrap()
+            .contains("rgba(0, 0, 0, 0)")
+            && layout["background"] != "transparent",
+        "{name}: solid card {layout}"
+    );
+    assert!(
+        n(&["button", "x"]) >= n(&["card", "x"])
+            && n(&["button", "right"]) <= n(&["card", "right"])
+            && n(&["button", "y"]) >= n(&["card", "y"])
+            && n(&["button", "bottom"]) <= n(&["card", "bottom"]),
+        "{name}: Reload inside the card {layout}"
+    );
+    assert!(
+        n(&["text", "right"]) <= n(&["button", "x"]),
+        "{name}: text clear of Reload {layout}"
+    );
+    assert!(
+        n(&["button", "width"]) >= 44. && n(&["button", "height"]) >= 24.,
+        "{name}: Reload is a real target {layout}"
+    );
     assert_eq!(layout["label"], "Reload");
     let line = layout["line"].as_str().unwrap();
-    assert!(line.starts_with("Monolith hit an error.") && line.contains("Test-requested"), "{name}: {line}");
+    assert!(
+        line.starts_with("Monolith hit an error.") && line.contains("Test-requested"),
+        "{name}: {line}"
+    );
     // The input region covers the whole card (inset by its corner radius), so it is clickable.
-    let card = RoundedRect { x: n(&["card", "x"]), y: n(&["card", "y"]), width: n(&["card", "width"]), height: n(&["card", "height"]), radius: n(&["radius"]) };
+    let card = RoundedRect {
+        x: n(&["card", "x"]),
+        y: n(&["card", "y"]),
+        width: n(&["card", "width"]),
+        height: n(&["card", "height"]),
+        radius: n(&["radius"]),
+    };
     let inset = card.radius.ceil() as i32 + 1;
     let probes = [
         (card.x as i32 + inset, card.y as i32 + 1),
-        ((card.x + card.width) as i32 - inset, (card.y + card.height) as i32 - 2),
-        ((card.x + card.width / 2.) as i32, (card.y + card.height / 2.) as i32),
-        (n(&["button", "x"]) as i32 + 4, (n(&["button", "y"]) + n(&["button", "height"]) / 2.) as i32),
+        (
+            (card.x + card.width) as i32 - inset,
+            (card.y + card.height) as i32 - 2,
+        ),
+        (
+            (card.x + card.width / 2.) as i32,
+            (card.y + card.height / 2.) as i32,
+        ),
+        (
+            n(&["button", "x"]) as i32 + 4,
+            (n(&["button", "y"]) + n(&["button", "height"]) / 2.) as i32,
+        ),
     ];
-    wait_for(&format!("7a {name} fallback input region"), Duration::from_secs(10), || {
-        let rows = normalize_rows(&input_region(conn, window));
-        probes
-            .iter()
-            .all(|&(x, y)| rows.iter().any(|r| i32::from(r.y) <= y && y < i32::from(r.y) + i32::from(r.height) && i32::from(r.x) <= x && x < i32::from(r.x) + i32::from(r.width)))
-            .then_some(())
-    });
+    wait_for(
+        &format!("7a {name} fallback input region"),
+        Duration::from_secs(10),
+        || {
+            let rows = normalize_rows(&input_region(conn, window));
+            probes
+                .iter()
+                .all(|&(x, y)| {
+                    rows.iter().any(|r| {
+                        i32::from(r.y) <= y
+                            && y < i32::from(r.y) + i32::from(r.height)
+                            && i32::from(r.x) <= x
+                            && x < i32::from(r.x) + i32::from(r.width)
+                    })
+                })
+                .then_some(())
+        },
+    );
     click(s, eis, origin, "[data-island-fallback] button");
-    until(s, &format!("7a {name} fallback Reload restores the island"), 25, "!!document.querySelector('.island') && !document.querySelector('[data-island-fallback]')");
+    until(
+        s,
+        &format!("7a {name} fallback Reload restores the island"),
+        25,
+        "!!document.querySelector('.island') && !document.querySelector('[data-island-fallback]')",
+    );
 }
 fn settings_section(s: &Stack, eis: &mut Wheel, origin: (i32, i32), section: &str) {
     click(
@@ -277,13 +347,18 @@ fn settings_section(s: &Stack, eis: &mut Wheel, origin: (i32, i32), section: &st
 }
 /// Pick the current swatch tile with real input and verify the radio selection.
 fn pick_scheme(s: &Stack, eis: &mut Wheel, origin: (i32, i32), id: &str) {
-    let radio = format!("[role=radiogroup][aria-label='Colour scheme'] [role=radio][data-testid=appearance-{id}]");
+    let radio = format!(
+        "[role=radiogroup][aria-label='Colour scheme'] [role=radio][data-testid=appearance-{id}]"
+    );
     click(s, eis, origin, &radio);
     until(
         s,
         &format!("7a scheme {id} selected"),
         8,
-        &format!("document.querySelector({})?.getAttribute('aria-checked')==='true'", json!(radio)),
+        &format!(
+            "document.querySelector({})?.getAttribute('aria-checked')==='true'",
+            json!(radio)
+        ),
     );
 }
 fn view(
@@ -362,12 +437,29 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     fs::write(&long_name, b"x").unwrap();
     let inst = s.root.join("inst");
     fs::create_dir_all(&inst).unwrap();
-    std::fs::set_permissions(&inst, <fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700)).unwrap();
+    std::fs::set_permissions(
+        &inst,
+        <fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700),
+    )
+    .unwrap();
     {
         use hermes_island_lib::integrations::shelf::core::Shelf;
         let mut shelf = Shelf::default();
-        shelf.add(vec![long_name.clone(), parked.join("Project folder"), parked.join("gone.txt")], 1, 12);
-        hermes_island_lib::integrations::private_file::write(&inst.join("shelf.json"), shelf.to_json().as_bytes(), 65536).unwrap();
+        shelf.add(
+            vec![
+                long_name.clone(),
+                parked.join("Project folder"),
+                parked.join("gone.txt"),
+            ],
+            1,
+            12,
+        );
+        hermes_island_lib::integrations::private_file::write(
+            &inst.join("shelf.json"),
+            shelf.to_json().as_bytes(),
+            65536,
+        )
+        .unwrap();
     }
     let mut app = launch(&s);
     let conn = s.connect();
@@ -492,7 +584,10 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     // code, and a Settings button only where a setting exists. The test instance has no Downloads
     // folder (not-configured: card, no button); weather enabled without a location is no-location
     // ("Choose location" inside the Weather card, which is stacked with the Battery/Bluetooth cards).
-    eval(&s, "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{weatherEnabled:true}})");
+    eval(
+        &s,
+        "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{weatherEnabled:true}})",
+    );
     for (id, ready) in [
         ("downloads", ".service-notice[data-kind=setup]"),
         ("quickInfo", ".service-notice-action button"),
@@ -512,16 +607,31 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         assert!(!notices.is_empty(), "{id}: no service notice {g}");
         assert_eq!(g["raw"], false, "{id}: raw status code shown {g}");
         for n in notices {
-            assert_eq!(n["inCard"], true, "{id}: notice button outside its card {g}");
-            assert_eq!(n["overlap"], false, "{id}: notice button overlaps its sentence or card title {g}");
+            assert_eq!(
+                n["inCard"], true,
+                "{id}: notice button outside its card {g}"
+            );
+            assert_eq!(
+                n["overlap"], false,
+                "{id}: notice button overlaps its sentence or card title {g}"
+            );
             if n["button"] == true {
-                assert!(n["size"].as_f64().unwrap() >= 20.0, "{id}: notice button collapsed {g}");
+                assert!(
+                    n["size"].as_f64().unwrap() >= 20.0,
+                    "{id}: notice button collapsed {g}"
+                );
             }
         }
-        assert!(g["cardGap"].as_f64().unwrap() >= 10.0, "{id}: stacked cards touch {g}");
+        assert!(
+            g["cardGap"].as_f64().unwrap() >= 10.0,
+            "{id}: stacked cards touch {g}"
+        );
         if id == "downloads" {
             // The Downloads folder comes from the desktop's user dirs: no Settings row, no button.
-            assert!(notices.iter().all(|n| n["button"] == false), "downloads: unexpected button {g}");
+            assert!(
+                notices.iter().all(|n| n["button"] == false),
+                "downloads: unexpected button {g}"
+            );
             // A KDE copy in progress: the Transfers card sits above the notice, its "Show in
             // folder" button inside its row and clear of every line of text, the bar inside the
             // row, and a real gap between the card and the notice below it.
@@ -542,11 +652,26 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
             assert!(t["text"].as_str().unwrap().contains("Dolphin →"), "{t}");
             assert_eq!(t["buttonIn"], true, "transfers: button outside its row {t}");
             assert_eq!(t["barIn"], true, "transfers: bar outside its row {t}");
-            assert_eq!(t["overlap"], false, "transfers: button overlaps the text or bar {t}");
-            assert!(t["size"].as_f64().unwrap() >= 20.0, "transfers: button collapsed {t}");
-            assert!((t["barWidth"].as_f64().unwrap() - 0.47).abs() < 0.02, "transfers: bar is not 47% {t}");
-            assert_eq!(t["above"], true, "transfers: card is not above the notice {t}");
-            assert!(t["gap"].as_f64().unwrap() >= 10.0, "transfers: card touches the notice {t}");
+            assert_eq!(
+                t["overlap"], false,
+                "transfers: button overlaps the text or bar {t}"
+            );
+            assert!(
+                t["size"].as_f64().unwrap() >= 20.0,
+                "transfers: button collapsed {t}"
+            );
+            assert!(
+                (t["barWidth"].as_f64().unwrap() - 0.47).abs() < 0.02,
+                "transfers: bar is not 47% {t}"
+            );
+            assert_eq!(
+                t["above"], true,
+                "transfers: card is not above the notice {t}"
+            );
+            assert!(
+                t["gap"].as_f64().unwrap() >= 10.0,
+                "transfers: card touches the notice {t}"
+            );
             assert_eq!(t["overflow"], false, "transfers: page scrolls sideways {t}");
             // Show in folder reaches Rust; a test instance never opens a real file manager.
             let reveal = eval(&s, "window.__TAURI_INTERNALS__.invoke('transfer_reveal',{id:'/org/kde/notificationmanager/jobs/JobView_1'}).then(()=>'opened',e=>e.code)");
@@ -554,14 +679,29 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
             screenshot(&s, &conn, window, "transfers-downloads");
             // The copy's client leaves the bus: the card goes away by itself.
             drop(copy);
-            until(&s, "7a transfers card cleared", 15, "!document.querySelector('.transfer-row')");
+            until(
+                &s,
+                "7a transfers card cleared",
+                15,
+                "!document.querySelector('.transfer-row')",
+            );
         } else {
-            assert!(g["cards"].as_u64().unwrap() >= 2, "quickInfo: expected stacked cards {g}");
-            assert!(notices.iter().any(|n| n["button"] == true && n["text"].as_str().unwrap().contains("Choose a location")), "quickInfo: no location button {g}");
+            assert!(
+                g["cards"].as_u64().unwrap() >= 2,
+                "quickInfo: expected stacked cards {g}"
+            );
+            assert!(
+                notices.iter().any(|n| n["button"] == true
+                    && n["text"].as_str().unwrap().contains("Choose a location")),
+                "quickInfo: no location button {g}"
+            );
         }
         screenshot(&s, &conn, window, &format!("service-notice-{id}"));
     }
-    eval(&s, "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{weatherEnabled:false}})");
+    eval(
+        &s,
+        "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{weatherEnabled:false}})",
+    );
     // Drop shelf page: three seeded cards (one moved/deleted). Every button inside its card and
     // clear of the text, cards at least 10 px apart, no sideways scroll.
     invoke_dispatch_view(&s, "shelf");
@@ -576,29 +716,73 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
         return {cards,gaps,overflow:pane.scrollWidth>pane.clientWidth+1,clearBelow:!!clear&&cr.top>=last.bottom+10,clearIn:!!clear&&inside(cr,R(pane))}})()");
     let cards = g["cards"].as_array().unwrap();
     assert_eq!(cards.len(), 3, "{g}");
-    assert_eq!(cards[0]["labels"], json!(["Open", "Reveal", "Copy path", "Remove"]), "{g}");
-    assert_eq!(cards[2]["labels"], json!(["Copy path", "Remove"]), "deleted item keeps only Copy/Remove {g}");
+    assert_eq!(
+        cards[0]["labels"],
+        json!(["Open", "Reveal", "Copy path", "Remove"]),
+        "{g}"
+    );
+    assert_eq!(
+        cards[2]["labels"],
+        json!(["Copy path", "Remove"]),
+        "deleted item keeps only Copy/Remove {g}"
+    );
     for c in cards {
         assert_eq!(c["inside"], true, "shelf: button outside its card {g}");
         assert_eq!(c["textInside"], true, "shelf: text outside its card {g}");
-        assert_eq!(c["overlap"], false, "shelf: button overlaps text or another button {g}");
+        assert_eq!(
+            c["overlap"], false,
+            "shelf: button overlaps text or another button {g}"
+        );
         assert_eq!(c["small"], false, "shelf: button collapsed {g}");
     }
-    assert!(g["gaps"].as_array().unwrap().iter().all(|v| v.as_f64().unwrap() >= 10.0), "shelf: cards touch {g}");
+    assert!(
+        g["gaps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|v| v.as_f64().unwrap() >= 10.0),
+        "shelf: cards touch {g}"
+    );
     assert_eq!(g["overflow"], false, "shelf: page scrolls sideways {g}");
-    assert_eq!(g["clearBelow"], true, "shelf: Clear all touches the cards {g}");
+    assert_eq!(
+        g["clearBelow"], true,
+        "shelf: Clear all touches the cards {g}"
+    );
     assert_eq!(g["clearIn"], true, "shelf: Clear all outside the page {g}");
     screenshot(&s, &conn, window, "shelf");
     // Open/Reveal reach Rust by id; a test instance never opens a real app.
     let opened = eval(&s, "window.__TAURI_INTERNALS__.invoke('shelf_get').then(v=>window.__TAURI_INTERNALS__.invoke('shelf_command',{op:{type:'open',id:v.items[0].id}})).then(()=>'opened',e=>e.code)");
     assert_eq!(opened, "unsupported", "{opened}");
-    eval(&s, "(document.querySelector('[aria-label=\"Remove gone.txt from the shelf\"]').click(),true)");
-    until(&s, "7a shelf remove", 10, "document.querySelectorAll('.app-pane:not([hidden]) .shelf-row').length===2");
-    assert!(!fs::read_to_string(inst.join("shelf.json")).unwrap().contains("gone.txt"));
+    eval(
+        &s,
+        "(document.querySelector('[aria-label=\"Remove gone.txt from the shelf\"]').click(),true)",
+    );
+    until(
+        &s,
+        "7a shelf remove",
+        10,
+        "document.querySelectorAll('.app-pane:not([hidden]) .shelf-row').length===2",
+    );
+    assert!(!fs::read_to_string(inst.join("shelf.json"))
+        .unwrap()
+        .contains("gone.txt"));
     // Navigation guard (Rust on_navigation): the page may not load anything outside the app.
-    eval(&s, &format!("(location.href={},true)", json!(format!("file://{}", long_name.display()))));
+    eval(
+        &s,
+        &format!(
+            "(location.href={},true)",
+            json!(format!("file://{}", long_name.display()))
+        ),
+    );
     std::thread::sleep(Duration::from_millis(1500));
-    assert_eq!(eval(&s, "location.protocol+'//'+location.host+'|'+!!document.querySelector('.island')"), "tauri://localhost|true", "a file URL replaced the island page");
+    assert_eq!(
+        eval(
+            &s,
+            "location.protocol+'//'+location.host+'|'+!!document.querySelector('.island')"
+        ),
+        "tauri://localhost|true",
+        "a file URL replaced the island page"
+    );
     // Skin is the fresh-install default (services/frontend.rs), so pick neutral first: every
     // iteration is a real change that must persist without a restart.
     for theme in ["neutral", "skin"] {
@@ -672,9 +856,15 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
             if id == "settings" {
                 // innerText follows CSS text-transform (card titles are uppercase).
                 // Settings reopens on the last section used, so open General explicitly.
-                eval(&s, "document.querySelector('.settings-rail [data-section=general]').click()");
+                eval(
+                    &s,
+                    "document.querySelector('.settings-rail [data-section=general]').click()",
+                );
                 std::thread::sleep(Duration::from_millis(400));
-                let text = eval(&s, "document.querySelector('.app-pane:not([hidden])').innerText");
+                let text = eval(
+                    &s,
+                    "document.querySelector('.app-pane:not([hidden])').innerText",
+                );
                 let text = text.as_str().unwrap().to_lowercase();
                 // Eight-section labeled rail.
                 assert_eq!(
@@ -683,13 +873,24 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                     "settings rail sections"
                 );
                 assert!(
-                    ["behavior", "clock", "shortcuts"].iter().all(|t| text.contains(t)),
+                    ["behavior", "clock", "shortcuts"]
+                        .iter()
+                        .all(|t| text.contains(t)),
                     "settings pane: {text}"
                 );
                 // Rendered layout of every section: the rail keeps its width and sits left of the
                 // content, nothing spills past the pane horizontally, every row's control stays
                 // inside its row, and a row's label never overlaps its control.
-                for section in ["general", "appearance", "notch", "companion", "notifications", "apps", "terminal", "advanced"] {
+                for section in [
+                    "general",
+                    "appearance",
+                    "notch",
+                    "companion",
+                    "notifications",
+                    "apps",
+                    "terminal",
+                    "advanced",
+                ] {
                     eval(&s, &format!("document.querySelector('.settings-rail [data-section={section}]').click()"));
                     std::thread::sleep(Duration::from_millis(450));
                     let g = eval(&s, "(()=>{const R=e=>e.getBoundingClientRect(),rail=R(document.querySelector('.settings-rail')),c=document.querySelector('.settings-content'),cr=R(c),pane=R(document.querySelector('.app-pane:not([hidden])'));\
@@ -698,22 +899,53 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
                         return (out||lap)?(r.dataset.settingId||r.textContent.slice(0,30))+(out?':out':':overlap'):null}).filter(Boolean);\
                         const cards=[...c.querySelectorAll(':scope > .settings-card, :scope > section')].filter(e=>e.offsetParent).map(R);const cardGap=cards.length<2?99:Math.min(...cards.slice(1).map((b,i)=>b.top-cards[i].bottom));\
                         return {rail:rail.width,gap:cr.left-rail.right,cardGap,fitClient:c.clientHeight,fitScroll:c.scrollHeight,spill:c.scrollWidth-c.clientWidth,paneRight:pane.right-cr.right,rows:c.querySelectorAll('.settings-row').length,bad}})()");
-                    assert!((g["rail"].as_f64().unwrap() - 150.0).abs() < 1.0, "{section}: rail width {g}");
-                    assert!(g["gap"].as_f64().unwrap() >= 0.0, "{section}: content overlaps rail {g}");
-                    assert!(g["spill"].as_f64().unwrap() <= 1.0, "{section}: horizontal overflow {g}");
-                    assert!(g["paneRight"].as_f64().unwrap() >= -1.0, "{section}: content past the pane {g}");
-                    assert!(g["rows"].as_u64().unwrap() > 0, "{section}: empty section {g}");
+                    assert!(
+                        (g["rail"].as_f64().unwrap() - 150.0).abs() < 1.0,
+                        "{section}: rail width {g}"
+                    );
+                    assert!(
+                        g["gap"].as_f64().unwrap() >= 0.0,
+                        "{section}: content overlaps rail {g}"
+                    );
+                    assert!(
+                        g["spill"].as_f64().unwrap() <= 1.0,
+                        "{section}: horizontal overflow {g}"
+                    );
+                    assert!(
+                        g["paneRight"].as_f64().unwrap() >= -1.0,
+                        "{section}: content past the pane {g}"
+                    );
+                    assert!(
+                        g["rows"].as_u64().unwrap() > 0,
+                        "{section}: empty section {g}"
+                    );
                     // Separate cards: a visible gap between every pair of stacked cards.
-                    assert!(g["cardGap"].as_f64().unwrap() >= 10.0, "{section}: cards touch {g}");
+                    assert!(
+                        g["cardGap"].as_f64().unwrap() >= 10.0,
+                        "{section}: cards touch {g}"
+                    );
                     // The island grows to fit the section (up to its maximum height) instead of
                     // squeezing it into a small scroll box: Settings scrolls inside .settings-content,
                     // and that hidden height must still count when the island sizes itself.
-                    let (client, scroll) = (g["fitClient"].as_f64().unwrap(), g["fitScroll"].as_f64().unwrap());
-                    assert!(client >= scroll.min(450.0) - 1.0, "{section}: island did not grow to fit Settings {g}");
-                    assert_eq!(g["bad"], serde_json::json!([]), "{section}: misplaced controls {g}");
+                    let (client, scroll) = (
+                        g["fitClient"].as_f64().unwrap(),
+                        g["fitScroll"].as_f64().unwrap(),
+                    );
+                    assert!(
+                        client >= scroll.min(450.0) - 1.0,
+                        "{section}: island did not grow to fit Settings {g}"
+                    );
+                    assert_eq!(
+                        g["bad"],
+                        serde_json::json!([]),
+                        "{section}: misplaced controls {g}"
+                    );
                     screenshot(&s, &conn, window, &format!("{theme}-settings-{section}"));
                 }
-                eval(&s, "document.querySelector('.settings-rail [data-section=general]').click()");
+                eval(
+                    &s,
+                    "document.querySelector('.settings-rail [data-section=general]').click()",
+                );
             }
             screenshot(&s, &conn, window, &format!("{theme}-{id}"));
         }
@@ -763,7 +995,15 @@ fn island_page_real_input_geometry_retained_draft_appearance_and_screenshots() {
     // island back.
     fallback_round_trip(&s, &conn, window, &mut eis, origin, "bootstrap",
         "(sessionStorage.setItem('island-test-fault','bootstrap'),setTimeout(()=>location.reload(),250),true)");
-    fallback_round_trip(&s, &conn, window, &mut eis, origin, "render", "(window.__islandTestCrash(),true)");
+    fallback_round_trip(
+        &s,
+        &conn,
+        window,
+        &mut eis,
+        origin,
+        "render",
+        "(window.__islandTestCrash(),true)",
+    );
     assert_eq!(unsafe { libc::kill(pid as i32, libc::SIGTERM) }, 0);
     wait_for(
         "7a owned app and fixture PTY exited",

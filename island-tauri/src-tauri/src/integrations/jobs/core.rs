@@ -283,10 +283,7 @@ impl Tracker {
                 else {
                     return false;
                 };
-                let Ok(path) = message
-                    .body()
-                    .deserialize::<zbus::OwnedObjectPath>()
-                else {
+                let Ok(path) = message.body().deserialize::<zbus::OwnedObjectPath>() else {
                     return false;
                 };
                 let Some(pending) = self.pending.remove(index) else {
@@ -316,9 +313,8 @@ impl Tracker {
                     if member != "update" {
                         return false;
                     }
-                    let Ok(properties) = message
-                        .body()
-                        .deserialize::<BTreeMap<String, OwnedValue>>()
+                    let Ok(properties) =
+                        message.body().deserialize::<BTreeMap<String, OwnedValue>>()
                     else {
                         return false;
                     };
@@ -357,7 +353,10 @@ impl Tracker {
     /// When `expire` next has something to do.
     pub fn next_expiry(&self) -> Option<Instant> {
         let pending = self.pending.iter().map(|p| p.at + PENDING_TTL);
-        let jobs = self.jobs.values().filter_map(|j| j.seen.map(|t| t + JOB_TTL));
+        let jobs = self
+            .jobs
+            .values()
+            .filter_map(|j| j.seen.map(|t| t + JOB_TTL));
         pending.chain(jobs).min()
     }
 

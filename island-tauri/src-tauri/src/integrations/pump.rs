@@ -159,14 +159,23 @@ pub async fn supervise<F, Fut>(
             backoff.reset();
         }
         if restarts >= policy.max_restarts {
-            tracing::error!(pump = name, restarts, "Event pump left stopped after repeated failures");
+            tracing::error!(
+                pump = name,
+                restarts,
+                "Event pump left stopped after repeated failures"
+            );
             report(PumpHealth::Stopped);
             return;
         }
         restarts += 1;
         report(PumpHealth::Restarting);
         let delay = backoff.next_delay();
-        tracing::warn!(pump = name, attempt = restarts, ?delay, "Restarting event pump");
+        tracing::warn!(
+            pump = name,
+            attempt = restarts,
+            ?delay,
+            "Restarting event pump"
+        );
         if pause(delay, &mut stop).await {
             return;
         }

@@ -434,7 +434,12 @@ impl Hub {
                 failed = true;
             }
             let actor = &self.actor;
-            match deliver(|| actor.dispatch(Intent::NotificationsSync(unread)), &mut stopped).await {
+            match deliver(
+                || actor.dispatch(Intent::NotificationsSync(unread)),
+                &mut stopped,
+            )
+            .await
+            {
                 Delivery::Done(_) => {}
                 // The count is recomputed and sent again next round.
                 Delivery::Busy => failed = true,
@@ -459,8 +464,9 @@ impl Hub {
                 None
             };
             let wait = async {
-                let expiry = expiry
-                    .map(|deadline| Duration::from_secs_f64(((deadline - self.now()).max(0.)) / 1000.));
+                let expiry = expiry.map(|deadline| {
+                    Duration::from_secs_f64(((deadline - self.now()).max(0.)) / 1000.)
+                });
                 match (expiry, retry) {
                     (Some(a), Some(b)) => tokio::time::sleep(a.min(b)).await,
                     (Some(a), None) | (None, Some(a)) => tokio::time::sleep(a).await,
@@ -495,11 +501,13 @@ impl Hub {
                         out.send(Outbound::Received(wire::NotificationReceived(n.0.into())))?;
                     }
                 }
-                Delta::NotificationClosed(c) => out.send(Outbound::Closed(wire::NotificationClosed {
-                    rev: c.rev,
-                    id: c.id,
-                    reason: c.reason.into(),
-                }))?,
+                Delta::NotificationClosed(c) => {
+                    out.send(Outbound::Closed(wire::NotificationClosed {
+                        rev: c.rev,
+                        id: c.id,
+                        reason: c.reason.into(),
+                    }))?
+                }
             }
         }
         Ok(())
@@ -574,7 +582,14 @@ impl Notifications {
         data: &Path,
     ) -> Result<Self, IslandError> {
         let bus = std::env::var("DBUS_SESSION_BUS_ADDRESS").unwrap_or_default();
-        Self::start_with(Arc::new(app), actor, settings, data, bus, RestartPolicy::standard())
+        Self::start_with(
+            Arc::new(app),
+            actor,
+            settings,
+            data,
+            bus,
+            RestartPolicy::standard(),
+        )
     }
     /// `start` with the outlet, session bus address and restart policy supplied (tests use a
     /// recorder, a bus that does not exist and short pauses).
@@ -604,11 +619,14 @@ impl Notifications {
             tracing::warn!(%error, "Notification policy not applied at start");
         }
         let forward = out.clone();
-        tauri::async_runtime::spawn(status.topic.forwarder(COALESCE, move |value: ServiceStatus| {
-            if let Err(error) = forward.send(Outbound::Status(value)) {
-                tracing::debug!(%error, "Notification status delivery failed");
-            }
-        }));
+        tauri::async_runtime::spawn(status.topic.forwarder(
+            COALESCE,
+            move |value: ServiceStatus| {
+                if let Err(error) = forward.send(Outbound::Status(value)) {
+                    tracing::debug!(%error, "Notification status delivery failed");
+                }
+            },
+        ));
         let monitor_task = tauri::async_runtime::spawn(hub.monitor.clone().run(
             hub.clone(),
             bus.clone(),

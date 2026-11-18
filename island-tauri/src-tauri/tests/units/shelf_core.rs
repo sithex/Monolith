@@ -99,18 +99,32 @@ fn shelf_list_is_newest_first_unique_and_capped() {
     let mut shelf = Shelf::default();
     assert!(shelf.add(vec![p("/a"), p("/b")], 1, 3));
     assert_eq!(
-        shelf.items().iter().map(|i| i.path.clone()).collect::<Vec<_>>(),
+        shelf
+            .items()
+            .iter()
+            .map(|i| i.path.clone())
+            .collect::<Vec<_>>(),
         [p("/a"), p("/b")]
     );
     assert!(shelf.add(vec![p("/c"), p("/d")], 2, 3));
     // Oldest dropped past the cap; the drop's own order kept.
     assert_eq!(
-        shelf.items().iter().map(|i| i.path.clone()).collect::<Vec<_>>(),
+        shelf
+            .items()
+            .iter()
+            .map(|i| i.path.clone())
+            .collect::<Vec<_>>(),
         [p("/c"), p("/d"), p("/a")]
     );
     // A path already parked moves to the front instead of appearing twice.
     assert!(shelf.add(vec![p("/a")], 3, 3));
-    assert_eq!(shelf.items()[0], Item { path: p("/a"), added_ms: 3 });
+    assert_eq!(
+        shelf.items()[0],
+        Item {
+            path: p("/a"),
+            added_ms: 3
+        }
+    );
     assert_eq!(shelf.items().len(), 3);
     assert!(shelf.trim(1));
     assert_eq!(shelf.items().len(), 1);
@@ -133,9 +147,20 @@ fn shelf_persists_as_uris_and_skips_entries_that_no_longer_validate() {
     assert_eq!(Shelf::from_json(&json, 1).items().len(), 1);
     let tampered = r#"{"version":1,"items":[{"uri":"file:///tmp/a%0A","addedMs":1},{"uri":"http://x/y","addedMs":1},{"uri":"file:///ok","addedMs":7},{"uri":"file:///ok","addedMs":8},{"addedMs":1}]}"#;
     let loaded = Shelf::from_json(tampered, 12);
-    assert_eq!(loaded.items(), [Item { path: PathBuf::from("/ok"), added_ms: 7 }]);
+    assert_eq!(
+        loaded.items(),
+        [Item {
+            path: PathBuf::from("/ok"),
+            added_ms: 7
+        }]
+    );
     assert!(Shelf::from_json("not json", 12).items().is_empty());
-    assert!(Shelf::from_json(r#"{"version":2,"items":[{"uri":"file:///ok","addedMs":7}]}"#, 12).items().is_empty());
+    assert!(Shelf::from_json(
+        r#"{"version":2,"items":[{"uri":"file:///ok","addedMs":7}]}"#,
+        12
+    )
+    .items()
+    .is_empty());
 }
 
 #[test]
@@ -150,11 +175,21 @@ fn shelf_launcher_app_is_appended_to_a_saved_v2_registry_last() {
         {"id":"settings","enabled":true,"order":5,"config":{"type":"settings"}},
         {"id":"downloads","enabled":false,"order":9,"config":{"type":"downloads"}}]}"#;
     let (registry, _) = Registry::from_json(saved).unwrap();
-    let ids: Vec<_> = registry.modules().iter().map(|m| (m.id.as_str(), m.order, m.enabled)).collect();
+    let ids: Vec<_> = registry
+        .modules()
+        .iter()
+        .map(|m| (m.id.as_str(), m.order, m.enabled))
+        .collect();
     assert_eq!(
         ids,
         // (`from_json` normalizes orders as before; the user's relative order is kept.)
-        [("terminal", 0, true), ("settings", 1, true), ("downloads", 2, false), ("shelf", 3, true), ("autoclicker", 4, true)]
+        [
+            ("terminal", 0, true),
+            ("settings", 1, true),
+            ("downloads", 2, false),
+            ("shelf", 3, true),
+            ("autoclicker", 4, true)
+        ]
     );
     // Already there (even disabled by the user): left exactly as saved.
     let off = saved.replace(
@@ -164,6 +199,9 @@ fn shelf_launcher_app_is_appended_to_a_saved_v2_registry_last() {
     let (kept, _) = Registry::from_json(&off).unwrap();
     assert_eq!(kept.modules().len(), 5);
     assert!(!kept.modules()[3].enabled);
-    assert!(Registry::defaults().modules().iter().any(|m| m.id.as_str() == "shelf" && m.enabled));
+    assert!(Registry::defaults()
+        .modules()
+        .iter()
+        .any(|m| m.id.as_str() == "shelf" && m.enabled));
     assert_eq!(module_route("shelf"), Some(IslandView::Shelf));
 }

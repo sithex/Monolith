@@ -1,6 +1,8 @@
 use super::blocking;
 use crate::{
-    contract::system::{GeoPlace, KillSignal, MonolithCost, ProcessList, SystemStats, WeatherState},
+    contract::system::{
+        GeoPlace, KillSignal, MonolithCost, ProcessList, SystemStats, WeatherState,
+    },
     error::IslandError,
     integrations::system_services::SystemServices,
     services::Services,

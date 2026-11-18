@@ -77,9 +77,16 @@ fn busy_answers_are_retried_a_few_times_then_handed_back_without_spinning() {
         &mut stopped,
     ));
     assert!(matches!(outcome, Delivery::Busy));
-    assert_eq!(calls.load(Ordering::SeqCst), 4, "one try plus three bounded retries");
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        4,
+        "one try plus three bounded retries"
+    );
     let took = started.elapsed();
-    assert!(took >= Duration::from_millis(200), "retries wait between attempts: {took:?}");
+    assert!(
+        took >= Duration::from_millis(200),
+        "retries wait between attempts: {took:?}"
+    );
     assert!(took < Duration::from_secs(2), "bounded: {took:?}");
 
     let calls = AtomicU32::new(0);
@@ -133,12 +140,19 @@ fn supervisor_restarts_a_failing_pump_with_backoff_and_leaves_it_stopped_at_the_
         move |state| h.lock().unwrap().push(state),
     ));
     use PumpHealth::*;
-    assert_eq!(runs.load(Ordering::SeqCst), 3, "first run plus two restarts");
+    assert_eq!(
+        runs.load(Ordering::SeqCst),
+        3,
+        "first run plus two restarts"
+    );
     assert_eq!(
         *health.lock().unwrap(),
         [Running, Restarting, Running, Restarting, Running, Stopped]
     );
-    assert!(started.elapsed() >= Duration::from_millis(60), "20 ms then 40 ms between runs");
+    assert!(
+        started.elapsed() >= Duration::from_millis(60),
+        "20 ms then 40 ms between runs"
+    );
 }
 
 #[test]
@@ -169,7 +183,9 @@ fn supervisor_restarts_after_a_panic_and_ends_on_a_stop_request() {
             move |state| h.lock().unwrap().push(state),
         ))
     });
-    wait_for("the restarted pump", Duration::from_secs(5), || runs.load(Ordering::SeqCst) == 2);
+    wait_for("the restarted pump", Duration::from_secs(5), || {
+        runs.load(Ordering::SeqCst) == 2
+    });
     stop.send_replace(true);
     task.join().unwrap();
     use PumpHealth::*;
@@ -274,10 +290,15 @@ impl Recorder {
         })
     }
     fn last_status(&self) -> Option<(bool, String)> {
-        self.events.lock().unwrap().iter().rev().find_map(|e| match e {
-            Outbound::Status(s) => Some((s.available, s.detail.clone())),
-            _ => None,
-        })
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find_map(|e| match e {
+                Outbound::Status(s) => Some((s.available, s.detail.clone())),
+                _ => None,
+            })
     }
 }
 
@@ -338,22 +359,35 @@ fn notification_pump_survives_a_full_actor_queue_and_delivers_afterwards() {
     std::thread::sleep(Duration::from_millis(50));
     while handle.try_dispatch(Intent::NotificationsSync(0)).is_ok() {}
     assert_eq!(
-        handle.try_dispatch(Intent::NotificationsSync(0)).unwrap_err().code,
+        handle
+            .try_dispatch(Intent::NotificationsSync(0))
+            .unwrap_err()
+            .code,
         ErrorCode::Busy
     );
     notifications.hub.insert(note("while busy")).unwrap();
-    wait_for("delivery while busy", Duration::from_secs(5), || out.received("while busy"));
+    wait_for("delivery while busy", Duration::from_secs(5), || {
+        out.received("while busy")
+    });
     // Long enough for every bounded retry to answer Busy at least once.
     std::thread::sleep(Duration::from_millis(600));
     gate.open();
     notifications.hub.insert(note("after busy")).unwrap();
-    wait_for("delivery after the queue drained", Duration::from_secs(5), || {
-        out.received("after busy")
-    });
-    wait_for("unread count reached the actor", Duration::from_secs(5), || {
-        handle.state().unread == 2
-    });
-    assert_eq!(out.last_status(), Some((true, "ready".into())), "never reported down");
+    wait_for(
+        "delivery after the queue drained",
+        Duration::from_secs(5),
+        || out.received("after busy"),
+    );
+    wait_for(
+        "unread count reached the actor",
+        Duration::from_secs(5),
+        || handle.state().unread == 2,
+    );
+    assert_eq!(
+        out.last_status(),
+        Some((true, "ready".into())),
+        "never reported down"
+    );
     notifications.shutdown().unwrap();
     handle.shutdown();
     let _ = std::fs::remove_dir_all(root);
@@ -374,21 +408,31 @@ fn notification_pump_survives_failing_emits_and_resyncs_from_a_snapshot() {
     });
     out.fail_next.store(3, Ordering::SeqCst);
     notifications.hub.insert(note("lost emit")).unwrap();
-    wait_for("the missed one arrives in a snapshot", Duration::from_secs(5), || {
-        out.snapshot_has("lost emit")
-    });
-    assert_eq!(out.fail_next.load(Ordering::SeqCst), 0, "all injected failures were hit");
+    wait_for(
+        "the missed one arrives in a snapshot",
+        Duration::from_secs(5),
+        || out.snapshot_has("lost emit"),
+    );
+    assert_eq!(
+        out.fail_next.load(Ordering::SeqCst),
+        0,
+        "all injected failures were hit"
+    );
     // A failure in the per-notification emit itself (popups went through).
     out.fail_received.store(1, Ordering::SeqCst);
     notifications.hub.insert(note("lost received")).unwrap();
-    wait_for("a failed single emit is resent in a snapshot", Duration::from_secs(5), || {
-        out.snapshot_has("lost received")
-    });
+    wait_for(
+        "a failed single emit is resent in a snapshot",
+        Duration::from_secs(5),
+        || out.snapshot_has("lost received"),
+    );
     assert_eq!(out.fail_received.load(Ordering::SeqCst), 0);
     notifications.hub.insert(note("next one")).unwrap();
-    wait_for("the next one is delivered normally", Duration::from_secs(5), || {
-        out.received("next one")
-    });
+    wait_for(
+        "the next one is delivered normally",
+        Duration::from_secs(5),
+        || out.received("next one"),
+    );
     assert_eq!(out.last_status(), Some((true, "ready".into())));
     notifications.shutdown().unwrap();
     handle.shutdown();
@@ -420,8 +464,13 @@ fn notifications_start_without_the_hermes_socket_and_say_so() {
     wait_for("status says why", Duration::from_secs(5), || {
         out.last_status() == Some((false, "ingest-unavailable".into()))
     });
-    notifications.hub.insert(note("desktop still works")).unwrap();
-    wait_for("delivery", Duration::from_secs(5), || out.received("desktop still works"));
+    notifications
+        .hub
+        .insert(note("desktop still works"))
+        .unwrap();
+    wait_for("delivery", Duration::from_secs(5), || {
+        out.received("desktop still works")
+    });
     notifications.shutdown().unwrap();
     handle.shutdown();
     let _ = std::fs::remove_dir_all(root);
@@ -443,7 +492,10 @@ fn a_failing_optional_constructor_is_recorded_not_fatal() {
     assert_eq!(failed, None);
     assert_eq!(degraded.failed(), ["system-services"]);
     let status = degraded::start_failed("power");
-    assert_eq!((status.available, status.detail.as_str()), (false, "start-failed"));
+    assert_eq!(
+        (status.available, status.detail.as_str()),
+        (false, "start-failed")
+    );
 }
 
 #[test]
@@ -460,7 +512,10 @@ fn missing_subsystems_boot_as_unavailable_and_their_commands_say_so() {
         &caps.lyrics_status,
         &caps.equalizer_status,
     ] {
-        assert_eq!((status.available, status.detail.as_str()), (false, "start-failed"));
+        assert_eq!(
+            (status.available, status.detail.as_str()),
+            (false, "start-failed")
+        );
     }
     assert_eq!(caps.clipboard_status.detail, "start-failed");
     assert!(parts.notifications.is_empty() && parts.bluetooth.is_empty());
@@ -471,9 +526,8 @@ fn missing_subsystems_boot_as_unavailable_and_their_commands_say_so() {
     let error = managed::missing::<Notifications>();
     assert_eq!(error.code, ErrorCode::Unavailable);
     assert!(error.message.starts_with("Notifications are unavailable"));
-    let error = managed::missing::<
-        Arc<hermes_island_lib::integrations::system_services::SystemServices>,
-    >();
+    let error =
+        managed::missing::<Arc<hermes_island_lib::integrations::system_services::SystemServices>>();
     assert_eq!(error.code, ErrorCode::Unavailable);
 }
 
@@ -488,14 +542,23 @@ fn a_worker_that_never_exits_is_left_behind_within_the_bound() {
     })
     .unwrap();
     let started = Instant::now();
-    assert_eq!(worker.join_within(Duration::from_millis(150)), JoinOutcome::TimedOut);
+    assert_eq!(
+        worker.join_within(Duration::from_millis(150)),
+        JoinOutcome::TimedOut
+    );
     assert!(started.elapsed() < Duration::from_secs(2));
     drop(release);
 
     let quick = BoundedThread::spawn("hi-test-quick", || {}).unwrap();
-    assert_eq!(quick.join_within(Duration::from_secs(5)), JoinOutcome::Joined);
+    assert_eq!(
+        quick.join_within(Duration::from_secs(5)),
+        JoinOutcome::Joined
+    );
     let panics = BoundedThread::spawn("hi-test-panics", || panic!("worker broke")).unwrap();
-    assert_eq!(panics.join_within(Duration::from_secs(5)), JoinOutcome::Panicked);
+    assert_eq!(
+        panics.join_within(Duration::from_secs(5)),
+        JoinOutcome::Panicked
+    );
 }
 
 #[test]
@@ -513,7 +576,11 @@ fn quit_runs_every_step_in_order_within_one_deadline_and_names_each_outcome() {
                 first();
                 Ok(())
             }),
-            Step::new("fails", Duration::from_secs(1), || Err("socket gone".into())),
+            Step::new(
+                "fails",
+                Duration::from_secs(1),
+                || Err("socket gone".into()),
+            ),
             Step::new("hangs", Duration::from_millis(200), || {
                 std::thread::sleep(Duration::from_secs(30));
                 Ok(())
@@ -535,13 +602,20 @@ fn quit_runs_every_step_in_order_within_one_deadline_and_names_each_outcome() {
         Duration::from_millis(1500),
     );
     let took = started.elapsed();
-    assert!(took < Duration::from_millis(2500), "one aggregate deadline: {took:?}");
+    assert!(
+        took < Duration::from_millis(2500),
+        "one aggregate deadline: {took:?}"
+    );
     let outcome = |name| outcomes.iter().find(|(n, _)| *n == name).unwrap().1.clone();
     assert_eq!(outcome("first"), StepOutcome::Done);
     assert_eq!(outcome("fails"), StepOutcome::Failed("socket gone".into()));
     assert_eq!(outcome("hangs"), StepOutcome::TimedOut);
     assert_eq!(outcome("panics"), StepOutcome::Panicked);
-    assert_eq!(outcome("after-hang"), StepOutcome::Done, "a hung step does not block the rest");
+    assert_eq!(
+        outcome("after-hang"),
+        StepOutcome::Done,
+        "a hung step does not block the rest"
+    );
     assert_eq!(outcome("eats-the-rest"), StepOutcome::TimedOut);
     assert_eq!(outcome("last"), StepOutcome::Skipped, "deadline spent");
     assert_eq!(*order.lock().unwrap(), ["first", "after-hang"]);

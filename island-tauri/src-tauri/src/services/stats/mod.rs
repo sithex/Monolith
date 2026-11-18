@@ -84,12 +84,21 @@ impl StatsService {
 
     #[cfg(not(target_os = "linux"))]
     pub fn processes(&self) -> Result<ProcessList, IslandError> {
-        Err(IslandError::unsupported("the process list is not implemented on this platform yet"))
+        Err(IslandError::unsupported(
+            "the process list is not implemented on this platform yet",
+        ))
     }
 
     #[cfg(not(target_os = "linux"))]
-    pub fn kill(&self, _pid: u32, _start_ticks: f64, _signal: KillSignal) -> Result<(), IslandError> {
-        Err(IslandError::unsupported("ending processes is not implemented on this platform yet"))
+    pub fn kill(
+        &self,
+        _pid: u32,
+        _start_ticks: f64,
+        _signal: KillSignal,
+    ) -> Result<(), IslandError> {
+        Err(IslandError::unsupported(
+            "ending processes is not implemented on this platform yet",
+        ))
     }
 
     #[cfg(not(target_os = "linux"))]

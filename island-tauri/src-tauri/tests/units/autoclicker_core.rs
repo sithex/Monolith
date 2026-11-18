@@ -104,7 +104,11 @@ fn saved_file_with_stats_round_trips_and_ignores_old_presets() {
     assert_eq!(load(&store(&saved)), saved);
     let mut raw: serde_json::Value = serde_json::from_str(&store(&saved)).unwrap();
     raw["presets"] = serde_json::json!([{"name": "Fast", "config": {}}]);
-    assert_eq!(load(&raw.to_string()), saved, "a file from a build with presets still loads");
+    assert_eq!(
+        load(&raw.to_string()),
+        saved,
+        "a file from a build with presets still loads"
+    );
 }
 
 #[test]

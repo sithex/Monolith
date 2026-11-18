@@ -316,7 +316,10 @@ fn pin_reports_a_failed_write_and_the_next_change_retries() {
     copy(&s, epoch, "keep me".into());
     let blocker = block_file(&dir);
     let id = s.list(None, 1).unwrap()[0].id.clone();
-    assert!(s.pin(&id, true).is_err(), "a pin that did not reach the disk is reported");
+    assert!(
+        s.pin(&id, true).is_err(),
+        "a pin that did not reach the disk is reported"
+    );
     std::fs::remove_dir_all(&blocker).unwrap();
     // Nothing persisted changes here, yet the failed state must be written again.
     s.configure(persist_settings()).unwrap();

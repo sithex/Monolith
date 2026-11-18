@@ -181,7 +181,10 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     assert_eq!(actor_state(&s)["mode"], "hover");
     assert_eq!(actor_state(&s)["hoverCause"]["type"], "notification");
     assert_eq!(
-        eval(&s, &format!("!!{card}.closest('.island')&&!{card}.hasAttribute('data-island-extension')")),
+        eval(
+            &s,
+            &format!("!!{card}.closest('.island')&&!{card}.hasAttribute('data-island-extension')")
+        ),
         true,
         "the card must be part of the island surface"
     );
@@ -205,10 +208,21 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
              (cr.right-gr.right)-(ir.x-cr.x)]}})()"
         ),
     );
-    let g: Vec<f64> = geo.as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+    let g: Vec<f64> = geo
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_f64().unwrap())
+        .collect();
     assert!((g[0] - g[1]).abs() < 0.5, "close target is round: {g:?}");
-    assert!(g[2].abs() <= 0.5 && g[3].abs() <= 0.5, "X centred in its target: {g:?}");
-    assert!(g[4].abs() <= 1.0 && g[5].abs() <= 1.0, "header row shares one centre line: {g:?}");
+    assert!(
+        g[2].abs() <= 0.5 && g[3].abs() <= 0.5,
+        "X centred in its target: {g:?}"
+    );
+    assert!(
+        g[4].abs() <= 1.0 && g[5].abs() <= 1.0,
+        "header row shares one centre line: {g:?}"
+    );
     assert!(g[6].abs() <= 1.0, "X inset mirrors the icon inset: {g:?}");
     wait_for(
         "card auto-dismisses after its TTL",
@@ -218,9 +232,11 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     wait_for("card input region released", Duration::from_secs(5), || {
         (input_region(&conn, window) == idle).then_some(())
     });
-    wait_for("notch closes with the queue", Duration::from_secs(3), || {
-        (actor_state(&s)["mode"] == "still").then_some(())
-    });
+    wait_for(
+        "notch closes with the queue",
+        Duration::from_secs(3),
+        || (actor_state(&s)["mode"] == "still").then_some(()),
+    );
     eval(
         &s,
         "window.__TAURI_INTERNALS__.invoke('settings_patch',{patch:{toastTtlMs:6000}})",
@@ -305,9 +321,17 @@ fn cli_notify_toast_ttl_reading_and_dnd_on_private_kwin() {
     let pickers = pickers.as_array().unwrap();
     assert_eq!(pickers.len(), 2, "global and per-app pickers: {pickers:?}");
     for p in pickers {
-        let g: Vec<f64> = p.as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+        let g: Vec<f64> = p
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_f64().unwrap())
+            .collect();
         assert!(g[0] <= 1.0, "play button level with the dropdown: {g:?}");
-        assert!((2.0..=12.0).contains(&g[1]), "play button just right of the dropdown: {g:?}");
+        assert!(
+            (2.0..=12.0).contains(&g[1]),
+            "play button just right of the dropdown: {g:?}"
+        );
         assert!(g[2] <= 2.0, "picker centred in its row: {g:?}");
         assert_eq!(g[3], 1.0, "play button inside the row: {g:?}");
         assert!(g[4] <= 0.0, "label and dropdown don't overlap: {g:?}");

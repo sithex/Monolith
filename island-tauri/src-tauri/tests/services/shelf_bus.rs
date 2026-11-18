@@ -105,11 +105,11 @@ fn shelf_add_over_dbus_validates_parks_persists_and_opens_by_id() {
         vec![
             pretty(&hostile),
             pretty(&folder),
-            pretty(&newline),                                   // control character: refused
-            pretty(&link),                                      // symlink: refused
-            pretty(&home.join("missing.txt")),                  // gone: refused
-            "https://example.com/x".into(),                     // not a file: refused
-            format!("file://{}/../data/x", home.display()),     // `..`: refused
+            pretty(&newline),                  // control character: refused
+            pretty(&link),                     // symlink: refused
+            pretty(&home.join("missing.txt")), // gone: refused
+            "https://example.com/x".into(),    // not a file: refused
+            format!("file://{}/../data/x", home.display()), // `..`: refused
         ],
     );
     assert_eq!(accepted, 2, "only the plain file and the folder are parked");
@@ -122,9 +122,15 @@ fn shelf_add_over_dbus_validates_parks_persists_and_opens_by_id() {
 
     // Persisted privately, as URIs (no raw name in the file), and reloaded.
     let saved = data.join("shelf.json");
-    assert_eq!(fs::metadata(&saved).unwrap().permissions().mode() & 0o777, 0o600);
+    assert_eq!(
+        fs::metadata(&saved).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
     let text = fs::read_to_string(&saved).unwrap();
-    assert!(!text.contains("$(id)") && text.contains("%24%28id%29"), "{text}");
+    assert!(
+        !text.contains("$(id)") && text.contains("%24%28id%29"),
+        "{text}"
+    );
     let again = ShelfStore::new(&data, opener.clone());
     again.configure(true, 3.0);
     assert_eq!(again.current().unwrap().items, now.items);
@@ -134,7 +140,10 @@ fn shelf_add_over_dbus_validates_parks_persists_and_opens_by_id() {
     store.command(ShelfOp::Open { id: id.clone() }).unwrap();
     store.command(ShelfOp::Reveal { id: id.clone() }).unwrap();
     let calls = opener.0.lock().unwrap().clone();
-    assert_eq!(calls[0], [OsString::from("xdg-open"), hostile.clone().into_os_string()]);
+    assert_eq!(
+        calls[0],
+        [OsString::from("xdg-open"), hostile.clone().into_os_string()]
+    );
     let reveal = hermes_island_lib::integrations::downloads::reveal_argv(&hostile);
     assert_eq!(calls[1], reveal);
     // The hostile path travels as one percent-encoded URI argument, then the empty startup id.
@@ -161,7 +170,13 @@ fn shelf_add_over_dbus_validates_parks_persists_and_opens_by_id() {
         fs::write(&f, b"x").unwrap();
         assert_eq!(add(&notch, vec![pretty(&f)]), 1);
     }
-    let names: Vec<_> = store.current().unwrap().items.into_iter().map(|i| i.name).collect();
+    let names: Vec<_> = store
+        .current()
+        .unwrap()
+        .items
+        .into_iter()
+        .map(|i| i.name)
+        .collect();
     assert_eq!(names, ["f3", "f2", "f1"]);
     let f0 = pretty(&home.join("f0"));
     assert_eq!(add(&notch, vec![f0.clone(); 65]), 0);

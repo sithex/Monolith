@@ -211,12 +211,8 @@ fn play_detached(file: Option<String>, name: String) {
             } else {
                 player.arg("--id").arg(name);
             }
-            let _ = crate::services::process::run_bounded(
-                player,
-                Duration::from_secs(5),
-                4096,
-                false,
-            );
+            let _ =
+                crate::services::process::run_bounded(player, Duration::from_secs(5), 4096, false);
         });
 }
 pub fn launch(desktop: &str) -> Result<(), IslandError> {
@@ -281,7 +277,11 @@ mod tests {
         .unwrap();
         n.sound_name = Some("bell".into());
         let mut s = Settings::default();
-        assert_eq!(choose_sound(&n, &s), (None, "bell".into()), "app hint when nothing chosen");
+        assert_eq!(
+            choose_sound(&n, &s),
+            (None, "bell".into()),
+            "app hint when nothing chosen"
+        );
         n.sound_name = None;
         assert_eq!(choose_sound(&n, &s).1, DEFAULT_SOUND);
         s.notification_sound_id = "complete".into();

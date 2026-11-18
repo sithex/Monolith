@@ -53,7 +53,9 @@ fn wl_copy(text: &str) -> Result<(), IslandError> {
     loop {
         match child.try_wait() {
             Ok(Some(status)) if status.success() => return Ok(()),
-            Ok(Some(_)) => return Err(IslandError::unavailable("wl-copy couldn't copy the colour")),
+            Ok(Some(_)) => {
+                return Err(IslandError::unavailable("wl-copy couldn't copy the colour"))
+            }
             Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
             _ => {
                 let _ = child.kill();

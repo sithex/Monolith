@@ -278,7 +278,10 @@ impl ClipOutlet for Outlet {
 fn wait_until(what: &str, mut ready: impl FnMut() -> bool) {
     let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
     while !ready() {
-        assert!(std::time::Instant::now() < end, "timed out waiting for {what}");
+        assert!(
+            std::time::Instant::now() < end,
+            "timed out waiting for {what}"
+        );
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }
@@ -306,9 +309,15 @@ fn clipboard_delivery_retries_a_failed_emit_and_keeps_order() {
             .offer(ClipPayload::Text(text.into()), vec![], epoch)
             .unwrap();
     }
-    wait_until("both entries delivered", || out.added.lock().unwrap().len() == 2);
+    wait_until("both entries delivered", || {
+        out.added.lock().unwrap().len() == 2
+    });
     assert_eq!(*out.added.lock().unwrap(), ["one", "two"]);
-    assert_eq!(service.status().unwrap().dropped, 0, "a retried entry is not a drop");
+    assert_eq!(
+        service.status().unwrap().dropped,
+        0,
+        "a retried entry is not a drop"
+    );
     service.shutdown().unwrap();
 }
 #[test]
@@ -345,14 +354,20 @@ fn clipboard_stand_in_never_touches_the_saved_history() {
     std::fs::write(&file, b"{\"saved\":\"unreadable by this build\"}").unwrap();
     let stand_in = Clipboard::unavailable(dir.clone()).unwrap();
     let status = stand_in.status().unwrap();
-    assert_eq!((status.available, status.detail.as_str()), (false, "start-failed"));
+    assert_eq!(
+        (status.available, status.detail.as_str()),
+        (false, "start-failed")
+    );
     let settings = Settings {
         clipboard_history: true,
         clipboard_persist: true,
         ..Settings::default()
     };
     stand_in.configure(settings).unwrap();
-    assert!(lock(&stand_in.worker).unwrap().is_none(), "no capture starts");
+    assert!(
+        lock(&stand_in.worker).unwrap().is_none(),
+        "no capture starts"
+    );
     assert!(stand_in.list(None, 10).unwrap().is_empty());
     assert_eq!(stand_in.copy("x").unwrap_err().code, ErrorCode::Invalid);
     assert_eq!(

@@ -255,9 +255,14 @@ pub fn create_island_window(
         // A dropped file or link must never replace the island page (see `navigation`).
         let own = navigation::app_origin(tauri::is_dev(), app.config().build.dev_url.as_ref());
         builder = builder.on_navigation(move |url| {
-            let ok = own.as_ref().is_some_and(|own| navigation::allowed(url, own));
+            let ok = own
+                .as_ref()
+                .is_some_and(|own| navigation::allowed(url, own));
             if !ok {
-                tracing::warn!(scheme = url.scheme(), "Blocked a navigation away from the island page");
+                tracing::warn!(
+                    scheme = url.scheme(),
+                    "Blocked a navigation away from the island page"
+                );
             }
             ok
         });

@@ -732,19 +732,36 @@ mod tests {
         let mut m = Machine::new(&s);
         step(&mut m, Intent::PopupShown("a".into()), &s, 0);
         assert_eq!(m.state.mode, IslandMode::Hover);
-        assert_eq!(m.state.hover_cause, Some(HoverCause::Notification { id: "a".into() }));
-        assert!(!m.timers.contains_key(&Timer::ToastTtl), "the popup queue owns the lifetime");
+        assert_eq!(
+            m.state.hover_cause,
+            Some(HoverCause::Notification { id: "a".into() })
+        );
+        assert!(
+            !m.timers.contains_key(&Timer::ToastTtl),
+            "the popup queue owns the lifetime"
+        );
         // Hover the card, leave: the notch returns to the queued card instead of closing.
         step(&mut m, Intent::PointerEnter, &s, 10);
         assert_eq!(m.state.hover_cause, Some(HoverCause::Pointer));
         step(&mut m, Intent::PointerLeave, &s, 20);
         let generation = m.timers[&Timer::LeaveGrace].generation;
-        step(&mut m, Intent::TimerFired(Timer::LeaveGrace, generation), &s, 400);
+        step(
+            &mut m,
+            Intent::TimerFired(Timer::LeaveGrace, generation),
+            &s,
+            400,
+        );
         assert_eq!(m.state.mode, IslandMode::Hover);
-        assert_eq!(m.state.hover_cause, Some(HoverCause::Notification { id: "a".into() }));
+        assert_eq!(
+            m.state.hover_cause,
+            Some(HoverCause::Notification { id: "a".into() })
+        );
         // A newer card takes over; the emptied queue closes the notch.
         step(&mut m, Intent::PopupShown("b".into()), &s, 500);
-        assert_eq!(m.state.hover_cause, Some(HoverCause::Notification { id: "b".into() }));
+        assert_eq!(
+            m.state.hover_cause,
+            Some(HoverCause::Notification { id: "b".into() })
+        );
         step(&mut m, Intent::PopupsEmpty, &s, 600);
         assert_eq!(m.state.mode, IslandMode::Still);
         // Leaving after the queue emptied closes as before.
@@ -752,7 +769,12 @@ mod tests {
         m.tick(&s, &Fake(900)).unwrap();
         step(&mut m, Intent::PointerLeave, &s, 950);
         let generation = m.timers[&Timer::LeaveGrace].generation;
-        step(&mut m, Intent::TimerFired(Timer::LeaveGrace, generation), &s, 1300);
+        step(
+            &mut m,
+            Intent::TimerFired(Timer::LeaveGrace, generation),
+            &s,
+            1300,
+        );
         assert_eq!(m.state.mode, IslandMode::Still);
         // DnD, disabled notifications and an open island never grow the notch.
         step(&mut m, Intent::SetDnd(true), &s, 1400);

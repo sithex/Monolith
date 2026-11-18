@@ -83,7 +83,10 @@ pub fn parse_drm_fdinfo(text: &str) -> Option<DrmClient> {
             }
             "drm-memory-vram" | "drm-resident-vram0" | "drm-total-vram" => {
                 let mut parts = value.split_whitespace();
-                let n = parts.next().and_then(|n| n.parse::<u64>().ok()).unwrap_or(0);
+                let n = parts
+                    .next()
+                    .and_then(|n| n.parse::<u64>().ok())
+                    .unwrap_or(0);
                 let unit = match parts.next() {
                     Some("KiB") => 1024,
                     Some("MiB") => 1024 * 1024,
@@ -129,7 +132,10 @@ impl Sampler {
         let mut seen_clients = HashSet::new();
         if let Ok(dir) = fs::read_dir("/proc") {
             for entry in dir.flatten() {
-                let Some(pid) = entry.file_name().to_str().and_then(|s| s.parse::<u32>().ok())
+                let Some(pid) = entry
+                    .file_name()
+                    .to_str()
+                    .and_then(|s| s.parse::<u32>().ok())
                 else {
                     continue;
                 };
@@ -140,7 +146,9 @@ impl Sampler {
         }
         raws.sort_by_key(|r| r.pid);
         let ticks = super::self_cost::ticks_per_second();
-        let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1) as f64;
+        let cpus = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1) as f64;
         let page = page_size() as f64;
         let mut cpu_next = HashMap::with_capacity(raws.len());
         let mut gpu_next = HashMap::new();
@@ -164,8 +172,7 @@ impl Sampler {
                     *vram.get_or_insert(0.0) += client.vram_bytes as f64;
                     if let (Some(secs), Some(&before)) = (elapsed, self.gpu.get(&client.key)) {
                         if secs > 0.05 {
-                            let pct = client.engine_ns.saturating_sub(before) as f64
-                                / (secs * 1e9)
+                            let pct = client.engine_ns.saturating_sub(before) as f64 / (secs * 1e9)
                                 * 100.0;
                             *gpu.get_or_insert(0.0) += pct;
                         }
@@ -231,12 +238,7 @@ pub fn display_name(comm: &str, argv0: &str) -> String {
     }
 }
 
-fn read_process(
-    pid: u32,
-    uid: u32,
-    me: u32,
-    seen_clients: &mut HashSet<String>,
-) -> Option<Raw> {
+fn read_process(pid: u32, uid: u32, me: u32, seen_clients: &mut HashSet<String>) -> Option<Raw> {
     let stat = parse_stat(&fs::read_to_string(format!("/proc/{pid}/stat")).ok()?)?;
     let cmdline = fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default();
     // Kernel threads have no command line; they are not something to manage from here.
@@ -301,7 +303,9 @@ fn read_process(
 /// pid whose start time no longer matches (it exited and the number was reused).
 pub fn kill(pid: u32, start_ticks: f64, signal: KillSignal) -> Result<(), IslandError> {
     if pid <= 1 || pid == std::process::id() {
-        return Err(IslandError::invalid("that process cannot be ended from here"));
+        return Err(IslandError::invalid(
+            "that process cannot be ended from here",
+        ));
     }
     let stat = fs::read_to_string(format!("/proc/{pid}/stat"))
         .ok()
@@ -379,24 +383,40 @@ drm-engine-compute:\t892 ns\ndrm-engine-gfx:\t1000 ns\ndrm-engine-dma:\t5000 ns\
         let mut s = Sampler::default();
         let first = s.sample();
         let me = std::process::id();
-        let row = first.rows.iter().find(|r| r.pid == me).expect("own process listed");
+        let row = first
+            .rows
+            .iter()
+            .find(|r| r.pid == me)
+            .expect("own process listed");
         assert!(row.cpu.is_none(), "first interval is unavailable");
         assert!(!row.own, "the island itself is never offered for killing");
         assert!(first.memory_total > 0.0);
         std::thread::sleep(std::time::Duration::from_millis(80));
         let second = s.sample();
-        assert!(second.rows.iter().find(|r| r.pid == me).unwrap().cpu.is_some());
+        assert!(second
+            .rows
+            .iter()
+            .find(|r| r.pid == me)
+            .unwrap()
+            .cpu
+            .is_some());
     }
 
     #[test]
     fn kill_refuses_self_init_and_stale_start_time() {
         assert!(kill(1, 0.0, KillSignal::Term).is_err());
         assert!(kill(std::process::id(), 0.0, KillSignal::Term).is_err());
-        let mut child = std::process::Command::new("sleep").arg("30").spawn().unwrap();
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
         let pid = child.id();
         let stat = parse_stat(&fs::read_to_string(format!("/proc/{pid}/stat")).unwrap()).unwrap();
         assert!(kill(pid, stat.start_ticks as f64 + 1.0, KillSignal::Term).is_err());
-        assert!(child.try_wait().unwrap().is_none(), "stale start time must not signal");
+        assert!(
+            child.try_wait().unwrap().is_none(),
+            "stale start time must not signal"
+        );
         kill(pid, stat.start_ticks as f64, KillSignal::Kill).unwrap();
         let status = child.wait().unwrap();
         use std::os::unix::process::ExitStatusExt;

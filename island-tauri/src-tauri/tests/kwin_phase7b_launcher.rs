@@ -131,14 +131,15 @@ fn point(s: &Stack, origin: (i32, i32), selector: &str) -> (i32, i32) {
                 return None;
             };
             // Allow subpixel jiggle, not the tens-of-pixels edit/completion reflow.
-            if p["ready"] != true || !previous.0.is_finite()
-                || (x - previous.0).abs() > 2.0 || (y - previous.1).abs() > 2.0
+            if p["ready"] != true
+                || !previous.0.is_finite()
+                || (x - previous.0).abs() > 2.0
+                || (y - previous.1).abs() > 2.0
             {
                 previous = (x, y);
                 since = Instant::now();
             }
-            (p["ready"] == true && since.elapsed() >= Duration::from_millis(250))
-                .then_some((x, y))
+            (p["ready"] == true && since.elapsed() >= Duration::from_millis(250)).then_some((x, y))
         },
     );
     (origin.0 + p.0 as i32, origin.1 + p.1 as i32)
@@ -149,13 +150,18 @@ fn click(s: &Stack, e: &mut Wheel, origin: (i32, i32), selector: &str) {
 }
 /// Pick the current swatch tile with real input and verify the radio selection.
 fn pick_scheme(s: &Stack, e: &mut Wheel, o: (i32, i32), id: &str) {
-    let radio = format!("[role=radiogroup][aria-label='Colour scheme'] [role=radio][data-testid=appearance-{id}]");
+    let radio = format!(
+        "[role=radiogroup][aria-label='Colour scheme'] [role=radio][data-testid=appearance-{id}]"
+    );
     click(s, e, o, &radio);
     until(
         s,
         &format!("7b scheme {id} selected"),
         8,
-        &format!("document.querySelector({})?.getAttribute('aria-checked')==='true'", json!(radio)),
+        &format!(
+            "document.querySelector({})?.getAttribute('aria-checked')==='true'",
+            json!(radio)
+        ),
     );
 }
 /// Select the stable section ID on the Settings rail (ui/views/SettingsView.tsx).

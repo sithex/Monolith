@@ -6,13 +6,13 @@
 //! list changes.
 pub mod core;
 
+use self::core::{Kind, Shelf};
 use crate::{
     bus::Latest,
     contract::apps::{ShelfChanged, ShelfOp, ShelfRow},
     error::IslandError,
     integrations::downloads::Opener,
 };
-use self::core::{Kind, Shelf};
 use std::{
     ffi::OsString,
     fs,

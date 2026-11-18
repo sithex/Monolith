@@ -8,7 +8,6 @@ use hermes_island_lib::{
     error::IslandError,
     integrations::{downloads::Opener, jobs::TransfersService, plasma::companion::CompanionBus},
 };
-use tauri::async_runtime::block_on;
 use std::{
     collections::HashMap,
     ffi::OsString,
@@ -19,6 +18,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
+use tauri::async_runtime::block_on;
 use zbus::{MessageStream, OwnedObjectPath, OwnedVariant, Variant};
 
 const T: Duration = Duration::from_secs(10);
@@ -94,8 +94,7 @@ fn a_kde_copy_reaches_the_card_and_the_notch_in_steps_and_the_job_is_undisturbed
     });
     let companion = block_on(CompanionBus::start_at(&address, None)).unwrap();
     companion.relay_copy_progress(service.progress());
-    let listener = block_on(zbus::connection::Builder::address(address.as_str()).build())
-        .unwrap();
+    let listener = block_on(zbus::connection::Builder::address(address.as_str()).build()).unwrap();
     let mut signals = block_on(MessageStream::for_match_rule(
         "type='signal',interface='local.hermes.Monolith.Transfers',member='CopyProgress'",
         &listener,
@@ -129,8 +128,7 @@ fn a_kde_copy_reaches_the_card_and_the_notch_in_steps_and_the_job_is_undisturbed
     assert_eq!(progress_now(), -1, "no copy yet");
 
     // The client: Dolphin-like requestView, then updates on the returned path.
-    let client = block_on(zbus::connection::Builder::address(address.as_str()).build())
-        .unwrap();
+    let client = block_on(zbus::connection::Builder::address(address.as_str()).build()).unwrap();
     let dest_url = format!("file://{}/movie.mkv", dest.display());
     let reply = block_on(client.call_method(
         Some("org.kde.JobViewServer"),
@@ -183,7 +181,11 @@ fn a_kde_copy_reaches_the_card_and_the_notch_in_steps_and_the_job_is_undisturbed
         "at most one step per 3 s: {:?}",
         stepped_at.duration_since(started_at)
     );
-    assert_eq!(progress_now(), 40, "a late notch can ask for the current step");
+    assert_eq!(
+        progress_now(),
+        40,
+        "a late notch can ask for the current step"
+    );
 
     // Show in folder: the path comes from the job (the file does not exist yet: its folder).
     service.reveal(VIEW).unwrap();
@@ -214,8 +216,7 @@ fn a_kde_copy_reaches_the_card_and_the_notch_in_steps_and_the_job_is_undisturbed
     );
 
     // A client that dies mid-copy leaves no stuck row.
-    let crashing = block_on(zbus::connection::Builder::address(address.as_str()).build())
-        .unwrap();
+    let crashing = block_on(zbus::connection::Builder::address(address.as_str()).build()).unwrap();
     block_on(crashing.call_method(
         Some("org.kde.JobViewServer"),
         "/JobViewServer",

@@ -465,7 +465,9 @@ pub fn sound_id_ok(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && !id.starts_with(['.', '-'])
-        && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
 }
 
 #[allow(clippy::ptr_arg)] // called with the field type by `settings_rule!`

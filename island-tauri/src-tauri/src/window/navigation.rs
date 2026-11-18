@@ -71,6 +71,9 @@ mod tests {
         assert!(!allowed(&url("tauri://localhost/island.html"), &app));
         assert!(!allowed(&url("file:///tmp/x"), &app));
         // A release build ignores a configured dev URL.
-        assert_eq!(app_origin(false, Some(&dev)).unwrap().as_str(), "tauri://localhost");
+        assert_eq!(
+            app_origin(false, Some(&dev)).unwrap().as_str(),
+            "tauri://localhost"
+        );
     }
 }

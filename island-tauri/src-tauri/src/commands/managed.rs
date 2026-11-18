@@ -33,7 +33,9 @@ pub fn missing<T: Subsystem>() -> IslandError {
 }
 
 /// Looks a subsystem up outside a command (host code, the settings path).
-pub fn require<T: Subsystem, R: Runtime>(app: &impl Manager<R>) -> Result<tauri::State<'_, T>, IslandError> {
+pub fn require<T: Subsystem, R: Runtime>(
+    app: &impl Manager<R>,
+) -> Result<tauri::State<'_, T>, IslandError> {
     app.try_state::<T>().ok_or_else(missing::<T>)
 }
 

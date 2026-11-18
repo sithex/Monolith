@@ -5,12 +5,12 @@
 mod db;
 mod log;
 
+use super::read_only_sqlite::open_regular;
 use crate::contract::agent_live::{
     AgentLiveBlock, AgentLiveBlocks, AgentLiveBlocksOp, AgentLiveProc, AgentLiveRaw,
     AgentLiveRequest, AgentLiveSnapshot, HistoryRaw,
 };
 use crate::error::IslandError;
-use super::read_only_sqlite::open_regular;
 use std::{
     fs,
     io::{self, Read, Write},

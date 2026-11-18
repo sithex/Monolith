@@ -1,16 +1,16 @@
 import QtQuick
 
-// A Necron Warrior (Warhammer 40,000), as crisp 1× pixel art: a living-metal skull with a
-// domed crest, deep eye sockets lit by green glow, a ribbed jaw grille and armoured
-// shoulders over a glowing core. The glowing eyes slide inside their sockets toward the
-// pointer.
+// A Necron Warrior (Warhammer 40,000), as crisp 1× pixel art (26 px):
+// a living-metal skull with a domed cranium, sagittal seam, deep eye sockets lit by green Gauss fire,
+// a ribbed jaw grille, hunched shoulder pauldrons, and a glowing green power core in the sternum.
+// The glowing eyes follow the pointer by whole pixels inside their sockets.
 //
-// Hover: the eyes flare and fill their sockets. Idle habit: it raises its gauss flayer
-// toward the pointer's side, charges it and fires a green beam. Dozing: stasis, the glow
-// dims to a low ember at the bottom of each socket.
+// Hover: the eyes flare and fill the sockets with blazing Gauss fire; the chest core flares white-hot.
+// Idle habit: raises its Gauss flayer toward the pointer's side, charges the coils to brilliant emerald/white,
+// and fires a Gauss disintegration beam. Dozing: stasis mode, the glow dims to a faint ember at the bottom of each socket.
 HabitCharacter {
     id: art
-    slotSize: 20 // pre-26 art; drop this line when redrawn
+    slotSize: 26
     gazeScale: 1
     habitFrames: 5
 
@@ -23,92 +23,138 @@ HabitCharacter {
     readonly property bool firing: !happy && habitFrame > 0
 
     readonly property var colors: ({
-        "O": "#121417", "S": "#c9cdd2", "s": "#8d939a", "d": "#5a6068", "k": "#2a2e33",
-        "H": "#eef1f4", "x": "#0b0d0f", "R": "#3b4046",
-        "G": "#5cff7a", "g": "#1fae3e", "e": "#174d26"
+        "O": "#0e1013",
+        "H": "#f0f5fa",
+        "S": "#ccd4de",
+        "s": "#8d97a3",
+        "d": "#57616d",
+        "m": "#373e47",
+        "k": "#1f2329",
+        "x": "#080a0d",
+        "W": "#edfff2",
+        "G": "#46f86e",
+        "g": "#19a83d",
+        "e": "#0f4720"
     })
 
     PixelSprite {
         objectName: "warriorBody"
-        y: 12
         colors: art.colors
         rows: [
-            "........OkkO........",
-            "..OOOOOOkddkOOOOOO..",
-            ".OHSSSsOdkkdOsSSSsO.",
-            "OHSSSsdOkRRkOdsSSsdO",
-            "OSsssdOdkGGkdOdsssdO",
-            ".OOOOOOkRkkRkOOOOOO.",
-            "......OdkRRkdO......",
-            "......OkRkkRkO......"
+            "..........OOOOOO..........",
+            "........OOHSSSSHOO........",
+            "......OHSSSSSSSSSSsO......",
+            ".....OHSSSSssSSSSSSsO.....",
+            "....OOHSSSSssSSSSSSsdOO...",
+            "....OSmxxxxddddxxxxmmSdO..",
+            "....OSsxxxxddddxxxxssSdO..",
+            "....OmsxxxxddddxxxxsmkOO..",
+            "....OkdxxxxkkkkxxxxdkmdO..",
+            "....OsdmdddkkkkddddmsdO...",
+            ".....OsdsskskskskssdsO....",
+            "......OmdkskskskskdmO.....",
+            "..OOOO.OmdsksksksdmO.OOOO.",
+            ".OHSSSO.OkkddddkkO.OSSSsO.",
+            "OHSSSSsO.OkddddkO.OsSSSSdO",
+            "OSSSSSsdOkddddddkOkdSSSSsd",
+            "OSSSSSsdOkdGWWGdkOdSSSSsdO",
+            ".OsdssddkOkGWWGkOkddssdsO.",
+            "..OkkkddkOkkGGkkOkddkkkO..",
+            "...OkdddkOkkddkkOkdddkO...",
+            "....OsdssddddddddssdsO....",
+            "....OkkddddddddddddkO.....",
+            ".....OkkddddddddddkO......",
+            "......OOddddddddOO........",
+            "........OddddddO..........",
+            "..........OOOOOO.........."
         ]
     }
-    PixelSprite {
-        objectName: "warriorHead"
-        x: 3
-        colors: art.colors
-        rows: [
-            "....OOOOOO....",
-            "..OOHSSSSsOO..",
-            ".OHSSSSSSSSsO.",
-            ".OSSSSSSSSSsO.",
-            "OSSSSSSSSSSSsO",
-            "OSxxxxSSxxxxsO",
-            "OSxxxxSSxxxxsO",
-            "OsxxxxSSxxxxdO",
-            ".OsSSSkkSSSdO.",
-            "..OsOSOSOSdO..",
-            "..OdOSOSOSdO..",
-            "...OOOOOOOO..."
-        ]
-    }
-    // Eye glow: a bright slit sliding toward the pointer inside each 4×3 socket.
+
+    // Eye glow: bright 2x2 pupils with glint sliding inside 4x4 sockets.
     Repeater {
-        model: [5, 11]
+        model: [7, 15]
         PixelSprite {
             required property int modelData
             required property int index
             objectName: "companionEye" + index
             readonly property bool flare: art.happy || art.habitFrame === 3 || art.habitFrame === 4
             readonly property bool dim: art.asleep || art.open < 0.5
-            x: modelData + (flare ? 0 : dim ? 1 : 1 + art.eyeX)
-            y: flare ? 5 : dim ? 7 : 6 + art.eyeY
+            x: modelData + (flare ? 0 : dim ? (art.asleep ? 1 : 0) : 1 + art.eyeX)
+            y: flare ? 5 : art.asleep ? 8 : dim ? 6 : 6 + art.eyeY
             colors: art.colors
-            rows: flare ? ["gGGg", "GGGG", "gGGg"] : art.asleep ? ["ee"] : dim ? ["gg"] : ["GG"]
+            rows: flare ? [
+                "gGGg",
+                "GWWG",
+                "GWWG",
+                "gGGg"
+            ] : art.asleep ? ["ee"] : dim ? ["gGGg"] : [
+                "WG",
+                "gG"
+            ]
         }
     }
+
     // The core flares on hover.
     PixelSprite {
         objectName: "hoverMark"
         visible: art.happy
-        x: 8
-        y: 15
+        x: 9
+        y: 16
         colors: art.colors
-        rows: ["GGGG", ".GG."]
+        rows: [
+            "OsWWWWsO",
+            "OGWWWWGO",
+            "OsGGGGsO"
+        ]
     }
 
     // Gauss flayer: drawn aimed right, mirrored for a shot to the left.
     Item {
         objectName: "warriorGauss"
         visible: art.firing
-        width: 20
-        height: 20
-        transform: Scale { origin.x: 10; xScale: art.habitDirection < 0 ? -1 : 1 }
+        width: 26
+        height: 26
+        transform: Scale { origin.x: 13; xScale: art.habitDirection < 0 ? -1 : 1 }
         PixelSprite {
-            x: 7
-            y: 15
+            x: 6
+            y: 19
             colors: art.colors
-            rows: art.habitFrame === 1 ? ["OOOOOOOOOO", "OdssssdkkO", ".OkO.OO..."]
-                : art.habitFrame === 2 || art.habitFrame === 5 ? ["OOOOOOOOOO", "OdgsgsgkkO", ".OkO.OO..."]
-                : ["OOOOOOOOOO", "OdGgGgGkkO", ".OkO.OO..."]
+            rows: art.habitFrame === 1 ? [
+                ".OOOOOOOOOOOO.",
+                "Osdssddssddskd",
+                "Odkkdkkdkkdkmd",
+                ".OOOOOOOOOOOO."
+            ] : art.habitFrame === 2 || art.habitFrame === 5 ? [
+                ".OOOOOOOOOOOO.",
+                "Osdgssgssgsskd",
+                "OdkGdkGdkGdkmd",
+                ".OOOOOOOOOOOO."
+            ] : [
+                ".OOOOOOOOOOOO.",
+                "OsdGWGWGWGWskd",
+                "OdkgGkgGkgGkmd",
+                ".OOOOOOOOOOOO."
+            ]
         }
         PixelSprite {
             objectName: "warriorBeam"
             visible: art.habitFrame === 3 || art.habitFrame === 4
-            x: 16
-            y: 15
+            x: 19
+            y: 18
             colors: art.colors
-            rows: art.habitFrame === 3 ? ["..g.", "GGGg", "..g."] : ["....", ".gg.", "...."]
+            rows: art.habitFrame === 3 ? [
+                ".......",
+                "..gG...",
+                ".......",
+                ".......",
+                "......."
+            ] : [
+                "..g.g..",
+                ".gWGGg.",
+                "gWGGGWG",
+                ".gWGGg.",
+                "..g.g.."
+            ]
         }
     }
 }

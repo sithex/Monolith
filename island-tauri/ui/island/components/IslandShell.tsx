@@ -8,9 +8,12 @@ export const UI_SPRING = { stiffness: 350, damping: 32, mass: 0.8 };
  * Page chrome: back button + title. Back returns to the page you came from
  * (Island keeps the history); on the Hermes home it shows the terminal glyph.
  */
-export function IslandShell({ title, children, intents, home = false, back, actions }: {
+export function IslandShell({ title, children, intents, home = false, back, actions, notice }: {
   title: string; children: ReactNode; intents: IslandIntents; home?: boolean;
   back?: { label: string; go(): void }; actions?: ReactNode;
+  /** A strip under the title row (the open island's notification banner). Under the notch the
+   *  title row rises into the clock bar, so anything placed before the shell would sit under it. */
+  notice?: ReactNode;
 }) {
   const id = useId(), reduced = useReducedMotionAll();
   return <section className="island-shell" aria-labelledby={id}>
@@ -24,6 +27,7 @@ export function IslandShell({ title, children, intents, home = false, back, acti
       <span className="title-spacer" />
       {actions}
     </header>
+    {notice}
     <div className="shell-content">{children}</div>
   </section>;
 }

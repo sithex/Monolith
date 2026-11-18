@@ -32,7 +32,12 @@ function setup(items) {
 test('open placement occupies its own row in the content and renders no card; newest replaces it and counts queued items', () => {
   const island = readFileSync(new URL('../ui/island/Island.tsx', import.meta.url), 'utf8');
   assert.match(island, /!active && <AnimatePresence>\{state.mode === 'hover'/);
-  assert.match(island, /className="terminal-wrap island-content"[^>]+>\s*\{active && <NotchNotifications fail=\{fail\} placement="open"[^>]+>\}\s*<ViewPager/);
+  assert.match(island, /notice=\{active \? <NotchNotifications fail=\{fail\} placement="open"[^>]+> : undefined\}>/);
+  assert.doesNotMatch(island, /className="terminal-wrap island-content"[^>]+>\s*\{active && <NotchNotifications/);
+  // Under the notch the shell's title row rises 42px into the clock bar, so the banner must sit
+  // after the header inside the shell, not before the shell (where the row would cover it).
+  const shell = readFileSync(new URL('../ui/island/components/IslandShell.tsx', import.meta.url), 'utf8');
+  assert.match(shell, /<\/header>\s*\{notice\}\s*<div className="shell-content">/);
   const { render, snapshot } = setup([note('First')]);
   assert.equal(component(render(), 'PlainCard').props.queued, 0);
   snapshot.items = [note('Newest'), ...snapshot.items];

@@ -187,10 +187,10 @@ export function Island() {
       exit={reduced ? { opacity: 0, transition: fadeOnly } : { opacity: 0, scale: 0.96, y: -6, transition: tween(DUR.fast) }}
       style={{ position: 'absolute', top: 42, left: 0, right: 0 }}>{approvalHover.active ? <ApprovalNotice fail={fail} /> : notificationHover.active ? <NotchNotifications fail={fail} placement="hover" {...notificationMute} /> : <PreviewNotice fail={fail} />}</motion.div>}</AnimatePresence>}
     <motion.div ref={wrap} className="terminal-wrap island-content" hidden={!active && !lingering} aria-hidden={!active} inert={!active} style={closing ?? undefined} {...openMotion}>
-      {active && <NotchNotifications fail={fail} placement="open" {...notificationMute} />}
       <ViewPager fail={fail} views={views}>
         <IslandShell title={viewLabels[view]} home={view === 'terminal'} intents={{ navigate: () => navigate('terminal') }} back={{ label: viewLabels[previous], go: goBack }}
-          actions={<>{view === 'launcher' && <LauncherEditButton fail={fail} />}<VoiceControls shown={view === 'terminal'} active={active && view === 'terminal'} fail={fail} /></>}>
+          actions={<>{view === 'launcher' && <LauncherEditButton fail={fail} />}<VoiceControls shown={view === 'terminal'} active={active && view === 'terminal'} fail={fail} /></>}
+           notice={active ? <NotchNotifications fail={fail} placement="open" {...notificationMute} /> : undefined}>
           <div className="view-pane" data-pane={view}>
             <div className="app-pane" hidden={view !== 'launcher'}>{view === 'launcher' && <Launcher navigate={navigate} fail={fail} />}</div>
             <div className="app-pane terminal-pane" hidden={view !== 'terminal'}>

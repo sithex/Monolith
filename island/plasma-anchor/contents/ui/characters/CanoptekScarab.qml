@@ -5,11 +5,12 @@ import QtQuick
 // jointed mechanical legs, a sensor visor with glowing emerald optic tracking the
 // pointer, and razor-sharp feeder mandibles.
 //
-// Tracking: the glowing optic slides left/right/up/down within the dark visor aperture.
+// Tracking: the glowing emerald optic and its aura slide left/right/up/down within
+// the dark visor aperture, with distinct whole-pixel poses for all directions.
 // Hover (hoverMark): the visor flares white-green from end to end, carapace glyphs
 // blaze with white energy, and mandibles spread wide in an aggressive threat display.
 // Idle habit: an authentic robotic skitter on alternating tripod legs with sharp
-// chittering chomps of the mandibles, settling smoothly to rest.
+// chittering scissor-chomps of the mandibles, settling smoothly to rest.
 // Blink: the optic narrows to a sinister slit.
 // Doze / Stasis: legs tuck close under the shell, runes dim to dormant embers.
 HabitCharacter {
@@ -20,7 +21,7 @@ HabitCharacter {
     habitInterval: 125
     habitCooldown: 12000
 
-    readonly property int eyeX: gazePx(gazeX, 0.7, -2, 2)
+    readonly property int eyeX: gazePx(gazeX, 1.2, -3, 3)
     readonly property int eyeY: gazePx(gazeY, 0.8, -1, 1)
     readonly property real open: face ? face.blink * face.lid : 1
     readonly property bool shut: open < 0.45
@@ -35,14 +36,15 @@ HabitCharacter {
         "s": "#7e8896", // Midtone silver plate
         "S": "#bac4d2", // Bright polished silver
         "H": "#f2f6fc", // Specular highlight rim
+        "L": "#96a0b0", // Leg metallic highlight
         "e": "#123a1e", // Stasis dormant green ember
+        "o": "#186e30", // Deep green ambient glow
         "g": "#28d052", // Vibrant Necron glyph green
         "G": "#58ff7a", // Intense green eye optic core
         "W": "#c6ffd4", // Hot white-green energy flare
         "w": "#ffffff", // Pure white glint
         "X": "#080a0e", // Dark sensor visor cavity
-        "x": "#181c24", // Internal chassis joint
-        "L": "#96a0b0"  // Leg metallic highlight
+        "x": "#181c24"  // Internal chassis joint
     })
 
     readonly property var normalBodyRows: [
@@ -78,29 +80,30 @@ HabitCharacter {
         return r.replace(/g/g, "e").replace(/G/g, "e");
     })
 
+    // 3 legs per side: connected, jointed, lighter-grey lines attached to body, angled outward like crawling beetle
     readonly property var restLegRows: [
         "..........................",
-        "..KK..................KK..",
-        ".KLdK................KdSL.",
-        ".KLdK................KdSL.",
-        "KLdK..................KdSL",
-        "KLdK..................KdSL",
-        "KdK....................KdK",
+        "..H....................H..",
+        "..SH..................HS..",
+        ".SS....................SS.",
+        ".SL....................LS.",
+        "..SL..................LS..",
+        "...SL................LS...",
+        "....Sdd..............ddS..",
         "..........................",
-        "KLK....................KLK",
-        "KLSK..................KSLK",
-        ".KdSK................KdSK.",
-        "..KdK................KdK..",
-        "...K..................K...",
-        "..........................",
-        ".KLK..................KLK.",
-        "KLSK..................KSLK",
-        "KdSK..................KdSK",
-        ".KdK..................KdK.",
-        "..KK..................KK..",
+        "H........................H",
+        "SH......................HS",
+        ".SS....................SS.",
+        "..SL...Sdd........ddS.LS..",
         "..........................",
         "..........................",
-        "..........................",
+        ".......Sdd........ddS.....",
+        "..SL..SS............SS.LS.",
+        ".SS....................SS.",
+        ".SL....................LS.",
+        "..SL..................LS..",
+        "..SH..................HS..",
+        "...H..................H...",
         "..........................",
         "..........................",
         "..........................",
@@ -108,28 +111,28 @@ HabitCharacter {
     ]
 
     readonly property var skitterLegsA: [
+        ".H........................",
+        ".SH....................H..",
+        "SS....................HS..",
+        ".SL....................SS.",
+        "..SL...................LS.",
+        "...SL.................LS..",
+        "....Sdd..............ddS..",
         "..........................",
-        "..KK......................",
-        ".KLdK.................KK..",
-        ".KLdK................KdSL.",
-        "KdK..................KdSL.",
-        "......................KdK.",
-        "......................KK..",
-        ".....................KdSL.",
-        "......................KK..",
-        "KLK.......................",
-        "KdSK......................",
-        ".KdK......................",
-        ".....................KLK..",
-        "....................KdSK..",
-        ".....................KdK..",
-        ".KLK..................K...",
-        "KdSK......................",
-        ".KdK......................",
-        "..KK......................",
-        "..........................",
-        "..........................",
-        "..........................",
+        ".........................H",
+        "........................HS",
+        ".......................SS.",
+        ".H......Sdd......ddS..LS..",
+        "SH.....SS..........SS.....",
+        ".SS....Sdd........ddS.....",
+        "..SL...................LS.",
+        "...S..................SS..",
+        "......................LS..",
+        ".SL...................LS..",
+        ".SL...................HS..",
+        "..SL...................H..",
+        "..SH......................",
+        "...H......................",
         "..........................",
         "..........................",
         "..........................",
@@ -137,28 +140,28 @@ HabitCharacter {
     ]
 
     readonly property var skitterLegsB: [
+        "........................H.",
+        "..H....................HS.",
+        ".SH....................SS.",
+        ".SS...................SL..",
+        ".LS..................SL...",
+        "..LS................SL....",
+        "..Sdd..............ddS....",
         "..........................",
-        "......................KK..",
-        "..KK.................KdSL.",
-        ".KLdK................KdSL.",
-        ".KLdK.................KdK.",
-        "..KdK.....................",
-        "..KK......................",
-        ".KLdK.....................",
-        "..KK......................",
-        "......................KLK.",
-        ".....................KdSK.",
-        "......................KdK.",
-        "..KLK.....................",
-        ".KdSK.....................",
-        "..KdK.....................",
-        "...K..................KLK.",
-        ".....................KdSK.",
-        "......................KdK.",
-        "......................KK..",
-        "..........................",
-        "..........................",
-        "..........................",
+        "H.........................",
+        "SH........................",
+        ".SS.......................",
+        "..SL..Sdd......ddS......H.",
+        ".....SS..........SS.....HS",
+        ".....Sdd........ddS....SS.",
+        ".LS...................LS..",
+        "..SS..................S...",
+        "..LS......................",
+        "..LS...................SL.",
+        "..HS...................SL.",
+        "..H...................SL..",
+        "......................HS..",
+        "......................H...",
         "..........................",
         "..........................",
         "..........................",
@@ -170,20 +173,20 @@ HabitCharacter {
         "..........................",
         "..........................",
         "..........................",
-        "....K................K....",
-        "...KLK..............KdSK..",
-        "...KdK..............KdK...",
+        "....H................H....",
+        "...SH................HS...",
+        "...SL................LS...",
+        "...S..................S...",
+        "..........................",
+        "....H................H....",
+        "...SH................HS...",
+        "...SL................LS...",
         "..........................",
         "..........................",
-        "....K................K....",
-        "...KdK..............KdK...",
-        "....K................K....",
-        "..........................",
-        "..........................",
-        "..........................",
-        "....K................K....",
-        "...KdK..............KdK...",
-        "....K................K....",
+        "....H................H....",
+        "...SH................HS...",
+        "...SL................LS...",
+        "...S..................S...",
         "..........................",
         "..........................",
         "..........................",
@@ -194,28 +197,29 @@ HabitCharacter {
         ".........................."
     ]
 
+    // Clear mandibles/pincers at front with lit edge (H/S) reading clearly on near-black
     readonly property var mandiblesOpen: [
-        ".......KsSSK..KsSSK.......",
-        ".......KdssK..KdssK.......",
-        "........KdssKKssddK.......",
-        ".........KdSK.KdSK........",
-        "..........KK...KK........."
+        ".......HSSd....dSSH.......",
+        ".......HSSs....sSSH.......",
+        "........HSSs..sSSH........",
+        ".........HSS..SSH.........",
+        "..........HS..SH.........."
     ]
 
     readonly property var mandiblesChomp: [
-        ".......KsSK....KsSK.......",
-        "........KsSK..KsSK........",
-        ".........KdssssdK.........",
-        "..........KdSSdK..........",
-        "...........KKKK..........."
+        "........HSSd..dSSH........",
+        "........HSSs..sSSH........",
+        ".........HSSssSSH.........",
+        "..........HSSSS...........",
+        "...........HSH............"
     ]
 
     readonly property var mandiblesHover: [
-        "......KsSK......KsSK......",
-        ".....KsSK........KsSK.....",
-        "......KdSK......KdSK......",
-        ".......KK........KK.......",
-        ".........................."
+        "......HSSd......dSSH......",
+        ".....HSSd........dSSH.....",
+        "....HSSd..........dSSH....",
+        "....HSS............SSH....",
+        "...HS................SH..."
     ]
 
     readonly property var hoverMarkRows: [
@@ -247,7 +251,7 @@ HabitCharacter {
         ".........................."
     ]
 
-    // 1. Jointed legs under carapace
+    // 1. Jointed mechanical legs under carapace
     PixelSprite {
         objectName: "scarabLegs"
         colors: art.colors
@@ -261,11 +265,11 @@ HabitCharacter {
         rows: art.sleeping ? art.sleepBodyRows : art.normalBodyRows
     }
 
-    // 3. Sensor optic eye inside visor aperture
+    // 3. Sensor optic eye inside visor aperture with glow halo and whole-pixel tracking
     PixelSprite {
         objectName: "companionEye0"
-        x: art.happy ? 6 : (art.sleeping ? 11 : (art.shut ? 11 : 11 + art.eyeX))
-        y: art.happy ? 15 : (art.sleeping ? 17 : (art.shut ? 16 : 16 + (art.eyeY > 0 ? 1 : art.eyeY < 0 ? -1 : 0)))
+        x: art.happy ? 6 : (art.sleeping ? 12 : (art.shut ? 10 + art.eyeX : 10 + art.eyeX))
+        y: art.happy ? 15 : (art.sleeping ? 16 : (art.shut ? 16 : (art.eyeY > 0 ? 17 : (art.eyeY < 0 ? 15 : 16))))
         colors: art.colors
         rows: art.happy ? [
             "gGGGGGGGGGGGGg",
@@ -274,12 +278,12 @@ HabitCharacter {
         ] : art.sleeping ? [
             "ee"
         ] : art.shut ? [
-            "gGGg"
+            "ogGGgo"
         ] : art.eyeY > 0 ? [
-            "gGwg"
+            "ogGwwgo"
         ] : [
-            "gGwg",
-            "gGGg"
+            "ogGwwgo",
+            "ogGGggo"
         ]
     }
 

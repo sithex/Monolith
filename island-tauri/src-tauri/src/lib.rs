@@ -221,7 +221,11 @@ fn run_app(cli: cli::Cli, force_embedded_ui: bool) -> anyhow::Result<()> {
             cli.ui,
             contract::island::UiKind::Legacy | contract::island::UiKind::Island
         ) {
-        match tauri::async_runtime::block_on(integrations::plasma::anchor::discover()) {
+        // Login can start the island before plasmashell answers: wait (bounded) for it,
+        // because the window, input region and pill are all shaped from this one read.
+        match tauri::async_runtime::block_on(integrations::plasma::anchor::discover_at_startup(
+            integrations::plasma::anchor::STARTUP_WAIT,
+        )) {
             Ok(anchor) => Some(anchor),
             Err(error) => {
                 tracing::info!(%error, "No Plasma anchor; retaining generic below-work-area placement");

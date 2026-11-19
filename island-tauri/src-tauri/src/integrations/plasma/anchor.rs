@@ -277,6 +277,46 @@ pub fn discovery_commands() -> [std::process::Command; 2] {
     ]);
     [outputs, panels]
 }
+/// How long startup waits for a plasmashell that is still loading (login races it).
+pub const STARTUP_WAIT: std::time::Duration = std::time::Duration::from_secs(25);
+/// Pause between startup attempts (each attempt is itself bounded by the 3 s helpers).
+const STARTUP_STEP: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Only a Plasma session is worth waiting for; anywhere else one attempt decides.
+pub fn plasma_session(current_desktop: Option<&str>) -> bool {
+    current_desktop.is_some_and(|d| d.split(':').any(|d| d.eq_ignore_ascii_case("KDE")))
+}
+
+/// Startup discovery: in a Plasma session, retries every failure until `wait` runs out, so
+/// the island never settles on the generic placement (which draws its own pill over the real
+/// notch). Every failure counts: plasmashell first doesn't answer, then answers with its
+/// panels loaded but the notch widget not yet laid out, which looks like "no notch".
+#[cfg(target_os = "linux")]
+pub async fn discover_at_startup(wait: std::time::Duration) -> Result<Anchor, IslandError> {
+    let patient = plasma_session(std::env::var("XDG_CURRENT_DESKTOP").ok().as_deref());
+    let deadline = std::time::Instant::now() + wait;
+    let mut attempts = 1u32;
+    loop {
+        match discover().await {
+            Ok(anchor) => {
+                if attempts > 1 {
+                    tracing::info!(
+                        attempts,
+                        "Plasma anchor found after waiting for plasmashell"
+                    );
+                }
+                return Ok(anchor);
+            }
+            Err(error) if patient && std::time::Instant::now() + STARTUP_STEP < deadline => {
+                tracing::debug!(%error, attempts, "Plasma not ready; retrying anchor discovery");
+                tokio::time::sleep(STARTUP_STEP).await;
+                attempts += 1;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 #[cfg(target_os = "linux")]
 pub async fn discover() -> Result<Anchor, IslandError> {
     tokio::task::spawn_blocking(|| {
@@ -309,6 +349,10 @@ pub async fn discover() -> Result<Anchor, IslandError> {
     .map_err(|_| IslandError::internal("Anchor discovery worker failed"))?
 }
 #[cfg(not(target_os = "linux"))]
+pub async fn discover_at_startup(_wait: std::time::Duration) -> Result<Anchor, IslandError> {
+    discover().await
+}
+#[cfg(not(target_os = "linux"))]
 pub async fn discover() -> Result<Anchor, IslandError> {
     Err(IslandError::unsupported("Plasma discovery requires Linux"))
 }
@@ -317,6 +361,16 @@ pub async fn discover() -> Result<Anchor, IslandError> {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn startup_waits_only_in_a_plasma_session() {
+        assert!(plasma_session(Some("KDE")));
+        assert!(plasma_session(Some("ubuntu:kde")));
+        assert!(!plasma_session(Some("GNOME")));
+        assert!(
+            !plasma_session(None),
+            "no desktop named: one attempt decides"
+        );
+    }
     #[test]
     fn every_monitor_keeps_logical_negative_origins_and_missing_outputs_explicit() {
         let outputs = json!({"outputs":[

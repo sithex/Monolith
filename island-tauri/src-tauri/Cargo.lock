@@ -1474,6 +1474,7 @@ dependencies = [
  "wayland-protocols",
  "wayland-protocols-plasma",
  "wayland-protocols-wlr",
+ "webkit2gtk",
  "wl-clipboard-rs",
  "x11rb",
  "xxhash-rust",

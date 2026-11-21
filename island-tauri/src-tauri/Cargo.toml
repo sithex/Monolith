@@ -77,6 +77,9 @@ wayland-protocols-wlr = { version = "=0.3.12", features = ["client"] }
 gtk-layer-shell = { version = "=0.8.2", features = ["v0_6"] }
 wayland-protocols-plasma = { version = "=0.3.12", features = ["client"] }
 gdkwayland-sys = "0.18"
+# Memory tunables on the island's WebKit view (cache model, page cache, WebGL). Same version and
+# feature set wry already pulls in, so the tree does not change.
+webkit2gtk = { version = "=2.0.2", features = ["v2_40"] }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 wl-clipboard-rs = "=0.9.5"
@@ -99,7 +102,7 @@ debug = "line-tables-only"
 debug = false
 
 [profile.release]
-lto = "thin"
+lto = "fat"
 codegen-units = 1
-strip = "debuginfo"
+strip = true
 panic = "abort"

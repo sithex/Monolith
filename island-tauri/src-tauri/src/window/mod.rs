@@ -194,6 +194,28 @@ fn apply_platform_hooks(
     ))
 }
 
+/// Memory tunables for the island's single, never-navigating page: no back/forward page cache
+/// (there is no history to go back to) and no WebGL outside the spike page (only its renderer
+/// probe calls it). The resource cache model stays the default: `DocumentViewer` measured no
+/// PSS gain (W1) and would drop decoded icons/artwork between views. Hardware acceleration,
+/// WebAudio (click sounds) and media stay as they are.
+#[cfg(target_os = "linux")]
+fn tune_webkit(window: &WebviewWindow, disable_webgl: bool) {
+    let applied = window.with_webview(move |webview| {
+        use webkit2gtk::{SettingsExt, WebViewExt};
+        let view = webview.inner();
+        if let Some(settings) = WebViewExt::settings(&view) {
+            settings.set_enable_page_cache(false);
+            if disable_webgl {
+                settings.set_enable_webgl(false);
+            }
+        }
+    });
+    if let Err(error) = applied {
+        tracing::warn!(%error, "WebKit memory settings were not applied");
+    }
+}
+
 pub fn create_island_window(
     app: &tauri::AppHandle,
     cli: &Cli,
@@ -310,6 +332,9 @@ pub fn create_island_window(
     let window = builder
         .build()
         .map_err(|e| IslandError::internal(format!("window creation failed: {e}")))?;
+
+    #[cfg(target_os = "linux")]
+    tune_webkit(&window, cli.spike.is_none());
 
     apply_platform_hooks(&window, cli.spike.as_ref(), (origin.x, origin.y))?;
 

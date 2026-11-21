@@ -10,6 +10,7 @@ pub mod error;
 pub mod identity;
 pub mod integrations;
 pub mod keyseq;
+pub mod memory;
 pub mod paths;
 pub mod platform;
 pub mod services;
@@ -470,6 +471,7 @@ fn shutdown_steps(handle: &tauri::AppHandle) {
 const SHUTDOWN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub fn run() -> ExitCode {
+    memory::limit_malloc_arenas();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     // `scripts/deploy-ui.sh` asks a binary which UI contract it was built with.
     if args == [ui_assets::PRINT_CONTRACT_FLAG] {
@@ -484,6 +486,7 @@ pub fn run() -> ExitCode {
         )
         .with_writer(std::io::stderr)
         .init();
+    memory::install_async_runtime();
     if let Some(request) = cli_notify::parse(&args) {
         return match request.and_then(cli_notify::send) {
             Ok(reply) => {

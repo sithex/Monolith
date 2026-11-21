@@ -49,6 +49,10 @@ pub trait ProbeHost: Send + Sync + 'static {
     fn eval(&self, script: &str) -> Result<(), IslandError>;
     /// `{pid, running, seq}` — from Rust, never terminal data.
     fn terminal(&self) -> Value;
+    /// Re-place the overlay window at a new size (production host only).
+    fn resize(&self, _width: u32, _height: u32) -> Value {
+        json!({"ok": false, "error": "resize is not supported by this host"})
+    }
 }
 
 type Reply = Result<String, String>;
@@ -275,6 +279,13 @@ fn handle(line: &[u8], inner: &Inner, host: &dyn ProbeHost, stop: &AtomicBool) -
                 .clamp(50, 60_000);
             eval(inner, host, stop, js, Duration::from_millis(timeout))
         }
+        Some("resize") => {
+            let size = |key: &str| request[key].as_u64().and_then(|v| u32::try_from(v).ok());
+            match (size("width"), size("height")) {
+                (Some(width), Some(height)) if width > 0 && height > 0 => host.resize(width, height),
+                _ => fail("resize needs positive integer `width` and `height`"),
+            }
+        }
         Some(other) => fail(format!("unknown op `{other}`")),
         None => fail("missing `op`"),
     }
@@ -368,6 +379,18 @@ impl ProbeHost for AppProbeHost {
             "peakUnackedBytes": flow.peak_unacked_bytes,
             "pausedReads": flow.paused_reads, "resumedReads": flow.resumed_reads,
             "readBytes": flow.read_bytes})
+    }
+
+    fn resize(&self, width: u32, height: u32) -> Value {
+        #[cfg(target_os = "linux")]
+        let result =
+            crate::integrations::plasma::runtime::resize_overlay_for_test(&self.app, width, height);
+        #[cfg(not(target_os = "linux"))]
+        let result: anyhow::Result<Value> = Err(anyhow::anyhow!("resize is Linux-only"));
+        match result {
+            Ok(bounds) => json!({"ok": true, "bounds": bounds}),
+            Err(error) => json!({"ok": false, "error": format!("{error:#}")}),
+        }
     }
 }
 

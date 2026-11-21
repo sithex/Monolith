@@ -241,7 +241,15 @@ export function createGeometryReporter(outer: HTMLElement, current: () => Island
   window.addEventListener('resize', resize); window.addEventListener('island-surfaces-changed', resize);
   schedule();
   const whenApplied = (callback: () => void) => { waiters.push(callback); release(); };
-  return { schedule, whenApplied, dispose() {
+  // Measure and place the side buttons now, in the current frame (a relocation moved the shell
+  // synchronously; a scheduled flush would draw the buttons one frame behind it).
+  const flushNow = (complete?: boolean) => {
+    if (disposed) return;
+    if (complete !== undefined) settled = complete;
+    if (frame !== null) cancelAnimationFrame(frame);
+    flush();
+  };
+  return { schedule, flushNow, whenApplied, dispose() {
     disposed = true; pending = null; waiters = [];
 
     if (glideTimer) clearTimeout(glideTimer);

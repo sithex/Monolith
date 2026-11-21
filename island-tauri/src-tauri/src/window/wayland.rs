@@ -118,6 +118,9 @@ pub struct WaylandSurface {
     blur_manager: Option<OrgKdeKwinBlurManager>,
     blur: Option<OrgKdeKwinBlur>,
     scale: i32,
+    /// A relocation is waiting for the page's first frame at the new geometry: no commit
+    /// may show the new position/size with the old content (see `hold`).
+    held: bool,
     // Keeps the private queue (and so `qh`) alive.
     _queue: wayland_client::EventQueue<Globals>,
 }
@@ -185,6 +188,7 @@ impl WaylandSurface {
             blur_manager,
             blur: None,
             scale: window.scale_factor().max(1),
+            held: false,
             _queue: queue,
         })
     }
@@ -208,10 +212,48 @@ impl WaylandSurface {
         let id = unsafe { ObjectId::from_ptr(WlSurface::interface(), raw.cast()) }
             .map_err(|_| IslandError::unavailable("invalid transferred surface"))?;
         if id != self.surface.id() {
+            let held = self.held;
             *self = Self::new(window)?;
+            self.held = held;
         }
         self.scale = window.scale_factor().max(1);
         Ok(())
+    }
+
+    /// Commit region changes now, unless a relocation holds the surface: then GTK's next
+    /// paint commits them together with the new geometry and the matching content.
+    fn commit(&self) {
+        if !self.held {
+            self.surface.commit();
+        }
+    }
+
+    /// Hold every commit of a relocation (new layer-shell margins/size, regions) until the
+    /// page has drawn its content for the new geometry. Committing earlier shows the moved or
+    /// resized window with the old content for a few frames: the island and its side buttons
+    /// jump by the window's move and back. GTK paints are frozen too (a GTK paint commits).
+    pub fn hold(&mut self, window: &gtk::ApplicationWindow) {
+        if !self.held {
+            if let Some(gdk_window) = window.window() {
+                gdk_window.freeze_updates();
+                self.held = true;
+            }
+        }
+    }
+
+    /// End a `hold`: GTK paints the latest page frame and commits it with the geometry.
+    pub fn release(&mut self, window: &gtk::ApplicationWindow) {
+        if self.held {
+            self.held = false;
+            if let Some(gdk_window) = window.window() {
+                gdk_window.thaw_updates();
+            }
+            window.queue_draw();
+        }
+    }
+
+    pub fn held(&self) -> bool {
+        self.held
     }
 
     fn region(&self, rows: &[ShapeRow]) -> WlRegion {
@@ -228,7 +270,7 @@ impl WaylandSurface {
         let region = self.region(rows);
         self.surface.set_input_region(Some(&region));
         region.destroy();
-        self.surface.commit();
+        self.commit();
         self.flush()
     }
 
@@ -239,7 +281,7 @@ impl WaylandSurface {
             let region = self.region(rows);
             effect.set_blur_region(Some(&region));
             region.destroy();
-            self.surface.commit();
+            self.commit();
             return self.flush();
         }
         let Some(manager) = &self.blur_manager else {
@@ -264,7 +306,7 @@ impl WaylandSurface {
             blur.commit();
             region.destroy();
         }
-        self.surface.commit();
+        self.commit();
         self.flush()
     }
 

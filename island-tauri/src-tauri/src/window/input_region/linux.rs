@@ -21,6 +21,54 @@ use x11rb::{
 
 const MAIN_THREAD_TIMEOUT: Duration = Duration::from_secs(2);
 
+/// Upper bound for a relocation hold (`hold_until_drawn`): a page that never answers (hung,
+/// reloading) must not freeze the window.
+const HOLD_LIMIT: Duration = Duration::from_millis(250);
+/// Resolves once the queued notch rect is applied (`native_pill_script`) and the page has
+/// rendered with it. Three frames, not two: the second rAF can fire within the same vsync as the
+/// first (measured releases at 12-15 ms), and the UI process can then still hold the previous
+/// frame, which shows the old content at the new geometry for one frame.
+const PAGE_DRAWN: &str = "return (window.__islandPillApplied||Promise.resolve()).then(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(true))))))";
+static HOLD: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Release the surface held by a relocation once the page has drawn the new geometry (or after
+/// `HOLD_LIMIT`). Only the newest hold releases: an older answer arriving late is ignored.
+fn hold_until_drawn(
+    window: &WebviewWindow,
+    surface: std::sync::Arc<std::sync::Mutex<crate::window::wayland::WaylandSurface>>,
+) {
+    use std::sync::atomic::Ordering;
+    let generation = HOLD.fetch_add(1, Ordering::SeqCst) + 1;
+    let started = std::time::Instant::now();
+    let release = {
+        let window = window.clone();
+        move |why: &'static str| {
+            if HOLD.load(Ordering::SeqCst) != generation {
+                return;
+            }
+            if let (Ok(gtk), Ok(mut surface)) = (window.gtk_window(), surface.lock()) {
+                if surface.held() {
+                    tracing::debug!("relocation hold released by {why} after {:?}", started.elapsed());
+                }
+                surface.release(&gtk);
+            }
+        }
+    };
+    let fallback = release.clone();
+    glib::timeout_add_local_once(HOLD_LIMIT, move || fallback("limit"));
+    let _ = window.with_webview(move |webview| {
+        use webkit2gtk::WebViewExt;
+        webview.inner().call_async_javascript_function(
+            PAGE_DRAWN,
+            None,
+            None,
+            None,
+            None::<&webkit2gtk::gio::Cancellable>,
+            move |_| release("page"),
+        );
+    });
+}
+
 /// KWin's blur-behind property (SPEC §0.5 (3)): CARDINAL[4n] = n window-relative rectangles
 /// `x, y, w, h`. An *empty* property would mean "blur the whole window", so an empty region
 /// is expressed by deleting the property instead.
@@ -140,11 +188,27 @@ impl PlatformBackend {
                             ));
                         }
                         LayerShell::set_monitor(&gtk, &monitor);
-                        gtk.set_layer_shell_margin(Edge::Left, target.x - area.x());
-                        gtk.set_layer_shell_margin(
-                            Edge::Top,
+                        let (left, top) = (
+                            target.x - area.x(),
                             target.y - area.y() - crate::window::wayland::TOP_BLEED,
                         );
+                        // Moving or resizing: hold every commit until the page has drawn its
+                        // content for the new geometry, so the move and the content land in
+                        // one frame (never the old content at the new place).
+                        if (
+                            gtk.layer_shell_margin(Edge::Left),
+                            gtk.layer_shell_margin(Edge::Top),
+                        ) != (left, top)
+                            || gtk.size() != (target.width as i32, target.height as i32)
+                        {
+                            surface
+                                .lock()
+                                .map_err(|_| IslandError::internal("surface lock poisoned"))?
+                                .hold(&gtk);
+                            hold_until_drawn(&window, surface.clone());
+                        }
+                        gtk.set_layer_shell_margin(Edge::Left, left);
+                        gtk.set_layer_shell_margin(Edge::Top, top);
                         gtk.resize(target.width as i32, target.height as i32);
                         surface
                             .lock()

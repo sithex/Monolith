@@ -244,9 +244,39 @@ fn select_monitor_anchor(
 }
 
 fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
-    use crate::window::{placement::over_panel, ISLAND_OVERLAY_HEIGHT, ISLAND_OVERLAY_WIDTH};
-    let target = over_panel(anchor, ISLAND_OVERLAY_WIDTH, ISLAND_OVERLAY_HEIGHT)?;
+    use crate::window::{ISLAND_OVERLAY_HEIGHT, ISLAND_OVERLAY_WIDTH};
+    relocate_sized(app, anchor, ISLAND_OVERLAY_WIDTH, ISLAND_OVERLAY_HEIGHT)
+}
+
+/// Test hook (test instances only): re-place the overlay at `width`×`height` over the startup
+/// anchor, the same path a monitor switch takes. Used to prove a runtime resize keeps the
+/// island at the identical screen position with no blank frame.
+pub fn resize_overlay_for_test(app: &tauri::AppHandle, width: u32, height: u32) -> Result<Value> {
+    let anchor = app
+        .try_state::<super::anchor::PlasmaAnchor>()
+        .and_then(|a| a.0.clone())
+        .filter(|a| a.native)
+        .context("No native anchor")?;
+    relocate_sized(app, &anchor, width, height)
+}
+
+fn relocate_sized(
+    app: &tauri::AppHandle,
+    anchor: &Anchor,
+    width: u32,
+    height: u32,
+) -> Result<Value> {
+    use crate::window::placement::over_panel;
+    let target = over_panel(anchor, width, height)?;
     let runtime = app.state::<IslandRuntime>();
+    let window = app
+        .get_webview_window(ISLAND_LABEL)
+        .context("Missing island window")?;
+    let previous = *runtime
+        .placement
+        .lock()
+        .map_err(|_| anyhow::anyhow!("Placement poisoned"))?;
+    let resized = (previous.2, previous.3) != (f64::from(target.width), f64::from(target.height));
     // The Wayland surface starts TOP_BLEED px above `target` (window/wayland.rs).
     #[cfg(target_os = "linux")]
     let bleed = if runtime.wayland {
@@ -263,6 +293,12 @@ fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
         height: anchor.pill.height,
         radius: anchor.pill_radius,
     };
+    // A resize changes the window's coordinates under the shell: queue the new notch rect
+    // before the resize so the page applies it with the first frame at the new size.
+    let script = |resize| crate::window::native_pill_script(&pill, Some(&anchor.output), resize);
+    if resized {
+        window.eval(script(Some((target.width, target.height))))?;
+    }
     {
         let mut controller = runtime
             .region
@@ -289,13 +325,9 @@ fn relocate(app: &tauri::AppHandle, anchor: &Anchor) -> Result<Value> {
         .native_output
         .lock()
         .map_err(|_| anyhow::anyhow!("Native output poisoned"))? = Some(anchor.output.clone());
-    let window = app
-        .get_webview_window(ISLAND_LABEL)
-        .context("Missing island window")?;
-    window.eval(crate::window::native_pill_script(
-        &pill,
-        Some(&anchor.output),
-    ))?;
+    if !resized {
+        window.eval(script(None))?;
+    }
     Ok(json!({"x":target.x,"y":target.y,"width":target.width,"height":target.height}))
 }
 

@@ -45,11 +45,31 @@ export function IslandSurface({ children, fail, paletteOpen = false, confirmingM
   const [viewport, setViewport] = useState({ width: innerWidth, height: innerHeight });
   // Rust moves `--native-pill-*` when the notch is resized (Settings → Notch → Width).
   const [, setPillRev] = useState(0);
+  // The notch as the shell's position last aimed at it (window px). A relocation (monitor
+  // switch, panel docked/floated, or the window resized around the notch) moves the window,
+  // so the same screen spot gets new window coordinates.
+  const aimedPill = useRef(pill);
   useLayoutEffect(() => {
-    const moved = () => setPillRev(n => n + 1);
+    // Carry the drawn shell (and, through the reporter, its side buttons) with the notch in the
+    // same frame, so it stays put on screen; only what is left of a running morph still
+    // animates. Springing it instead drew the island and its buttons at the old window
+    // coordinates, sliding back for ~0.3 s after every relocation that moved the window.
+    const moved = () => {
+      const now = nativePill(), was = aimedPill.current, root = outer.current;
+      aimedPill.current = now;
+      const dx = now && was ? now.x + now.width / 2 - (was.x + was.width / 2) : 0, dy = now && was ? now.y - was.y : 0;
+      const l = parseFloat(root?.style.left ?? ''), t = parseFloat(root?.style.top ?? '');
+      if (root && (dx || dy) && Number.isFinite(l) && Number.isFinite(t)) {
+        if (animating.current) animation.stop();
+        root.style.left = `${l + dx}px`; root.style.top = `${t + dy}px`;
+        animation.set({ left: l + dx, top: t + dy });
+        owner.current?.flushNow(!animating.current);
+      }
+      setPillRev(n => n + 1);
+    };
     addEventListener('island-native-pill', moved);
     return () => removeEventListener('island-native-pill', moved);
-  }, []);
+  }, [animation]);
   const visible = visibleLayout(layout.layout, launcher.items.filter(i => i.enabled && i.known && i.view).map(i => i.view!));
   const liveLayout = useRef(visible);
   useLayoutEffect(() => {

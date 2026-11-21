@@ -87,10 +87,22 @@ fn native_output_js(output: Option<&str>) -> String {
         None => "delete document.documentElement.dataset.nativePillOutput;".into(),
     }
 }
-pub fn native_pill_script(pill: &RoundedRect, output: Option<&str>) -> String {
+/// Publishes the notch rect (window px) to the page and makes it re-measure. `resized` is the
+/// window's new logical size when this relocation also resizes the window: the page then holds
+/// the new rect until its viewport reports that size (500 ms fallback), so the shell moves in
+/// the same frame as the window instead of one frame early or late. Send it before the resize.
+pub fn native_pill_script(
+    pill: &RoundedRect,
+    output: Option<&str>,
+    resized: Option<(u32, u32)>,
+) -> String {
     let values = serde_json::json!({ "x":pill.x,"y":pill.y,"width":pill.width,"height":pill.height,"radius":pill.radius });
     let output = native_output_js(output);
-    format!("(()=>{{const v={values};for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');{output}window.dispatchEvent(new Event('island-native-pill'));window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('island-surfaces-changed'));}})()")
+    let want = match resized {
+        Some((w, h)) => format!("[{w},{h}]"),
+        None => "null".into(),
+    };
+    format!("(()=>{{const v={values};let res;window.__islandPillApplied=new Promise(r=>res=r);const apply=()=>{{for(const [k,x] of Object.entries(v))document.documentElement.style.setProperty('--native-pill-'+k,x+'px');{output}window.dispatchEvent(new Event('island-native-pill'));window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('island-surfaces-changed'));res();}};const want={want};window.__islandPillPending?.cancel();window.__islandPillPending=null;if(!want||(innerWidth===want[0]&&innerHeight===want[1])){{apply();return;}}let done=false;const stop=()=>{{done=true;removeEventListener('resize',on,true);clearTimeout(timer);if(window.__islandPillPending===pending)window.__islandPillPending=null;}};const on=()=>{{if(!done&&innerWidth===want[0]&&innerHeight===want[1]){{stop();apply();}}}};const timer=setTimeout(()=>{{if(!done){{stop();apply();}}}},500);const pending={{cancel(){{if(!done)stop();}}}};window.__islandPillPending=pending;addEventListener('resize',on,true);}})()")
 }
 
 /// The page the window loads for `--ui` (`harness` is `index.html` from the config).
@@ -323,7 +335,7 @@ pub fn create_island_window(
             let current = runtime.native_pill.lock().ok().and_then(|pill| *pill);
             let output = runtime.native_output.lock().ok().and_then(|o| o.clone());
             if let Some(pill) = current {
-                if let Err(error) = window.eval(native_pill_script(&pill, output.as_deref())) {
+                if let Err(error) = window.eval(native_pill_script(&pill, output.as_deref(), None)) {
                     tracing::warn!(%error, "Could not re-apply the notch position after a page load");
                 }
             }
@@ -405,6 +417,7 @@ mod tests {
                 radius: 16.0,
             },
             Some("DP-1"),
+            None,
         );
         assert!(
             script.contains("dataset.nativePillOutput=\"DP-1\""),
@@ -418,6 +431,7 @@ mod tests {
                 height: 1.,
                 radius: 0.
             },
+            None,
             None
         )
         .contains("delete document.documentElement.dataset.nativePillOutput"));
@@ -437,6 +451,25 @@ mod tests {
         for event in ["island-native-pill", "resize", "island-surfaces-changed"] {
             assert!(script.contains(&format!("new Event('{event}')")));
         }
+        // Same size: applied at once. A resize: held until the viewport has the new size.
+        assert!(script.contains("const want=null;"), "{script}");
+        let pill = RoundedRect {
+            x: 1.,
+            y: 2.,
+            width: 3.,
+            height: 4.,
+            radius: 1.,
+        };
+        let held = native_pill_script(&pill, None, Some((1070, 1010)));
+        assert!(held.contains("const want=[1070,1010];"), "{held}");
+        assert!(
+            held.contains("addEventListener('resize',on,true)"),
+            "{held}"
+        );
+        assert!(
+            held.contains("innerWidth===want[0]&&innerHeight===want[1]"),
+            "{held}"
+        );
     }
 
     #[test]

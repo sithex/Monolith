@@ -33,11 +33,14 @@ use std::{
 };
 use tokio::sync::watch;
 
+/// Short and unique (pid + counter): fixtures bind Unix sockets inside this dir, and a socket
+/// path over 108 bytes fails to bind, so a long TMPDIR must still leave room.
 fn scratch(name: &str) -> PathBuf {
+    static NEXT: AtomicU32 = AtomicU32::new(0);
     let dir = std::env::temp_dir().join(format!(
-        "hi-failsafes-{name}-{}-{:?}",
+        "hi-fs-{name}-{}-{}",
         std::process::id(),
-        Instant::now()
+        NEXT.fetch_add(1, Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&dir).unwrap();
     dir

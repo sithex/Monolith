@@ -34,3 +34,7 @@ island/evidence/
 island-tauri/evidence/
 test-results/
 __pycache__/
+
+# Claude Code context notes kit: per-session state
+.claude/session-notes/
+.claude/hooks/.state/
